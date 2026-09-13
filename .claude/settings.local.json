@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /Users/90Amr/Projects/employee-attendance-system-2/app -type f | sort; echo \"---components---\"; find /Users/90Amr/Projects/employee-attendance-system-2/components -type f | sort)",
+      "Read(//Users/90Amr/Projects/employee-attendance-system-2/app/**)",
+      "Read(//Users/90Amr/Projects/employee-attendance-system-2/components/**)"
+    ]
+  }
+}

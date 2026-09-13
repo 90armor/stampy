@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Geist Sans (self-hosted variable font) — primary UI typeface. Inter (linked
+   in layouts/app.blade.php) and the system stack stay as fallbacks in
+   tailwind.config.js if this fails to load. */
+@font-face {
+    font-family: 'Geist';
+    src: url('../../node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2') format('woff2-variations'),
+         url('../../node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2') format('woff2');
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+}
+
+[x-cloak] {
+    display: none !important;
+}
+
+/* Chrome/Edge paint autofilled inputs with their own white/lavender UA
+   background that plain `bg-*` utilities can't override. The inset
+   box-shadow trick paints our own surface color over it instead. */
+:root {
+    --input-bg: #ffffff;
+    --input-text: #1c1917;
+}
+.dark {
+    --input-bg: #292524;
+    --input-text: #f5f5f4;
+}
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+    box-shadow: 0 0 0 1000px var(--input-bg) inset;
+    -webkit-text-fill-color: var(--input-text);
+    caret-color: var(--input-text);
+    transition: background-color 9999s ease-in-out 0s;
+}
+
+/* Soft decorative backdrop behind the app shell / auth screen — pairs with the
+   glass (translucent + backdrop-blur) surfaces on cards, sidebar, and topbar. */
+.bg-shell {
+    background-image:
+        radial-gradient(circle at 12% 8%, rgba(175, 240, 209, 0.35), transparent 32%),
+        radial-gradient(circle at 88% 18%, rgba(185, 217, 200, 0.3), transparent 28%);
+    background-attachment: fixed;
+}
+.dark .bg-shell {
+    background-image:
+        radial-gradient(circle at 12% 8%, rgba(20, 97, 68, 0.25), transparent 32%),
+        radial-gradient(circle at 88% 18%, rgba(30, 66, 50, 0.35), transparent 28%);
+}

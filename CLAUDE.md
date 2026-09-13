@@ -1,0 +1,179 @@
+# Attendance Management System
+
+Internal HR tool for managing employee attendance, leave, and overtime. Built as a Laravel monolith across 5 phases. This document is the source of truth for tech stack decisions, schema, conventions, and roadmap — keep it updated as each phase lands.
+
+## Tech stack (fixed — do not substitute)
+
+- **Laravel 13** (monolith, no separate API/SPA split)
+- **Laravel Breeze** — Blade + Alpine.js stack (auth scaffolding: login, register, password reset, email verification, profile)
+- **Livewire 3** — all interactive server-rendered components (pinned to `^3.0`; do not upgrade to Livewire 4 without a deliberate decision)
+- **MySQL** — primary datastore
+- **spatie/laravel-permission** — roles (no granular permissions used yet in Phase 1, just roles)
+- **Tailwind CSS** (via Breeze) — utility-first styling, no component library
+
+Why: Breeze+Blade avoids standing up a separate frontend/API for what is an internal, low-traffic HR tool. Livewire gives interactivity (search, filters, modals, inline validation) without hand-rolling JSON endpoints or a JS framework. Spatie's package is the de facto standard for Laravel RBAC and plays cleanly with route middleware and policies.
+
+## Local environment
+
+- PHP 8.5, Composer 2.10, MySQL 9.4 (Homebrew), Node/npm for Vite asset builds.
+- Database: `attendance_system` (MySQL). `.env` / `.env.example` are pre-configured for `DB_CONNECTION=mysql`.
+- Run `php artisan migrate:fresh --seed` to reset and reseed. Seeded accounts (all password `password`, **change after first login**):
+  - `admin@example.com` — admin
+  - `aye.aye.mon@example.com` — manager (Engineering)
+  - `kyaw.kyaw.naing@example.com` — employee (Engineering)
+  - `zaw.zaw.htet@example.com` — manager (Operations)
+  - (Su Su Hlaing and Thida Win are seeded as employee records with no login account, to exercise the "employee without a user account" case.)
+
+## Design system
+
+One primary color, one accent color, one font, a small set of reusable Blade components — with full light/dark support. Apply these everywhere — don't introduce one-off styles. This look (evergreen/mint palette, sidebar + topbar shell, dark mode) was deliberately aligned with a reference UI prototype (`employee-attendance-system-2`, a Next.js/shadcn mockup called "Northstar") that is **not** part of this codebase's stack — it was used only as a visual reference, then re-implemented natively in Blade/Tailwind.
+
+- **Font:** Inter for interface copy, loaded via Bunny Fonts (`fonts.bunny.net`) — set as the Tailwind `sans` default in `tailwind.config.js`. DM Serif Display (also via Bunny Fonts) is used as a single editorial accent — currently only the italicized word in the auth hero headline (`font-serif` utility) — never for body or UI copy.
+- **Primary color:** deep evergreen, defined as the `primary` color scale in `tailwind.config.js` (50–900). Use `primary-600`/`primary-700` for buttons/links, `primary-50`/`primary-100` for tints and active-state backgrounds.
+- **Accent color:** mint, defined as the `accent` color scale (50–900). Used for icon badges, the brand mark, and highlight text (e.g. the auth hero) — not for primary actions.
+- **Neutrals:** the `slate` scale name is kept for continuity but its hex values are overridden in `tailwind.config.js` to a **warm** palette (equivalent to Tailwind's stock `stone` scale) instead of stock cool-toned slate — matches the warm cream/oklch neutrals in the Northstar reference. `slate-50` page background / `slate-950` in dark mode, `white`/`slate-900` cards, glass sidebar/topbar (see below).
+- **Glass surfaces:** sidebar, topbar, cards (`x-card`), the dropdown menu, and auth-page inputs/theme-toggle are translucent + blurred (`bg-white/70 backdrop-blur-xl dark:bg-slate-900/60` pattern, opacity varies slightly by surface) rather than solid — this is a deliberate glassmorphism look, not a stray utility. Pair every glass surface with a soft decorative backdrop: the `.bg-shell` utility (`resources/css/app.css`) adds two subtle mint/evergreen radial gradients behind `app.blade.php`'s `<body>` and `guest.blade.php`'s outer wrapper so the blur has something to pick up. Apply `.bg-shell` to any new full-page layout.
+- **Dark mode:** class-based (`darkMode: 'class'` in `tailwind.config.js`), toggled by adding/removing `.dark` on `<html>`. A small inline script in each layout's `<head>` (`app.blade.php`, `guest.blade.php`) applies the stored `localStorage.theme` (or system preference) before paint to avoid a flash of the wrong theme. The toggle button in the topbar and on the auth pages flips the class and persists the choice. Every new component must carry a `dark:` variant — check contrast for text, borders, inputs, and hover states, not just backgrounds.
+- **Cards:** `bg-white/70 backdrop-blur-xl rounded-lg shadow-sm ring-1 ring-slate-200/60 hover:ring-primary-200/60 dark:bg-slate-900/60 dark:ring-slate-800/70` (see `x-card`) — glass, no heavy borders, subtle primary-tinted ring on hover.
+- **Tables:** `divide-y divide-slate-100 dark:divide-slate-800`, `hover:bg-slate-50 dark:hover:bg-slate-800/60` rows, generous cell padding (`px-6 py-4`), uppercase `text-xs` column headers.
+- **Forms:** label above input (`x-input-label`, `mb-1`), `rounded-lg border-slate-300`, glass background (`bg-white/80 backdrop-blur-sm dark:bg-slate-800/70`), `focus:ring-primary-500` focus rings, red inline errors below the field (`x-input-error`).
+- **Empty states:** icon in a soft circular badge + one-line title + optional description + action button (`x-empty-state`).
+- **Icons:** Heroicons (outline, 24x24, stroke-width 1.5), inlined via the single `x-icon` component (`resources/views/components/icon.blade.php`) rather than a JS icon library — add new icons there as `match()` cases.
+- **App shell:** fixed sidebar (`layouts/partials/sidebar.blade.php`, `w-[242px]`, light glass surface, evergreen/primary-tinted active state — not a dark panel) + sticky glass topbar with a breadcrumb-style page title and dark-mode toggle (`layouts/partials/topbar.blade.php`). Sidebar nav items for features not yet built (Attendance, Time off, Reports) are rendered disabled with a "Soon" badge rather than omitted, so the roadmap is visible without linking anywhere — flip an item to a real link only when that phase actually ships. Auth pages (`layouts/guest.blade.php`) use a split-screen layout: an evergreen hero panel (hidden below `lg`) plus the glass form panel.
+
+Reusable UI lives in `resources/views/components/`: `button.blade.php` (variants: `primary`, `secondary`, `danger`), `card.blade.php`, `badge.blade.php` (colors: `primary`, `green`, `red`, `amber`, `slate`), `empty-state.blade.php`, `icon.blade.php`, `confirm-dialog.blade.php`, `textarea.blade.php`, plus Breeze's `text-input`, `input-label`, `input-error` (restyled to match this system). Breeze's `primary-button`/`secondary-button` delegate to `x-button` so auth pages and app pages share one look.
+
+**Alpine note:** any element using a bare `@click`/`x-show`/etc. with no `x-data` anywhere in its ancestor chain silently gets no directive binding at all (confirmed empirically on this Alpine 3.17 setup — it isn't just an edge case). Add `x-data="{}"` directly on any standalone interactive element that isn't already nested inside a component with its own `x-data` (e.g. the dark-mode toggle buttons).
+
+## Naming conventions
+
+- **Tables/migrations:** snake_case, plural table names, one migration file per table, named `create_{table}_table`.
+- **Models:** singular StudCase (`Employee`, `Department`), relationships as standard Eloquent methods (`department()`, `employees()`).
+- **Livewire components:** namespaced by feature under `App\Livewire\{Feature}\{Action}`, e.g. `App\Livewire\Employees\Index`, `App\Livewire\Employees\Form`. Matching views under `resources/views/livewire/{feature}/{action}.blade.php` (kebab-case). A single `Form` component handles both create and edit (mounted with an optional model for edit).
+- **Policies:** `app/Policies/{Model}Policy.php`, auto-discovered by Laravel's naming convention (no manual registration needed).
+- **Routes:** RESTful names (`employees.index`, `organization.index`), grouped by role-based middleware in `routes/web.php`.
+- **Gates:** feature-level gates (`manage-employees`, `manage-departments`) defined in `AppServiceProvider::boot()` for cases broader than a single model policy; per-model authorization goes through Policies.
+
+## Coding conventions
+
+- **Validation:** Livewire components validate via `rules()` (or `#[Validate]` attributes) — never trust unvalidated `wire:model` input. No Form Requests are used yet since all Phase 1 writes go through Livewire; introduce Form Requests only if/when plain controllers start handling validated input (e.g. a future API).
+- **Authorization:** every Livewire component that manages a resource calls `$this->authorize(...)` in `mount()` for page-level checks and again in the specific action method (e.g. `deactivate()`, `save()`, `delete()`) before mutating. Route groups also carry `role:` middleware as a second layer of defense (see `routes/web.php`).
+- **Soft deletes:** `Employee` uses `SoftDeletes` — "deactivate" in the UI sets `status = inactive` and soft-deletes the row. Departments have no soft deletes; a department with employees assigned cannot be deleted (guarded in `Departments\Index::delete()`).
+- **User/HR data split:** `users` is auth-only (name, email, password). All HR data lives on `employees`, linked via nullable `employees.user_id` — an employee may exist with no login (not yet onboarded to self-service), and a `User` always optionally has one `Employee` profile.
+- **Tests:** `tests/Feature` uses Livewire's `Livewire::test()` harness against components directly (mount/call/assert) for business logic, and plain HTTP tests (`$this->get(...)->assertForbidden()`) for route-level role gating, since Livewire's test harness converts `AuthorizationException` into a response rather than letting it bubble as a PHP exception.
+
+## Database schema
+
+### Phase 1 (built)
+
+**`departments`**
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint PK | |
+| name | string | |
+| description | text, nullable | |
+| timestamps | | |
+
+**`positions`**
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint PK | |
+| name | string | |
+| description | text, nullable | |
+| timestamps | | |
+
+**`employees`**
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint PK | |
+| user_id | bigint FK → users, nullable | `nullOnDelete`; employee may have no login yet |
+| employee_code | string, unique | |
+| full_name | string | |
+| department_id | bigint FK → departments | `restrictOnDelete` |
+| position_id | bigint FK → positions | `restrictOnDelete` |
+| join_date | date | |
+| device_user_id | string, unique, nullable | maps to the user ID on the ZKTeco fingerprint device |
+| status | enum(active, inactive) | default `active` |
+| timestamps, soft deletes | | |
+
+Plus the standard `users`, `cache`, `jobs` tables (Laravel defaults) and `roles`/`permissions`/pivot tables (spatie/laravel-permission).
+
+### Future phases (not yet migrated — kept here so later migrations stay consistent with this plan)
+
+**`attendance_logs`** (Phase 2 — raw device punches)
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint PK | |
+| employee_id | bigint FK → employees, nullable | nullable until matched by device_user_id |
+| device_user_id | string | as reported by the ZKTeco device |
+| punch_time | datetime | |
+| log_type | string/enum | e.g. check-in / check-out / unknown, device-dependent |
+| raw_payload | json, nullable | original device payload for troubleshooting |
+| timestamps | | |
+
+**`attendances`** (Phase 2 — processed daily records, derived from `attendance_logs`)
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint PK | |
+| employee_id | bigint FK → employees | |
+| date | date | |
+| check_in | datetime, nullable | |
+| check_out | datetime, nullable | |
+| status | enum | e.g. present/late/absent/half-day |
+| timestamps | | |
+
+**`leave_types`** (Phase 3)
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint PK | |
+| name | string | e.g. Annual, Sick, Unpaid |
+| default_days_per_year | integer, nullable | |
+| timestamps | | |
+
+**`leaves`** (Phase 3)
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint PK | |
+| employee_id | bigint FK → employees | |
+| leave_type_id | bigint FK → leave_types | |
+| start_date / end_date | date | |
+| status | enum | pending/approved/rejected |
+| approved_by | bigint FK → users, nullable | |
+| timestamps | | |
+
+**`overtime_requests`** (Phase 4)
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint PK | |
+| employee_id | bigint FK → employees | |
+| date | date | |
+| hours | decimal | |
+| status | enum | pending/approved/rejected |
+| approved_by | bigint FK → users, nullable | |
+| timestamps | | |
+
+Exact columns for Phase 2–4 tables will be refined when those phases are scoped in detail — this is a planning skeleton, not a final spec.
+
+## Roles & authorization
+
+Three roles via spatie/laravel-permission: `admin`, `manager`, `employee`.
+
+| Area | admin | manager | employee |
+|---|---|---|---|
+| Dashboard | ✅ | ✅ | ✅ |
+| View employees | ✅ | ✅ | ❌ |
+| Create/edit/deactivate employees | ✅ | ❌ | ❌ |
+| Departments (view/create/edit/delete) | ✅ | ❌ | ❌ |
+| Positions (view/create/edit/delete) | ✅ | ❌ | ❌ |
+
+Enforced in three places: route middleware (`role:admin|manager` / `role:admin` in `routes/web.php`), Livewire component `mount()`/action methods (via Policies), and the sidebar (nav items conditionally rendered by `auth()->user()->hasRole(...)`).
+
+## 5-phase roadmap
+
+1. **Foundation** (this phase) — project setup, auth, roles/permissions, departments, positions, employees, layout/navigation.
+2. **Attendance & device integration** — `attendance_logs` ingestion from the ZKTeco device (matched via `device_user_id`), processing into `attendances`, attendance dashboards/reports.
+3. **Leave management** — `leave_types`, `leaves`, request/approval workflow, balances.
+4. **Overtime** — `overtime_requests`, request/approval workflow, integration with processed attendance.
+5. **Reporting & polish** — cross-cutting reports (attendance/leave/overtime), exports, UX polish, performance pass.
+
+Do not build features from Phase 2 onward until explicitly asked — this file should be updated at the start of each new phase with the finalized scope for that phase.
