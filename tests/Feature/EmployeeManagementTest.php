@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Livewire\Employees\FormModal;
 use App\Livewire\Employees\Index;
 use App\Models\Department;
 use App\Models\Employee;
@@ -32,7 +33,7 @@ class EmployeeManagementTest extends TestCase
         $position = Position::factory()->create();
 
         Livewire::actingAs($admin)
-            ->test(Index::class)
+            ->test(FormModal::class)
             ->call('create')
             ->set('full_name', 'Jane Doe')
             ->set('employee_code', 'EMP-9001')
@@ -55,7 +56,7 @@ class EmployeeManagementTest extends TestCase
         $position = Position::factory()->create();
 
         $component = Livewire::actingAs($admin)
-            ->test(Index::class)
+            ->test(FormModal::class)
             ->call('create')
             ->set('full_name', 'John Smith')
             ->set('employee_code', 'EMP-9002')
@@ -84,7 +85,7 @@ class EmployeeManagementTest extends TestCase
         Employee::factory()->create(['employee_code' => 'EMP-DUP', 'department_id' => $department->id]);
 
         Livewire::actingAs($admin)
-            ->test(Index::class)
+            ->test(FormModal::class)
             ->call('create')
             ->set('full_name', 'Duplicate Code')
             ->set('employee_code', 'EMP-DUP')
@@ -104,7 +105,7 @@ class EmployeeManagementTest extends TestCase
             ->test(Index::class)
             ->call('deactivate', $employee->id);
 
-        $this->assertSoftDeleted('employees', ['id' => $employee->id]);
+        $this->assertNotSoftDeleted('employees', ['id' => $employee->id]);
         $this->assertSame('inactive', $employee->fresh()->status);
     }
 

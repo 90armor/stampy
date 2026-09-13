@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Livewire\Employees\Index as EmployeesIndex;
+use App\Livewire\Employees\Show as ShowEmployee;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Position;
@@ -17,7 +18,13 @@ Route::get('/dashboard', function () {
     $attendance = null;
 
     if (auth()->user()->hasAnyRole(['admin', 'manager'])) {
-        $totalEmployees = Employee::withTrashed()->count();
+        $totalEmployees = Employee::count();
+
+        // Inactive employees are still on the books but don't attend, so every
+        // attendance figure below (today's breakdown, needsAttention,
+        // recentActivity, department %) is scoped to the active workforce only —
+        // deactivating someone must never move the Present-today percentage.
+        $activeEmployees = Employee::where('status', 'active')->count();
 
         $stats = [
             'total_employees' => $totalEmployees,
@@ -31,15 +38,20 @@ Route::get('/dashboard', function () {
         // Both needsAttention and recentActivity read from the same status
         // assignment below so they can't contradict each other (e.g. an
         // employee can't be "absent" and "checked in" at once).
-        $todayBreakdown = DemoAttendance::todayBreakdown($totalEmployees);
-        $assignedStatuses = DemoAttendance::assignStatuses(Employee::orderBy('id')->get(), $todayBreakdown);
+        $todayBreakdown = DemoAttendance::todayBreakdown($activeEmployees);
+        $assignedStatuses = DemoAttendance::assignStatuses(
+            Employee::where('status', 'active')->orderBy('id')->get(),
+            $todayBreakdown
+        );
 
         $attendance = [
             'today' => $todayBreakdown,
             'needsAttention' => DemoAttendance::needsAttention($assignedStatuses),
             'trend' => DemoAttendance::weeklyTrend(),
             'departments' => DemoAttendance::departmentAttendance(
-                Department::withCount('employees')->orderBy('name')->get()
+                Department::withCount(['employees' => fn ($query) => $query->where('status', 'active')])
+                    ->orderBy('name')
+                    ->get()
             ),
             'recent' => DemoAttendance::recentActivity($assignedStatuses),
             'onboarding' => [
@@ -61,6 +73,7 @@ Route::middleware('auth')->group(function () {
 
 Route::middleware(['auth', 'verified', 'role:admin|manager'])->group(function () {
     Route::get('/employees', EmployeesIndex::class)->name('employees.index');
+    Route::get('/employees/{employee}', ShowEmployee::class)->name('employees.show');
 });
 
 Route::middleware(['auth', 'verified', 'role:admin'])->group(function () {
