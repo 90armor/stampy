@@ -14,45 +14,42 @@
     @if ($stats)
         {{-- KPI cards --}}
         <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <x-card class="p-5">
-                <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                    <x-icon name="users" class="h-5 w-5" />
-                </div>
-                <p class="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">Total employees</p>
-                <p class="mt-1 text-[28px] font-semibold leading-none tracking-tight tabular-nums text-slate-900 dark:text-slate-100">{{ $stats['total_employees'] }}</p>
-                <x-trend direction="up" class="mt-1.5">+{{ $stats['new_this_month'] }} this month</x-trend>
-            </x-card>
+            <x-stat-card icon="users" label="Total employees" :value="$stats['total_employees']">
+                <x-slot name="subtext">
+                    <x-trend direction="up">+{{ $stats['new_this_month'] }} this month</x-trend>
+                </x-slot>
+            </x-stat-card>
 
-            <x-card class="p-5">
-                <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300">
-                    <x-icon name="check" class="h-5 w-5" />
-                </div>
-                <p class="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">Present today</p>
-                <p class="mt-1 text-[28px] font-semibold leading-none tracking-tight tabular-nums text-slate-900 dark:text-slate-100">{{ $attendance['today']['present']['count'] }}</p>
-                <p class="mt-1.5 text-xs text-slate-400 dark:text-slate-500">{{ $attendance['today']['present']['percent'] }}% of workforce</p>
-            </x-card>
+            <x-stat-card
+                icon="check"
+                label="Present today"
+                :value="$attendance['today']['present']['count']"
+                icon-class="bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
+            >
+                <x-slot name="subtext">{{ $attendance['today']['present']['percent'] }}% of workforce</x-slot>
+            </x-stat-card>
 
-            <x-card class="p-5">
-                <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
-                    <x-icon name="clock" class="h-5 w-5" />
-                </div>
-                <p class="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">Late today</p>
-                <p class="mt-1 text-[28px] font-semibold leading-none tracking-tight tabular-nums text-slate-900 dark:text-slate-100">{{ $attendance['today']['late']['count'] }}</p>
-                <p class="mt-1.5 text-xs text-slate-400 dark:text-slate-500">
+            <x-stat-card
+                icon="clock"
+                label="Late today"
+                :value="$attendance['today']['late']['count']"
+                icon-class="bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
+            >
+                <x-slot name="subtext">
                     {{ $attendance['today']['late']['count'] === 0 ? 'No late arrivals' : $attendance['today']['late']['percent'].'% of workforce' }}
-                </p>
-            </x-card>
+                </x-slot>
+            </x-stat-card>
 
-            <x-card class="p-5">
-                <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
-                    <x-icon name="calendar-days" class="h-5 w-5" />
-                </div>
-                <p class="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">On leave</p>
-                <p class="mt-1 text-[28px] font-semibold leading-none tracking-tight tabular-nums text-slate-900 dark:text-slate-100">{{ $attendance['today']['leave']['count'] }}</p>
-                <p class="mt-1.5 text-xs text-slate-400 dark:text-slate-500">
+            <x-stat-card
+                icon="calendar-days"
+                label="On leave"
+                :value="$attendance['today']['leave']['count']"
+                icon-class="bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+            >
+                <x-slot name="subtext">
                     {{ $attendance['today']['leave']['count'] === 0 ? 'No one on leave' : $attendance['today']['leave']['percent'].'% of workforce' }}
-                </p>
-            </x-card>
+                </x-slot>
+            </x-stat-card>
         </div>
 
         {{-- Today's Attendance + Quick Actions --}}
