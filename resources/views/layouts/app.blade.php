@@ -11,15 +11,20 @@
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" />
 
-        <!-- Dark mode: applied before paint to avoid a flash of the wrong theme -->
+        <!-- Dark mode: applied before paint to avoid a flash of the wrong theme. Also
+             re-applied on 'livewire:navigated' because wire:navigate morphs <html> against
+             the freshly-fetched page (which has no 'dark' class baked in) and skips
+             re-running this identical inline script, so without the listener the class
+             gets silently dropped — and the theme "resets" — on every SPA navigation. -->
         <script>
-            (function () {
+            function applyStoredTheme() {
                 var stored = localStorage.getItem('theme');
                 var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                if (stored === 'dark' || (!stored && prefersDark)) {
-                    document.documentElement.classList.add('dark');
-                }
-            })();
+                document.documentElement.classList.toggle('dark', stored === 'dark' || (!stored && prefersDark));
+            }
+
+            applyStoredTheme();
+            document.addEventListener('livewire:navigated', applyStoredTheme);
         </script>
 
         <!-- Scripts -->
@@ -47,7 +52,7 @@
 
             <!-- Main column -->
             <div class="flex flex-1 flex-col overflow-hidden">
-                @include('layouts.partials.topbar', ['header' => $header ?? null])
+                @include('layouts.partials.topbar', ['header' => $header ?? null, 'breadcrumbs' => $breadcrumbs ?? null])
 
                 <main class="flex-1 overflow-y-auto">
                     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

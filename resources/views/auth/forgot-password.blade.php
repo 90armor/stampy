@@ -1,5 +1,5 @@
 <x-guest-layout>
-    <a href="{{ route('login') }}" class="mb-6 inline-flex items-center gap-x-1 text-sm font-semibold text-primary-700 hover:text-primary-800 dark:text-accent-300 dark:hover:text-accent-200">
+    <a href="{{ route('login') }}" wire:navigate class="mb-6 inline-flex items-center gap-x-1 text-sm font-semibold text-primary-700 hover:text-primary-800 dark:text-accent-300 dark:hover:text-accent-200">
         <x-icon name="chevron-right" class="w-4 h-4 rotate-180" />
         Back to sign in
     </a>

@@ -58,7 +58,7 @@
             </label>
 
             @if (Route::has('password.request'))
-                <a class="text-sm font-semibold text-primary-700 hover:text-primary-800 dark:text-accent-300 dark:hover:text-accent-200" href="{{ route('password.request') }}">
+                <a class="text-sm font-semibold text-primary-700 hover:text-primary-800 dark:text-accent-300 dark:hover:text-accent-200" href="{{ route('password.request') }}" wire:navigate>
                     {{ __('Forgot password?') }}
                 </a>
             @endif

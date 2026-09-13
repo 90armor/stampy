@@ -11,15 +11,17 @@
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700|dm-serif-display:400&display=swap" rel="stylesheet" />
 
-        <!-- Dark mode: applied before paint to avoid a flash of the wrong theme -->
+        <!-- Dark mode: applied before paint to avoid a flash of the wrong theme. Also
+             re-applied on 'livewire:navigated' — see layouts/app.blade.php for why. -->
         <script>
-            (function () {
+            function applyStoredTheme() {
                 var stored = localStorage.getItem('theme');
                 var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                if (stored === 'dark' || (!stored && prefersDark)) {
-                    document.documentElement.classList.add('dark');
-                }
-            })();
+                document.documentElement.classList.toggle('dark', stored === 'dark' || (!stored && prefersDark));
+            }
+
+            applyStoredTheme();
+            document.addEventListener('livewire:navigated', applyStoredTheme);
         </script>
 
         <!-- Scripts -->

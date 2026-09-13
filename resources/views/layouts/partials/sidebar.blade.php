@@ -14,7 +14,7 @@ $navItems = [
         <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-400 text-primary-900">
             <x-icon name="bolt" class="w-4 h-4" />
         </span>
-        <a href="{{ route('dashboard') }}" class="text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
+        <a href="{{ route('dashboard') }}" wire:navigate class="text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
             {{ config('app.name') }}
         </a>
     </div>
@@ -26,9 +26,12 @@ $navItems = [
                 <div class="my-2 border-t border-slate-200/70 dark:border-slate-800/70"></div>
             @endif
             @if ($item['enabled'])
-                @php $active = request()->routeIs($item['route'].'*'); @endphp
+                {{-- Match on the route-name prefix (e.g. 'employees*'), not the exact
+                     route, so nested pages like employees.show keep this item active. --}}
+                @php $active = request()->routeIs(explode('.', $item['route'])[0].'*'); @endphp
                 <a
                     href="{{ route($item['route']) }}"
+                    wire:navigate
                     class="group relative flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm transition
                         {{ $active ? 'bg-primary-100/80 font-semibold text-primary-700 dark:bg-primary-900/50 dark:text-primary-300' : 'font-medium text-slate-500 hover:bg-slate-100/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white' }}"
                 >

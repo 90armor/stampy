@@ -7,11 +7,26 @@
     <div class="flex flex-1 items-center justify-between">
         <div class="min-w-0 flex items-center gap-x-2 text-sm text-slate-500 dark:text-slate-400">
             @unless (request()->routeIs('dashboard'))
-                <span class="hidden sm:inline">{{ config('app.name') }}</span>
-                <x-icon name="chevron-right" class="hidden sm:inline w-4 h-4 text-slate-300 dark:text-slate-600" />
-                <span class="font-semibold text-slate-900 dark:text-slate-100">
-                    {{ $header ?? '' }}
-                </span>
+                @if ($breadcrumbs ?? null)
+                    @foreach ($breadcrumbs as $crumb)
+                        @unless ($loop->first)
+                            <x-icon name="chevron-right" class="hidden sm:inline w-4 h-4 text-slate-300 dark:text-slate-600" />
+                        @endunless
+                        @if (! $loop->last)
+                            <a href="{{ $crumb['route'] }}" wire:navigate class="hidden sm:inline hover:text-slate-900 dark:hover:text-slate-100">
+                                {{ $crumb['label'] }}
+                            </a>
+                        @else
+                            <span class="font-semibold text-slate-900 dark:text-slate-100">{{ $crumb['label'] }}</span>
+                        @endif
+                    @endforeach
+                @else
+                    <span class="hidden sm:inline">{{ config('app.name') }}</span>
+                    <x-icon name="chevron-right" class="hidden sm:inline w-4 h-4 text-slate-300 dark:text-slate-600" />
+                    <span class="font-semibold text-slate-900 dark:text-slate-100">
+                        {{ $header ?? '' }}
+                    </span>
+                @endif
             @endunless
         </div>
 
@@ -45,7 +60,7 @@
                 </x-slot>
 
                 <x-slot name="content">
-                    <x-dropdown-link :href="route('profile.edit')">
+                    <x-dropdown-link :href="route('profile.edit')" wire:navigate>
                         {{ __('Profile') }}
                     </x-dropdown-link>
 
