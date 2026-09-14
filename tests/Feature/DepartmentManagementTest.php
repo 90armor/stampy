@@ -51,6 +51,32 @@ class DepartmentManagementTest extends TestCase
         $this->assertSame('New Name', $department->fresh()->name);
     }
 
+    public function test_department_name_must_be_unique(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        Department::factory()->create(['name' => 'Engineering']);
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->call('create')
+            ->set('name', 'Engineering')
+            ->call('save')
+            ->assertHasErrors(['name']);
+    }
+
+    public function test_editing_a_department_can_keep_its_own_name(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        $department = Department::factory()->create(['name' => 'Engineering']);
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->call('edit', $department->id)
+            ->set('name', 'Engineering')
+            ->call('save')
+            ->assertHasNoErrors();
+    }
+
     public function test_department_with_employees_cannot_be_deleted(): void
     {
         $admin = User::factory()->create()->assignRole('admin');

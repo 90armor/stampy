@@ -51,6 +51,32 @@ class PositionManagementTest extends TestCase
         $this->assertSame('New Title', $position->fresh()->name);
     }
 
+    public function test_position_name_must_be_unique(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        Position::factory()->create(['name' => 'Software Engineer']);
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->call('create')
+            ->set('name', 'Software Engineer')
+            ->call('save')
+            ->assertHasErrors(['name']);
+    }
+
+    public function test_editing_a_position_can_keep_its_own_name(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        $position = Position::factory()->create(['name' => 'Software Engineer']);
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->call('edit', $position->id)
+            ->set('name', 'Software Engineer')
+            ->call('save')
+            ->assertHasNoErrors();
+    }
+
     public function test_position_with_employees_cannot_be_deleted(): void
     {
         $admin = User::factory()->create()->assignRole('admin');

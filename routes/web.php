@@ -28,8 +28,8 @@ Route::get('/dashboard', function () {
 
         $stats = [
             'total_employees' => $totalEmployees,
-            'new_this_month' => Employee::whereMonth('created_at', now()->month)
-                ->whereYear('created_at', now()->year)
+            'new_this_month' => Employee::whereMonth('join_date', now()->month)
+                ->whereYear('join_date', now()->year)
                 ->count(),
         ];
 

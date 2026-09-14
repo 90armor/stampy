@@ -105,7 +105,7 @@ class EmployeeManagementTest extends TestCase
             ->test(Index::class)
             ->call('deactivate', $employee->id);
 
-        $this->assertNotSoftDeleted('employees', ['id' => $employee->id]);
+        $this->assertDatabaseHas('employees', ['id' => $employee->id]);
         $this->assertSame('inactive', $employee->fresh()->status);
     }
 
@@ -129,5 +129,79 @@ class EmployeeManagementTest extends TestCase
         $this->actingAs($employee)
             ->get(route('employees.index'))
             ->assertForbidden();
+    }
+
+    public function test_manager_cannot_create_an_employee_via_the_form_modal(): void
+    {
+        $manager = User::factory()->create()->assignRole('manager');
+
+        // A denied authorize() call renders as a 403 response, which ends the
+        // Livewire round-trip for that instance — assert the denial directly
+        // rather than chaining further set()/call() onto it.
+        Livewire::actingAs($manager)
+            ->test(FormModal::class)
+            ->call('create')
+            ->assertForbidden();
+    }
+
+    public function test_manager_cannot_edit_an_employee_via_the_form_modal(): void
+    {
+        $manager = User::factory()->create()->assignRole('manager');
+        $employee = Employee::factory()->create(['full_name' => 'Original Name']);
+
+        Livewire::actingAs($manager)
+            ->test(FormModal::class)
+            ->call('edit', $employee->id)
+            ->assertForbidden();
+
+        $this->assertSame('Original Name', $employee->fresh()->full_name);
+    }
+
+    public function test_manager_cannot_call_save_directly_on_the_form_modal(): void
+    {
+        $manager = User::factory()->create()->assignRole('manager');
+        $department = Department::factory()->create();
+        $position = Position::factory()->create();
+
+        // Calls save() without going through create()/edit() first, to prove
+        // save() enforces authorization on its own rather than relying on the
+        // caller having already been through a gated entry point.
+        Livewire::actingAs($manager)
+            ->test(FormModal::class)
+            ->set('full_name', 'Direct Save')
+            ->set('employee_code', 'EMP-9200')
+            ->set('department_id', $department->id)
+            ->set('position_id', $position->id)
+            ->set('join_date', '2026-01-01')
+            ->call('save')
+            ->assertForbidden();
+
+        $this->assertDatabaseMissing('employees', ['employee_code' => 'EMP-9200']);
+    }
+
+    public function test_manager_cannot_deactivate_an_employee(): void
+    {
+        $manager = User::factory()->create()->assignRole('manager');
+        $employee = Employee::factory()->create(['status' => 'active']);
+
+        Livewire::actingAs($manager)
+            ->test(Index::class)
+            ->call('deactivate', $employee->id)
+            ->assertForbidden();
+
+        $this->assertSame('active', $employee->fresh()->status);
+    }
+
+    public function test_manager_cannot_reactivate_an_employee(): void
+    {
+        $manager = User::factory()->create()->assignRole('manager');
+        $employee = Employee::factory()->create(['status' => 'inactive']);
+
+        Livewire::actingAs($manager)
+            ->test(Index::class)
+            ->call('reactivate', $employee->id)
+            ->assertForbidden();
+
+        $this->assertSame('inactive', $employee->fresh()->status);
     }
 }
