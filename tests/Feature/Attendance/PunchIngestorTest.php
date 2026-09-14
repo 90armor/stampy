@@ -84,6 +84,35 @@ class PunchIngestorTest extends TestCase
         $this->assertSame('out', $log->punch_type->value);
     }
 
+    public function test_inference_groups_a_double_tap_instead_of_alternating_per_punch(): void
+    {
+        $employee = Employee::factory()->create(['device_user_id' => '2005']);
+
+        $source = new FakeAttendanceSource([
+            new PunchRecord(deviceUserId: '2005', punchedAt: Carbon::parse('2026-02-02 08:00:00'), punchType: null),
+            new PunchRecord(deviceUserId: '2005', punchedAt: Carbon::parse('2026-02-02 08:00:08'), punchType: null),
+            new PunchRecord(deviceUserId: '2005', punchedAt: Carbon::parse('2026-02-02 17:00:00'), punchType: null),
+        ]);
+
+        app(PunchIngestor::class)->ingest(
+            $source,
+            Carbon::parse('2026-02-01'),
+            Carbon::parse('2026-02-03'),
+            PunchSource::Device,
+        );
+
+        $types = AttendanceLog::where('employee_id', $employee->id)
+            ->orderBy('punched_at')
+            ->pluck('punch_type')
+            ->map(fn ($type) => $type->value)
+            ->all();
+
+        // Without grouping this would infer in, out, in — the double-tap
+        // 8 seconds later would flip the alternation for the rest of the day.
+        $this->assertSame(['in', 'in', 'out'], $types);
+        $this->assertSame(3, AttendanceLog::where('employee_id', $employee->id)->count());
+    }
+
     public function test_two_punches_seconds_apart_are_both_stored(): void
     {
         Employee::factory()->create(['device_user_id' => '2003']);

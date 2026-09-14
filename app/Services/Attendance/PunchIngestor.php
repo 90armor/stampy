@@ -74,8 +74,15 @@ class PunchIngestor
     /**
      * For any resolved punch missing a type, infer it from its position in
      * that employee's full chronological punch list for the day (existing
-     * DB rows across all sources, merged with the rest of this batch),
-     * alternating in/out starting with in.
+     * DB rows across all sources, merged with the rest of this batch).
+     *
+     * A plain per-punch alternation breaks on a double-tap: 08:00, 08:00:08,
+     * 17:00 would infer in, out, in. So punches within
+     * config('attendance.duplicate_window_seconds') of the *previous* punch
+     * in the timeline are chained into one group first; the group (not the
+     * punch) is what alternates, so the example above becomes in, in, out.
+     * Every punch is still stored — this only changes what type gets
+     * assigned to the ones that arrived with none.
      *
      * @param  array<int, array{employee_id: int, punched_at: CarbonInterface, punch_type: ?PunchType, raw: array}>  $resolved
      */
@@ -86,6 +93,8 @@ class PunchIngestor
         if ($needsInference === []) {
             return;
         }
+
+        $windowSeconds = config('attendance.duplicate_window_seconds', 90);
 
         $employeeIds = array_unique(array_column($resolved, 'employee_id'));
 
@@ -117,12 +126,21 @@ class PunchIngestor
 
             usort($timeline, fn (array $a, array $b) => $a['time'] <=> $b['time']);
 
-            foreach ($timeline as $position => $entry) {
+            $group = -1;
+            $previousTime = null;
+
+            foreach ($timeline as $entry) {
+                if ($previousTime === null || $entry['time']->getTimestamp() - $previousTime->getTimestamp() > $windowSeconds) {
+                    $group++;
+                }
+
+                $previousTime = $entry['time'];
+
                 if ($entry['index'] === null || $resolved[$entry['index']]['punch_type'] !== null) {
                     continue;
                 }
 
-                $resolved[$entry['index']]['punch_type'] = $position % 2 === 0 ? PunchType::In : PunchType::Out;
+                $resolved[$entry['index']]['punch_type'] = $group % 2 === 0 ? PunchType::In : PunchType::Out;
             }
         }
     }

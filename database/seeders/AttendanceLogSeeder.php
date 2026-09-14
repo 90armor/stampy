@@ -21,7 +21,7 @@ class AttendanceLogSeeder extends Seeder
      */
     private const RANDOM_SEED = 20260914;
 
-    private const DAYS = 60;
+    public const DAYS = 60;
 
     /**
      * Weighted day outcomes; must sum to 100.
@@ -142,7 +142,11 @@ class AttendanceLogSeeder extends Seeder
             ],
             'overnight' => [
                 ['time' => $start->copy()->subMinutes(mt_rand(1, 10)), 'type' => PunchType::In],
-                ['time' => $date->copy()->addDay()->startOfDay()->addMinutes(mt_rand(1, 180)), 'type' => PunchType::Out],
+                // Capped at 120 (not 180) so the gap from a ~08:00 check-in
+                // stays under DailySummaryBuilder's 18h pairing window — a
+                // wider range let some seeded "overnight" days come out
+                // incomplete instead of exercising the overnight-pairing path.
+                ['time' => $date->copy()->addDay()->startOfDay()->addMinutes(mt_rand(1, 120)), 'type' => PunchType::Out],
             ],
         };
 

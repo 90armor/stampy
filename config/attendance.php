@@ -32,4 +32,34 @@ return [
         'has_header' => true,
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Double-tap window
+    |--------------------------------------------------------------------------
+    |
+    | When PunchIngestor has to infer a punch's type (source didn't report
+    | one), punches this close to the previous one in that day's chronological
+    | order are treated as the same physical event — a double-tap on the
+    | sensor — and get the SAME inferred type, so alternation advances per
+    | group rather than per punch. This is inference-only: it never drops a
+    | row, and never re-types a punch whose source already reported a type.
+    |
+    */
+
+    'duplicate_window_seconds' => 90,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Minute rounding
+    |--------------------------------------------------------------------------
+    |
+    | Not a config value — recorded here because it's a rule of the same
+    | calculation this file configures. DailySummaryBuilder computes
+    | worked_minutes, late_minutes, and early_leave_minutes from raw
+    | timestamp differences using intdiv(seconds, 60), which truncates
+    | toward zero: a partial minute is always dropped, never rounded up.
+    | E.g. late by 10 minutes 45 seconds records as 10 late_minutes, not 11.
+    |
+    */
+
 ];
