@@ -36,14 +36,16 @@ One primary color, one accent color, one font, a small set of reusable Blade com
 - **Dark mode:** class-based (`darkMode: 'class'` in `tailwind.config.js`), toggled by adding/removing `.dark` on `<html>`. A small inline script in each layout's `<head>` (`app.blade.php`, `guest.blade.php`) applies the stored `localStorage.theme` (or system preference) before paint to avoid a flash of the wrong theme. The toggle button in the topbar and on the auth pages flips the class and persists the choice. Every new component must carry a `dark:` variant — check contrast for text, borders, inputs, and hover states, not just backgrounds.
 - **Cards:** `bg-white/70 backdrop-blur-xl rounded-lg shadow-sm ring-1 ring-slate-200/60 hover:ring-primary-200/60 dark:bg-slate-900/60 dark:ring-slate-800/70` (see `x-card`) — glass, no heavy borders, subtle primary-tinted ring on hover.
 - **Tables:** `divide-y divide-slate-100 dark:divide-slate-800`, `hover:bg-slate-50 dark:hover:bg-slate-800/60` rows, generous cell padding (`px-6 py-4`), uppercase `text-xs` column headers.
-- **Forms:** label above input (`x-input-label`, `mb-1`), `rounded-lg border-slate-300`, glass background (`bg-white/80 backdrop-blur-sm dark:bg-slate-800/70`), `focus:ring-primary-500` focus rings, red inline errors below the field (`x-input-error`).
+- **Forms:** label above input (`x-input-label`, `mb-1`), `rounded-lg border-slate-300`, glass background (`bg-white/80 backdrop-blur-sm dark:bg-slate-800/70`), `focus:ring-primary-500` focus rings, red inline errors below the field (`x-input-error`). `x-text-input`/`x-textarea`/`x-select` accept a `surface` prop — `glass` (default, unchanged on every page that doesn't pass it) or `solid` (opaque, no blur; used only inside the employee/department/position modals, which are dense enough that glass hurt legibility). Don't flip the default without checking every page that omits the prop.
 - **Empty states:** icon in a soft circular badge + one-line title + optional description + action button (`x-empty-state`).
 - **Icons:** Heroicons (outline, 24x24, stroke-width 1.5), inlined via the single `x-icon` component (`resources/views/components/icon.blade.php`) rather than a JS icon library — add new icons there as `match()` cases.
 - **App shell:** fixed sidebar (`layouts/partials/sidebar.blade.php`, `w-[242px]`, light glass surface, evergreen/primary-tinted active state — not a dark panel) + sticky glass topbar with a breadcrumb-style page title and dark-mode toggle (`layouts/partials/topbar.blade.php`). Sidebar nav items for features not yet built (Attendance, Time off, Reports) are rendered disabled with a "Soon" badge rather than omitted, so the roadmap is visible without linking anywhere — flip an item to a real link only when that phase actually ships. Auth pages (`layouts/guest.blade.php`) use a split-screen layout: an evergreen hero panel (hidden below `lg`) plus the glass form panel.
 
-Reusable UI lives in `resources/views/components/`: `button.blade.php` (variants: `primary`, `secondary`, `danger`), `card.blade.php`, `badge.blade.php` (colors: `primary`, `green`, `red`, `amber`, `slate`), `empty-state.blade.php`, `icon.blade.php`, `confirm-dialog.blade.php`, `textarea.blade.php`, plus Breeze's `text-input`, `input-label`, `input-error` (restyled to match this system). Breeze's `primary-button`/`secondary-button` delegate to `x-button` so auth pages and app pages share one look.
+Reusable UI lives in `resources/views/components/`: `button.blade.php` (variants: `primary`, `secondary`, `danger`), `card.blade.php`, `badge.blade.php` (colors: `primary`, `green`, `red`, `amber`, `slate`), `empty-state.blade.php`, `icon.blade.php`, `confirm-dialog.blade.php`, `select.blade.php`, plus Breeze's `text-input`, `textarea`, `input-label`, `input-error` (restyled to match this system). Breeze's `primary-button`/`secondary-button` delegate to `x-button` so auth pages and app pages share one look.
 
 **Alpine note:** any element using a bare `@click`/`x-show`/etc. with no `x-data` anywhere in its ancestor chain silently gets no directive binding at all (confirmed empirically on this Alpine 3.17 setup — it isn't just an edge case). Add `x-data="{}"` directly on any standalone interactive element that isn't already nested inside a component with its own `x-data` (e.g. the dark-mode toggle buttons).
+
+**Modals:** every create/edit modal builds on `<x-modal>` (`resources/views/components/modal.blade.php`) — never hand-roll the overlay/backdrop/focus-trap again; that duplication across the employee/department/position modals is exactly what got cleaned up before Phase 2. Props beyond Breeze's originals: `entangle="propertyName"` two-way binds the modal's Alpine `show` state to a Livewire boolean via `$wire.entangle().live`, so Escape and backdrop-click correctly close the Livewire property itself instead of only hiding the panel client-side — pass it whenever the modal's visibility is driven by a Livewire property (as opposed to Breeze's original `open-modal`/`close-modal` window-event pattern, which still works unentangled). `surface="solid"` swaps in the opaque panel (see Forms note above). `maxWidth` only accepts the named presets defined in the component (`sm`/`md`/`lg`/`xl`/`2xl`/`employee-form`) — never interpolate a raw pixel value, since Tailwind's class scanner only picks up literal text in source files and a runtime-built `max-w-[...]` string produces no CSS silently; add a new named preset instead. Focus restoration (returning focus to whatever triggered the modal) is automatic — don't re-implement it per modal.
 
 ## Naming conventions
 
@@ -52,13 +54,12 @@ Reusable UI lives in `resources/views/components/`: `button.blade.php` (variants
 - **Livewire components:** namespaced by feature under `App\Livewire\{Feature}\{Action}`, e.g. `App\Livewire\Employees\Index`, `App\Livewire\Employees\Form`. Matching views under `resources/views/livewire/{feature}/{action}.blade.php` (kebab-case). A single `Form` component handles both create and edit (mounted with an optional model for edit).
 - **Policies:** `app/Policies/{Model}Policy.php`, auto-discovered by Laravel's naming convention (no manual registration needed).
 - **Routes:** RESTful names (`employees.index`, `organization.index`), grouped by role-based middleware in `routes/web.php`.
-- **Gates:** feature-level gates (`manage-employees`, `manage-departments`) defined in `AppServiceProvider::boot()` for cases broader than a single model policy; per-model authorization goes through Policies.
 
 ## Coding conventions
 
 - **Validation:** Livewire components validate via `rules()` (or `#[Validate]` attributes) — never trust unvalidated `wire:model` input. No Form Requests are used yet since all Phase 1 writes go through Livewire; introduce Form Requests only if/when plain controllers start handling validated input (e.g. a future API).
 - **Authorization:** every Livewire component that manages a resource calls `$this->authorize(...)` in `mount()` for page-level checks and again in the specific action method (e.g. `deactivate()`, `save()`, `delete()`) before mutating. Route groups also carry `role:` middleware as a second layer of defense (see `routes/web.php`).
-- **Soft deletes:** `Employee` uses `SoftDeletes` — "deactivate" in the UI sets `status = inactive` and soft-deletes the row. Departments have no soft deletes; a department with employees assigned cannot be deleted (guarded in `Departments\Index::delete()`).
+- **Employee lifecycle:** no soft deletes anywhere in Phase 1 — "deactivate" in the UI only sets `employees.status = inactive`; the row (and its future attendance history) is never removed by the app. Departments/positions with employees assigned cannot be hard-deleted either (guarded in `Departments\Index::delete()` / `Positions\Index::delete()`).
 - **User/HR data split:** `users` is auth-only (name, email, password). All HR data lives on `employees`, linked via nullable `employees.user_id` — an employee may exist with no login (not yet onboarded to self-service), and a `User` always optionally has one `Employee` profile.
 - **Tests:** `tests/Feature` uses Livewire's `Livewire::test()` harness against components directly (mount/call/assert) for business logic, and plain HTTP tests (`$this->get(...)->assertForbidden()`) for route-level role gating, since Livewire's test harness converts `AuthorizationException` into a response rather than letting it bubble as a PHP exception.
 
@@ -74,7 +75,7 @@ Reusable UI lives in `resources/views/components/`: `button.blade.php` (variants
 | Column | Type | Notes |
 |---|---|---|
 | id | bigint PK | |
-| name | string | |
+| name | string, unique | |
 | description | text, nullable | |
 | timestamps | | |
 
@@ -82,7 +83,7 @@ Reusable UI lives in `resources/views/components/`: `button.blade.php` (variants
 | Column | Type | Notes |
 |---|---|---|
 | id | bigint PK | |
-| name | string | |
+| name | string, unique | |
 | description | text, nullable | |
 | timestamps | | |
 
@@ -97,8 +98,8 @@ Reusable UI lives in `resources/views/components/`: `button.blade.php` (variants
 | position_id | bigint FK → positions | `restrictOnDelete` |
 | join_date | date | |
 | device_user_id | string, unique, nullable | maps to the user ID on the ZKTeco fingerprint device |
-| status | enum(active, inactive) | default `active` |
-| timestamps, soft deletes | | |
+| status | enum(active, inactive) | default `active`, indexed |
+| timestamps | | no soft deletes — see Employee lifecycle above |
 
 Plus the standard `users`, `cache`, `jobs` tables (Laravel defaults) and `roles`/`permissions`/pivot tables (spatie/laravel-permission).
 
@@ -174,10 +175,10 @@ Enforced in three places: route middleware (`role:admin|manager` / `role:admin` 
 
 ## 5-phase roadmap
 
-1. **Foundation** (this phase) — project setup, auth, roles/permissions, departments, positions, employees, layout/navigation.
-2. **Attendance & device integration** — `attendance_logs` ingestion from the ZKTeco device (matched via `device_user_id`), processing into `attendances`, attendance dashboards/reports.
+1. **Foundation** (complete) — project setup, auth, roles/permissions, departments, positions, employees, layout/navigation. Closed out with a full codebase audit (see `AUDIT.md`) — all Critical/High/Medium findings fixed.
+2. **Attendance & device integration** (current) — `attendance_logs` ingestion from the ZKTeco device (matched via `device_user_id`), processing into `attendances`, attendance dashboards/reports.
 3. **Leave management** — `leave_types`, `leaves`, request/approval workflow, balances.
 4. **Overtime** — `overtime_requests`, request/approval workflow, integration with processed attendance.
 5. **Reporting & polish** — cross-cutting reports (attendance/leave/overtime), exports, UX polish, performance pass.
 
-Do not build features from Phase 2 onward until explicitly asked — this file should be updated at the start of each new phase with the finalized scope for that phase.
+Phase 2's detailed scope isn't finalized yet — don't build features until this section is updated with that scope. Update this file at the start of each new phase.
