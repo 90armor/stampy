@@ -3,7 +3,6 @@
 namespace App\Livewire\Positions;
 
 use App\Models\Position;
-use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -15,11 +14,17 @@ class Index extends Component
 
     public ?Position $editing = null;
 
-    #[Validate('required|string|max:255')]
     public string $name = '';
 
-    #[Validate('nullable|string|max:1000')]
     public ?string $description = null;
+
+    protected function rules(): array
+    {
+        return [
+            'name' => ['required', 'string', 'max:255', 'unique:positions,name,'.$this->editing?->id],
+            'description' => ['nullable', 'string', 'max:1000'],
+        ];
+    }
 
     public function mount(): void
     {
@@ -66,11 +71,11 @@ class Index extends Component
     {
         $this->authorize('delete', $position);
 
-        // withTrashed() matters here: a deactivated (soft-deleted) employee still
-        // physically occupies the row that the position_id foreign key
-        // (restrictOnDelete) points at, so excluding trashed rows would let this
-        // check pass while the DB delete still fails with an unhandled exception.
-        if ($position->employees()->withTrashed()->exists()) {
+        // A deactivated (status = 'inactive') employee still occupies the row
+        // that the position_id foreign key (restrictOnDelete) points at, so
+        // this must count inactive employees too — otherwise the check could
+        // pass while the DB delete still fails with an unhandled exception.
+        if ($position->employees()->exists()) {
             $this->addError('delete', 'Cannot delete a position that still has employees assigned.');
 
             return;
