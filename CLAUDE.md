@@ -23,6 +23,13 @@ Why: Breeze+Blade avoids standing up a separate frontend/API for what is an inte
   - `kyaw.kyaw.naing@example.com` — employee (Engineering)
   - `zaw.zaw.htet@example.com` — manager (Operations)
   - (Su Su Hlaing and Thida Win are seeded as employee records with no login account, to exercise the "employee without a user account" case.)
+- **Test database:** the suite runs against MySQL, not sqlite (see phpunit.xml's comment for why — briefly, sqlite has no enforced DATE column type and already hid one real bug). It needs a `stampy_testing` database, separate from the dev `stampy` one, granted to the same `attendance` user. `docker/mysql/init/01-create-testing-db.sql` creates and grants it automatically, but **only on a fresh `mysql_data` volume** — the official MySQL image runs `/docker-entrypoint-initdb.d/` scripts once, the first time the data directory is empty. If you already have an existing volume from before this file existed (e.g. `docker compose up` predates this change), run once by hand:
+  ```
+  docker compose exec mysql mysql -uroot -psecret -e "
+    CREATE DATABASE IF NOT EXISTS stampy_testing CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    GRANT ALL PRIVILEGES ON stampy_testing.* TO 'attendance'@'%';
+    FLUSH PRIVILEGES;"
+  ```
 
 ## Design system
 

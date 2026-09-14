@@ -50,6 +50,7 @@ services:
             MYSQL_ROOT_PASSWORD: secret
         volumes:
             - mysql_data:/var/lib/mysql
+            - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
         healthcheck:
             test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-psecret"]
             interval: 5s
