@@ -62,6 +62,10 @@ Reusable UI lives in `resources/views/components/`: `button.blade.php` (variants
 - **User/HR data split:** `users` is auth-only (name, email, password). All HR data lives on `employees`, linked via nullable `employees.user_id` — an employee may exist with no login (not yet onboarded to self-service), and a `User` always optionally has one `Employee` profile.
 - **Tests:** `tests/Feature` uses Livewire's `Livewire::test()` harness against components directly (mount/call/assert) for business logic, and plain HTTP tests (`$this->get(...)->assertForbidden()`) for route-level role gating, since Livewire's test harness converts `AuthorizationException` into a response rather than letting it bubble as a PHP exception.
 
+## Testing notes
+
+- **Livewire authorization tests:** after a Livewire call is denied by `authorize()`, the response is a 403 rather than a normal component snapshot, so chaining further `->set()`/`->call()` on the same test instance throws `Invalid Livewire snapshot structure`. Assert `->assertForbidden()` on the denied call itself; start a fresh `Livewire::test()` instance for any subsequent assertions.
+
 ## Database schema
 
 ### Phase 1 (built)
