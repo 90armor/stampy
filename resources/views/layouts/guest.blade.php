@@ -7,6 +7,8 @@
 
         <title>{{ config('app.name', 'Laravel') }}</title>
 
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700|dm-serif-display:400&display=swap" rel="stylesheet" />
@@ -32,12 +34,7 @@
         <div class="min-h-screen grid grid-cols-1 lg:grid-cols-[46%_54%] bg-slate-50 dark:bg-slate-950 bg-shell">
             <!-- Hero panel -->
             <section class="hidden lg:flex flex-col bg-primary-700 text-white px-16 py-12">
-                <div class="flex items-center gap-x-2.5 text-lg font-semibold tracking-tight">
-                    <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-400 text-primary-900">
-                        <x-icon name="bolt" class="w-4 h-4" />
-                    </span>
-                    {{ config('app.name') }}
-                </div>
+                <x-logo-lockup size="32" variant="dark" />
 
                 <div class="flex flex-1 items-center">
                     <div class="max-w-md">
@@ -67,11 +64,9 @@
                 </button>
 
                 <div class="w-full max-w-sm">
-                    <div class="mb-10 flex items-center justify-center gap-x-2.5 text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100 lg:hidden">
-                        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-100 text-primary-700 dark:bg-primary-800 dark:text-primary-100">
-                            <x-icon name="bolt" class="w-4 h-4" />
-                        </span>
-                        {{ config('app.name') }}
+                    <div class="mb-10 flex flex-col items-center text-center lg:hidden">
+                        <x-logo-lockup size="40" />
+                        <p class="mt-2 text-sm text-slate-500">attendance, stamped in seconds</p>
                     </div>
 
                     {{ $slot }}

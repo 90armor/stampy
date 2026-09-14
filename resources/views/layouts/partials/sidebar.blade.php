@@ -10,12 +10,10 @@ $navItems = [
 @endphp
 
 <div class="flex h-full w-[242px] flex-col bg-white/70 backdrop-blur-xl border-r border-slate-200/60 dark:bg-slate-900/60 dark:border-slate-800/70">
-    <div class="flex h-16 shrink-0 items-center gap-x-2.5 px-6">
-        <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-400 text-primary-900">
-            <x-icon name="bolt" class="w-4 h-4" />
-        </span>
-        <a href="{{ route('dashboard') }}" wire:navigate class="text-lg font-semibold tracking-tight text-slate-900 dark:text-white">
-            {{ config('app.name') }}
+    <div class="flex h-16 shrink-0 items-center px-6">
+        <a href="{{ route('dashboard') }}" wire:navigate class="flex items-center gap-2.5">
+            <x-logo size="28" />
+            <span class="text-xl font-medium text-slate-900 dark:text-slate-100">Stampy</span>
         </a>
     </div>
 
