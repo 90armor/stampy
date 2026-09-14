@@ -27,10 +27,21 @@
              DB_HOST/etc. as real environment variables (see docker-compose.yml), and
              PHPUnit's <env> tag silently no-ops instead of overriding an already-set
              env var unless forced — without this, tests were running (and via
-             RefreshDatabase, wiping) the real dev MySQL database on every run. -->
-        <env name="DB_CONNECTION" value="sqlite" force="true"/>
-        <env name="DB_DATABASE" value=":memory:" force="true"/>
-        <env name="DB_HOST" value="" force="true"/>
+             RefreshDatabase, wiping) the real dev MySQL database on every run.
+
+             MySQL, not sqlite, on purpose: this app's attendance features are
+             date/time arithmetic and a 'date'-cast column compared against MySQL's
+             real DATE type, which behaves differently from sqlite's (no enforced
+             column types, so a value with a time component just gets stored as
+             given instead of truncated) — a green sqlite suite already hid one bug
+             here. DB_DATABASE below is a dedicated stampy_testing database, never
+             the dev "stampy" one — do not repoint this at "stampy" for any reason. -->
+        <env name="DB_CONNECTION" value="mysql" force="true"/>
+        <env name="DB_DATABASE" value="stampy_testing" force="true"/>
+        <env name="DB_HOST" value="mysql" force="true"/>
+        <env name="DB_PORT" value="3306" force="true"/>
+        <env name="DB_USERNAME" value="attendance" force="true"/>
+        <env name="DB_PASSWORD" value="secret" force="true"/>
         <env name="DB_URL" value="" force="true"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
