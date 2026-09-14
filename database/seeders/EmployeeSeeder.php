@@ -74,12 +74,14 @@ class EmployeeSeeder extends Seeder
             $userId = null;
 
             if ($data['create_user']) {
-                $email = strtolower(str_replace(' ', '.', $data['full_name'])).'@example.com';
+                $username = strtolower(str_replace(' ', '.', $data['full_name']));
+                $email = $username.'@example.com';
 
                 $user = User::firstOrCreate(
                     ['email' => $email],
                     [
                         'name' => $data['full_name'],
+                        'username' => $username,
                         'password' => Hash::make('password'),
                         'email_verified_at' => now(),
                     ]

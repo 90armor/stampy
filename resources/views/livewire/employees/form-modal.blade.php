@@ -16,6 +16,7 @@
                     Share these credentials with {{ $full_name }}. This password is shown once and cannot be retrieved later.
                 </p>
                 <dl class="mt-3 space-y-1 text-sm">
+                    <div class="flex gap-2"><dt class="font-medium text-slate-500 dark:text-slate-400 w-20">Username</dt><dd class="text-slate-900 dark:text-slate-100">{{ $username }}</dd></div>
                     <div class="flex gap-2"><dt class="font-medium text-slate-500 dark:text-slate-400 w-20">Email</dt><dd class="text-slate-900 dark:text-slate-100">{{ $email }}</dd></div>
                     <div class="flex gap-2"><dt class="font-medium text-slate-500 dark:text-slate-400 w-20">Password</dt><dd class="font-mono text-slate-900 dark:text-slate-100">{{ $generatedPassword }}</dd></div>
                 </dl>
@@ -170,6 +171,17 @@
 
                                         @if ($create_user)
                                             <div class="mt-4 space-y-4 border-t border-slate-200/60 pt-4 dark:border-slate-800/60">
+                                                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+                                                    <div class="sm:max-w-[240px]">
+                                                        <x-input-label for="emp_username" value="Username" class="!mb-0" />
+                                                        <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Login identifier. Defaults to the employee code.</p>
+                                                    </div>
+                                                    <div class="sm:w-[320px] sm:shrink-0">
+                                                        <x-text-input id="emp_username" type="text" surface="solid" wire:model="username" />
+                                                        <x-input-error :messages="$errors->get('username')" class="mt-1" />
+                                                    </div>
+                                                </div>
+
                                                 <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
                                                     <div class="sm:max-w-[240px]">
                                                         <x-input-label for="emp_email" value="Email" class="!mb-0" />

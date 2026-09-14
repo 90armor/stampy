@@ -40,6 +40,8 @@ class FormModal extends Component
 
     public bool $create_user = false;
 
+    public string $username = '';
+
     public string $email = '';
 
     public string $role = 'employee';
@@ -59,6 +61,7 @@ class FormModal extends Component
             'device_user_id' => ['nullable', 'string', 'max:50', 'unique:employees,device_user_id,'.$employeeId],
             'status' => ['required', 'in:active,inactive'],
             'create_user' => ['boolean'],
+            'username' => ['required_if:create_user,true', 'nullable', 'string', 'max:255', 'unique:users,username'],
             'email' => ['required_if:create_user,true', 'nullable', 'email', 'max:255', 'unique:users,email'],
             'role' => ['required_if:create_user,true', 'nullable', 'in:admin,manager,employee'],
         ];
@@ -93,6 +96,13 @@ class FormModal extends Component
         $this->showModal = true;
     }
 
+    public function updatedCreateUser(bool $value): void
+    {
+        if ($value && $this->username === '') {
+            $this->username = $this->employee_code;
+        }
+    }
+
     public function save(): void
     {
         $this->authorize($this->editing ? 'update' : 'create', $this->editing ?? Employee::class);
@@ -114,6 +124,7 @@ class FormModal extends Component
 
             $user = User::create([
                 'name' => $this->full_name,
+                'username' => $this->username,
                 'email' => $this->email,
                 'password' => Hash::make($password),
                 'email_verified_at' => now(),
@@ -148,7 +159,7 @@ class FormModal extends Component
     {
         $this->reset([
             'editing', 'full_name', 'employee_code', 'department_id', 'position_id',
-            'join_date', 'device_user_id', 'create_user', 'email', 'generatedPassword',
+            'join_date', 'device_user_id', 'create_user', 'username', 'email', 'generatedPassword',
         ]);
         $this->status = 'active';
         $this->role = 'employee';
