@@ -105,7 +105,7 @@ class EmployeeManagementTest extends TestCase
             ->test(Index::class)
             ->call('deactivate', $employee->id);
 
-        $this->assertNotSoftDeleted('employees', ['id' => $employee->id]);
+        $this->assertDatabaseHas('employees', ['id' => $employee->id]);
         $this->assertSame('inactive', $employee->fresh()->status);
     }
 

@@ -66,11 +66,11 @@ class Index extends Component
     {
         $this->authorize('delete', $position);
 
-        // withTrashed() matters here: a deactivated (soft-deleted) employee still
-        // physically occupies the row that the position_id foreign key
-        // (restrictOnDelete) points at, so excluding trashed rows would let this
-        // check pass while the DB delete still fails with an unhandled exception.
-        if ($position->employees()->withTrashed()->exists()) {
+        // A deactivated (status = 'inactive') employee still occupies the row
+        // that the position_id foreign key (restrictOnDelete) points at, so
+        // this must count inactive employees too — otherwise the check could
+        // pass while the DB delete still fails with an unhandled exception.
+        if ($position->employees()->exists()) {
             $this->addError('delete', 'Cannot delete a position that still has employees assigned.');
 
             return;
