@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Enums\AttendanceSource;
+use App\Enums\PunchSource;
 use App\Enums\PunchType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -27,7 +27,7 @@ class AttendanceLog extends Model
         return [
             'punched_at' => 'datetime',
             'punch_type' => PunchType::class,
-            'source' => AttendanceSource::class,
+            'source' => PunchSource::class,
             'raw' => 'array',
         ];
     }

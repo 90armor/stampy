@@ -2,7 +2,7 @@
 
 namespace App\Enums;
 
-enum AttendanceSource: string
+enum PunchSource: string
 {
     case Device = 'device';
     case Import = 'import';

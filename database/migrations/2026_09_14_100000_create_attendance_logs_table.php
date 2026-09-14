@@ -19,7 +19,11 @@ return new class extends Migration
             $table->json('raw')->nullable();
             $table->timestamps();
 
-            $table->index(['employee_id', 'punched_at']);
+            // Replaces the old (employee_id, punched_at) index — this composite
+            // unique already serves those lookups via its leftmost columns, and
+            // additionally enforces idempotency structurally: the same device
+            // punch re-imported (or re-seeded) can't be stored twice.
+            $table->unique(['employee_id', 'punched_at', 'source']);
         });
     }
 

@@ -2,7 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Enums\AttendanceSource;
+use App\Enums\PunchSource;
 use App\Enums\PunchType;
 use App\Models\AttendanceLog;
 use App\Models\Employee;
@@ -24,7 +24,7 @@ class AttendanceLogFactory extends Factory
             'employee_id' => Employee::factory(),
             'punched_at' => $this->faker->dateTimeBetween('-1 month', 'now'),
             'punch_type' => PunchType::In,
-            'source' => AttendanceSource::Device,
+            'source' => PunchSource::Device,
             'device_id' => null,
             'created_by' => null,
             'raw' => null,
