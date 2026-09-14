@@ -10,9 +10,14 @@ class AdminUserSeeder extends Seeder
 {
     /**
      * Default local/dev credentials — must be changed after first login.
+     * Never seeds a known password in production.
      */
     public function run(): void
     {
+        if (app()->isProduction()) {
+            return;
+        }
+
         $admin = User::firstOrCreate(
             ['email' => 'admin@example.com'],
             [
