@@ -1,3 +1,5 @@
+name: stampy
+
 services:
     app:
         build:
@@ -10,7 +12,7 @@ services:
             DB_CONNECTION: mysql
             DB_HOST: mysql
             DB_PORT: 3306
-            DB_DATABASE: attendance_system
+            DB_DATABASE: stampy
             DB_USERNAME: attendance
             DB_PASSWORD: secret
         depends_on:
@@ -42,7 +44,7 @@ services:
     mysql:
         image: mysql:9.4
         environment:
-            MYSQL_DATABASE: attendance_system
+            MYSQL_DATABASE: stampy
             MYSQL_USER: attendance
             MYSQL_PASSWORD: secret
             MYSQL_ROOT_PASSWORD: secret

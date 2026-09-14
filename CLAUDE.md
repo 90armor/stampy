@@ -16,7 +16,7 @@ Why: Breeze+Blade avoids standing up a separate frontend/API for what is an inte
 ## Local environment
 
 - PHP 8.5, Composer 2.10, MySQL 9.4 (Homebrew), Node/npm for Vite asset builds.
-- Database: `attendance_system` (MySQL). `.env` / `.env.example` are pre-configured for `DB_CONNECTION=mysql`.
+- Database: `stampy` (MySQL). `.env` / `.env.example` are pre-configured for `DB_CONNECTION=mysql`.
 - Run `php artisan migrate:fresh --seed` to reset and reseed. Seeded accounts (all password `password`, **change after first login**):
   - `admin@example.com` — admin
   - `aye.aye.mon@example.com` — manager (Engineering)
