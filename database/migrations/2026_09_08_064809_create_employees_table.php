@@ -17,6 +17,8 @@ return new class extends Migration
             $table->foreignId('position_id')->constrained()->restrictOnDelete();
             $table->date('join_date');
             $table->string('device_user_id')->nullable()->unique();
+            $table->foreignId('work_schedule_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('manager_id')->nullable()->constrained('employees')->nullOnDelete();
             $table->enum('status', ['active', 'inactive'])->default('active');
             $table->timestamps();
             $table->softDeletes();
