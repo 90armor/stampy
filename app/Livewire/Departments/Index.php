@@ -3,7 +3,6 @@
 namespace App\Livewire\Departments;
 
 use App\Models\Department;
-use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -15,11 +14,17 @@ class Index extends Component
 
     public ?Department $editing = null;
 
-    #[Validate('required|string|max:255')]
     public string $name = '';
 
-    #[Validate('nullable|string|max:1000')]
     public ?string $description = null;
+
+    protected function rules(): array
+    {
+        return [
+            'name' => ['required', 'string', 'max:255', 'unique:departments,name,'.$this->editing?->id],
+            'description' => ['nullable', 'string', 'max:1000'],
+        ];
+    }
 
     public function mount(): void
     {
