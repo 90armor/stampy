@@ -3,7 +3,11 @@ $navItems = [
     ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'home', 'visible' => true, 'enabled' => true],
     ['label' => 'Employees', 'route' => 'employees.index', 'icon' => 'users', 'visible' => auth()->user()->hasAnyRole(['admin', 'manager']), 'enabled' => true],
     ['label' => 'Organization', 'route' => 'organization.index', 'icon' => 'building-office', 'visible' => auth()->user()->hasRole('admin'), 'enabled' => true],
-    ['label' => 'Attendance', 'route' => 'attendance.index', 'icon' => 'clock', 'visible' => auth()->user()->hasAnyRole(['admin', 'manager']), 'enabled' => true],
+    // 'Attendance' and 'My attendance' share the 'attendance.' route-name
+    // prefix but must not both light up together, so each gets an explicit
+    // pattern instead of the derived 'prefix.*' every other item uses.
+    ['label' => 'Attendance', 'route' => 'attendance.index', 'icon' => 'clock', 'visible' => auth()->user()->hasAnyRole(['admin', 'manager']), 'enabled' => true, 'activePatterns' => ['attendance.index', 'attendance.show']],
+    ['label' => 'My attendance', 'route' => 'attendance.mine', 'icon' => 'user-circle', 'visible' => true, 'enabled' => true, 'activePatterns' => ['attendance.mine']],
     ['label' => 'Time off', 'icon' => 'calendar-days', 'visible' => true, 'enabled' => false],
     ['label' => 'Reports', 'icon' => 'document-text', 'visible' => auth()->user()->hasAnyRole(['admin', 'manager']), 'enabled' => false],
 ];
@@ -25,8 +29,10 @@ $navItems = [
             @endif
             @if ($item['enabled'])
                 {{-- Match on the route-name prefix (e.g. 'employees*'), not the exact
-                     route, so nested pages like employees.show keep this item active. --}}
-                @php $active = request()->routeIs(explode('.', $item['route'])[0].'*'); @endphp
+                     route, so nested pages like employees.show keep this item active —
+                     unless the item declares explicit patterns (see the comment above
+                     the Attendance/My attendance entries). --}}
+                @php $active = request()->routeIs(...($item['activePatterns'] ?? [explode('.', $item['route'])[0].'*'])); @endphp
                 <a
                     href="{{ route($item['route']) }}"
                     wire:navigate

@@ -23,6 +23,20 @@
         <h1 class="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Daily attendance</h1>
     </div>
 
+    @if ($scopeHasNoEmployeeRecord)
+        {{-- A manager-role account with no linked employees row has no
+        position in the org tree, so scopedEmployeeIds() is deliberately
+        empty rather than "all employees" — filters/stat cards would be
+        meaningless over zero rows, so this replaces them entirely with an
+        explanation instead of a bare "no results" table. --}}
+        <x-card>
+            <x-empty-state
+                icon="user-x"
+                title="Your account isn't linked to an employee record"
+                description="Attendance can't be scoped to you until an admin links this login to an employee profile. Contact an admin to get this set up."
+            />
+        </x-card>
+    @else
     {{-- Always exactly these 4 (Present/Late/Absent/Incomplete), 0 shown
     plainly when a status has no rows — not appear/disappear based on
     whether data exists — same as Employees' Total/Active/Inactive.
@@ -218,8 +232,10 @@
                             <tr wire:key="daily-attendance-{{ $attendance->id }}" class="relative hover:bg-slate-50 dark:hover:bg-slate-800/60">
                                 <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{{ $attendance->work_date->format('D j M') }}</td>
                                 <td class="px-6 py-4">
-                                    <div class="font-medium text-slate-900 dark:text-slate-100">{{ $attendance->employee->full_name }}</div>
-                                    <div class="text-sm text-slate-500 dark:text-slate-400">{{ $attendance->employee->employee_code }}</div>
+                                    <a href="{{ route('attendance.show', $attendance->employee) }}" wire:navigate class="group/link inline-block">
+                                        <div class="font-medium text-slate-900 group-hover/link:text-primary-600 dark:text-slate-100 dark:group-hover/link:text-primary-400">{{ $attendance->employee->full_name }}</div>
+                                        <div class="text-sm text-slate-500 dark:text-slate-400">{{ $attendance->employee->employee_code }}</div>
+                                    </a>
                                 </td>
                                 <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{{ $attendance->employee->department->name }}</td>
                                 <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">
@@ -255,4 +271,5 @@
             </div>
         @endif
     </x-card>
+    @endif
 </div>

@@ -42,6 +42,23 @@ class AttendanceIndexTest extends TestCase
         ]);
     }
 
+    private function attendanceRowForEmployee(Employee $employee, string $workDate, AttendanceStatus $status): DailyAttendance
+    {
+        return DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => $workDate,
+            'status' => $status,
+        ]);
+    }
+
+    private function managerUser(Employee $employee): User
+    {
+        $user = User::factory()->create()->assignRole('manager');
+        $employee->update(['user_id' => $user->id]);
+
+        return $user;
+    }
+
     public function test_admin_can_view_the_attendance_list(): void
     {
         $this->actingAs($this->admin())->get(route('attendance.index'))->assertOk();
@@ -223,6 +240,90 @@ class AttendanceIndexTest extends TestCase
             ->test(Index::class)
             ->set('toDate', today()->addDays(5)->format('Y-m-d'))
             ->assertSee('only been calculated up to');
+    }
+
+    public function test_admin_sees_every_employees_attendance(): void
+    {
+        $admin = $this->admin();
+
+        $topA = Employee::factory()->create(['full_name' => 'Top A']);
+        $topB = Employee::factory()->create(['full_name' => 'Top B']);
+        $this->attendanceRowForEmployee($topA, today()->format('Y-m-d'), AttendanceStatus::Present);
+        $this->attendanceRowForEmployee($topB, today()->format('Y-m-d'), AttendanceStatus::Present);
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->assertSee('Top A')
+            ->assertSee('Top B');
+    }
+
+    public function test_manager_sees_only_their_own_and_transitive_subordinates(): void
+    {
+        $top = Employee::factory()->create(['full_name' => 'Manager Self']);
+        $mid = Employee::factory()->create(['full_name' => 'Direct Report', 'manager_id' => $top->id]);
+        $leaf = Employee::factory()->create(['full_name' => 'Report Of Report', 'manager_id' => $mid->id]);
+        $otherBranch = Employee::factory()->create(['full_name' => 'Unrelated Person']);
+
+        $this->attendanceRowForEmployee($top, today()->format('Y-m-d'), AttendanceStatus::Present);
+        $this->attendanceRowForEmployee($mid, today()->format('Y-m-d'), AttendanceStatus::Present);
+        $this->attendanceRowForEmployee($leaf, today()->format('Y-m-d'), AttendanceStatus::Present);
+        $this->attendanceRowForEmployee($otherBranch, today()->format('Y-m-d'), AttendanceStatus::Present);
+
+        $manager = $this->managerUser($top);
+
+        Livewire::actingAs($manager)
+            ->test(Index::class)
+            ->assertSee('Manager Self')
+            ->assertSee('Direct Report')
+            ->assertSee('Report Of Report')
+            ->assertDontSee('Unrelated Person');
+    }
+
+    public function test_manager_summary_reflects_only_the_scoped_set(): void
+    {
+        $top = Employee::factory()->create();
+        $subordinate = Employee::factory()->create(['manager_id' => $top->id]);
+        $outsider = Employee::factory()->create();
+
+        $this->attendanceRowForEmployee($top, today()->format('Y-m-d'), AttendanceStatus::Present);
+        $this->attendanceRowForEmployee($subordinate, today()->format('Y-m-d'), AttendanceStatus::Absent);
+        $this->attendanceRowForEmployee($outsider, today()->format('Y-m-d'), AttendanceStatus::Present);
+
+        $manager = $this->managerUser($top);
+
+        $summary = Livewire::actingAs($manager)
+            ->test(Index::class)
+            ->instance()
+            ->render()
+            ->getData()['summary'];
+
+        $this->assertSame(1, $summary->get('present'));
+        $this->assertSame(1, $summary->get('absent'));
+    }
+
+    public function test_manager_department_dropdown_only_offers_departments_in_scope(): void
+    {
+        $deptA = Department::factory()->create(['name' => 'Scoped Dept']);
+        $deptB = Department::factory()->create(['name' => 'Unscoped Dept']);
+
+        $top = Employee::factory()->create(['department_id' => $deptA->id]);
+        Employee::factory()->create(['department_id' => $deptB->id]);
+
+        $manager = $this->managerUser($top);
+
+        Livewire::actingAs($manager)
+            ->test(Index::class)
+            ->assertSee('Scoped Dept')
+            ->assertDontSee('Unscoped Dept');
+    }
+
+    public function test_a_manager_role_user_with_no_linked_employee_sees_an_explicit_message(): void
+    {
+        $manager = User::factory()->create()->assignRole('manager');
+
+        Livewire::actingAs($manager)
+            ->test(Index::class)
+            ->assertSee("isn't linked to an employee record");
     }
 
     public function test_overnight_row_renders_the_plus_one_marker(): void

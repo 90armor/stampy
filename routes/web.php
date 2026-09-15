@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Livewire\Attendance\Index as AttendanceIndex;
+use App\Livewire\Attendance\Show as AttendanceShow;
 use App\Livewire\Employees\Index as EmployeesIndex;
 use App\Livewire\Employees\Show as ShowEmployee;
 use App\Models\Department;
@@ -70,12 +71,19 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    // No role restriction: resolves the viewer's own linked employee record
+    // (EmployeePolicy::view already allows anyone to view their own record
+    // regardless of role). Row-level scoping, not route middleware, is what
+    // keeps this from exposing anyone else's data.
+    Route::get('/my-attendance', AttendanceShow::class)->name('attendance.mine');
 });
 
 Route::middleware(['auth', 'verified', 'role:admin|manager'])->group(function () {
     Route::get('/employees', EmployeesIndex::class)->name('employees.index');
     Route::get('/employees/{employee}', ShowEmployee::class)->name('employees.show');
     Route::get('/attendance', AttendanceIndex::class)->name('attendance.index');
+    Route::get('/attendance/{employee}', AttendanceShow::class)->name('attendance.show');
 });
 
 Route::middleware(['auth', 'verified', 'role:admin'])->group(function () {

@@ -8,6 +8,7 @@ use App\Models\Department;
 use App\Models\Employee;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -17,6 +18,20 @@ class Index extends Component
     use WithPagination;
 
     private const PER_PAGE = 20;
+
+    /**
+     * Resolved lazily the first time it's needed within a request and
+     * reused by baseQuery(), summaryQuery(), and the department dropdown —
+     * cheap either way (one BFS over a small org tree, not per attendance
+     * row), but no reason to walk it twice in the same render().
+     *
+     * @var int[]|null
+     */
+    private ?array $scopedEmployeeIds = null;
+
+    private bool $scopeResolved = false;
+
+    private bool $scopeHasNoEmployeeRecord = false;
 
     #[Url(as: 'from', history: true)]
     public string $fromDate = '';
@@ -40,10 +55,9 @@ class Index extends Component
         // itself (admin|manager) — there's no dedicated attendance policy,
         // reusing Employee's viewAny keeps this consistent with route
         // middleware rather than inventing a second gate for the same rule.
-        //
-        // Phase 3: managers currently see every employee's attendance here,
-        // same as EmployeePolicy::viewAny. Scoping this list down to a
-        // manager's own subordinates (via Employee::manager_id) belongs here.
+        // viewAny only decides whether this page is reachable at all; which
+        // rows it shows is narrowed separately by scopedEmployeeIds(),
+        // mirroring EmployeePolicy::view's row-level rule.
         $this->authorize('viewAny', Employee::class);
 
         if ($this->fromDate === '') {
@@ -139,6 +153,55 @@ class Index extends Component
     }
 
     /**
+     * Row-level scope for the acting user, mirroring EmployeePolicy::view:
+     * admin sees everyone (null = no restriction, avoids a pointless
+     * whereIn over every employee id); a manager sees themself plus their
+     * transitive subordinates; anyone else sees only their own record. A
+     * manager-role user with no linked employee record has no position in
+     * the org tree — returns an empty (not null) array so the query
+     * correctly yields zero rows, and the view shows an explicit message
+     * rather than a plain "no results" empty state.
+     *
+     * Resolved once per request: baseQuery(), summaryQuery(), and the
+     * department dropdown in render() all call this, and memoizing means
+     * the subordinate BFS (one query per org-tree level, not per row) only
+     * runs once.
+     *
+     * @return int[]|null
+     */
+    private function scopedEmployeeIds(): ?array
+    {
+        if ($this->scopeResolved) {
+            return $this->scopedEmployeeIds;
+        }
+
+        $this->scopeResolved = true;
+        $user = auth()->user();
+
+        if ($user->hasRole('admin')) {
+            return $this->scopedEmployeeIds = null;
+        }
+
+        $employee = $user->employee;
+
+        if ($employee === null) {
+            $this->scopeHasNoEmployeeRecord = true;
+
+            Log::warning('Attendance list viewed by a user with no linked employee record — showing an empty scope.', [
+                'user_id' => $user->id,
+            ]);
+
+            return $this->scopedEmployeeIds = [];
+        }
+
+        if ($user->hasRole('manager')) {
+            return $this->scopedEmployeeIds = [$employee->id, ...$employee->subordinateIds()];
+        }
+
+        return $this->scopedEmployeeIds = [$employee->id];
+    }
+
+    /**
      * Powers the paginated table only. Joins (not whereHas) because the
      * default sort crosses the employee relation — whereHas can filter that
      * but can't drive an ORDER BY.
@@ -148,6 +211,10 @@ class Index extends Component
         return DailyAttendance::query()
             ->join('employees', 'employees.id', '=', 'daily_attendances.employee_id')
             ->whereBetween('daily_attendances.work_date', [$this->fromDate, $this->toDate])
+            ->when(
+                $this->scopedEmployeeIds() !== null,
+                fn (Builder $query) => $query->whereIn('daily_attendances.employee_id', $this->scopedEmployeeIds() ?? [])
+            )
             ->when(
                 $this->employeeFilter,
                 fn (Builder $query) => $query->where(function (Builder $query) {
@@ -172,11 +239,19 @@ class Index extends Component
      * overview (matching how Employees' Total/Active/Inactive cards ignore
      * that page's own search/filters) instead of vanishing whenever a chip
      * is toggled off. No join needed since nothing here touches employees.
+     *
+     * Row-level scoping is NOT one of the filters this deliberately ignores
+     * — it's access control, not a user-adjustable filter, so it applies
+     * here the same as it does to baseQuery().
      */
     private function summaryQuery(): Builder
     {
         return DailyAttendance::query()
-            ->whereBetween('work_date', [$this->fromDate, $this->toDate]);
+            ->whereBetween('work_date', [$this->fromDate, $this->toDate])
+            ->when(
+                $this->scopedEmployeeIds() !== null,
+                fn (Builder $query) => $query->whereIn('employee_id', $this->scopedEmployeeIds() ?? [])
+            );
     }
 
     /**
@@ -213,6 +288,8 @@ class Index extends Component
 
     public function render()
     {
+        $scopedIds = $this->scopedEmployeeIds();
+
         $attendances = $this->baseQuery()
             ->select('daily_attendances.*')
             ->with(['employee.department'])
@@ -222,12 +299,21 @@ class Index extends Component
 
         $summary = $this->summary();
 
+        $departments = Department::query()
+            ->when(
+                $scopedIds !== null,
+                fn (Builder $query) => $query->whereHas('employees', fn (Builder $q) => $q->whereIn('id', $scopedIds ?? []))
+            )
+            ->orderBy('name')
+            ->get();
+
         return view('livewire.attendance.index', [
             'attendances' => $attendances,
-            'departments' => Department::orderBy('name')->get(),
+            'departments' => $departments,
             'summary' => $summary,
             'maxBuiltDate' => DailyAttendance::max('work_date'),
             'allStatuses' => AttendanceStatus::cases(),
+            'scopeHasNoEmployeeRecord' => $this->scopeHasNoEmployeeRecord,
         ])->layout('layouts.app', ['header' => 'Attendance']);
     }
 }

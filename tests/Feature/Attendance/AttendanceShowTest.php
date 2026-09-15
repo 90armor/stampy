@@ -1,0 +1,189 @@
+<?php
+
+namespace Tests\Feature\Attendance;
+
+use App\Enums\AttendanceStatus;
+use App\Livewire\Attendance\Show;
+use App\Models\DailyAttendance;
+use App\Models\Employee;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
+use Spatie\Permission\Models\Role;
+use Tests\TestCase;
+
+class AttendanceShowTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        foreach (['admin', 'manager', 'employee'] as $role) {
+            Role::firstOrCreate(['name' => $role]);
+        }
+    }
+
+    private function admin(): User
+    {
+        return User::factory()->create()->assignRole('admin');
+    }
+
+    private function managerUser(Employee $employee): User
+    {
+        $user = User::factory()->create()->assignRole('manager');
+        $employee->update(['user_id' => $user->id]);
+
+        return $user;
+    }
+
+    public function test_admin_can_view_any_employees_detail_page(): void
+    {
+        $employee = Employee::factory()->create();
+
+        $this->actingAs($this->admin())
+            ->get(route('attendance.show', $employee))
+            ->assertOk();
+    }
+
+    public function test_a_manager_can_view_a_report_of_a_report(): void
+    {
+        $top = Employee::factory()->create();
+        $mid = Employee::factory()->create(['manager_id' => $top->id]);
+        $leaf = Employee::factory()->create(['manager_id' => $mid->id]);
+
+        $manager = $this->managerUser($top);
+
+        $this->actingAs($manager)
+            ->get(route('attendance.show', $leaf))
+            ->assertOk();
+    }
+
+    public function test_a_manager_cannot_view_a_peer(): void
+    {
+        $topA = Employee::factory()->create();
+        $topB = Employee::factory()->create();
+
+        $manager = $this->managerUser($topA);
+
+        $this->actingAs($manager)
+            ->get(route('attendance.show', $topB))
+            ->assertForbidden();
+    }
+
+    public function test_a_manager_cannot_view_someone_in_another_branch(): void
+    {
+        $topA = Employee::factory()->create();
+        $midA = Employee::factory()->create(['manager_id' => $topA->id]);
+
+        $topB = Employee::factory()->create();
+        $otherBranch = Employee::factory()->create(['manager_id' => $topB->id]);
+
+        $manager = $this->managerUser($midA);
+
+        $this->actingAs($manager)
+            ->get(route('attendance.show', $otherBranch))
+            ->assertForbidden();
+    }
+
+    public function test_an_employee_can_view_their_own_detail_page_but_not_a_colleagues(): void
+    {
+        $own = Employee::factory()->create();
+        $other = Employee::factory()->create();
+
+        $user = User::factory()->create()->assignRole('employee');
+        $own->update(['user_id' => $user->id]);
+
+        // /attendance/{employee} is gated by role:admin|manager route
+        // middleware, so a plain employee reaches their own record via
+        // /my-attendance instead — see the next test.
+        $this->actingAs($user)
+            ->get(route('attendance.show', $other))
+            ->assertForbidden();
+    }
+
+    public function test_my_attendance_resolves_to_the_authenticated_users_own_employee(): void
+    {
+        $user = User::factory()->create()->assignRole('employee');
+        $employee = Employee::factory()->create(['user_id' => $user->id, 'full_name' => 'Self Viewer']);
+
+        $this->actingAs($user)
+            ->get(route('attendance.mine'))
+            ->assertOk()
+            ->assertSee('Self Viewer');
+    }
+
+    public function test_my_attendance_shows_a_clear_message_when_theres_no_linked_employee(): void
+    {
+        $user = User::factory()->create()->assignRole('employee');
+
+        $this->actingAs($user)
+            ->get(route('attendance.mine'))
+            ->assertOk()
+            ->assertSee("isn't linked to an employee record");
+    }
+
+    public function test_a_day_with_no_daily_attendance_row_renders_as_not_calculated(): void
+    {
+        $employee = Employee::factory()->create();
+        $month = today()->startOfMonth();
+
+        // Only the first day of the month has been calculated; every other
+        // day in the month must show as "Not calculated", not "Absent" —
+        // asserted via the summary counts (workdays/absent stay at what the
+        // one real row contributes) rather than a page-wide assertDontSee,
+        // since "Absent" is also a summary-bar category label that's always
+        // printed (with a 0 count) regardless of whether any day has it.
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => $month->format('Y-m-d'),
+            'status' => AttendanceStatus::Present,
+        ]);
+
+        $component = Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', $month->format('Y-m'))
+            ->assertSee('Not calculated');
+
+        $summary = $component->instance()->render()->getData()['summary'];
+
+        $this->assertSame(1, $summary['workdays']);
+        $this->assertSame(1, $summary['present']);
+        $this->assertSame(0, $summary['absent']);
+    }
+
+    public function test_month_summary_counts_match_the_calculated_rows(): void
+    {
+        $employee = Employee::factory()->create();
+        $month = today()->startOfMonth();
+
+        $statuses = [
+            AttendanceStatus::Present,
+            AttendanceStatus::Present,
+            AttendanceStatus::Late,
+            AttendanceStatus::Absent,
+        ];
+
+        foreach ($statuses as $i => $status) {
+            DailyAttendance::factory()->create([
+                'employee_id' => $employee->id,
+                'work_date' => $month->copy()->addDays($i)->format('Y-m-d'),
+                'status' => $status,
+            ]);
+        }
+
+        $summary = Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', $month->format('Y-m'))
+            ->instance()
+            ->render()
+            ->getData()['summary'];
+
+        $this->assertSame(2, $summary['present']);
+        $this->assertSame(1, $summary['late']);
+        $this->assertSame(1, $summary['absent']);
+        $this->assertSame(0, $summary['incomplete']);
+        $this->assertSame(4, $summary['workdays']);
+    }
+}

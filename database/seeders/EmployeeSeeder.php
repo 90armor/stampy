@@ -73,10 +73,15 @@ class EmployeeSeeder extends Seeder
     /**
      * 35 employees across the existing departments/positions — enough to
      * exercise list/pagination/filter views (Phase 2.4). A few people act as
-     * manager_id anchors (the two named department managers, plus 3 informal
-     * team leads holding a regular position) so the reporting tree has more
-     * than one level; everyone else reports to one of those five. Roughly
-     * half get a login account, so "employee with no account" stays
+     * manager_id anchors (the two named department managers, plus 3 team
+     * leads holding a regular position) so the reporting tree has more than
+     * one level; everyone else reports to one of those five. All five carry
+     * the 'manager' Spatie role and a linked user account — row-level
+     * access (Phase 2.4b) resolves a manager's scope by walking manager_id
+     * from their own employee record, so a team lead with subordinates but
+     * only the 'employee' role would have reports nobody with that role can
+     * actually reach. Everyone else gets 'employee' (or no account at all).
+     * Roughly half get a login account, so "employee with no account" stays
      * represented at scale, not just as the two original examples.
      *
      * @return array<int, array{employee_code: string, full_name: string, department_id: int, position: string, join_date: string, device_user_id: string, role: ?string, create_user: bool, manager_code: ?string}>
@@ -94,8 +99,8 @@ class EmployeeSeeder extends Seeder
 
             // --- Engineering: two Software-Engineer team leads under Aye Aye
             // Mon, each with their own reports. ---
-            ['employee_code' => 'EMP-0006', 'full_name' => 'Htet Htet Oo', 'department_id' => $engineeringId, 'position' => 'Software Engineer', 'join_date' => '2022-03-10', 'device_user_id' => '1006', 'role' => 'employee', 'create_user' => true, 'manager_code' => 'EMP-0001'],
-            ['employee_code' => 'EMP-0007', 'full_name' => 'Wai Yan Aung', 'department_id' => $engineeringId, 'position' => 'Software Engineer', 'join_date' => '2022-05-18', 'device_user_id' => '1007', 'role' => 'employee', 'create_user' => true, 'manager_code' => 'EMP-0001'],
+            ['employee_code' => 'EMP-0006', 'full_name' => 'Htet Htet Oo', 'department_id' => $engineeringId, 'position' => 'Software Engineer', 'join_date' => '2022-03-10', 'device_user_id' => '1006', 'role' => 'manager', 'create_user' => true, 'manager_code' => 'EMP-0001'],
+            ['employee_code' => 'EMP-0007', 'full_name' => 'Wai Yan Aung', 'department_id' => $engineeringId, 'position' => 'Software Engineer', 'join_date' => '2022-05-18', 'device_user_id' => '1007', 'role' => 'manager', 'create_user' => true, 'manager_code' => 'EMP-0001'],
             ['employee_code' => 'EMP-0008', 'full_name' => 'Nay Chi Win', 'department_id' => $engineeringId, 'position' => 'Software Engineer', 'join_date' => '2023-01-09', 'device_user_id' => '1008', 'role' => null, 'create_user' => false, 'manager_code' => 'EMP-0006'],
             ['employee_code' => 'EMP-0009', 'full_name' => 'Moe Moe Khaing', 'department_id' => $engineeringId, 'position' => 'Software Engineer', 'join_date' => '2023-02-14', 'device_user_id' => '1009', 'role' => 'employee', 'create_user' => true, 'manager_code' => 'EMP-0006'],
             ['employee_code' => 'EMP-0010', 'full_name' => 'Thura Kyaw', 'department_id' => $engineeringId, 'position' => 'Software Engineer', 'join_date' => '2023-04-22', 'device_user_id' => '1010', 'role' => null, 'create_user' => false, 'manager_code' => 'EMP-0006'],
@@ -116,7 +121,7 @@ class EmployeeSeeder extends Seeder
 
             // --- Operations: one Office-Coordinator team lead under Zaw Zaw
             // Htet, plus direct reports. ---
-            ['employee_code' => 'EMP-0023', 'full_name' => 'Ohnmar Kyaw', 'department_id' => $operationsId, 'position' => 'Office Coordinator', 'join_date' => '2022-06-01', 'device_user_id' => '1023', 'role' => 'employee', 'create_user' => true, 'manager_code' => 'EMP-0004'],
+            ['employee_code' => 'EMP-0023', 'full_name' => 'Ohnmar Kyaw', 'department_id' => $operationsId, 'position' => 'Office Coordinator', 'join_date' => '2022-06-01', 'device_user_id' => '1023', 'role' => 'manager', 'create_user' => true, 'manager_code' => 'EMP-0004'],
             ['employee_code' => 'EMP-0024', 'full_name' => 'Zaw Min Tun', 'department_id' => $operationsId, 'position' => 'Office Coordinator', 'join_date' => '2022-09-14', 'device_user_id' => '1024', 'role' => null, 'create_user' => false, 'manager_code' => 'EMP-0023'],
             ['employee_code' => 'EMP-0025', 'full_name' => 'Shwe Yi Aung', 'department_id' => $operationsId, 'position' => 'Office Coordinator', 'join_date' => '2023-01-27', 'device_user_id' => '1025', 'role' => 'employee', 'create_user' => true, 'manager_code' => 'EMP-0023'],
             ['employee_code' => 'EMP-0026', 'full_name' => 'Htay Htay Win', 'department_id' => $operationsId, 'position' => 'Office Coordinator', 'join_date' => '2023-04-15', 'device_user_id' => '1026', 'role' => null, 'create_user' => false, 'manager_code' => 'EMP-0023'],
