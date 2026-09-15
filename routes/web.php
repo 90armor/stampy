@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
+use App\Livewire\Attendance\Index as AttendanceIndex;
 use App\Livewire\Employees\Index as EmployeesIndex;
 use App\Livewire\Employees\Show as ShowEmployee;
 use App\Models\Department;
@@ -74,6 +75,7 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'verified', 'role:admin|manager'])->group(function () {
     Route::get('/employees', EmployeesIndex::class)->name('employees.index');
     Route::get('/employees/{employee}', ShowEmployee::class)->name('employees.show');
+    Route::get('/attendance', AttendanceIndex::class)->name('attendance.index');
 });
 
 Route::middleware(['auth', 'verified', 'role:admin'])->group(function () {
