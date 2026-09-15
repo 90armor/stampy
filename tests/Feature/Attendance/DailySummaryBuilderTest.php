@@ -204,6 +204,30 @@ class DailySummaryBuilderTest extends TestCase
         $this->assertNull($row->last_out);
     }
 
+    public function test_a_gap_of_exactly_17h59m_pairs(): void
+    {
+        $employee = $this->employeeOn($this->schedule());
+        $this->punch($employee, self::MONDAY.' 08:00:00', 'in');
+        $this->punch($employee, '2026-02-03 01:59:00', 'out'); // 17h59m later.
+
+        $row = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::MONDAY));
+
+        $this->assertSame(AttendanceStatus::Present, $row->status);
+        $this->assertNotNull($row->last_out);
+    }
+
+    public function test_a_gap_of_18h01m_does_not_pair(): void
+    {
+        $employee = $this->employeeOn($this->schedule());
+        $this->punch($employee, self::MONDAY.' 08:00:00', 'in');
+        $this->punch($employee, '2026-02-03 02:01:00', 'out'); // 18h01m later.
+
+        $row = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::MONDAY));
+
+        $this->assertSame(AttendanceStatus::Incomplete, $row->status);
+        $this->assertNull($row->last_out);
+    }
+
     public function test_double_tap_day_matches_a_clean_day(): void
     {
         $schedule = $this->schedule();

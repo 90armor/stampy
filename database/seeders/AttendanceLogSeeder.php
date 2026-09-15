@@ -142,11 +142,14 @@ class AttendanceLogSeeder extends Seeder
             ],
             'overnight' => [
                 ['time' => $start->copy()->subMinutes(mt_rand(1, 10)), 'type' => PunchType::In],
-                // Capped at 120 (not 180) so the gap from a ~08:00 check-in
-                // stays under DailySummaryBuilder's 18h pairing window — a
-                // wider range let some seeded "overnight" days come out
-                // incomplete instead of exercising the overnight-pairing path.
-                ['time' => $date->copy()->addDay()->startOfDay()->addMinutes(mt_rand(1, 120)), 'type' => PunchType::Out],
+                // Capped at 90 (not 120, originally 180) so the gap from a
+                // ~08:00 check-in sits safely under DailySummaryBuilder's 18h
+                // pairing window with margin — 120 still landed exactly on
+                // the boundary (18h00m), which is fine today but would
+                // silently flip to incomplete if that arithmetic ever changed
+                // by even a minute. The boundary itself is covered by
+                // DailySummaryBuilderTest, not depended on here.
+                ['time' => $date->copy()->addDay()->startOfDay()->addMinutes(mt_rand(1, 90)), 'type' => PunchType::Out],
             ],
         };
 
