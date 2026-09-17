@@ -6,6 +6,7 @@ use App\Enums\PunchSource;
 use App\Enums\PunchType;
 use App\Models\AttendanceLog;
 use App\Models\Employee;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -28,6 +29,16 @@ class AttendanceLogFactory extends Factory
             'device_id' => null,
             'created_by' => null,
             'raw' => null,
+            'voided_at' => null,
+            'voided_by' => null,
         ];
+    }
+
+    public function voided(): static
+    {
+        return $this->state(fn () => [
+            'voided_at' => now(),
+            'voided_by' => User::factory(),
+        ]);
     }
 }

@@ -15,6 +15,12 @@ use Carbon\CarbonInterface;
  * Computes (or recomputes) one employee's daily_attendances row for one
  * date, purely from attendance_logs. daily_attendances is derived data and
  * must always be fully recomputable — nothing else may write to it.
+ *
+ * Every attendance_logs query here uses AttendanceLog::notVoided() — a
+ * voided punch (e.g. someone else's finger matched the device) must never
+ * contribute to first_in, last_out, or the overnight lookback in either
+ * direction, so each of the four queries below carries the scope
+ * individually rather than relying on a single shared starting point.
  */
 class DailySummaryBuilder
 {
@@ -33,6 +39,7 @@ class DailySummaryBuilder
         $isWorkday = in_array($workDate->dayOfWeekIso, $schedule->workdays, true);
 
         $firstIn = AttendanceLog::query()
+            ->notVoided()
             ->where('employee_id', $employee->id)
             ->where('punch_type', PunchType::In->value)
             ->whereBetween('punched_at', [$workDate, $workDate->copy()->endOfDay()])
@@ -60,6 +67,7 @@ class DailySummaryBuilder
 
         if ($firstIn) {
             $lastOut = AttendanceLog::query()
+                ->notVoided()
                 ->where('employee_id', $employee->id)
                 ->where('punch_type', PunchType::Out->value)
                 ->where('punched_at', '>', $firstIn->punched_at)
@@ -81,6 +89,7 @@ class DailySummaryBuilder
             // previous day's daily_attendances row says — so the result
             // doesn't depend on the order dates are built in.
             $candidates = AttendanceLog::query()
+                ->notVoided()
                 ->where('employee_id', $employee->id)
                 ->where('punch_type', PunchType::Out->value)
                 ->whereBetween('punched_at', [$workDate, $workDate->copy()->endOfDay()])
@@ -89,6 +98,7 @@ class DailySummaryBuilder
 
             foreach ($candidates as $candidate) {
                 $claimedByEarlierShift = AttendanceLog::query()
+                    ->notVoided()
                     ->where('employee_id', $employee->id)
                     ->where('punch_type', PunchType::In->value)
                     ->where('punched_at', '<', $candidate->punched_at)

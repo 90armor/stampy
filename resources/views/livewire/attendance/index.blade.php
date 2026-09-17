@@ -220,8 +220,9 @@
                             <th class="px-6 py-3 text-right">Worked</th>
                             <th class="px-6 py-3 text-right">Late</th>
                             <th class="px-6 py-3 text-right">Early leave</th>
-                            <th class="px-6 py-3">
-                                Status
+                            <th class="px-6 py-3">Status</th>
+                            <th class="py-3 pl-2 pr-6">
+                                <span class="sr-only">Open detail</span>
                                 <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
                             </th>
                         </tr>
@@ -229,11 +230,19 @@
                     <tbody>
                         @foreach ($attendances as $attendance)
                             @php $style = $statusStyles[$attendance->status->value] ?? $statusStyles['off']; @endphp
-                            <tr wire:key="daily-attendance-{{ $attendance->id }}" class="relative hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                            <tr wire:key="daily-attendance-{{ $attendance->id }}" class="group relative hover:bg-slate-50 dark:hover:bg-slate-800/60">
                                 <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{{ $attendance->work_date->format('D j M') }}</td>
                                 <td class="px-6 py-4">
-                                    <a href="{{ route('attendance.show', $attendance->employee) }}" wire:navigate class="group/link inline-block">
-                                        <div class="font-medium text-slate-900 group-hover/link:text-primary-600 dark:text-slate-100 dark:group-hover/link:text-primary-400">{{ $attendance->employee->full_name }}</div>
+                                    {{-- Resting-state accent color (not just on hover) + underline-on-hover
+                                    + a visible focus ring is the app's new "this is a link" convention —
+                                    see CLAUDE.md's Design system → Links. Hover alone isn't enough on
+                                    touch devices, which never trigger it. --}}
+                                    <a
+                                        href="{{ route('attendance.show', $attendance->employee) }}"
+                                        wire:navigate
+                                        class="inline-block rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                                    >
+                                        <div class="font-medium text-primary-700 underline decoration-1 underline-offset-2 decoration-primary-300 transition hover:decoration-primary-600 dark:text-primary-400 dark:decoration-primary-700 dark:hover:decoration-primary-400">{{ $attendance->employee->full_name }}</div>
                                         <div class="text-sm text-slate-500 dark:text-slate-400">{{ $attendance->employee->employee_code }}</div>
                                     </a>
                                 </td>
@@ -256,6 +265,9 @@
                                 <td class="px-6 py-4 text-right text-sm text-slate-700 dark:text-slate-300">{{ $attendance->early_leave_minutes > 0 ? $attendance->early_leave_minutes.'m' : '—' }}</td>
                                 <td class="px-6 py-4">
                                     <x-badge :color="$style['badge']">{{ $attendance->status->label() }}</x-badge>
+                                </td>
+                                <td class="py-4 pl-2 pr-6 text-right">
+                                    <x-icon name="chevron-right" class="ml-auto h-4 w-4 text-slate-400 transition group-hover:text-primary-600 dark:text-slate-500 dark:group-hover:text-primary-400" />
                                     @unless ($loop->last)
                                         <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
                                     @endunless

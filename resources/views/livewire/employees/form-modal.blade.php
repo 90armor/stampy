@@ -118,6 +118,22 @@
 
                                 <div class="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
                                     <div class="sm:max-w-[240px]">
+                                        <x-input-label for="emp_manager_id" value="Manager" class="!mb-0" />
+                                        <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Leave blank for a top-level employee.</p>
+                                    </div>
+                                    <div class="sm:w-[320px] sm:shrink-0">
+                                        <x-select id="emp_manager_id" surface="solid" wire:model="manager_id">
+                                            <option value="">No manager</option>
+                                            @foreach ($managerOptions as $manager)
+                                                <option value="{{ $manager->id }}">{{ $manager->full_name }} ({{ $manager->employee_code }})</option>
+                                            @endforeach
+                                        </x-select>
+                                        <x-input-error :messages="$errors->get('manager_id')" class="mt-1" />
+                                    </div>
+                                </div>
+
+                                <div class="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+                                    <div class="sm:max-w-[240px]">
                                         <x-input-label for="emp_join_date" value="Join date" class="!mb-0" />
                                     </div>
                                     <div class="sm:w-[320px] sm:shrink-0">

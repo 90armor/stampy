@@ -174,6 +174,69 @@ class DailySummaryBuilderTest extends TestCase
         $this->assertNull($saturday->last_out);
     }
 
+    public function test_a_voided_in_punch_is_excluded_from_first_in(): void
+    {
+        $employee = $this->employeeOn($this->schedule());
+        AttendanceLog::factory()->voided()->create([
+            'employee_id' => $employee->id,
+            'punched_at' => self::MONDAY.' 07:55:00',
+            'punch_type' => 'in',
+        ]);
+        $this->punch($employee, self::MONDAY.' 17:05:00', 'out');
+
+        $row = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::MONDAY));
+
+        // With the in-punch voided, first_in must come back empty — the
+        // 17:05 out-punch is then this day's own unclaimed candidate (no
+        // earlier in-punch exists at all, voided or not).
+        $this->assertNull($row->first_in);
+        $this->assertNotNull($row->last_out);
+        $this->assertSame(AttendanceStatus::Incomplete, $row->status);
+    }
+
+    public function test_a_voided_out_punch_is_excluded_from_the_overnight_pairing(): void
+    {
+        $employee = $this->employeeOn($this->schedule());
+        $this->punch($employee, self::MONDAY.' 20:00:00', 'in');
+        AttendanceLog::factory()->voided()->create([
+            'employee_id' => $employee->id,
+            'punched_at' => '2026-02-03 02:00:00',
+            'punch_type' => 'out',
+        ]);
+
+        $row = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::MONDAY));
+
+        // The only candidate last_out is voided, so first_in stands alone —
+        // an incomplete shift, not the paired 300-minute overnight shift
+        // this same punch pair produces in the un-voided version of this
+        // scenario above.
+        $this->assertNotNull($row->first_in);
+        $this->assertNull($row->last_out);
+        $this->assertSame(AttendanceStatus::Incomplete, $row->status);
+    }
+
+    public function test_a_voided_in_punch_no_longer_claims_the_next_days_out_candidate(): void
+    {
+        $employee = $this->employeeOn($this->schedule());
+        AttendanceLog::factory()->voided()->create([
+            'employee_id' => $employee->id,
+            'punched_at' => self::FRIDAY.' 08:00:00',
+            'punch_type' => 'in',
+        ]);
+        $this->punch($employee, self::SATURDAY.' 01:00:00', 'out');
+
+        $saturday = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::SATURDAY));
+
+        // In the un-voided version of this scenario (the test above this
+        // one), Friday's in-punch claims Saturday's 01:00 out-punch as its
+        // own overnight tail, and Saturday is built as Off. With Friday's
+        // in-punch voided, that claim must not happen — the "claimed by an
+        // earlier shift" check has to see the voided punch as absent too,
+        // not just first_in and the direct pairing queries.
+        $this->assertSame(AttendanceStatus::Incomplete, $saturday->status);
+        $this->assertNotNull($saturday->last_out);
+    }
+
     public function test_unclaimed_out_punch_more_than_18h_from_any_in_is_still_incomplete(): void
     {
         $employee = $this->employeeOn($this->schedule());
