@@ -19,10 +19,10 @@
             </div>
         @endif
 
-        <!-- Email Address -->
+        <!-- Email or username -->
         <div>
-            <x-input-label for="email" :value="__('Work email')" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autofocus autocomplete="username" placeholder="you@company.com" />
+            <x-input-label for="email" :value="__('Email or username')" />
+            <x-text-input id="email" class="block mt-1 w-full" type="text" name="email" :value="old('email')" required autofocus autocomplete="username" placeholder="you@company.com or username" />
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
         </div>
 

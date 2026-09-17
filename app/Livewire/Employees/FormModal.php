@@ -6,6 +6,7 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Position;
 use App\Models\User;
+use App\Support\TemporaryPassword;
 use Closure;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
@@ -51,6 +52,15 @@ class FormModal extends Component
     public string $role = 'employee';
 
     public ?string $generatedPassword = null;
+
+    /**
+     * A freshly-reset password for an EXISTING account — distinct from
+     * generatedPassword (which pairs with username/email/role from the
+     * create-user flow above and doesn't apply here: resetting doesn't
+     * change any of those). Shown once, same rule as generatedPassword:
+     * never persisted anywhere but the hash, never shown again.
+     */
+    public ?string $resetPasswordValue = null;
 
     protected function rules(): array
     {
@@ -187,11 +197,38 @@ class FormModal extends Component
         $this->resetForm();
     }
 
+    /**
+     * Admin-only (enforced here, not just by the button being hidden — see
+     * CLAUDE.md's Authorization convention). Reuses EmployeePolicy::update
+     * rather than a dedicated policy, matching how manual-punch actions on
+     * Attendance\Show reuse it for the same "admin manages this person's
+     * data" question.
+     */
+    public function resetPassword(): void
+    {
+        $this->authorize('update', $this->editing);
+
+        $user = $this->editing->user;
+        $temporary = TemporaryPassword::generate();
+
+        $user->forceFill([
+            'password' => Hash::make($temporary),
+            'must_change_password' => true,
+            'password_changed_at' => null,
+            'password_reset_by' => auth()->id(),
+            'password_reset_at' => now(),
+            'temporary_password_expires_at' => now()->addHours(48),
+        ])->save();
+
+        $this->resetPasswordValue = $temporary;
+    }
+
     protected function resetForm(): void
     {
         $this->reset([
             'editing', 'full_name', 'employee_code', 'department_id', 'position_id', 'manager_id',
             'join_date', 'device_user_id', 'create_user', 'username', 'email', 'generatedPassword',
+            'resetPasswordValue',
         ]);
         $this->status = 'active';
         $this->role = 'employee';
