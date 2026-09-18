@@ -11,6 +11,18 @@
         </p>
     </div>
 
+    @php
+        // Same displayVariant()-derived palette as Attendance\Index, so
+        // "Present"/"Absent"/"Incomplete" mean the same colour everywhere in
+        // the app — see that file's own comment for why timing (late/early)
+        // is a Present subtext, not a peer tile or its own colour here.
+        $variantStyles = [
+            'present' => ['icon' => 'check', 'iconClass' => 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400'],
+            'absent' => ['icon' => 'user-x', 'iconClass' => 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400'],
+            'incomplete' => ['icon' => 'exclamation-triangle', 'iconClass' => 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300'],
+        ];
+    @endphp
+
     @if ($stats)
         {{-- KPI cards --}}
         <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -21,35 +33,42 @@
             </x-stat-card>
 
             <x-stat-card
-                icon="check"
+                :icon="$variantStyles['present']['icon']"
                 label="Present today"
                 :value="$attendance['today']['present']['count']"
-                icon-class="bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300"
+                :icon-class="$variantStyles['present']['iconClass']"
             >
-                <x-slot name="subtext">{{ $attendance['today']['present']['percent'] }}% of workforce</x-slot>
+                @if ($attendance['today']['late']['count'] > 0 || $attendance['today']['earlyLeave']['count'] > 0)
+                    <x-slot name="subtext">
+                        of which
+                        @if ($attendance['today']['late']['count'] > 0)
+                            {{ $attendance['today']['late']['count'] }} late
+                        @endif
+                        @if ($attendance['today']['late']['count'] > 0 && $attendance['today']['earlyLeave']['count'] > 0)
+                            &middot;
+                        @endif
+                        @if ($attendance['today']['earlyLeave']['count'] > 0)
+                            {{ $attendance['today']['earlyLeave']['count'] }} left early
+                        @endif
+                    </x-slot>
+                @else
+                    <x-slot name="subtext">{{ $attendance['today']['present']['percent'] }}% of workforce</x-slot>
+                @endif
             </x-stat-card>
 
             <x-stat-card
-                icon="clock"
-                label="Late today"
-                :value="$attendance['today']['late']['count']"
-                icon-class="bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400"
-            >
-                <x-slot name="subtext">
-                    {{ $attendance['today']['late']['count'] === 0 ? 'No late arrivals' : $attendance['today']['late']['percent'].'% of workforce' }}
-                </x-slot>
-            </x-stat-card>
+                :icon="$variantStyles['absent']['icon']"
+                label="Absent today"
+                :value="collect($attendance['today']['segments'])->firstWhere('key', 'absent')['count'] ?? 0"
+                :icon-class="$variantStyles['absent']['iconClass']"
+            />
 
             <x-stat-card
-                icon="calendar-days"
-                label="On leave"
-                :value="$attendance['today']['leave']['count']"
-                icon-class="bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
-            >
-                <x-slot name="subtext">
-                    {{ $attendance['today']['leave']['count'] === 0 ? 'No one on leave' : $attendance['today']['leave']['percent'].'% of workforce' }}
-                </x-slot>
-            </x-stat-card>
+                :icon="$variantStyles['incomplete']['icon']"
+                label="Incomplete today"
+                :value="collect($attendance['today']['segments'])->firstWhere('key', 'incomplete')['count'] ?? 0"
+                :icon-class="$variantStyles['incomplete']['iconClass']"
+            />
         </div>
 
         {{-- Today's Attendance + Quick Actions --}}
@@ -59,34 +78,34 @@
                 <h2 class="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">Today's Attendance</h2>
                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Employee attendance status for today</p>
 
-                @php
-                    $breakdown = [
-                        ['label' => 'Present', 'dot' => 'bg-primary-500', 'data' => $attendance['today']['present']],
-                        ['label' => 'Late', 'dot' => 'bg-amber-400', 'data' => $attendance['today']['late']],
-                        ['label' => 'On leave', 'dot' => 'bg-blue-400', 'data' => $attendance['today']['leave']],
-                        ['label' => 'Absent', 'dot' => 'bg-red-400', 'data' => $attendance['today']['absent']],
-                    ];
-                @endphp
+                @unless ($attendance['today']['builtToday'])
+                    {{-- No scheduled job runs attendance:build-daily (see
+                    CLAUDE.md's Local environment note) — today's rows may
+                    simply not exist yet at whatever moment this loads. --}}
+                    <p class="mt-3 text-xs text-slate-400 dark:text-slate-500">
+                        Today's attendance hasn't been calculated yet.
+                    </p>
+                @endunless
 
                 <div
                     class="mt-5 flex h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"
                     role="img"
-                    aria-label="Present {{ $attendance['today']['present']['percent'] }}%, late {{ $attendance['today']['late']['percent'] }}%, on leave {{ $attendance['today']['leave']['percent'] }}%, absent {{ $attendance['today']['absent']['percent'] }}%"
+                    aria-label="{{ collect($attendance['today']['segments'])->map(fn ($segment) => $segment['label'].' '.$segment['percent'].'%')->implode(', ') }}"
                 >
-                    @foreach ($breakdown as $segment)
-                        <div class="{{ $segment['dot'] }}" style="width: {{ $segment['data']['percent'] }}%"></div>
+                    @foreach ($attendance['today']['segments'] as $segment)
+                        <div class="{{ $segment['dot'] }}" style="width: {{ $segment['percent'] }}%"></div>
                     @endforeach
                 </div>
 
                 <dl class="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                    @foreach ($breakdown as $segment)
+                    @foreach ($attendance['today']['segments'] as $segment)
                         <div>
                             <dt class="flex items-center gap-x-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
                                 <span class="h-2 w-2 rounded-full {{ $segment['dot'] }}"></span>
                                 {{ $segment['label'] }}
                             </dt>
-                            <dd class="mt-1 text-lg font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ $segment['data']['count'] }}</dd>
-                            <dd class="text-xs text-slate-400 dark:text-slate-500">{{ $segment['data']['percent'] }}%</dd>
+                            <dd class="mt-1 text-lg font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ $segment['count'] }}</dd>
+                            <dd class="text-xs text-slate-400 dark:text-slate-500">{{ $segment['percent'] }}%</dd>
                         </div>
                     @endforeach
                 </dl>
@@ -95,27 +114,27 @@
                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Needs attention</p>
 
                     @if (count($attendance['needsAttention']))
+                        @php
+                            $attentionAvatarClass = [
+                                'red' => 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400',
+                                'violet' => 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
+                                'amber' => 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
+                            ];
+                        @endphp
                         <ul class="mt-3 divide-y divide-slate-100 dark:divide-slate-800">
                             @foreach ($attendance['needsAttention'] as $person)
-                                @php
-                                    $isAbsent = $person['status'] === 'absent';
-                                @endphp
                                 <li class="flex items-center gap-x-3 py-2.5 first:pt-0 last:pb-0">
-                                    <span @class([
-                                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
-                                        'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400' => $isAbsent,
-                                        'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' => ! $isAbsent,
-                                    ])>
+                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold {{ $attentionAvatarClass[$person['badge']] }}">
                                         {{ strtoupper(substr($person['name'], 0, 1)) }}
                                     </span>
                                     <span class="min-w-0 flex-1 truncate text-sm font-medium text-slate-700 dark:text-slate-200">
                                         {{ $person['name'] }}
                                     </span>
-                                    <x-badge :color="$isAbsent ? 'red' : 'amber'">
-                                        {{ ucfirst($person['status']) }}
+                                    <x-badge :color="$person['badge']">
+                                        {{ $person['label'] }}
                                     </x-badge>
-                                    @if ($person['time'])
-                                        <span class="shrink-0 text-xs text-slate-400 dark:text-slate-500">{{ $person['time'] }}</span>
+                                    @if ($person['detail'])
+                                        <span class="shrink-0 text-xs text-slate-400 dark:text-slate-500">{{ $person['detail'] }}</span>
                                     @endif
                                 </li>
                             @endforeach
@@ -253,7 +272,7 @@
                                 $tone = match ($activity['tone']) {
                                     'present' => ['bg' => 'bg-primary-50 dark:bg-primary-900/40', 'text' => 'text-primary-700 dark:text-primary-300', 'icon' => 'check'],
                                     'late' => ['bg' => 'bg-amber-50 dark:bg-amber-900/30', 'text' => 'text-amber-600 dark:text-amber-400', 'icon' => 'clock'],
-                                    'leave' => ['bg' => 'bg-blue-50 dark:bg-blue-900/30', 'text' => 'text-blue-600 dark:text-blue-400', 'icon' => 'calendar-days'],
+                                    'out' => ['bg' => 'bg-slate-100 dark:bg-slate-800', 'text' => 'text-slate-500 dark:text-slate-400', 'icon' => 'logout'],
                                     default => ['bg' => 'bg-slate-100 dark:bg-slate-800', 'text' => 'text-slate-500 dark:text-slate-400', 'icon' => 'user-circle'],
                                 };
                             @endphp

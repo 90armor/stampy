@@ -8,7 +8,8 @@ use App\Livewire\Employees\Show as ShowEmployee;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Position;
-use App\Support\DemoAttendance;
+use App\Support\DashboardAttendance;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -20,13 +21,17 @@ Route::get('/dashboard', function () {
     $attendance = null;
 
     if (auth()->user()->hasAnyRole(['admin', 'manager'])) {
-        $totalEmployees = Employee::count();
+        $user = auth()->user();
 
-        // Inactive employees are still on the books but don't attend, so every
-        // attendance figure below (today's breakdown, needsAttention,
-        // recentActivity, department %) is scoped to the active workforce only —
-        // deactivating someone must never move the Present-today percentage.
-        $activeEmployees = Employee::where('status', 'active')->count();
+        // Total employees / new this month are organisational headcount
+        // facts, not attendance records — the employee directory itself
+        // (Employees\Index) is fully visible to both admin and manager with
+        // no row-level scoping, so these stay unscoped too. Only the
+        // ATTENDANCE figures below get the manager's own-team-only scope,
+        // matching Attendance\Index/Show's row-level rule (attendance
+        // records are the sensitive, team-specific data here, not the
+        // directory).
+        $totalEmployees = Employee::count();
 
         $stats = [
             'total_employees' => $totalEmployees,
@@ -35,27 +40,42 @@ Route::get('/dashboard', function () {
                 ->count(),
         ];
 
-        // Attendance figures are demo data until a real Attendance model /
-        // device-punch pipeline exists — see App\Support\DemoAttendance.
-        // Both needsAttention and recentActivity read from the same status
-        // assignment below so they can't contradict each other (e.g. an
-        // employee can't be "absent" and "checked in" at once).
-        $todayBreakdown = DemoAttendance::todayBreakdown($activeEmployees);
-        $assignedStatuses = DemoAttendance::assignStatuses(
-            Employee::where('status', 'active')->orderBy('id')->get(),
-            $todayBreakdown
-        );
+        // null = admin, no restriction. A manager with no linked employee
+        // record gets an empty scope (matching Attendance\Index's own
+        // handling of that edge case) rather than an error — every figure
+        // below just reads as all-zero/empty, which is accurate: they have
+        // no team to show attendance for.
+        $employeeIds = null;
+
+        if ($user->hasRole('manager')) {
+            $employee = $user->employee;
+
+            if ($employee === null) {
+                Log::warning('Dashboard viewed by a manager with no linked employee record — showing an empty scope.', [
+                    'user_id' => $user->id,
+                ]);
+            }
+
+            $employeeIds = $employee ? [$employee->id, ...$employee->subordinateIds()] : [];
+        }
+
+        $departments = Department::withCount(['employees' => fn ($query) => $query
+            ->where('status', 'active')
+            ->when($employeeIds !== null, fn ($q) => $q->whereIn('id', $employeeIds)),
+        ])
+            ->orderBy('name')
+            ->get()
+            // Not worth showing a manager a department they have no one in —
+            // an admin's unrestricted scope never filters anything out here.
+            ->filter(fn (Department $department) => $department->employees_count > 0)
+            ->values();
 
         $attendance = [
-            'today' => $todayBreakdown,
-            'needsAttention' => DemoAttendance::needsAttention($assignedStatuses),
-            'trend' => DemoAttendance::weeklyTrend(),
-            'departments' => DemoAttendance::departmentAttendance(
-                Department::withCount(['employees' => fn ($query) => $query->where('status', 'active')])
-                    ->orderBy('name')
-                    ->get()
-            ),
-            'recent' => DemoAttendance::recentActivity($assignedStatuses),
+            'today' => DashboardAttendance::todayBreakdown($employeeIds),
+            'needsAttention' => DashboardAttendance::needsAttention($employeeIds),
+            'trend' => DashboardAttendance::weeklyTrend($employeeIds),
+            'departments' => DashboardAttendance::departmentAttendance($departments, $employeeIds),
+            'recent' => DashboardAttendance::recentActivity($employeeIds),
             'onboarding' => [
                 'departments' => Department::count() > 0,
                 'positions' => Position::count() > 0,
