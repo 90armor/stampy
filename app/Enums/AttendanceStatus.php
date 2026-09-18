@@ -21,6 +21,7 @@ enum AttendanceStatus: string
     case Off = 'off';
     case Holiday = 'holiday';
     case Leave = 'leave';
+    case InProgress = 'in_progress';
 
     public function label(): string
     {
@@ -31,6 +32,7 @@ enum AttendanceStatus: string
             self::Off => 'Off',
             self::Holiday => 'Holiday',
             self::Leave => 'Leave',
+            self::InProgress => 'In progress',
         };
     }
 }

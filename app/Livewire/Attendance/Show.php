@@ -7,6 +7,7 @@ use App\Enums\PunchSource;
 use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
 use App\Models\Employee;
+use App\Models\Holiday;
 use App\Services\Attendance\DailySummaryBuilder;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
@@ -376,6 +377,28 @@ class Show extends Component
     }
 
     /**
+     * Company-wide holidays for the month, keyed by 'Y-m-d' — read straight
+     * from `holidays`, not derived from `daily_attendances`. That's
+     * deliberate: daily_attendances only has rows for dates the builder has
+     * already reached, so a holiday three weeks out would have no row at
+     * all if this were sourced from there — employees need to see upcoming
+     * holidays, which is most of the point of showing them. Powers the
+     * calendar grid only; not fetched or shown in the table view.
+     *
+     * @return Collection<string, Holiday>
+     */
+    private function holidaysByDate(): Collection
+    {
+        $start = $this->monthStart();
+        $end = $start->copy()->endOfMonth();
+
+        return Holiday::query()
+            ->whereBetween('date', [$start->format('Y-m-d'), $end->format('Y-m-d')])
+            ->get()
+            ->keyBy(fn (Holiday $holiday) => $holiday->date->format('Y-m-d'));
+    }
+
+    /**
      * Counts only — no derived or payroll-adjacent figures. "Workdays" is
      * simply present+absent+incomplete (i.e. every calculated day that
      * isn't off/holiday/leave); "late"/"early_leave_days" and "Total worked"
@@ -462,6 +485,7 @@ class Show extends Component
             'monthLabel' => $this->monthStart()->format('F Y'),
             'isCurrentMonth' => $this->month === today()->format('Y-m'),
             'punchesByDate' => $this->punchesByDate(),
+            'holidaysByDate' => $this->holidaysByDate(),
             'lastBuiltInMonth' => $lastBuiltInMonth,
             'monthFullyBuilt' => $lastBuiltInMonth === $days->last()['date']->format('Y-m-d'),
         ])->layout('layouts.app', $layoutData);

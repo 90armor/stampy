@@ -7,6 +7,7 @@ use App\Enums\PunchType;
 use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
 use App\Models\Employee;
+use App\Models\Holiday;
 use App\Models\WorkSchedule;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
@@ -113,7 +114,9 @@ class DailySummaryBuilder
             }
         }
 
-        $attributes = $this->calculate($schedule, $workDate, $isWorkday, $firstIn, $lastOut);
+        $isHoliday = Holiday::query()->whereDate('date', $workDate)->exists();
+
+        $attributes = $this->calculate($schedule, $workDate, $isWorkday, $firstIn, $lastOut, $isHoliday);
         $attributes['work_schedule_id'] = $schedule->id;
 
         // Not updateOrCreate(): work_date has a 'date' cast, which formats
@@ -151,6 +154,7 @@ class DailySummaryBuilder
         bool $isWorkday,
         ?AttendanceLog $firstIn,
         ?AttendanceLog $lastOut,
+        bool $isHoliday,
     ): array {
         $hasIn = $firstIn !== null;
         $hasOut = $lastOut !== null;
@@ -164,7 +168,15 @@ class DailySummaryBuilder
             $workedSeconds = $lastOut->punched_at->getTimestamp() - $firstIn->punched_at->getTimestamp();
             $workedMinutes = max(0, intdiv($workedSeconds, 60) - $schedule->break_minutes);
 
-            if ($isWorkday) {
+            // Working a holiday is never late or early-leaving, regardless of
+            // when they clocked in/out — matters for OT later, where a
+            // holiday's worked hours must not also register as a timing
+            // exception. isWorkday is deliberately still checked alongside
+            // isHoliday: a holiday landing on a weekend is caught by the
+            // status match() below (-> Off) before this is ever reached with
+            // hasBoth true, but the guard here is the one that actually
+            // stops late/early from being computed either way.
+            if ($isWorkday && ! $isHoliday) {
                 $scheduledStart = Carbon::parse($workDate->format('Y-m-d').' '.$schedule->start_time);
                 $scheduledEnd = Carbon::parse($workDate->format('Y-m-d').' '.$schedule->end_time);
 
@@ -182,24 +194,66 @@ class DailySummaryBuilder
             }
         }
 
-        // Exactly one of {in, out} is always incomplete, regardless of
-        // whether the date is a workday — a lone punch on a day off is just
-        // as unresolved as one on a scheduled day. A day both punches cover
-        // is always Present, whether or not the arrival was late or the
-        // departure early — timing is a separate dimension (late_minutes/
-        // early_leave_minutes above), not a status. See AttendanceStatus's
-        // doc comment for why a `Late` status doesn't exist here.
+        // Status precedence, highest to lowest — the one place this is
+        // decided; every rule below is a special case of "what wins when
+        // several could apply to the same punch-less or punch-partial day":
+        //
+        //   1. off         — no punches at all, and not a scheduled workday.
+        //                    Wins outright, holiday or not: a holiday
+        //                    landing on a weekend doesn't change anything,
+        //                    it's already non-working — but this is
+        //                    specifically the no-punches case. Someone who
+        //                    works a non-workday (holiday or an ordinary
+        //                    weekend) is covered by rule 3, not this one —
+        //                    that already worked before holidays existed
+        //                    and holidays don't change it.
+        //   2. holiday      — no punches at all, a workday, marked as a
+        //                    holiday. Beats absent and in_progress (an
+        //                    unworked holiday is never "still open", it's
+        //                    just a holiday) but not present: see 3.
+        //   3. present      — both punches exist, on any day (workday,
+        //                    holiday, or an ordinary weekend someone came in
+        //                    on). A holiday doesn't need to override this —
+        //                    it already zeroed late/early above — and a
+        //                    fully-punched day is never "in progress"
+        //                    regardless of the time of day.
+        //   4. in_progress  — today, the schedule's end_time hasn't passed
+        //                    yet, and punches so far would otherwise resolve
+        //                    to incomplete or absent below. Only ever
+        //                    applies to today (see isInProgress()); not
+        //                    conditioned on isWorkday, matching rule 5's own
+        //                    workday-agnostic incomplete rule.
+        //   5. incomplete   — exactly one of {in, out}, on any day. This
+        //                    includes a one-sided punch on a holiday: the
+        //                    punch being incomplete is a device-defect fact
+        //                    independent of whether the day was a holiday,
+        //                    so holiday does not suppress it the way it does
+        //                    for "no punches at all" in rule 2.
+        //   6. absent       — a workday, no punches, not a holiday, and not
+        //                    (today and still before end_time).
+        //
+        // Timing is a separate dimension from all of this — see
+        // AttendanceStatus's doc comment for why a `Late` status doesn't
+        // exist here.
         $status = match (true) {
-            ! $hasIn && ! $hasOut => $isWorkday ? AttendanceStatus::Absent : AttendanceStatus::Off,
+            ! $hasIn && ! $hasOut && ! $isWorkday => AttendanceStatus::Off,
+            ! $hasIn && ! $hasOut && $isHoliday => AttendanceStatus::Holiday,
+            $hasBoth => AttendanceStatus::Present,
+            $this->isInProgress($workDate, $schedule) => AttendanceStatus::InProgress,
             $hasIn xor $hasOut => AttendanceStatus::Incomplete,
-            default => AttendanceStatus::Present,
+            default => AttendanceStatus::Absent,
         };
 
-        if (! $isWorkday) {
+        if (! $isWorkday || $isHoliday) {
             $lateMinutes = 0;
             $earlyLeaveMinutes = 0;
         }
 
+        // InProgress isn't listed here: it can only ever be reached when
+        // hasBoth is false (rule 3 above claims every hasBoth day as
+        // Present first), so worked_minutes is already 0 from its
+        // initialization above, same as it already was for a one-sided
+        // Incomplete punch before InProgress existed.
         if ($status === AttendanceStatus::Incomplete || $status === AttendanceStatus::Absent) {
             $workedMinutes = 0;
         }
@@ -212,5 +266,25 @@ class DailySummaryBuilder
             'early_leave_minutes' => $earlyLeaveMinutes,
             'status' => $status->value,
         ];
+    }
+
+    /**
+     * Only ever true for today: a day already in the past is either fully
+     * resolved (present/incomplete) or definitively absent by now, and a
+     * future date is never built at all. Rebuilding today after end_time has
+     * passed must downgrade this to absent/incomplete on its own — there is
+     * no separate "un-in-progress" step, it's simply that this returns false
+     * once now() has caught up, and the match() above falls through to
+     * whichever of those two the punches actually resolve to.
+     */
+    private function isInProgress(Carbon $workDate, WorkSchedule $schedule): bool
+    {
+        if (! $workDate->isToday()) {
+            return false;
+        }
+
+        $scheduledEnd = Carbon::parse($workDate->format('Y-m-d').' '.$schedule->end_time);
+
+        return now()->lt($scheduledEnd);
     }
 }

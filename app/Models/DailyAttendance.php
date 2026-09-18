@@ -89,10 +89,12 @@ class DailyAttendance extends Model
      * independent facts, so no view may re-derive a colour bucket by
      * checking late_minutes/early_leave_minutes/status itself; they all
      * call this instead. A timing exception can only ever coincide with
-     * Present: Incomplete/Absent/Off/Holiday/Leave days structurally carry
-     * zero late/early minutes (DailySummaryBuilder only computes either when
-     * both punches exist on a workday), so 'timing' and those five statuses
-     * are mutually exclusive by construction, not by a check here.
+     * Present: every other status structurally carries zero late/early
+     * minutes (DailySummaryBuilder only computes either when both punches
+     * exist on a workday that isn't a holiday — InProgress/Incomplete/
+     * Absent never have both, and a worked Holiday has them forced to 0),
+     * so 'timing' and every other variant are mutually exclusive by
+     * construction, not by a check here.
      */
     public function displayVariant(): string
     {
@@ -102,6 +104,7 @@ class DailyAttendance extends Model
             AttendanceStatus::Leave => 'leave',
             AttendanceStatus::Absent => 'absent',
             AttendanceStatus::Incomplete => 'incomplete',
+            AttendanceStatus::InProgress => 'in_progress',
             AttendanceStatus::Present => $this->hasTimingException() ? 'timing' : 'present',
         };
     }

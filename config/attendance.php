@@ -13,6 +13,16 @@ return [
     | `punch_type` is optional — omit it (or leave a row's value unmapped)
     | to let PunchIngestor infer in/out from position instead.
     |
+    | `datetime_format` has no timezone component, and CsvAttendanceSource
+    | parses it with Carbon::createFromFormat() with no explicit timezone
+    | either — both deliberate. A device physically sitting in the office
+    | reports its own wall-clock time with no timezone marker of its own, so
+    | the only correct reading is "this string is already in the app's
+    | timezone" (config('app.timezone'), Asia/Phnom_Penh) — not UTC, and not
+    | a conversion. If a future device export ever DOES include an offset or
+    | "Z" suffix, this parsing needs to change to respect it explicitly
+    | rather than silently reinterpreting it as local time.
+    |
     */
 
     'csv' => [

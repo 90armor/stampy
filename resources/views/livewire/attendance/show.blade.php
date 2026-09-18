@@ -37,10 +37,24 @@
         // back in line with its siblings.
         'absent' => ['badge' => 'red', 'icon' => 'x-mark', 'bg' => 'bg-red-50 dark:bg-red-900/20', 'text' => 'text-red-700 dark:text-red-300', 'ring' => 'ring-red-600/20 dark:ring-red-500/40'],
         'off' => ['badge' => 'slate', 'icon' => 'calendar-days', 'bg' => 'bg-slate-100 dark:bg-slate-800', 'text' => 'text-slate-500 dark:text-slate-400', 'ring' => 'ring-slate-500/10 dark:ring-slate-500/20'],
-        // Neither occurs yet (Phase 2.4f adds holidays; nothing assigns
-        // leave yet) — defined now so the palette/icon exists, no lookup
-        // or UI built beyond that.
-        'holiday' => ['badge' => 'slate', 'icon' => 'flag', 'bg' => 'bg-primary-50 dark:bg-primary-900/20', 'text' => 'text-primary-700 dark:text-primary-300', 'ring' => 'ring-primary-600/20 dark:ring-primary-500/30'],
+        // blue, not primary/evergreen: primary is still a green-family hue
+        // (a different shade of the same "present" story present's own
+        // stock-green already tells), which would repeat the exact
+        // amber/violet confusability problem this app has already fixed
+        // twice. Must not read as red or amber either — it means "not yet",
+        // not a failure. 'clock' is free to reuse here since 'timing' (see
+        // above) moved off it onto 'present's check. text-blue-700/blue-300
+        // measured 6.16:1 (light, on blue-50) and 9.51:1 (dark, on
+        // blue-900/20 over the card background).
+        'in_progress' => ['badge' => 'blue', 'icon' => 'clock', 'bg' => 'bg-blue-50 dark:bg-blue-900/20', 'text' => 'text-blue-700 dark:text-blue-300', 'ring' => 'ring-blue-600/20 dark:ring-blue-500/30'],
+        // fuchsia: doesn't collide with any hue already in use (green/amber/
+        // violet/red/slate/blue, plus primary/accent's own green family).
+        // text-fuchsia-700/fuchsia-300 measured 5.89:1 (light, on
+        // fuchsia-50) and 9.79:1 (dark, on fuchsia-900/20 over the card
+        // background).
+        'holiday' => ['badge' => 'fuchsia', 'icon' => 'flag', 'bg' => 'bg-fuchsia-50 dark:bg-fuchsia-900/20', 'text' => 'text-fuchsia-700 dark:text-fuchsia-300', 'ring' => 'ring-fuchsia-600/20 dark:ring-fuchsia-500/30'],
+        // Doesn't occur yet — nothing assigns Leave until Phase 3 — defined
+        // now so the palette/icon exists, no lookup built beyond that.
         'leave' => ['badge' => 'slate', 'icon' => 'briefcase', 'bg' => 'bg-accent-50 dark:bg-accent-900/20', 'text' => 'text-accent-700 dark:text-accent-300', 'ring' => 'ring-accent-600/20 dark:ring-accent-500/30'],
     ];
 
@@ -69,6 +83,8 @@
         ['icon' => $variantStyles['incomplete']['icon'], 'text' => $variantStyles['incomplete']['text'], 'label' => \App\Enums\AttendanceStatus::Incomplete->label()],
         ['icon' => $variantStyles['absent']['icon'], 'text' => $variantStyles['absent']['text'], 'label' => \App\Enums\AttendanceStatus::Absent->label()],
         ['icon' => $variantStyles['off']['icon'], 'text' => $variantStyles['off']['text'], 'label' => \App\Enums\AttendanceStatus::Off->label()],
+        ['icon' => $variantStyles['in_progress']['icon'], 'text' => $variantStyles['in_progress']['text'], 'label' => \App\Enums\AttendanceStatus::InProgress->label()],
+        ['icon' => $variantStyles['holiday']['icon'], 'text' => $variantStyles['holiday']['text'], 'label' => \App\Enums\AttendanceStatus::Holiday->label()],
         ['icon' => $notCalculatedStyle['icon'], 'text' => $notCalculatedStyle['text'], 'label' => 'Not calculated'],
     ];
 @endphp
@@ -228,6 +244,10 @@
                         @php
                             $record = $cell['record'];
                             $cellDateKey = $cell['date']->format('Y-m-d');
+                            // Read straight from the `holidays` table, not from
+                            // $record — see holidaysByDate()'s doc comment for why
+                            // (a future holiday has no daily_attendances row yet).
+                            $holiday = $cell['inMonth'] ? $holidaysByDate->get($cellDateKey) : null;
 
                             // Marked times (see CLAUDE.md's "Marked times" note) point at
                             // the specific value that's out of range instead of just
@@ -254,7 +274,8 @@
                             $earlyMinutesLabel = $earlyDeparture ? $record->early_leave_minutes.' minute'.($record->early_leave_minutes === 1 ? '' : 's') : null;
                             $cellAriaLabel = $cell['date']->format('F j, Y').', '.$statusLabel
                                 .($lateArrival ? ', arrived '.$lateMinutesLabel.' late' : '')
-                                .($earlyDeparture ? ', left '.$earlyMinutesLabel.' early' : '');
+                                .($earlyDeparture ? ', left '.$earlyMinutesLabel.' early' : '')
+                                .($holiday ? ', Holiday: '.$holiday->name : '');
                         @endphp
 
                         @if ($cell['inMonth'])
@@ -283,10 +304,28 @@
                                     <span class="text-sm font-bold sm:text-base {{ $style['text'] }}">{{ $cell['date']->day }}</span>
                                     <x-icon :name="$style['icon']" class="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4 {{ $style['text'] }}" />
                                 </div>
-                                {{-- Off shows nothing below the day number — no punches on a
-                                non-working day is expected, not information worth a "—/—"
-                                placeholder (unlike Absent, where the gap is meaningful). --}}
-                                @if ($record && $record->status->value !== 'off')
+                                {{-- A holiday cell shows its name whatever the attendance
+                                status is (or isn't, yet) — read from $holiday, not from
+                                $record, so an upcoming holiday with no daily_attendances
+                                row yet still renders. Deliberately not tinted with the
+                                'holiday' variant's fuchsia here: that colour belongs to
+                                $style (the cell background), which already reflects the
+                                REAL attendance outcome (holiday/present/off/not
+                                calculated) — this label is just the name, independent of
+                                which of those the cell turned out to be. --}}
+                                @if ($holiday)
+                                    <span class="w-full truncate text-[10px] font-medium leading-tight text-fuchsia-700 dark:text-fuchsia-300" title="{{ $holiday->name }}">
+                                        {{ $holiday->name }}
+                                    </span>
+                                @endif
+                                {{-- Off and an unworked Holiday both show nothing below the
+                                day number — no punches on a non-working day is expected, not
+                                information worth a "—/—" placeholder (unlike Absent, where
+                                the gap is meaningful). A worked holiday is 'present', not
+                                'holiday' (see the builder's precedence order), so this never
+                                hides real in/out times — only the no-punches holiday case,
+                                which structurally has none to show anyway. --}}
+                                @if ($record && $record->status->value !== 'off' && $record->status->value !== 'holiday')
                                     {{-- A plain "→" character, not an icon — the status icon is
                                     the one signal that matters; a marked time (see CLAUDE.md's
                                     "Marked times" note) points at the specific in/out value
@@ -528,12 +567,23 @@
                     $modalMarkedLate = $modalRecord && $modalRecord->isLate();
                     $modalMarkedEarly = $modalRecord && $modalRecord->leftEarly();
                     $markedTimeClass = 'text-red-700 underline decoration-red-600 decoration-2 underline-offset-2 dark:text-red-300 dark:decoration-red-400';
+                    // Same holiday-name source as the calendar cell (read
+                    // straight from `holidays`, not $modalRecord) — the
+                    // modal is opened from a cell, so it should never say
+                    // less about the day than the cell it came from.
+                    $modalHoliday = $holidaysByDate->get($viewingDay);
                 @endphp
                 <div class="p-6">
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">{{ $modalDate->format('l') }}</p>
                             <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100">{{ $modalDate->format('F j, Y') }}</h3>
+                            @if ($modalHoliday)
+                                <p class="mt-0.5 flex items-center gap-1 text-sm font-medium text-fuchsia-700 dark:text-fuchsia-300">
+                                    <x-icon name="flag" class="h-3.5 w-3.5 shrink-0" />
+                                    {{ $modalHoliday->name }}
+                                </p>
+                            @endif
                         </div>
                         {{-- Status pill shows the real attendance status ("Present"); a
                         timing exception is a separate amber chip alongside it, same

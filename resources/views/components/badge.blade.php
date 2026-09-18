@@ -13,6 +13,13 @@ $colors = [
     // 9.06:1 measured against this badge's own composited background,
     // matching the other entries' actual-not-assumed contrast.
     'violet' => 'bg-violet-50 text-violet-700 ring-violet-600/20 dark:bg-violet-900/30 dark:text-violet-300 dark:ring-violet-500/30',
+    // Added for Attendance's InProgress status. dark:text-blue-300 (not
+    // -400): 9.07:1 measured against this badge's own composited
+    // background, matching the other entries' actual-not-assumed contrast.
+    'blue' => 'bg-blue-50 text-blue-700 ring-blue-600/20 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-500/30',
+    // Added for Attendance's Holiday status. dark:text-fuchsia-300 (not
+    // -400): 9.33:1 measured the same way.
+    'fuchsia' => 'bg-fuchsia-50 text-fuchsia-700 ring-fuchsia-600/20 dark:bg-fuchsia-900/30 dark:text-fuchsia-300 dark:ring-fuchsia-500/30',
 ];
 @endphp
 

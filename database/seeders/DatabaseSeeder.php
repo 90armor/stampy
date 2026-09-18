@@ -23,6 +23,11 @@ class DatabaseSeeder extends Seeder
             DepartmentSeeder::class,
             PositionSeeder::class,
             EmployeeSeeder::class,
+            // Before AttendanceLogSeeder/build-daily below — holidays must
+            // already exist when the builder first runs, or the seeded
+            // system comes up with those dates built as plain absent/
+            // present instead of holiday/present-with-no-timing-exception.
+            HolidaySeeder::class,
             AttendanceLogSeeder::class,
         ]);
 
