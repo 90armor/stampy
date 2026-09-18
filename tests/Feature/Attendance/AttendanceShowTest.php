@@ -40,24 +40,26 @@ class AttendanceShowTest extends TestCase
 
     public function test_admin_can_view_any_employees_detail_page(): void
     {
-        $employee = Employee::factory()->create();
+        $employee = Employee::factory()->create(['full_name' => 'Detail Page Target']);
 
         $this->actingAs($this->admin())
             ->get(route('attendance.show', $employee))
-            ->assertOk();
+            ->assertOk()
+            ->assertSee('Detail Page Target');
     }
 
     public function test_a_manager_can_view_a_report_of_a_report(): void
     {
         $top = Employee::factory()->create();
         $mid = Employee::factory()->create(['manager_id' => $top->id]);
-        $leaf = Employee::factory()->create(['manager_id' => $mid->id]);
+        $leaf = Employee::factory()->create(['manager_id' => $mid->id, 'full_name' => 'Leaf Report Target']);
 
         $manager = $this->managerUser($top);
 
         $this->actingAs($manager)
             ->get(route('attendance.show', $leaf))
-            ->assertOk();
+            ->assertOk()
+            ->assertSee('Leaf Report Target');
     }
 
     public function test_a_manager_cannot_view_a_peer(): void

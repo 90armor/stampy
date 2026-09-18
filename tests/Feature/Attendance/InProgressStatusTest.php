@@ -74,6 +74,19 @@ class InProgressStatusTest extends TestCase
         $this->assertSame(AttendanceStatus::Absent, $row->status);
     }
 
+    public function test_a_day_stops_being_in_progress_at_exactly_end_time(): void
+    {
+        $employee = $this->employee();
+
+        Carbon::setTestNow(Carbon::parse(self::TODAY.' 16:59:59'));
+        $before = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::TODAY));
+        $this->assertSame(AttendanceStatus::InProgress, $before->status);
+
+        Carbon::setTestNow(Carbon::parse(self::TODAY.' 17:00:00'));
+        $at = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::TODAY));
+        $this->assertSame(AttendanceStatus::Absent, $at->status);
+    }
+
     public function test_today_in_punch_only_before_end_time_is_in_progress(): void
     {
         Carbon::setTestNow(Carbon::parse(self::TODAY.' 12:00:00'));

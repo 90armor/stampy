@@ -113,6 +113,47 @@ class PunchIngestorTest extends TestCase
         $this->assertSame(3, AttendanceLog::where('employee_id', $employee->id)->count());
     }
 
+    /**
+     * @return list<string>
+     */
+    private function inferredTypesFor(string $deviceUserId, string $secondPunchAt): array
+    {
+        config(['attendance.duplicate_window_seconds' => 90]);
+
+        $employee = Employee::factory()->create(['device_user_id' => $deviceUserId]);
+
+        app(PunchIngestor::class)->ingest(
+            new FakeAttendanceSource([
+                new PunchRecord(deviceUserId: $deviceUserId, punchedAt: Carbon::parse('2026-02-02 08:00:00'), punchType: null),
+                new PunchRecord(deviceUserId: $deviceUserId, punchedAt: Carbon::parse($secondPunchAt), punchType: null),
+                new PunchRecord(deviceUserId: $deviceUserId, punchedAt: Carbon::parse('2026-02-02 17:00:00'), punchType: null),
+            ]),
+            Carbon::parse('2026-02-01'),
+            Carbon::parse('2026-02-03'),
+            PunchSource::Device,
+        );
+
+        return AttendanceLog::where('employee_id', $employee->id)
+            ->orderBy('punched_at')
+            ->pluck('punch_type')
+            ->map(fn ($type) => $type->value)
+            ->all();
+    }
+
+    public function test_punches_exactly_the_window_apart_are_one_double_tap_group(): void
+    {
+        // 08:00:00 -> 08:01:30 is exactly 90s: same group, so both are "in"
+        // and the 17:00 punch is the day's "out".
+        $this->assertSame(['in', 'in', 'out'], $this->inferredTypesFor('2006', '2026-02-02 08:01:30'));
+    }
+
+    public function test_punches_one_second_past_the_window_are_separate_groups(): void
+    {
+        // 08:00:00 -> 08:01:31 is 91s: two distinct events, so they
+        // alternate in, out — and 17:00 is the next "in".
+        $this->assertSame(['in', 'out', 'in'], $this->inferredTypesFor('2007', '2026-02-02 08:01:31'));
+    }
+
     public function test_two_punches_seconds_apart_are_both_stored(): void
     {
         Employee::factory()->create(['device_user_id' => '2003']);

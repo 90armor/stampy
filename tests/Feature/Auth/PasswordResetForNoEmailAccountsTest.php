@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
@@ -41,7 +42,7 @@ class PasswordResetForNoEmailAccountsTest extends TestCase
             ->test(FormModal::class)
             ->call('edit', $employee->id)
             ->call('resetPassword')
-            ->assertSet('resetPasswordValue', fn ($value) => ! empty($value));
+            ->assertSet('resetPasswordValue', fn ($value) => is_string($value) && Hash::check($value, $user->fresh()->password));
 
         $user->refresh();
         $this->assertTrue($user->must_change_password);
@@ -80,7 +81,9 @@ class PasswordResetForNoEmailAccountsTest extends TestCase
             ->call('resetPassword');
 
         $temporary = $component->get('resetPasswordValue');
-        $this->assertNotEmpty($temporary);
+
+        // The password shown to the admin must be one this account really authenticates with.
+        $this->assertTrue(Auth::validate(['username' => $user->username, 'password' => $temporary]));
 
         // Dismissing ("Done") clears it — there is no second look.
         $component->set('resetPasswordValue', null)->assertSet('resetPasswordValue', null);

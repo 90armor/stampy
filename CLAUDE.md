@@ -168,6 +168,8 @@ Plus `cache`, `jobs`, `sessions`, `password_reset_tokens` (Laravel defaults) and
 | is_default | bool | default `false`; the schedule `Employee::effectiveSchedule()` falls back to when an employee has none assigned |
 | timestamps | | |
 
+**Minute arithmetic truncates, never rounds** — `late_minutes` and `early_leave_minutes` are `intdiv(seconds, 60)` in `DailySummaryBuilder::calculate()`. Concretely, against an 08:00 start with 10 minutes' grace: `08:10:59` is **not** late (grace is inclusive through the whole of minute 10), late begins at `08:11:00`, and `08:11:59` is 11 minutes late, not 12; likewise leaving at `16:59:01` is not an early leave. **This is a deliberate rule, not an oversight — do not "fix" it to `round()` or `ceil()`.** Wherever rounding is ambiguous, attendance favours the employee: docking someone over seconds is indefensible, especially once these minutes feed payroll. `round()` looks more accurate in isolation, and would quietly start marking arrivals from `08:10:30` onward as late. Pinned by `DailySummaryBuilderTest::test_seconds_never_count_against_the_employee_late_and_early_minutes_truncate` (and the grace boundary itself, `>` not `>=`, by `test_arrival_exactly_at_the_end_of_grace_is_not_late`).
+
 **`attendance_logs`** — raw device punches. Append-only: a wrong punch (e.g. someone else's finger matched the device) is never edited or deleted, only voided — see the "append-only" note below.
 | Column | Type | Notes |
 |---|---|---|

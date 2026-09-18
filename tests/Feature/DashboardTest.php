@@ -10,6 +10,7 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -65,6 +66,22 @@ class DashboardTest extends TestCase
 
         $response->assertOk();
         $response->assertViewHas('stats', fn ($stats) => $stats['total_employees'] === 3);
+    }
+
+    public function test_new_this_month_counts_only_joiners_from_the_current_month_and_year(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-15 12:00:00'));
+
+        Employee::factory()->create(['join_date' => '2026-03-01']); // first day of this month
+        Employee::factory()->create(['join_date' => '2026-03-15']); // today
+        Employee::factory()->create(['join_date' => '2026-02-28']); // last day of last month
+        Employee::factory()->create(['join_date' => '2026-04-01']); // first day of next month
+        Employee::factory()->create(['join_date' => '2025-03-10']); // same month, a year ago
+
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertViewHas('stats', fn ($stats) => $stats['new_this_month'] === 2);
     }
 
     public function test_admin_sees_every_employees_attendance_today(): void

@@ -10,6 +10,7 @@ use App\Models\WorkSchedule;
 use App\Services\Attendance\DailySummaryBuilder;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use ReflectionClassConstant;
 use Tests\TestCase;
 
 class DailySummaryBuilderTest extends TestCase
@@ -89,6 +90,64 @@ class DailySummaryBuilderTest extends TestCase
         $this->assertTrue($row->isLate());
         // Full gap from start_time (25), not from the end of the 10min grace.
         $this->assertSame(25, $row->late_minutes);
+    }
+
+    public function test_arrival_exactly_at_the_end_of_grace_is_not_late(): void
+    {
+        $employee = $this->employeeOn($this->schedule(['grace_minutes' => 10]));
+        $this->punch($employee, self::MONDAY.' 08:10:00', 'in');
+        $this->punch($employee, self::MONDAY.' 17:00:00', 'out');
+
+        $row = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::MONDAY));
+
+        $this->assertSame(AttendanceStatus::Present, $row->status);
+        $this->assertSame(0, $row->late_minutes);
+        $this->assertFalse($row->isLate());
+    }
+
+    public function test_arrival_one_minute_past_grace_is_late_by_the_full_gap_from_start_time(): void
+    {
+        $employee = $this->employeeOn($this->schedule(['grace_minutes' => 10]));
+        $this->punch($employee, self::MONDAY.' 08:11:00', 'in');
+        $this->punch($employee, self::MONDAY.' 17:00:00', 'out');
+
+        $row = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::MONDAY));
+
+        $this->assertSame(AttendanceStatus::Present, $row->status);
+        $this->assertTrue($row->isLate());
+        // 11 (08:00 -> 08:11), never 1 (the minutes past the end of grace).
+        $this->assertSame(11, $row->late_minutes);
+    }
+
+    /**
+     * Minute arithmetic truncates, never rounds: where rounding is
+     * ambiguous attendance favours the employee, and docking someone over
+     * seconds is indefensible (especially once this feeds payroll). See
+     * CLAUDE.md's note beside the work_schedules table.
+     */
+    public function test_seconds_never_count_against_the_employee_late_and_early_minutes_truncate(): void
+    {
+        $schedule = $this->schedule(['grace_minutes' => 10]);
+
+        // [in, out, expected late minutes, expected early-leave minutes]
+        $cases = [
+            ['08:10:59', '17:00:00', 0, 0],   // 59s into the last grace minute: not late
+            ['08:11:00', '17:00:00', 11, 0],  // the first second that is late
+            ['08:11:59', '17:00:00', 11, 0],  // 11m59s late is 11, not 12
+            ['08:00:00', '16:59:01', 0, 0],   // 59s short of end_time: not early
+            ['08:00:00', '16:58:01', 0, 1],   // 1m59s short is 1, not 2
+        ];
+
+        foreach ($cases as [$in, $out, $expectedLate, $expectedEarly]) {
+            $employee = $this->employeeOn($schedule);
+            $this->punch($employee, self::MONDAY.' '.$in, 'in');
+            $this->punch($employee, self::MONDAY.' '.$out, 'out');
+
+            $row = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::MONDAY));
+
+            $this->assertSame($expectedLate, $row->late_minutes, "in {$in} / out {$out}: late");
+            $this->assertSame($expectedEarly, $row->early_leave_minutes, "in {$in} / out {$out}: early");
+        }
     }
 
     public function test_early_departure_reports_correct_minutes(): void
@@ -244,7 +303,7 @@ class DailySummaryBuilderTest extends TestCase
         // 17:05 out-punch is then this day's own unclaimed candidate (no
         // earlier in-punch exists at all, voided or not).
         $this->assertNull($row->first_in);
-        $this->assertNotNull($row->last_out);
+        $this->assertSame(self::MONDAY.' 17:05:00', $row->last_out->format('Y-m-d H:i:s'));
         $this->assertSame(AttendanceStatus::Incomplete, $row->status);
     }
 
@@ -264,7 +323,7 @@ class DailySummaryBuilderTest extends TestCase
         // an incomplete shift, not the paired 300-minute overnight shift
         // this same punch pair produces in the un-voided version of this
         // scenario above.
-        $this->assertNotNull($row->first_in);
+        $this->assertSame(self::MONDAY.' 20:00:00', $row->first_in->format('Y-m-d H:i:s'));
         $this->assertNull($row->last_out);
         $this->assertSame(AttendanceStatus::Incomplete, $row->status);
     }
@@ -288,7 +347,7 @@ class DailySummaryBuilderTest extends TestCase
         // earlier shift" check has to see the voided punch as absent too,
         // not just first_in and the direct pairing queries.
         $this->assertSame(AttendanceStatus::Incomplete, $saturday->status);
-        $this->assertNotNull($saturday->last_out);
+        $this->assertSame(self::SATURDAY.' 01:00:00', $saturday->last_out->format('Y-m-d H:i:s'));
     }
 
     public function test_unclaimed_out_punch_more_than_18h_from_any_in_is_still_incomplete(): void
@@ -304,7 +363,7 @@ class DailySummaryBuilderTest extends TestCase
 
         $this->assertSame(AttendanceStatus::Incomplete, $tuesday->status);
         $this->assertSame(0, $tuesday->worked_minutes);
-        $this->assertNotNull($tuesday->last_out);
+        $this->assertSame('2026-02-03 03:00:00', $tuesday->last_out->format('Y-m-d H:i:s'));
     }
 
     public function test_out_beyond_18_hours_is_not_paired(): void
@@ -330,7 +389,21 @@ class DailySummaryBuilderTest extends TestCase
         $row = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::MONDAY));
 
         $this->assertSame(AttendanceStatus::Present, $row->status);
-        $this->assertNotNull($row->last_out);
+        $this->assertSame('2026-02-03 01:59:00', $row->last_out->format('Y-m-d H:i:s'));
+    }
+
+    public function test_a_gap_of_exactly_18h00m00s_pairs(): void
+    {
+        $employee = $this->employeeOn($this->schedule());
+        $this->punch($employee, self::MONDAY.' 08:00:00', 'in');
+        $this->punch($employee, '2026-02-03 02:00:00', 'out'); // Exactly 18h later.
+
+        $row = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::MONDAY));
+
+        $this->assertSame(AttendanceStatus::Present, $row->status);
+        $this->assertSame('2026-02-03 02:00:00', $row->last_out->format('Y-m-d H:i:s'));
+        // 18h = 1080 minutes, minus the 60 minute break.
+        $this->assertSame(1020, $row->worked_minutes);
     }
 
     public function test_a_gap_of_18h01m_does_not_pair(): void
@@ -343,6 +416,118 @@ class DailySummaryBuilderTest extends TestCase
 
         $this->assertSame(AttendanceStatus::Incomplete, $row->status);
         $this->assertNull($row->last_out);
+    }
+
+    private function maxShiftHours(): int
+    {
+        return (new ReflectionClassConstant(DailySummaryBuilder::class, 'MAX_SHIFT_HOURS'))->getValue();
+    }
+
+    /**
+     * The shift window is applied in two independent places: pairing an out
+     * to its in (the earlier day), and deciding whether an out-only day's
+     * punch is already claimed by an earlier shift (the later day). If the
+     * two ever disagree at the boundary, one out-punch becomes both days'
+     * last_out — counted twice. Both are pinned here against the same
+     * constant, and in both build orders.
+     */
+    public function test_an_out_exactly_the_shift_window_after_an_in_is_claimed_once_by_the_earlier_day(): void
+    {
+        $employee = $this->employeeOn($this->schedule());
+        $in = Carbon::parse(self::MONDAY.' 08:00:00');
+        $out = $in->copy()->addHours($this->maxShiftHours());
+        $this->assertSame('2026-02-03', $out->format('Y-m-d'), 'premise: the out-punch lands on the next day');
+
+        $this->punch($employee, $in->format('Y-m-d H:i:s'), 'in');
+        $this->punch($employee, $out->format('Y-m-d H:i:s'), 'out');
+
+        foreach ([['2026-02-02', '2026-02-03'], ['2026-02-03', '2026-02-02']] as $order) {
+            $rows = [];
+            foreach ($order as $date) {
+                $rows[$date] = app(DailySummaryBuilder::class)->build($employee, Carbon::parse($date));
+            }
+
+            $label = 'build order '.implode(' then ', $order);
+            $monday = $rows['2026-02-02'];
+            $tuesday = $rows['2026-02-03'];
+
+            $this->assertSame(AttendanceStatus::Present, $monday->status, $label);
+            $this->assertSame($out->format('Y-m-d H:i:s'), $monday->last_out->format('Y-m-d H:i:s'), $label);
+            $this->assertSame($this->maxShiftHours() * 60 - 60, $monday->worked_minutes, $label);
+
+            // The same punch must not also surface as Tuesday's own.
+            $this->assertNull($tuesday->last_out, $label);
+            $this->assertNull($tuesday->first_in, $label);
+            $this->assertSame(AttendanceStatus::Absent, $tuesday->status, $label);
+        }
+    }
+
+    public function test_an_out_one_second_past_the_shift_window_belongs_only_to_the_later_day(): void
+    {
+        $employee = $this->employeeOn($this->schedule());
+        $in = Carbon::parse(self::MONDAY.' 08:00:00');
+        $out = $in->copy()->addHours($this->maxShiftHours())->addSecond();
+
+        $this->punch($employee, $in->format('Y-m-d H:i:s'), 'in');
+        $this->punch($employee, $out->format('Y-m-d H:i:s'), 'out');
+
+        foreach ([['2026-02-02', '2026-02-03'], ['2026-02-03', '2026-02-02']] as $order) {
+            $rows = [];
+            foreach ($order as $date) {
+                $rows[$date] = app(DailySummaryBuilder::class)->build($employee, Carbon::parse($date));
+            }
+
+            $label = 'build order '.implode(' then ', $order);
+
+            $this->assertSame(AttendanceStatus::Incomplete, $rows['2026-02-02']->status, $label);
+            $this->assertNull($rows['2026-02-02']->last_out, $label);
+
+            $this->assertSame(AttendanceStatus::Incomplete, $rows['2026-02-03']->status, $label);
+            $this->assertSame($out->format('Y-m-d H:i:s'), $rows['2026-02-03']->last_out->format('Y-m-d H:i:s'), $label);
+        }
+    }
+
+    public function test_an_in_punch_at_midnight_belongs_to_the_new_day_and_23_59_59_to_the_old_one(): void
+    {
+        $employee = $this->employeeOn($this->schedule());
+        $this->punch($employee, self::MONDAY.' 23:59:59', 'in');
+        $this->punch($employee, '2026-02-03 00:00:00', 'in');
+
+        $monday = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::MONDAY));
+        $tuesday = app(DailySummaryBuilder::class)->build($employee, Carbon::parse('2026-02-03'));
+
+        $this->assertSame(self::MONDAY.' 23:59:59', $monday->first_in->format('Y-m-d H:i:s'));
+        $this->assertSame('2026-02-03 00:00:00', $tuesday->first_in->format('Y-m-d H:i:s'));
+    }
+
+    public function test_an_out_only_punch_at_midnight_belongs_to_the_new_day_and_23_59_59_to_the_old_one(): void
+    {
+        $employee = $this->employeeOn($this->schedule());
+        $this->punch($employee, self::MONDAY.' 23:59:59', 'out');
+        $this->punch($employee, '2026-02-03 00:00:00', 'out');
+
+        $monday = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::MONDAY));
+        $tuesday = app(DailySummaryBuilder::class)->build($employee, Carbon::parse('2026-02-03'));
+
+        $this->assertSame(self::MONDAY.' 23:59:59', $monday->last_out->format('Y-m-d H:i:s'));
+        $this->assertSame('2026-02-03 00:00:00', $tuesday->last_out->format('Y-m-d H:i:s'));
+    }
+
+    public function test_a_shift_no_longer_than_the_break_reports_zero_worked_minutes_never_negative(): void
+    {
+        $schedule = $this->schedule(['break_minutes' => 60]);
+
+        // [out time, expected worked minutes] for an 08:00 in.
+        foreach ([['08:30:00', 0], ['09:00:00', 0], ['09:01:00', 1]] as [$outTime, $expected]) {
+            $employee = $this->employeeOn($schedule);
+            $this->punch($employee, self::MONDAY.' 08:00:00', 'in');
+            $this->punch($employee, self::MONDAY.' '.$outTime, 'out');
+
+            $row = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::MONDAY));
+
+            $this->assertSame(AttendanceStatus::Present, $row->status, "out at {$outTime}");
+            $this->assertSame($expected, $row->worked_minutes, "out at {$outTime}");
+        }
     }
 
     public function test_double_tap_day_matches_a_clean_day(): void

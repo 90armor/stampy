@@ -61,7 +61,13 @@ class AttendanceIndexTest extends TestCase
 
     public function test_admin_can_view_the_attendance_list(): void
     {
-        $this->actingAs($this->admin())->get(route('attendance.index'))->assertOk();
+        $this->attendanceRow(today()->format('Y-m-d'), AttendanceStatus::Present, ['full_name' => 'Admin List Target']);
+
+        $this->actingAs($this->admin())
+            ->get(route('attendance.index'))
+            ->assertOk()
+            ->assertSee('Daily attendance')
+            ->assertSee('Admin List Target');
     }
 
     public function test_employee_role_cannot_view_the_attendance_list(): void

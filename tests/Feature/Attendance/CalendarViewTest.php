@@ -62,14 +62,26 @@ class CalendarViewTest extends TestCase
     {
         $employee = Employee::factory()->create();
 
+        // Only the table view renders this column header.
+        $tableHeader = '<th class="px-6 py-3 text-right">Worked</th>';
+
+        $this->actingAs($this->admin())
+            ->get(route('attendance.show', $employee))
+            ->assertOk()
+            ->assertDontSeeHtml($tableHeader);
+
+        // The URL alone is enough to land on the table view.
         $this->actingAs($this->admin())
             ->get(route('attendance.show', $employee).'?view=table')
-            ->assertOk();
+            ->assertOk()
+            ->assertSeeHtml($tableHeader);
 
         Livewire::actingAs($this->admin())
             ->test(Show::class, ['employee' => $employee])
+            ->assertDontSeeHtml($tableHeader)
             ->set('view', 'table')
-            ->assertSet('view', 'table');
+            ->assertSet('view', 'table')
+            ->assertSeeHtml($tableHeader);
     }
 
     public function test_first_column_is_sunday_for_a_month_starting_on_a_sunday(): void
@@ -283,7 +295,7 @@ class CalendarViewTest extends TestCase
         $record = $data['recordsByDate']->get('2026-03-02');
         $this->assertNotNull($record);
         $this->assertSame(AttendanceStatus::Incomplete, $record->status);
-        $this->assertNotNull($record->first_in);
+        $this->assertSame('2026-03-02 07:55:00', $record->first_in->format('Y-m-d H:i:s'));
 
         $punch = AttendanceLog::where('employee_id', $employee->id)->firstOrFail();
 
@@ -315,7 +327,7 @@ class CalendarViewTest extends TestCase
 
         $before = app(DailySummaryBuilder::class)->build($employee, Carbon::parse('2026-03-03'));
         $this->assertSame(AttendanceStatus::Incomplete, $before->status);
-        $this->assertNotNull($before->last_out);
+        $this->assertSame('2026-03-03 01:00:00', $before->last_out->format('Y-m-d H:i:s'));
 
         Livewire::actingAs($this->admin())
             ->test(Show::class, ['employee' => $employee])
@@ -330,7 +342,7 @@ class CalendarViewTest extends TestCase
 
         // 2026-03-02 now pairs as an overnight shift into 2026-03-03...
         $mar2 = DailyAttendance::where('employee_id', $employee->id)->whereDate('work_date', '2026-03-02')->first();
-        $this->assertNotNull($mar2->last_out);
+        $this->assertSame('2026-03-03 01:00:00', $mar2->last_out->format('Y-m-d H:i:s'));
         $this->assertTrue($mar2->isOvernightOut());
 
         // ...and 2026-03-03 — a day the modal was never open on — must have

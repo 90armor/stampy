@@ -71,7 +71,7 @@ class ManualPunchTest extends TestCase
 
         $after = DailyAttendance::where('id', $before->id)->first();
         $this->assertSame(AttendanceStatus::Incomplete, $after->status);
-        $this->assertNotNull($after->first_in);
+        $this->assertSame(self::DAY.' 07:55:00', $after->first_in->format('Y-m-d H:i:s'));
         $this->assertNull($after->last_out);
     }
 
@@ -175,7 +175,7 @@ class ManualPunchTest extends TestCase
         $row = DailyAttendance::where('employee_id', $employee->id)
             ->whereDate('work_date', self::DAY)
             ->first();
-        $this->assertNotNull($row->first_in);
+        $this->assertSame(self::DAY.' 07:55:00', $row->first_in->format('Y-m-d H:i:s'));
         $this->assertSame(AttendanceStatus::Incomplete, $row->status);
     }
 
@@ -262,7 +262,7 @@ class ManualPunchTest extends TestCase
         // Monday) — otherwise Tuesday's stale row keeps reading as if
         // Monday's shift still claims its out-punch.
         $tuesdayAfter = DailyAttendance::where('id', $nextDay->id)->first();
-        $this->assertNotNull($tuesdayAfter->last_out);
+        $this->assertSame(self::NEXT_DAY.' 01:00:00', $tuesdayAfter->last_out->format('Y-m-d H:i:s'));
         $this->assertSame(AttendanceStatus::Incomplete, $tuesdayAfter->status);
     }
 
