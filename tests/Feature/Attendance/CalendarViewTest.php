@@ -182,7 +182,6 @@ class CalendarViewTest extends TestCase
 
         $statuses = [
             '2026-03-02' => [AttendanceStatus::Present, 'M4.5 12.75l6 6 9-13.5'],
-            '2026-03-03' => [AttendanceStatus::Late, 'M12 6v6h4.5m4.5 0a9'],
             '2026-03-04' => [AttendanceStatus::Incomplete, 'M12 9v3.75m-9.303'],
             '2026-03-05' => [AttendanceStatus::Absent, 'M6 18 18 6M6 6l12 12'],
             '2026-03-01' => [AttendanceStatus::Off, 'M6.75 3v2.25M17.25 3v2.25'],
@@ -203,6 +202,28 @@ class CalendarViewTest extends TestCase
         foreach ($statuses as [$status, $iconPath]) {
             $component->assertSeeHtml($iconPath);
         }
+    }
+
+    public function test_a_timing_exception_day_shares_the_present_check_icon(): void
+    {
+        // The icon reflects attendance (they showed up), not timing — see
+        // AttendanceStatus's doc comment and the calendar's 'timing' variant
+        // style. The amber colour and the marked time are what distinguish
+        // a late/early day from a clean one, not the icon shape.
+        $employee = Employee::factory()->create();
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => '2026-03-03',
+            'status' => AttendanceStatus::Present,
+            'first_in' => Carbon::parse('2026-03-03 08:25:00'),
+            'last_out' => Carbon::parse('2026-03-03 17:00:00'),
+            'late_minutes' => 25,
+        ]);
+
+        Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', self::SUNDAY_START_MONTH)
+            ->assertSeeHtml('M4.5 12.75l6 6 9-13.5');
     }
 
     public function test_every_cell_carries_an_accessible_label(): void

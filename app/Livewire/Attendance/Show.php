@@ -377,9 +377,13 @@ class Show extends Component
 
     /**
      * Counts only — no derived or payroll-adjacent figures. "Workdays" is
-     * simply present+late+absent+incomplete (i.e. every calculated day that
-     * isn't off/holiday/leave); "Early leave" and "Total worked" are plain
-     * counts/sums over the same calculated rows, not anything interpreted.
+     * simply present+absent+incomplete (i.e. every calculated day that
+     * isn't off/holiday/leave); "late"/"early_leave_days" and "Total worked"
+     * are plain counts/sums over the same calculated rows, not anything
+     * interpreted. "Late" and "early leave" are counted from late_minutes/
+     * early_leave_minutes, not from status — timing is not a status (see
+     * AttendanceStatus's doc comment) — so a day can contribute to both
+     * counts at once.
      *
      * @param  Collection<int, array{date: Carbon, record: ?DailyAttendance}>  $days
      * @return array<string, int>
@@ -392,7 +396,6 @@ class Show extends Component
 
         $workdayStatuses = [
             AttendanceStatus::Present->value,
-            AttendanceStatus::Late->value,
             AttendanceStatus::Absent->value,
             AttendanceStatus::Incomplete->value,
         ];
@@ -403,10 +406,10 @@ class Show extends Component
                 $workdayStatuses
             ))->count(),
             'present' => $counts->get(AttendanceStatus::Present->value, 0),
-            'late' => $counts->get(AttendanceStatus::Late->value, 0),
+            'late' => $records->filter(fn (DailyAttendance $row) => $row->isLate())->count(),
             'absent' => $counts->get(AttendanceStatus::Absent->value, 0),
             'incomplete' => $counts->get(AttendanceStatus::Incomplete->value, 0),
-            'early_leave_days' => $records->filter(fn (DailyAttendance $row) => $row->early_leave_minutes > 0)->count(),
+            'early_leave_days' => $records->filter(fn (DailyAttendance $row) => $row->leftEarly())->count(),
             'total_worked_minutes' => (int) $records->sum('worked_minutes'),
         ];
     }

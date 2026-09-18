@@ -240,10 +240,13 @@ class ManualPunchTest extends TestCase
 
         $dayBefore = $this->build($employee, self::DAY);
         $nextDay = $this->build($employee, self::NEXT_DAY);
-        // Late, not Present: first_in (20:00) is measured against this same
-        // calendar day's 08:00 scheduled start, which an evening check-in is
-        // always well past — worked_minutes/pairing is unaffected either way.
-        $this->assertSame(AttendanceStatus::Late, $dayBefore->status);
+        // Present with a late-arrival timing exception, not a separate
+        // status (see AttendanceStatus's doc comment): first_in (20:00) is
+        // measured against this same calendar day's 08:00 scheduled start,
+        // which an evening check-in is always well past — worked_minutes/
+        // pairing is unaffected either way.
+        $this->assertSame(AttendanceStatus::Present, $dayBefore->status);
+        $this->assertTrue($dayBefore->isLate());
         // Tuesday's only punch was already claimed as Monday's overnight
         // tail — Tuesday isn't a scheduled workday's absence either way here
         // since it's still built from the pairing, just with nothing of its
@@ -288,9 +291,11 @@ class ManualPunchTest extends TestCase
             ->assertHasNoErrors();
 
         $after = DailyAttendance::where('id', $before->id)->first();
-        // Late, not Present — see the note in the overnight-pairing test
-        // above; first_in at 20:00 is always past this day's 08:00 start.
-        $this->assertSame(AttendanceStatus::Late, $after->status);
+        // Present with a late-arrival timing exception — see the note in
+        // the overnight-pairing test above; first_in at 20:00 is always
+        // past this day's 08:00 start.
+        $this->assertSame(AttendanceStatus::Present, $after->status);
+        $this->assertTrue($after->isLate());
         // 20:00 -> 00:30 next day = 270 minutes, minus 60 break = 210.
         $this->assertSame(210, $after->worked_minutes);
     }

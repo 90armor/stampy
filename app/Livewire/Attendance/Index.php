@@ -49,6 +49,19 @@ class Index extends Component
     #[Url(as: 'status', history: true)]
     public array $statuses = [];
 
+    /**
+     * Independent of $statuses — timing (late arrival / early departure)
+     * isn't a status (see AttendanceStatus's doc comment), so it gets its
+     * own filter rather than being folded into the status chips. Values are
+     * 'late'/'early'; empty means unrestricted, matching $employeeFilter/
+     * $departmentFilter's convention (only $statuses defaults to a
+     * non-empty set, to hide Off by default).
+     *
+     * @var string[]
+     */
+    #[Url(as: 'timing', history: true)]
+    public array $timingFilters = [];
+
     public function mount(): void
     {
         // Attendance visibility is gated the same as the employee directory
@@ -98,12 +111,28 @@ class Index extends Component
         $this->resetPage();
     }
 
+    public function updatingTimingFilters(): void
+    {
+        $this->resetPage();
+    }
+
     public function toggleStatus(string $status): void
     {
         if (in_array($status, $this->statuses, true)) {
             $this->statuses = array_values(array_diff($this->statuses, [$status]));
         } else {
             $this->statuses[] = $status;
+        }
+
+        $this->resetPage();
+    }
+
+    public function toggleTimingFilter(string $timing): void
+    {
+        if (in_array($timing, $this->timingFilters, true)) {
+            $this->timingFilters = array_values(array_diff($this->timingFilters, [$timing]));
+        } else {
+            $this->timingFilters[] = $timing;
         }
 
         $this->resetPage();
@@ -137,6 +166,7 @@ class Index extends Component
         $this->employeeFilter = '';
         $this->departmentFilter = '';
         $this->statuses = $this->defaultStatuses();
+        $this->timingFilters = [];
         $this->resetPage();
     }
 
@@ -229,6 +259,21 @@ class Index extends Component
             ->when(
                 $this->statuses !== [],
                 fn (Builder $query) => $query->whereIn('daily_attendances.status', $this->statuses)
+            )
+            ->when(
+                $this->timingFilters !== [],
+                // OR across selected timing chips (late OR early), matching
+                // how the status chips above combine via whereIn — "any of
+                // the selected chips", not "all of them".
+                fn (Builder $query) => $query->where(function (Builder $query) {
+                    if (in_array('late', $this->timingFilters, true)) {
+                        $query->orWhere('daily_attendances.late_minutes', '>', 0);
+                    }
+
+                    if (in_array('early', $this->timingFilters, true)) {
+                        $query->orWhere('daily_attendances.early_leave_minutes', '>', 0);
+                    }
+                })
             );
     }
 
@@ -270,19 +315,33 @@ class Index extends Component
      */
     private function summary(): Collection
     {
-        $counts = $this->summaryQuery()
+        $query = $this->summaryQuery();
+
+        $counts = (clone $query)
             ->select('status')
             ->selectRaw('count(*) as total')
             ->groupBy('status')
             ->pluck('total', 'status');
 
+        // 'late'/'early' aren't AttendanceStatus values (timing isn't a
+        // status — see its doc comment), so they're counted from late_/
+        // early_leave_minutes directly, the same way DailyAttendance's
+        // isLate()/leftEarly() would per-row. A late/early day is already
+        // counted in 'present' above — these two are a breakdown of it, not
+        // additional rows — which is why the view renders them as a
+        // sub-line under the Present tile rather than as peer tiles (see
+        // CLAUDE.md's "Status vs. timing" note). This must stay in sync
+        // with what the list's timing filter itself returns — covered by a
+        // test asserting the two agree.
+        $lateCount = (clone $query)->where('late_minutes', '>', 0)->count();
+        $earlyCount = (clone $query)->where('early_leave_minutes', '>', 0)->count();
+
         return collect([
-            AttendanceStatus::Present,
-            AttendanceStatus::Late,
-            AttendanceStatus::Absent,
-            AttendanceStatus::Incomplete,
-        ])->mapWithKeys(fn (AttendanceStatus $status) => [
-            $status->value => $counts->get($status->value, 0),
+            'present' => $counts->get(AttendanceStatus::Present->value, 0),
+            'late' => $lateCount,
+            'early' => $earlyCount,
+            'absent' => $counts->get(AttendanceStatus::Absent->value, 0),
+            'incomplete' => $counts->get(AttendanceStatus::Incomplete->value, 0),
         ]);
     }
 

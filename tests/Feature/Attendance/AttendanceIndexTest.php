@@ -191,12 +191,13 @@ class AttendanceIndexTest extends TestCase
         $this->assertSame(20, $data['attendances']->count());
     }
 
-    public function test_summary_is_a_fixed_four_status_set_with_zero_fallback(): void
+    public function test_summary_is_a_fixed_key_set_with_zero_fallback(): void
     {
         $admin = $this->admin();
 
-        // Only a present row and an off row exist today — late/absent/
-        // incomplete have zero rows, and off isn't part of the fixed set.
+        // Only a present row and an off row exist today — late/early/
+        // absent/incomplete have zero rows, and off isn't part of the
+        // fixed set.
         $this->attendanceRow(today()->format('Y-m-d'), AttendanceStatus::Present);
         $this->attendanceRow(today()->format('Y-m-d'), AttendanceStatus::Off);
 
@@ -206,9 +207,10 @@ class AttendanceIndexTest extends TestCase
             ->render()
             ->getData()['summary'];
 
-        $this->assertSame(['present', 'late', 'absent', 'incomplete'], $summary->keys()->all());
+        $this->assertSame(['present', 'late', 'early', 'absent', 'incomplete'], $summary->keys()->all());
         $this->assertSame(1, $summary->get('present'));
         $this->assertSame(0, $summary->get('late'));
+        $this->assertSame(0, $summary->get('early'));
         $this->assertSame(0, $summary->get('absent'));
         $this->assertSame(0, $summary->get('incomplete'));
     }
@@ -342,5 +344,259 @@ class AttendanceIndexTest extends TestCase
         Livewire::actingAs($admin)
             ->test(Index::class)
             ->assertSee('(+1)');
+    }
+
+    public function test_incomplete_badge_and_stat_card_use_violet_not_amber(): void
+    {
+        $admin = $this->admin();
+        $employee = Employee::factory()->create();
+
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => today()->format('Y-m-d'),
+            'status' => AttendanceStatus::Incomplete,
+            'first_in' => today()->setTime(8, 0),
+            'last_out' => null,
+        ]);
+
+        $html = Livewire::actingAs($admin)->test(Index::class)->html();
+
+        // bg-amber-50 text-amber-600 legitimately appears elsewhere on this
+        // page (Late's own stat card/badge, even at a zero count), so this
+        // checks the Incomplete badge's own violet classes directly rather
+        // than a broad "no amber anywhere" assertion.
+        $this->assertStringContainsString('bg-violet-50 text-violet-700', $html);
+    }
+
+    public function test_the_present_tile_shows_a_breakdown_subtext_not_a_peer_late_tile(): void
+    {
+        $admin = $this->admin();
+
+        // The subtext counts ROWS with a timing exception, not minutes —
+        // two late employees (whatever their individual late_minutes) is
+        // "2 late", not the sum of their minutes.
+        foreach ([12, 30] as $lateMinutes) {
+            DailyAttendance::factory()->create([
+                'employee_id' => Employee::factory()->create()->id,
+                'work_date' => today()->format('Y-m-d'),
+                'status' => AttendanceStatus::Present,
+                'late_minutes' => $lateMinutes,
+                'early_leave_minutes' => 0,
+            ]);
+        }
+        DailyAttendance::factory()->create([
+            'employee_id' => Employee::factory()->create()->id,
+            'work_date' => today()->format('Y-m-d'),
+            'status' => AttendanceStatus::Present,
+            'late_minutes' => 0,
+            'early_leave_minutes' => 5,
+        ]);
+
+        $html = Livewire::actingAs($admin)->test(Index::class)->html();
+
+        // A late/early day is already counted in Present, not a peer tile
+        // (see CLAUDE.md's "Status vs. timing" note) — the containment is
+        // shown as a sub-line, not a fourth "Late" stat card.
+        $this->assertStringContainsString('of which', $html);
+        $this->assertStringContainsString('2 late', $html);
+        $this->assertStringContainsString('1 left early', $html);
+    }
+
+    public function test_no_breakdown_subtext_when_nothing_is_late_or_early(): void
+    {
+        $admin = $this->admin();
+        $employee = Employee::factory()->create();
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => today()->format('Y-m-d'),
+            'status' => AttendanceStatus::Present,
+            'late_minutes' => 0,
+            'early_leave_minutes' => 0,
+        ]);
+
+        $html = Livewire::actingAs($admin)->test(Index::class)->html();
+
+        $this->assertStringNotContainsString('of which', $html);
+    }
+
+    public function test_a_late_arrival_marks_the_in_time_with_a_red_underline_and_a_label(): void
+    {
+        $admin = $this->admin();
+        $employee = Employee::factory()->create();
+
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => today()->format('Y-m-d'),
+            'status' => AttendanceStatus::Present,
+            'first_in' => today()->setTime(8, 12),
+            'last_out' => today()->setTime(17, 0),
+            'late_minutes' => 12,
+            'early_leave_minutes' => 0,
+        ]);
+
+        $html = Livewire::actingAs($admin)->test(Index::class)->html();
+
+        $this->assertStringContainsString('aria-label="Arrived 12 minutes late"', $html);
+        $this->assertStringNotContainsString('aria-label="Left', $html);
+    }
+
+    public function test_a_present_row_with_an_early_leave_marks_the_out_time(): void
+    {
+        $admin = $this->admin();
+        $employee = Employee::factory()->create();
+
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => today()->format('Y-m-d'),
+            'status' => AttendanceStatus::Present,
+            'first_in' => today()->setTime(8, 0),
+            'last_out' => today()->setTime(16, 56),
+            'late_minutes' => 0,
+            'early_leave_minutes' => 4,
+        ]);
+
+        $html = Livewire::actingAs($admin)->test(Index::class)->html();
+
+        $this->assertStringContainsString('aria-label="Left 4 minutes early"', $html);
+        // The Status badge stays "Present" — status doesn't change, only the
+        // specific Out time is marked (see CLAUDE.md's "Marked times" note).
+        $this->assertStringContainsString('Present', $html);
+        // No separate "Early 4m" chip beside the badge — the marked time and
+        // the numeric Early leave column already show this.
+        $this->assertStringNotContainsString('>Early 4m<', $html);
+    }
+
+    /**
+     * @return array{lateOnly: Employee, earlyOnly: Employee, both: Employee, clean: Employee}
+     */
+    private function seedTimingScenarios(): array
+    {
+        $lateOnly = Employee::factory()->create(['full_name' => 'Timing Late Only']);
+        DailyAttendance::factory()->create([
+            'employee_id' => $lateOnly->id,
+            'work_date' => today()->format('Y-m-d'),
+            'status' => AttendanceStatus::Present,
+            'late_minutes' => 12,
+            'early_leave_minutes' => 0,
+        ]);
+
+        $earlyOnly = Employee::factory()->create(['full_name' => 'Timing Early Only']);
+        DailyAttendance::factory()->create([
+            'employee_id' => $earlyOnly->id,
+            'work_date' => today()->format('Y-m-d'),
+            'status' => AttendanceStatus::Present,
+            'late_minutes' => 0,
+            'early_leave_minutes' => 8,
+        ]);
+
+        $both = Employee::factory()->create(['full_name' => 'Timing Both']);
+        DailyAttendance::factory()->create([
+            'employee_id' => $both->id,
+            'work_date' => today()->format('Y-m-d'),
+            'status' => AttendanceStatus::Present,
+            'late_minutes' => 5,
+            'early_leave_minutes' => 5,
+        ]);
+
+        $clean = Employee::factory()->create(['full_name' => 'Timing Clean']);
+        DailyAttendance::factory()->create([
+            'employee_id' => $clean->id,
+            'work_date' => today()->format('Y-m-d'),
+            'status' => AttendanceStatus::Present,
+            'late_minutes' => 0,
+            'early_leave_minutes' => 0,
+        ]);
+
+        return compact('lateOnly', 'earlyOnly', 'both', 'clean');
+    }
+
+    public function test_the_timing_filter_late_only_returns_late_and_both_but_not_early_only_or_clean(): void
+    {
+        $admin = $this->admin();
+        $this->seedTimingScenarios();
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->set('timingFilters', ['late'])
+            ->assertSee('Timing Late Only')
+            ->assertSee('Timing Both')
+            ->assertDontSee('Timing Early Only')
+            ->assertDontSee('Timing Clean');
+    }
+
+    public function test_the_timing_filter_early_only_returns_early_and_both_but_not_late_only_or_clean(): void
+    {
+        $admin = $this->admin();
+        $this->seedTimingScenarios();
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->set('timingFilters', ['early'])
+            ->assertSee('Timing Early Only')
+            ->assertSee('Timing Both')
+            ->assertDontSee('Timing Late Only')
+            ->assertDontSee('Timing Clean');
+    }
+
+    public function test_the_timing_filter_combines_late_and_early_independently(): void
+    {
+        $admin = $this->admin();
+        $this->seedTimingScenarios();
+
+        // Both chips selected together — an "any of the selected" (OR) union,
+        // matching how the status chips already combine — returns every
+        // scenario that has EITHER exception, still excluding the clean day.
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->set('timingFilters', ['late', 'early'])
+            ->assertSee('Timing Late Only')
+            ->assertSee('Timing Early Only')
+            ->assertSee('Timing Both')
+            ->assertDontSee('Timing Clean');
+    }
+
+    public function test_no_timing_filter_is_unrestricted_like_the_other_filters(): void
+    {
+        $admin = $this->admin();
+        $this->seedTimingScenarios();
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->assertSee('Timing Late Only')
+            ->assertSee('Timing Early Only')
+            ->assertSee('Timing Both')
+            ->assertSee('Timing Clean');
+    }
+
+    public function test_summary_late_count_agrees_with_what_the_timing_filter_returns(): void
+    {
+        $admin = $this->admin();
+        $this->seedTimingScenarios();
+
+        $component = Livewire::actingAs($admin)->test(Index::class);
+
+        $summary = $component->instance()->render()->getData()['summary'];
+
+        $lateFiltered = Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->set('timingFilters', ['late'])
+            ->instance()
+            ->render()
+            ->getData()['attendances'];
+
+        $earlyFiltered = Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->set('timingFilters', ['early'])
+            ->instance()
+            ->render()
+            ->getData()['attendances'];
+
+        // lateOnly + both = 2 rows have late_minutes > 0, matching both the
+        // stat card's count and what filtering by 'late' actually returns.
+        // Same for earlyOnly + both on the 'early' side.
+        $this->assertSame(2, $summary['late']);
+        $this->assertSame(2, $lateFiltered->total());
+        $this->assertSame(2, $summary['early']);
+        $this->assertSame(2, $earlyFiltered->total());
     }
 }

@@ -1,8 +1,23 @@
 @php
-    $statusStyles = [
+    // Colour comes from DailyAttendance::displayVariant() everywhere on this
+    // page — "did they attend" (status) and "was the timing off" (late/early
+    // minutes) are independent facts (see AttendanceStatus's doc comment),
+    // so no lookup here keys off late_minutes/early_leave_minutes/status
+    // directly. 'timing' is the variant for a Present day with a late
+    // arrival and/or early leave — needed here for the per-row Status badge
+    // (a row can resolve to it), but NOT for the Present stat card below:
+    // that tile aggregates every present row, on-time or not, so it stays
+    // green/check like Present itself — only its subtext breaks out how
+    // many of those were late/early, it doesn't recolour the whole tile.
+    $variantStyles = [
         'present' => ['icon' => 'check', 'badge' => 'green', 'iconClass' => 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400'],
-        'late' => ['icon' => 'clock', 'badge' => 'amber', 'iconClass' => 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'],
-        'incomplete' => ['icon' => 'exclamation-triangle', 'badge' => 'amber', 'iconClass' => 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'],
+        'timing' => ['icon' => 'clock', 'badge' => 'amber', 'iconClass' => 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'],
+        // violet, not amber — matches Attendance\Show's calendar/day-modal/
+        // table (see CLAUDE.md's "Status colors" note): Incomplete is a
+        // device defect (a punch never recorded), a late/early timing
+        // exception is normal employee behavior, and the two used to be
+        // visually indistinguishable here.
+        'incomplete' => ['icon' => 'exclamation-triangle', 'badge' => 'violet', 'iconClass' => 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300'],
         'absent' => ['icon' => 'user-x', 'badge' => 'red', 'iconClass' => 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400'],
         'off' => ['icon' => 'calendar-days', 'badge' => 'slate', 'iconClass' => 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'],
         'holiday' => ['icon' => 'calendar-days', 'badge' => 'slate', 'iconClass' => 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'],
@@ -37,22 +52,56 @@
             />
         </x-card>
     @else
-    {{-- Always exactly these 4 (Present/Late/Absent/Incomplete), 0 shown
-    plainly when a status has no rows — not appear/disappear based on
-    whether data exists — same as Employees' Total/Active/Inactive.
-    Off/Holiday/Leave are passive/expected states, not KPIs an admin needs
-    to monitor, so they're left out here (still filterable as chips below,
-    and still shown as a badge on individual table rows). --}}
-    <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        @foreach ($summary as $statusValue => $count)
-            @php $style = $statusStyles[$statusValue]; @endphp
-            <x-stat-card
-                :icon="$style['icon']"
-                :label="\App\Enums\AttendanceStatus::from($statusValue)->label()"
-                :value="$count"
-                :icon-class="$style['iconClass']"
-            />
-        @endforeach
+    {{-- Always exactly these 3 (Present/Absent/Incomplete), 0 shown plainly
+    when a status has no rows — not appear/disappear based on whether data
+    exists — same as Employees' Total/Active/Inactive. Off/Holiday/Leave are
+    passive/expected states, not KPIs an admin needs to monitor, so they're
+    left out here (still filterable as chips below, and still shown as a
+    badge on individual table rows).
+
+    Late/Early leave are NOT peer tiles here, even though they used to be:
+    a late or early day is already one of the Present rows counted above,
+    not an additional one (see CLAUDE.md's "Status vs. timing" note) — a
+    separate "Late" tile next to "Present" implied they were disjoint and
+    summed to a total, which was true back when Late was its own status but
+    is wrong now. Shown as a sub-line under Present instead ("of which..."),
+    which is the containment made visible with the least structural change —
+    the alternative (nesting Present/Late/Early into one grouped card) would
+    need a new component for something this page is the only user of. --}}
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <x-stat-card
+            :icon="$variantStyles['present']['icon']"
+            label="Present"
+            :value="$summary['present']"
+            :icon-class="$variantStyles['present']['iconClass']"
+        >
+            @if ($summary['late'] > 0 || $summary['early'] > 0)
+                <x-slot name="subtext">
+                    of which
+                    @if ($summary['late'] > 0)
+                        {{ $summary['late'] }} late
+                    @endif
+                    @if ($summary['late'] > 0 && $summary['early'] > 0)
+                        &middot;
+                    @endif
+                    @if ($summary['early'] > 0)
+                        {{ $summary['early'] }} left early
+                    @endif
+                </x-slot>
+            @endif
+        </x-stat-card>
+        <x-stat-card
+            :icon="$variantStyles['absent']['icon']"
+            label="Absent"
+            :value="$summary['absent']"
+            :icon-class="$variantStyles['absent']['iconClass']"
+        />
+        <x-stat-card
+            :icon="$variantStyles['incomplete']['icon']"
+            label="Incomplete"
+            :value="$summary['incomplete']"
+            :icon-class="$variantStyles['incomplete']['iconClass']"
+        />
     </div>
 
     <x-card :padding="false">
@@ -174,7 +223,12 @@
             </div>
         </div>
 
-        <div class="flex flex-wrap gap-2 px-6 pb-6">
+        {{-- Two independent filters, not one long chip list — a label per
+        row is the whole point, since Status and Timing combine with AND
+        between them (and OR within each), and nothing about the chips
+        themselves signals that grouping. --}}
+        <p class="px-6 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Status</p>
+        <div class="flex flex-wrap gap-2 px-6 pb-4">
             @foreach ($allStatuses as $status)
                 @php $selected = in_array($status->value, $statuses, true); @endphp
                 <button
@@ -187,6 +241,30 @@
                     ])
                 >
                     {{ $status->label() }}
+                </button>
+            @endforeach
+        </div>
+
+        {{-- Timing (late arrival / early departure) is independent of status
+        (see AttendanceStatus's doc comment) — filtering for it used to be
+        impossible since "late" wasn't a filterable status any more than
+        "early leave" ever was. Same chip styling and OR-across-selected
+        semantics as the status chips above, just a separate #[Url]-bound
+        property so the two filters combine independently. --}}
+        <p class="px-6 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Timing</p>
+        <div class="flex flex-wrap gap-2 px-6 pb-6">
+            @foreach (['late' => 'Late arrival', 'early' => 'Early departure'] as $value => $label)
+                @php $selected = in_array($value, $timingFilters, true); @endphp
+                <button
+                    type="button"
+                    wire:click="toggleTimingFilter('{{ $value }}')"
+                    @class([
+                        'inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition',
+                        'bg-amber-600 text-white shadow-sm dark:bg-amber-500' => $selected,
+                        'bg-transparent text-slate-500 ring-1 ring-inset ring-slate-300 hover:border-slate-400 hover:text-slate-700 dark:text-slate-400 dark:ring-slate-700 dark:hover:text-slate-200' => ! $selected,
+                    ])
+                >
+                    {{ $label }}
                 </button>
             @endforeach
         </div>
@@ -212,8 +290,8 @@
                 <table class="min-w-full">
                     <thead>
                         <tr class="relative text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                            <th class="px-6 py-3">Date</th>
-                            <th class="px-6 py-3">Employee</th>
+                            <th class="whitespace-nowrap px-6 py-3">Date</th>
+                            <th class="min-w-[11rem] px-6 py-3">Employee</th>
                             <th class="px-6 py-3">Department</th>
                             <th class="px-6 py-3">In</th>
                             <th class="px-6 py-3">Out</th>
@@ -229,9 +307,21 @@
                     </thead>
                     <tbody>
                         @foreach ($attendances as $attendance)
-                            @php $style = $statusStyles[$attendance->status->value] ?? $statusStyles['off']; @endphp
+                            @php
+                                $style = $variantStyles[$attendance->displayVariant()];
+
+                                // Marked times (see CLAUDE.md's "Marked times" note) — the
+                                // Status badge shows the real attendance status ("Present"),
+                                // so the In/Out cells are where the specific late-arrival/
+                                // early-leave discrepancy is pointed out, matching the
+                                // calendar's convention, instead of it only living in the
+                                // Late/Early leave columns.
+                                $markedLate = $attendance->isLate();
+                                $markedEarly = $attendance->leftEarly();
+                                $markedTimeClass = 'text-red-700 underline decoration-red-600 decoration-2 underline-offset-2 dark:text-red-300 dark:decoration-red-400';
+                            @endphp
                             <tr wire:key="daily-attendance-{{ $attendance->id }}" class="group relative hover:bg-slate-50 dark:hover:bg-slate-800/60">
-                                <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{{ $attendance->work_date->format('D j M') }}</td>
+                                <td class="whitespace-nowrap px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{{ $attendance->work_date->format('D j M') }}</td>
                                 <td class="px-6 py-4">
                                     {{-- Resting-state accent color (not just on hover) + underline-on-hover
                                     + a visible focus ring is the app's new "this is a link" convention —
@@ -242,18 +332,29 @@
                                         wire:navigate
                                         class="inline-block rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                                     >
-                                        <div class="font-medium text-primary-700 underline decoration-1 underline-offset-2 decoration-primary-300 transition hover:decoration-primary-600 dark:text-primary-400 dark:decoration-primary-700 dark:hover:decoration-primary-400">{{ $attendance->employee->full_name }}</div>
+                                        <div class="whitespace-nowrap font-medium text-primary-700 underline decoration-1 underline-offset-2 decoration-primary-300 transition hover:decoration-primary-600 dark:text-primary-400 dark:decoration-primary-700 dark:hover:decoration-primary-400">{{ $attendance->employee->full_name }}</div>
                                         <div class="text-sm text-slate-500 dark:text-slate-400">{{ $attendance->employee->employee_code }}</div>
                                     </a>
                                 </td>
                                 <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{{ $attendance->employee->department->name }}</td>
                                 <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">
-                                    <x-time :time="$attendance->first_in" />
-                                    @if (! $attendance->first_in) — @endif
+                                    @if ($attendance->first_in)
+                                        @if ($markedLate)
+                                            <x-time :time="$attendance->first_in" class="{{ $markedTimeClass }}" aria-label="Arrived {{ $attendance->late_minutes }} minute{{ $attendance->late_minutes === 1 ? '' : 's' }} late" />
+                                        @else
+                                            <x-time :time="$attendance->first_in" />
+                                        @endif
+                                    @else
+                                        —
+                                    @endif
                                 </td>
                                 <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">
                                     @if ($attendance->last_out)
-                                        <x-time :time="$attendance->last_out" />
+                                        @if ($markedEarly)
+                                            <x-time :time="$attendance->last_out" class="{{ $markedTimeClass }}" aria-label="Left {{ $attendance->early_leave_minutes }} minute{{ $attendance->early_leave_minutes === 1 ? '' : 's' }} early" />
+                                        @else
+                                            <x-time :time="$attendance->last_out" />
+                                        @endif
                                         @if ($attendance->isOvernightOut())
                                             <span class="text-slate-400 dark:text-slate-500">(+1)</span>
                                         @endif
@@ -262,9 +363,15 @@
                                     @endif
                                 </td>
                                 <td class="px-6 py-4 text-right text-sm text-slate-700 dark:text-slate-300">{{ $attendance->formattedWorkedMinutes() ?? '—' }}</td>
-                                <td class="px-6 py-4 text-right text-sm text-slate-700 dark:text-slate-300">{{ $attendance->late_minutes > 0 ? $attendance->late_minutes.'m' : '—' }}</td>
-                                <td class="px-6 py-4 text-right text-sm text-slate-700 dark:text-slate-300">{{ $attendance->early_leave_minutes > 0 ? $attendance->early_leave_minutes.'m' : '—' }}</td>
+                                <td class="px-6 py-4 text-right text-sm text-slate-700 dark:text-slate-300">{{ $attendance->isLate() ? $attendance->late_minutes.'m' : '—' }}</td>
+                                <td class="px-6 py-4 text-right text-sm text-slate-700 dark:text-slate-300">{{ $attendance->leftEarly() ? $attendance->early_leave_minutes.'m' : '—' }}</td>
                                 <td class="px-6 py-4">
+                                    {{-- Status only — the adjacent Late/Early leave columns
+                                    already show the minutes (aligned, scannable), and the
+                                    marked In/Out times already point at which one; a third
+                                    "Late 21m" chip here repeated the same fact and bloated
+                                    row height. Colour still comes from displayVariant(), so
+                                    a timing exception still reads amber, not green. --}}
                                     <x-badge :color="$style['badge']">{{ $attendance->status->label() }}</x-badge>
                                 </td>
                                 <td class="py-4 pl-2 pr-6 text-right">

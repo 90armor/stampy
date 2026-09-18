@@ -184,12 +184,14 @@ class DailySummaryBuilder
 
         // Exactly one of {in, out} is always incomplete, regardless of
         // whether the date is a workday — a lone punch on a day off is just
-        // as unresolved as one on a scheduled day.
+        // as unresolved as one on a scheduled day. A day both punches cover
+        // is always Present, whether or not the arrival was late or the
+        // departure early — timing is a separate dimension (late_minutes/
+        // early_leave_minutes above), not a status. See AttendanceStatus's
+        // doc comment for why a `Late` status doesn't exist here.
         $status = match (true) {
             ! $hasIn && ! $hasOut => $isWorkday ? AttendanceStatus::Absent : AttendanceStatus::Off,
             $hasIn xor $hasOut => AttendanceStatus::Incomplete,
-            ! $isWorkday => AttendanceStatus::Present,
-            $lateMinutes > 0 => AttendanceStatus::Late,
             default => AttendanceStatus::Present,
         };
 

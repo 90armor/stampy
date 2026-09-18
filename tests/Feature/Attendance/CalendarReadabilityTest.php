@@ -56,16 +56,18 @@ class CalendarReadabilityTest extends TestCase
             ->test(Show::class, ['employee' => $employee])
             ->set('month', self::MONTH);
 
-        foreach (['Present', 'Late', 'Incomplete', 'Absent', 'Off', 'Not calculated', 'Late arrival / early departure'] as $label) {
+        foreach (['Present', 'Incomplete', 'Absent', 'Off', 'Not calculated', 'Late / Early leave'] as $label) {
             $component->assertSee($label);
         }
 
         // Each legend entry's icon path, not just its label text — proves
         // the legend actually pairs icon-to-label, not just prints text
-        // near unrelated icons elsewhere on the page.
+        // near unrelated icons elsewhere on the page. No icon path for
+        // "Late / Early leave": that entry is a colour swatch + underlined
+        // sample time, not an icon at all — merging it out of the icon list
+        // is exactly what stopped it duplicating present's check icon.
         foreach ([
             'M4.5 12.75l6 6 9-13.5',       // present (check)
-            'M12 6v6h4.5m4.5 0a9',          // late (clock)
             'M12 9v3.75m-9.303',            // incomplete (triangle)
             'M6 18 18 6M6 6l12 12',         // absent (x-mark)
             'M6.75 3v2.25M17.25 3v2.25',    // off (calendar-days)
@@ -73,6 +75,12 @@ class CalendarReadabilityTest extends TestCase
         ] as $path) {
             $component->assertSeeHtml($path);
         }
+
+        // Exactly one "Late / Early leave" entry — this used to be two
+        // (an icon-based legend row sharing present's check icon, plus a
+        // separately worded "Late arrival / early leave" marked-time
+        // sample), now merged into a single entry.
+        $this->assertSame(1, substr_count($component->html(), 'Late / Early leave'));
     }
 
     public function test_the_summary_label_says_calculated_workdays_not_workdays(): void
@@ -172,7 +180,7 @@ class CalendarReadabilityTest extends TestCase
         DailyAttendance::factory()->create([
             'employee_id' => $employee->id,
             'work_date' => '2026-03-02',
-            'status' => AttendanceStatus::Late,
+            'status' => AttendanceStatus::Present,
             'first_in' => Carbon::parse('2026-03-02 08:12:00'),
             'last_out' => Carbon::parse('2026-03-02 17:00:00'),
             'late_minutes' => 12,
@@ -211,13 +219,65 @@ class CalendarReadabilityTest extends TestCase
         $this->assertStringNotContainsString('aria-label="Arrived', $html);
     }
 
+    public function test_the_table_view_also_marks_late_arrival_and_early_leave_times(): void
+    {
+        $employee = Employee::factory()->create();
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => '2026-03-02',
+            'status' => AttendanceStatus::Present,
+            'first_in' => Carbon::parse('2026-03-02 08:12:00'),
+            'last_out' => Carbon::parse('2026-03-02 16:56:00'),
+            'late_minutes' => 12,
+            'early_leave_minutes' => 4,
+        ]);
+
+        $html = Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', self::MONTH)
+            ->set('view', 'table')
+            ->html();
+
+        $this->assertStringContainsString('aria-label="Arrived 12 minutes late"', $html);
+        $this->assertStringContainsString('aria-label="Left 4 minutes early"', $html);
+        // The marked times and the numeric Late/Early leave columns already
+        // show this — a third "Late 12m"/"Early 4m" chip beside the Status
+        // badge repeated the same fact and bloated the row height, so it
+        // was removed.
+        $this->assertStringNotContainsString('>Late 12m<', $html);
+        $this->assertStringNotContainsString('>Early 4m<', $html);
+    }
+
+    public function test_the_day_modal_also_marks_late_arrival_and_early_leave_times(): void
+    {
+        $employee = Employee::factory()->create();
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => '2026-03-02',
+            'status' => AttendanceStatus::Present,
+            'first_in' => Carbon::parse('2026-03-02 08:12:00'),
+            'last_out' => Carbon::parse('2026-03-02 16:56:00'),
+            'late_minutes' => 12,
+            'early_leave_minutes' => 4,
+        ]);
+
+        $html = Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', self::MONTH)
+            ->call('openDay', '2026-03-02')
+            ->html();
+
+        $this->assertStringContainsString('aria-label="Arrived 12 minutes late"', $html);
+        $this->assertStringContainsString('aria-label="Left 4 minutes early"', $html);
+    }
+
     public function test_a_day_with_both_a_late_arrival_and_an_early_departure_marks_both_times(): void
     {
         $employee = Employee::factory()->create();
         DailyAttendance::factory()->create([
             'employee_id' => $employee->id,
             'work_date' => '2026-03-02',
-            'status' => AttendanceStatus::Late,
+            'status' => AttendanceStatus::Present,
             'first_in' => Carbon::parse('2026-03-02 08:12:00'),
             'last_out' => Carbon::parse('2026-03-02 16:56:00'),
             'late_minutes' => 12,
@@ -272,7 +332,7 @@ class CalendarReadabilityTest extends TestCase
         DailyAttendance::factory()->create([
             'employee_id' => $employee->id,
             'work_date' => '2026-03-03',
-            'status' => AttendanceStatus::Late,
+            'status' => AttendanceStatus::Present,
             'first_in' => Carbon::parse('2026-03-03 08:12:00'),
             'last_out' => Carbon::parse('2026-03-03 17:00:00'),
             'late_minutes' => 12,
@@ -288,6 +348,59 @@ class CalendarReadabilityTest extends TestCase
         $this->assertStringContainsString('text-amber-700', $html);
     }
 
+    public function test_the_tables_incomplete_badge_matches_the_calendars_violet_not_amber(): void
+    {
+        $employee = Employee::factory()->create();
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => '2026-03-02',
+            'status' => AttendanceStatus::Incomplete,
+            'first_in' => Carbon::parse('2026-03-02 08:00:00'),
+            'last_out' => null,
+        ]);
+
+        $html = Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', self::MONTH)
+            ->set('view', 'table')
+            ->html();
+
+        $this->assertStringContainsString('bg-violet-50', $html);
+        $this->assertStringNotContainsString('bg-amber-50 text-amber-700', $html);
+    }
+
+    public function test_a_present_day_with_an_early_leave_borrows_lates_amber_cell_colour(): void
+    {
+        $employee = Employee::factory()->create();
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => '2026-03-02',
+            'status' => AttendanceStatus::Present,
+            'first_in' => Carbon::parse('2026-03-02 08:00:00'),
+            'last_out' => Carbon::parse('2026-03-02 16:56:00'),
+            'late_minutes' => 0,
+            'early_leave_minutes' => 4,
+        ]);
+        // A plain Present day, for contrast — must stay green.
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => '2026-03-03',
+            'status' => AttendanceStatus::Present,
+            'first_in' => Carbon::parse('2026-03-03 08:00:00'),
+            'last_out' => Carbon::parse('2026-03-03 17:00:00'),
+            'late_minutes' => 0,
+            'early_leave_minutes' => 0,
+        ]);
+
+        $html = Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', self::MONTH)
+            ->html();
+
+        $this->assertStringContainsString('bg-amber-50 dark:bg-amber-900/20', $html);
+        $this->assertStringContainsString('bg-green-50 dark:bg-green-900/20', $html);
+    }
+
     public function test_the_legend_shows_a_marked_time_sample_instead_of_a_dot(): void
     {
         $employee = Employee::factory()->create();
@@ -297,7 +410,8 @@ class CalendarReadabilityTest extends TestCase
             ->set('month', self::MONTH)
             ->html();
 
-        $this->assertStringContainsString('Late arrival / early departure', $html);
+        $this->assertStringContainsString('Late / Early leave', $html);
+        $this->assertStringContainsString('decoration-red-600', $html);
         $this->assertStringNotContainsString('bg-slate-700 dark:bg-slate-200', $html);
     }
 
@@ -412,13 +526,21 @@ class CalendarReadabilityTest extends TestCase
             'last_out' => Carbon::parse('2026-03-02 17:15:00'),
         ]);
 
+        // Not assertDontSee('AM')/('PM'): that scans the WHOLE page, including
+        // the acting admin's Faker-generated name, which can coincidentally
+        // contain that substring (flaky — passed in isolation, failed once
+        // inside the full suite run purely from Faker RNG ordering). The
+        // meridiem is always wrapped in its own span with nothing else
+        // inside (see <x-time>), so checking for that exact tag boundary is
+        // still a real "no meridiem was rendered" check, just not a fragile
+        // whole-page substring one.
         Livewire::actingAs($this->admin())
             ->test(Show::class, ['employee' => $employee])
             ->set('month', self::MONTH)
             ->assertSee('08:52')
             ->assertSee('17:15')
-            ->assertDontSee('AM')
-            ->assertDontSee('PM');
+            ->assertDontSeeHtml('>AM<')
+            ->assertDontSeeHtml('>PM<');
     }
 
     public function test_the_modal_drops_seconds_from_raw_punch_times(): void

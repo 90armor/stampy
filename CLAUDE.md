@@ -44,14 +44,28 @@ One primary color, one accent color, one font, a small set of reusable Blade com
 - **Cards:** `bg-white/70 backdrop-blur-xl rounded-lg shadow-sm ring-1 ring-slate-200/60 hover:ring-primary-200/60 dark:bg-slate-900/60 dark:ring-slate-800/70` (see `x-card`) — glass, no heavy borders, subtle primary-tinted ring on hover.
 - **Tables:** row dividers are an inset `h-px bg-slate-200/60 dark:bg-slate-800/60` line, not a `divide-y` utility — for a real `<table>` (e.g. Employees, Attendance), give the header `<tr>` and every body `<tr>` `relative`, then drop a `pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60` span into the *last* `<th>`/`<td>` of each row (`@unless ($loop->last)` on body rows, so the final row doesn't get a trailing line before the card edge/pagination); for a card-style row list with no `<table>` (e.g. Departments, Positions), a plain `border-t border-slate-200/60 dark:border-slate-800/60` on each row (`first:border-t-0`) does the same job more simply. Either way it's **`slate-200/60`, not `slate-100`** — this file used to say `divide-y divide-slate-100 dark:divide-slate-800`, which was never what any real page actually did, and `slate-100` (this app's warm-stone-remapped scale) is nearly invisible against a white/glass card in light mode. If a new table's borders are hard to see, this is almost certainly why — check the actual color, not just whether a border class is present. `hover:bg-slate-50 dark:hover:bg-slate-800/60` rows, generous cell padding (`px-6 py-4`), uppercase `text-xs` column headers.
 - **Links (data rows that navigate elsewhere):** give the link text the primary accent color at rest — `text-primary-700 dark:text-primary-400` — plus a **permanent, muted underline** (`underline decoration-1 underline-offset-2 decoration-primary-300 dark:decoration-primary-700`) that strengthens on hover (`hover:decoration-primary-600 dark:hover:decoration-primary-400`), and a `focus-visible:ring-2 focus-visible:ring-primary-500` on the `<a>` for keyboard users. Color alone was tried first and wasn't enough: in a table where every name in a column is a link, there's no unlinked neighbor to contrast against, so a color-only treatment just reads as that column's styling rather than as interactivity — the underline is what actually reads as "clickable" regardless of neighboring rows. Never rely on a hover-only change (no underline until hover, color-only hover, etc.) — touch devices have no hover state, so whatever signals "link" must already be visible at rest. A trailing `chevron-right` icon at the row's end must also be visible at rest, not merely present — `text-slate-400 dark:text-slate-500` (not `slate-300`/`slate-700`, which reads as nearly invisible) — strengthening further on row hover (`group-hover:text-primary-600`, `group` on the containing `<tr>`). This applies when the link is a specific clickable element inside the row (e.g. Attendance's employee-name cell, kept deliberately narrow so the rest of the row's times/durations stay selectable text) — a different, equally valid pattern is making the *whole row* the click target (Employees' directory list: `cursor-pointer` + `@click="window.location = ..."` + a `focus-visible` ring on the `<tr>` itself), which doesn't need the text styled as a link at all since the row hover/cursor already signals it. Pick whichever pattern fits — cell-link when the row has content people need to select and copy, whole-row when it doesn't — but a cell-link must always get this full styling (color + underline + visible chevron); a link that looks like plain text, or blends into its column, is in practice no link.
-- **Status colors:** the app's core palette (green/amber/red/slate, plus primary/accent for a couple of low-frequency states) covers most status meanings, but `violet` is a deliberate, one-time exception — Attendance's calendar/day-modal uses it for `incomplete`, distinct from `late`'s amber. The two used to share amber and were indistinguishable at a glance in light mode (only a small icon differed): a status filled-in-error by the *device* (a punch never recorded) and a status that's normal *employee behavior* (arrived after start time) are not the same kind of fact, and conflating their color makes "how many days was I late" over-count the data-defect days too. `violet` was picked because it doesn't collide with anything already meaningful (green/amber/red/slate/primary/accent are all spoken for). This is the only place a new hue has been added to the palette — don't add another for a future status without the same kind of justification, and don't "clean this up" back to amber; the whole point is that it's visually distinct. `text-violet-700 dark:text-violet-300` (light: 6.48:1 on `bg-violet-50`; dark: 9.43:1 on `bg-violet-900/20` composited over the card background) — the `-300` in dark mode, not `-400`, for the same reason `absent` uses `red-300`: measured against the actual composited background, not assumed from the shade number.
-- **Marked times (a specific value is out of range, not just the day):** when a value inside a cell needs to say "this exact number is the problem" — e.g. the calendar's late arrival/early departure times — color alone repeats the exact failure the status icons exist to prevent (someone who can't distinguish red from the surrounding muted gray would see an ordinary-looking time). Pair `text-red-700 dark:text-red-300` with `underline decoration-red-600 decoration-2 underline-offset-2 dark:decoration-red-400` on just that value — the underline is a shape cue that survives greyscale on its own, independent of whether the color reads at all. A prior version of this used a plain corner dot to mean "something about this day needs a closer look"; it was removed for saying too little (it didn't say *what*, and sat close enough to the status icon to be missed) — mark the specific value instead of the day when the UI can point at a specific value.
+- **Status vs. timing — two independent dimensions, never conflated:** `AttendanceStatus` answers exactly one question, "did they attend" — `present` / `incomplete` / `absent` / `off` / `holiday` / `leave`. Whether the *timing* was off (arrived late, left early) is a completely separate fact, tracked on `DailyAttendance`'s `late_minutes`/`early_leave_minutes` columns and surfaced through `isLate()` / `leftEarly()` / `hasTimingException()` — **never** as a status value. A `Late` status used to exist and was removed: it mixed the two dimensions, and a day that was both late *and* left early would have needed a third, combined status — the question "what do we call a day that's both?" was itself the sign timing didn't belong in the enum. A day both punches cover is always `present`, whatever the timing.
+- **`DailyAttendance::displayVariant()` is the single source of truth for colour** — the one method that resolves both dimensions (status + timing) into one display bucket. Every view (calendar, table, list) colours a cell/badge by looking up this variant; no view may re-derive a colour bucket by checking `late_minutes`/`early_leave_minutes`/`status` directly. This is what keeps the three views from drifting apart the way they did when each independently decided "does this day have a problem":
+
+  | variant | colour | meaning |
+  |---|---|---|
+  | `present` | green | normal day |
+  | `timing` | amber | attended, but arrival or departure was outside schedule (`present` + `hasTimingException()`) |
+  | `incomplete` | violet | data defect — a punch is missing |
+  | `absent` | red | did not attend |
+  | `off` / `holiday` | slate | not a working day (`leave` keeps its own accent color, same idea) |
+  | not calculated | muted | no `daily_attendances` row yet — not a variant string (there's no model instance to call it on), handled separately in each view |
+
+  `violet` (`incomplete`) was a deliberate, one-time exception to the app's core green/amber/red/slate palette (plus primary/accent for a couple of low-frequency states) — it's also the one non-base color `x-badge` carries (`primary`/`green`/`red`/`amber`/`slate`/`violet`). Incomplete (a device defect — a punch never recorded) and a timing exception (normal employee behavior) used to share amber and were indistinguishable at a glance in light mode. Don't add another one-off hue for a future variant without the same kind of justification, and don't "clean this up" back to amber. `text-violet-700 dark:text-violet-300` (light: 6.48:1 on `bg-violet-50`; dark: 9.43:1 on `bg-violet-900/20` composited over the card background) — the `-300` in dark mode, not `-400`, for the same reason `absent` uses `red-300`: measured against the actual composited background, not assumed from the shade number.
+- **The calendar's status icon reflects attendance, not timing:** a `timing`-variant cell reuses `present`'s check icon rather than a separate glyph — the icon answers "did they show up" (shape-safe in greyscale on its own), while the amber colour and the marked time (below) carry the timing exception. This is deliberate, not a gap: conflating "attended" and "arrived late" into one icon (a clock) was the old, now-removed design.
+- **Marked times (a specific value is out of range, not just the day):** when a value inside a cell needs to say "this exact number is the problem" — e.g. the calendar/table/list's late-arrival/early-leave times — color alone repeats the exact failure the status icons exist to prevent (someone who can't distinguish red from the surrounding muted gray would see an ordinary-looking time). Pair `text-red-700 dark:text-red-300` with `underline decoration-red-600 decoration-2 underline-offset-2 dark:decoration-red-400` on just that value — the underline is a shape cue that survives greyscale on its own, independent of whether the color reads at all. A prior version of this used a plain corner dot to mean "something about this day needs a closer look"; it was removed for saying too little (it didn't say *what*, and sat close enough to the status icon to be missed) — mark the specific value instead of the day when the UI can point at a specific value.
+- **Status badge + timing chips (table/list), not a recolored badge:** the table and list's Status column shows the real attendance status ("Present") in its normal badge color, with small separate amber chips alongside it for each timing exception present (`Late 21m`, `Early 4m`) — so the row reads "Present, 21 minutes late" instead of either hiding the lateness behind a plain badge or overwriting the attendance fact with a fabricated "Late" one. The calendar handles this differently (the whole cell borrows `timing`'s amber via `displayVariant()`, no separate chip) because its cell has no status word to begin with — only an icon — so recoloring it doesn't contradict any text the way recoloring a badge that still says "Present" would.
 - **Forms:** label above input (`x-input-label`, `mb-1`), `rounded-lg border-slate-300`, glass background (`bg-white/80 backdrop-blur-sm dark:bg-slate-800/70`), `focus:ring-primary-500` focus rings, red inline errors below the field (`x-input-error`). `x-text-input`/`x-textarea`/`x-select` accept a `surface` prop — `glass` (default, unchanged on every page that doesn't pass it) or `solid` (opaque, no blur; used only inside the employee/department/position modals, which are dense enough that glass hurt legibility). Don't flip the default without checking every page that omits the prop.
 - **Empty states:** icon in a soft circular badge + one-line title + optional description + action button (`x-empty-state`).
 - **Icons:** Heroicons (outline, 24x24, stroke-width 1.5), inlined via the single `x-icon` component (`resources/views/components/icon.blade.php`) rather than a JS icon library — add new icons there as `match()` cases.
 - **App shell:** fixed sidebar (`layouts/partials/sidebar.blade.php`, `w-[242px]`, light glass surface, evergreen/primary-tinted active state — not a dark panel) + sticky glass topbar with a breadcrumb-style page title and dark-mode toggle (`layouts/partials/topbar.blade.php`). Sidebar nav items for features not yet built (Attendance, Time off, Reports) are rendered disabled with a "Soon" badge rather than omitted, so the roadmap is visible without linking anywhere — flip an item to a real link only when that phase actually ships. Auth pages (`layouts/guest.blade.php`) use a split-screen layout: an evergreen hero panel (hidden below `lg`) plus the glass form panel.
 
-Reusable UI lives in `resources/views/components/`: `button.blade.php` (variants: `primary`, `secondary`, `danger`), `card.blade.php`, `badge.blade.php` (colors: `primary`, `green`, `red`, `amber`, `slate`), `empty-state.blade.php`, `icon.blade.php`, `confirm-dialog.blade.php`, `select.blade.php`, plus Breeze's `text-input`, `textarea`, `input-label`, `input-error` (restyled to match this system). Breeze's `primary-button`/`secondary-button` delegate to `x-button` so auth pages and app pages share one look.
+Reusable UI lives in `resources/views/components/`: `button.blade.php` (variants: `primary`, `secondary`, `danger`), `card.blade.php`, `badge.blade.php` (colors: `primary`, `green`, `red`, `amber`, `slate`, `violet` — the last one exists only for Attendance's Incomplete status, see the "Status colors" note above), `empty-state.blade.php`, `icon.blade.php`, `confirm-dialog.blade.php`, `select.blade.php`, plus Breeze's `text-input`, `textarea`, `input-label`, `input-error` (restyled to match this system). Breeze's `primary-button`/`secondary-button` delegate to `x-button` so auth pages and app pages share one look.
 
 **Alpine note:** any element using a bare `@click`/`x-show`/etc. with no `x-data` anywhere in its ancestor chain silently gets no directive binding at all (confirmed empirically on this Alpine 3.17 setup — it isn't just an edge case). Add `x-data="{}"` directly on any standalone interactive element that isn't already nested inside a component with its own `x-data` (e.g. the dark-mode toggle buttons).
 
@@ -108,34 +122,81 @@ Reusable UI lives in `resources/views/components/`: `button.blade.php` (variants
 | position_id | bigint FK → positions | `restrictOnDelete` |
 | join_date | date | |
 | device_user_id | string, unique, nullable | maps to the user ID on the ZKTeco fingerprint device |
+| work_schedule_id | bigint FK → work_schedules, nullable | `nullOnDelete`; see `Employee::effectiveSchedule()` — falls back to the default schedule when null |
+| manager_id | bigint FK → employees, nullable | `nullOnDelete`; self-referencing, added in Phase 2.4c for row-level attendance scoping (a manager sees themself plus transitive subordinates) |
 | status | enum(active, inactive) | default `active`, indexed |
 | timestamps | | no soft deletes — see Employee lifecycle above |
 
-Plus the standard `users`, `cache`, `jobs` tables (Laravel defaults) and `roles`/`permissions`/pivot tables (spatie/laravel-permission).
+**`users`** — not just Laravel's defaults; Phase 2.4d added password-reset columns for accounts without email:
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint PK | |
+| name | string | |
+| username | string, unique | login identifier — separate from `email`, which is nullable (an employee without a real inbox still needs to log in) |
+| email | string, unique, nullable | |
+| email_verified_at | timestamp, nullable | |
+| password | string | |
+| must_change_password | bool | default `false`; live flag, cleared on the user's own password change |
+| password_changed_at | timestamp, nullable | |
+| password_reset_by | bigint FK → users, nullable | `nullOnDelete`, self-referencing; an audit record of an admin-issued reset, kept even after the user changes it — distinct from `must_change_password` |
+| password_reset_at | timestamp, nullable | |
+| temporary_password_expires_at | timestamp, nullable | checked at login against this stored value, not inferred from `updated_at` |
+| remember_token, timestamps | | |
+
+Plus `cache`, `jobs`, `sessions`, `password_reset_tokens` (Laravel defaults) and `roles`/`permissions`/pivot tables (spatie/laravel-permission).
+
+### Phase 2 (built)
+
+**`work_schedules`**
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint PK | |
+| name | string | |
+| start_time / end_time | time | |
+| grace_minutes | unsigned smallint | default `0`; minutes after `start_time` before a late arrival counts as late at all — once past grace, `late_minutes` is the full gap from `start_time`, not the remainder past grace |
+| break_minutes | unsigned smallint | default `0`; subtracted from worked time |
+| workdays | json | array of ISO weekday numbers (1=Monday) |
+| is_default | bool | default `false`; the schedule `Employee::effectiveSchedule()` falls back to when an employee has none assigned |
+| timestamps | | |
+
+**`attendance_logs`** — raw device punches. Append-only: a wrong punch (e.g. someone else's finger matched the device) is never edited or deleted, only voided — see the "append-only" note below.
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint PK | |
+| employee_id | bigint FK → employees | `cascadeOnDelete` |
+| punched_at | datetime | |
+| punch_type | string | `in` / `out` |
+| source | string | default `device`; `manual` for admin-entered corrections |
+| device_id | string, nullable | |
+| created_by | bigint FK → users, nullable | `nullOnDelete`; who entered a manual punch |
+| raw | json, nullable | original device payload for troubleshooting |
+| voided_at | timestamp, nullable | |
+| voided_by | bigint FK → users, nullable | `nullOnDelete` |
+| timestamps | | |
+
+Unique on `(employee_id, punched_at, source)` — deliberately *not* including `voided_at`: on MySQL a unique index treats every `NULL` as distinct from every other `NULL`, so including it would let the same device punch collide, get voided, and then be re-imported as a live "duplicate" — reopening the exact bug the index exists to prevent (confirmed empirically, not assumed). A punch voided at its exact key permanently occupies that key; reviving (not re-inserting) is the correct fix when an admin re-adds a punch at the same timestamp they just voided — see `Attendance\Show::addPunch()`.
+
+**`daily_attendances`** — one row per employee per date, entirely derived from `attendance_logs` by `DailySummaryBuilder`. Must always be fully recomputable — nothing else may write to it.
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint PK | |
+| employee_id | bigint FK → employees | `cascadeOnDelete` |
+| work_date | date | |
+| work_schedule_id | bigint FK → work_schedules, nullable | `nullOnDelete`; the schedule actually used for *this day's* calculation, since an employee's schedule can change over time |
+| first_in / last_out | datetime, nullable | the paired punches for the day, per `DailySummaryBuilder`'s 18h pairing window |
+| worked_minutes | unsigned int | default `0` |
+| late_minutes / early_leave_minutes | unsigned int | default `0`; see the "status vs. timing" note below |
+| status | string | `AttendanceStatus` value — `present`/`incomplete`/`absent`/`off`/`holiday`/`leave` |
+| note | string, nullable | |
+| timestamps | | |
+
+Unique on `(employee_id, work_date)`; indexed on `(work_date, status)`.
+
+Two model decisions here aren't obvious from the schema alone, and both have already been re-litigated once — recorded so they aren't re-opened a third time:
+- **`attendance_logs` is append-only.** A correction is a void (`voided_at`/`voided_by`) plus a new row, never an edit to an existing one — preserves a full audit trail of what the device actually reported vs. what an admin corrected, and is what makes `daily_attendances` safely recomputable at any time.
+- **Status answers "did they attend"; timing is a separate dimension.** `AttendanceStatus` has no `Late` value — a `late_minutes`/`early_leave_minutes` > 0 day is still `present`. See the "Status vs. timing" note under Design system for the full reasoning; `DailyAttendance::displayVariant()` is what every view colours from, so this distinction isn't just a data-modeling footnote — it's the one thing every Attendance view must route through.
 
 ### Future phases (not yet migrated — kept here so later migrations stay consistent with this plan)
-
-**`attendance_logs`** (Phase 2 — raw device punches)
-| Column | Type | Notes |
-|---|---|---|
-| id | bigint PK | |
-| employee_id | bigint FK → employees, nullable | nullable until matched by device_user_id |
-| device_user_id | string | as reported by the ZKTeco device |
-| punch_time | datetime | |
-| log_type | string/enum | e.g. check-in / check-out / unknown, device-dependent |
-| raw_payload | json, nullable | original device payload for troubleshooting |
-| timestamps | | |
-
-**`attendances`** (Phase 2 — processed daily records, derived from `attendance_logs`)
-| Column | Type | Notes |
-|---|---|---|
-| id | bigint PK | |
-| employee_id | bigint FK → employees | |
-| date | date | |
-| check_in | datetime, nullable | |
-| check_out | datetime, nullable | |
-| status | enum | e.g. present/late/absent/half-day |
-| timestamps | | |
 
 **`leave_types`** (Phase 3)
 | Column | Type | Notes |
@@ -167,7 +228,7 @@ Plus the standard `users`, `cache`, `jobs` tables (Laravel defaults) and `roles`
 | approved_by | bigint FK → users, nullable | |
 | timestamps | | |
 
-Exact columns for Phase 2–4 tables will be refined when those phases are scoped in detail — this is a planning skeleton, not a final spec.
+Exact columns for Phase 3–4 tables will be refined when those phases are scoped in detail — this is a planning skeleton, not a final spec.
 
 ## Roles & authorization
 
@@ -186,7 +247,7 @@ Enforced in three places: route middleware (`role:admin|manager` / `role:admin` 
 ## 5-phase roadmap
 
 1. **Foundation** (complete) — project setup, auth, roles/permissions, departments, positions, employees, layout/navigation. Closed out with a full codebase audit (see `AUDIT.md`) — all Critical/High/Medium findings fixed.
-2. **Attendance & device integration** (current) — `attendance_logs` ingestion from the ZKTeco device (matched via `device_user_id`), processing into `attendances`, attendance dashboards/reports.
+2. **Attendance & device integration** (current) — `attendance_logs` ingestion from the ZKTeco device (matched via `device_user_id`), processing into `daily_attendances`, attendance dashboards/reports.
 3. **Leave management** — `leave_types`, `leaves`, request/approval workflow, balances.
 4. **Overtime** — `overtime_requests`, request/approval workflow, integration with processed attendance.
 5. **Reporting & polish** — cross-cutting reports (attendance/leave/overtime), exports, UX polish, performance pass.

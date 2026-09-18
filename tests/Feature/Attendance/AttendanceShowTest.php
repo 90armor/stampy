@@ -158,18 +158,22 @@ class AttendanceShowTest extends TestCase
         $employee = Employee::factory()->create();
         $month = today()->startOfMonth();
 
-        $statuses = [
-            AttendanceStatus::Present,
-            AttendanceStatus::Present,
-            AttendanceStatus::Late,
-            AttendanceStatus::Absent,
+        // A late arrival is Present with late_minutes set, not a separate
+        // status (see AttendanceStatus's doc comment) — 'late' below is
+        // counted from that field, not from status.
+        $rows = [
+            ['status' => AttendanceStatus::Present, 'late_minutes' => 0],
+            ['status' => AttendanceStatus::Present, 'late_minutes' => 0],
+            ['status' => AttendanceStatus::Present, 'late_minutes' => 15],
+            ['status' => AttendanceStatus::Absent, 'late_minutes' => 0],
         ];
 
-        foreach ($statuses as $i => $status) {
+        foreach ($rows as $i => $row) {
             DailyAttendance::factory()->create([
                 'employee_id' => $employee->id,
                 'work_date' => $month->copy()->addDays($i)->format('Y-m-d'),
-                'status' => $status,
+                'status' => $row['status'],
+                'late_minutes' => $row['late_minutes'],
             ]);
         }
 
@@ -180,7 +184,7 @@ class AttendanceShowTest extends TestCase
             ->render()
             ->getData()['summary'];
 
-        $this->assertSame(2, $summary['present']);
+        $this->assertSame(3, $summary['present']);
         $this->assertSame(1, $summary['late']);
         $this->assertSame(1, $summary['absent']);
         $this->assertSame(0, $summary['incomplete']);
