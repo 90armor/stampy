@@ -142,7 +142,11 @@ class Employee extends Model
             $depth++;
         }
 
-        if ($frontier !== []) {
+        // A non-empty frontier at the cap only means "not checked yet" — warn only if those nodes really have unvisited reports.
+        $truncated = $frontier !== []
+            && static::query()->whereIn('manager_id', $frontier)->pluck('id')->contains(fn ($id) => ! isset($visited[$id]));
+
+        if ($truncated) {
             Log::warning('Employee::subordinateIds hit its depth cap without exhausting the tree — check for a manager_id cycle or an unusually deep org chart.', [
                 'employee_id' => $this->id,
                 'max_depth' => $maxDepth,

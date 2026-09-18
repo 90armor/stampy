@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -79,6 +80,47 @@ class EmployeeAccessScopingTest extends TestCase
         $this->assertContains($c->id, $ids);
         // The cycle must not re-include a itself.
         $this->assertNotContains($a->id, $ids);
+    }
+
+    /**
+     * @return array{0: Employee, 1: list<int>} the top of the chain, then each report's id, shallowest first
+     */
+    private function reportingChain(int $levelsBelowTop): array
+    {
+        $top = Employee::factory()->create();
+        $previous = $top;
+        $ids = [];
+
+        for ($level = 1; $level <= $levelsBelowTop; $level++) {
+            $previous = Employee::factory()->create(['manager_id' => $previous->id]);
+            $ids[] = $previous->id;
+        }
+
+        return [$top, $ids];
+    }
+
+    // 10 mirrors the depth cap inside Employee::resolveSubordinateIds().
+    public function test_a_chain_exactly_at_the_depth_cap_resolves_fully_without_warning(): void
+    {
+        Log::spy();
+
+        [$top, $ids] = $this->reportingChain(10);
+
+        $this->assertEqualsCanonicalizing($ids, $top->subordinateIds());
+        Log::shouldNotHaveReceived('warning');
+    }
+
+    public function test_a_chain_beyond_the_depth_cap_is_truncated_and_warns(): void
+    {
+        Log::spy();
+
+        [$top, $ids] = $this->reportingChain(11);
+
+        $resolved = $top->subordinateIds();
+
+        $this->assertEqualsCanonicalizing(array_slice($ids, 0, 10), $resolved);
+        $this->assertNotContains($ids[10], $resolved);
+        Log::shouldHaveReceived('warning')->once();
     }
 
     public function test_policy_allows_admin_to_view_any_employee(): void
