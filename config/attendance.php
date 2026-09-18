@@ -50,6 +50,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Displayed time format
+    |--------------------------------------------------------------------------
+    |
+    | How punch times (first_in/last_out and raw attendance_logs times) are
+    | rendered across the app — the calendar, the day modal, the table view,
+    | and the attendance list. A PHP date() format string; every one of
+    | those views renders through App\Support\AttendanceTime::format(), so
+    | switching back to 24-hour is this one line, not a hunt through blade
+    | files. 'g:i A' = 12-hour, no leading zero, uppercase AM/PM (e.g.
+    | "8:52 AM"); use 'H:i' for 24-hour ("08:52").
+    |
+    */
+
+    'time_format' => 'g:i A',
+
+    /*
+    |--------------------------------------------------------------------------
     | Minute rounding
     |--------------------------------------------------------------------------
     |

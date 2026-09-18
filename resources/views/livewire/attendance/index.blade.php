@@ -248,11 +248,12 @@
                                 </td>
                                 <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{{ $attendance->employee->department->name }}</td>
                                 <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">
-                                    {{ $attendance->first_in?->format('H:i') ?? '—' }}
+                                    <x-time :time="$attendance->first_in" />
+                                    @if (! $attendance->first_in) — @endif
                                 </td>
                                 <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">
                                     @if ($attendance->last_out)
-                                        {{ $attendance->last_out->format('H:i') }}
+                                        <x-time :time="$attendance->last_out" />
                                         @if ($attendance->isOvernightOut())
                                             <span class="text-slate-400 dark:text-slate-500">(+1)</span>
                                         @endif

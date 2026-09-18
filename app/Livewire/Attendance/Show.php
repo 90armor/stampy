@@ -24,6 +24,14 @@ class Show extends Component
     public string $month = '';
 
     /**
+     * Calendar is the default (Phase 2.4e) — the table stays available
+     * (it shows worked/late/early minutes per row, which the calendar
+     * can't fit) but is now the secondary view.
+     */
+    #[Url(as: 'view', history: true)]
+    public string $view = 'calendar';
+
+    /**
      * 'Y-m-d' of the day whose add-punch mini-form is open, or null when
      * none is. Only one at a time — simpler than tracking per-day state,
      * and there's no case where an admin needs two open together.
@@ -35,6 +43,23 @@ class Show extends Component
     public string $newPunchTime = '';
 
     public string $newPunchType = 'in';
+
+    /**
+     * Decoupled from $viewingDay on purpose (matching FormModal's
+     * $showModal/$editing split): entangling the modal directly on a
+     * nullable string works in principle (Alpine treats any non-empty
+     * string as truthy), but the modal's own close paths (backdrop click,
+     * Escape) assign JS `false` back through the two-way binding, which a
+     * ?string-typed property has no clean way to receive. A dedicated
+     * boolean sidesteps that entirely.
+     */
+    public bool $dayModalOpen = false;
+
+    /**
+     * 'Y-m-d' of the day the modal is currently showing — set once on open,
+     * left alone on close so the closing transition doesn't blank first.
+     */
+    public ?string $viewingDay = null;
 
     /**
      * Route-model-bound when reached via /attendance/{employee} (admin or a
@@ -91,6 +116,29 @@ class Show extends Component
 
     public function cancelAddingPunch(): void
     {
+        $this->addingPunchFor = null;
+        $this->resetErrorBag();
+    }
+
+    /**
+     * Only days within the currently-viewed month are meaningful — grid
+     * cells for adjacent-month padding days aren't rendered with a click
+     * handler at all (see gridDays()), but this guards the same rule
+     * server-side rather than trusting that alone.
+     */
+    public function openDay(string $date): void
+    {
+        if (! Carbon::createFromFormat('Y-m-d', $date)->isSameMonth($this->monthStart())) {
+            return;
+        }
+
+        $this->viewingDay = $date;
+        $this->dayModalOpen = true;
+    }
+
+    public function closeDayModal(): void
+    {
+        $this->dayModalOpen = false;
         $this->addingPunchFor = null;
         $this->resetErrorBag();
     }
@@ -210,23 +258,40 @@ class Show extends Component
     }
 
     /**
-     * Every calendar day of the month paired with its daily_attendances row
-     * (or null). A missing row means the builder hasn't run for that date
-     * yet — it must never be conflated with "absent", which is why this
-     * pads the whole month rather than only returning rows that exist.
+     * The month's daily_attendances rows, keyed by 'Y-m-d' — fetched once
+     * per render() and shared by days(), gridDays(), and the day modal's
+     * summary lookup, so the table view and the calendar view never issue
+     * separate queries for the same month.
      *
-     * @return Collection<int, array{date: Carbon, record: ?DailyAttendance}>
+     * @return Collection<string, DailyAttendance>
      */
-    private function calendarDays(): Collection
+    private function existingRecords(): Collection
     {
         $start = $this->monthStart();
         $end = $start->copy()->endOfMonth();
 
-        $existing = DailyAttendance::query()
+        return DailyAttendance::query()
             ->where('employee_id', $this->employee->id)
             ->whereBetween('work_date', [$start->format('Y-m-d'), $end->format('Y-m-d')])
             ->get()
             ->keyBy(fn (DailyAttendance $row) => $row->work_date->format('Y-m-d'));
+    }
+
+    /**
+     * Every calendar day of the month paired with its daily_attendances row
+     * (or null). A missing row means the builder hasn't run for that date
+     * yet — it must never be conflated with "absent", which is why this
+     * pads the whole month rather than only returning rows that exist.
+     * Powers the table view only — exactly the days in the month, no
+     * leading/trailing padding (see gridDays() for that).
+     *
+     * @param  Collection<string, DailyAttendance>  $existing
+     * @return Collection<int, array{date: Carbon, record: ?DailyAttendance}>
+     */
+    private function days(Collection $existing): Collection
+    {
+        $start = $this->monthStart();
+        $end = $start->copy()->endOfMonth();
 
         $days = collect();
         $cursor = $start->copy();
@@ -241,6 +306,48 @@ class Show extends Component
         }
 
         return $days;
+    }
+
+    /**
+     * The full Sunday-first calendar grid for the month, including leading/
+     * trailing days from adjacent months so every row has 7 cells (35 or 42
+     * total). Explicit Carbon::SUNDAY/SATURDAY rather than the app-locale
+     * default — startOfWeek()/endOfWeek() only fall back to locale when no
+     * day is given, so this is first-column-Sunday regardless of
+     * config('app.locale') or Carbon's runtime locale (confirmed against
+     * both, not assumed).
+     *
+     * Padding cells carry inMonth=false and no record — they're rendered
+     * muted, non-clickable, and excluded from the month summary purely to
+     * keep the grid rectangular, so there's no reason to look up real
+     * attendance data for a date outside the month being viewed.
+     *
+     * @param  Collection<string, DailyAttendance>  $existing
+     * @return Collection<int, array{date: Carbon, inMonth: bool, record: ?DailyAttendance}>
+     */
+    private function gridDays(Collection $existing): Collection
+    {
+        $monthStart = $this->monthStart();
+        $monthEnd = $monthStart->copy()->endOfMonth();
+        $gridStart = $monthStart->copy()->startOfWeek(Carbon::SUNDAY);
+        $gridEnd = $monthEnd->copy()->endOfWeek(Carbon::SATURDAY);
+
+        $cells = collect();
+        $cursor = $gridStart->copy();
+
+        while ($cursor->lte($gridEnd)) {
+            $inMonth = $cursor->month === $monthStart->month && $cursor->year === $monthStart->year;
+
+            $cells->push([
+                'date' => $cursor->copy(),
+                'inMonth' => $inMonth,
+                'record' => $inMonth ? $existing->get($cursor->format('Y-m-d')) : null,
+            ]);
+
+            $cursor->addDay();
+        }
+
+        return $cells;
     }
 
     /**
@@ -317,7 +424,11 @@ class Show extends Component
                 ->layout('layouts.app', ['header' => 'My attendance']);
         }
 
-        $days = $this->calendarDays();
+        // Fetched once and shared by both views (and the day modal's summary
+        // lookup) — the calendar's extra padding cells never need their own
+        // query since they carry no real data (see gridDays()).
+        $existing = $this->existingRecords();
+        $days = $this->days($existing);
 
         // A plain employee reaching this page via /my-attendance can't
         // reach /attendance (role:admin|manager) at all, so a breadcrumb
@@ -331,12 +442,25 @@ class Show extends Component
                 ['label' => $this->employee->full_name],
             ]];
 
+        // Derived from $existing (already fetched above) rather than a
+        // fresh MAX(work_date) query — Attendance\Index's list page can
+        // afford a real global query since it's the only date-range fact
+        // on that page, but here the query-count budget is already spent
+        // on the two queries every render needs, and this page only ever
+        // needs to know how far the CURRENT month got, which $existing
+        // already answers for free.
+        $lastBuiltInMonth = $existing->keys()->sort()->last();
+
         return view('livewire.attendance.show', [
             'days' => $days,
+            'gridDays' => $this->gridDays($existing),
+            'recordsByDate' => $existing,
             'summary' => $this->summary($days),
             'monthLabel' => $this->monthStart()->format('F Y'),
             'isCurrentMonth' => $this->month === today()->format('Y-m'),
             'punchesByDate' => $this->punchesByDate(),
+            'lastBuiltInMonth' => $lastBuiltInMonth,
+            'monthFullyBuilt' => $lastBuiltInMonth === $days->last()['date']->format('Y-m-d'),
         ])->layout('layouts.app', $layoutData);
     }
 }
