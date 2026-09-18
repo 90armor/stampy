@@ -9,6 +9,14 @@ use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
 
+// Real container env vars outrank every .env file, so --env=testing must drop them for .env.testing's database to be used.
+if (PHP_SAPI === 'cli' && in_array('--env=testing', $_SERVER['argv'] ?? [], true)) {
+    foreach (['DB_CONNECTION', 'DB_HOST', 'DB_PORT', 'DB_DATABASE', 'DB_USERNAME', 'DB_PASSWORD', 'DB_URL'] as $key) {
+        unset($_SERVER[$key], $_ENV[$key]);
+        putenv($key);
+    }
+}
+
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
