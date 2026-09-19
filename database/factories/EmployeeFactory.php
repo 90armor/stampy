@@ -25,7 +25,7 @@ class EmployeeFactory extends Factory
             'full_name' => $this->faker->name(),
             'department_id' => Department::factory(),
             'position_id' => Position::factory(),
-            'join_date' => $this->faker->dateTimeBetween('-3 years', 'now'),
+            'join_date' => '2020-01-01',
             'device_user_id' => $this->faker->unique()->numerify('####'),
             'status' => 'active',
         ];

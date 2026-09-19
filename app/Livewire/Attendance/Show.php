@@ -9,6 +9,7 @@ use App\Models\DailyAttendance;
 use App\Models\Employee;
 use App\Models\Holiday;
 use App\Services\Attendance\DailySummaryBuilder;
+use App\Support\AttendanceTime;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
@@ -148,13 +149,24 @@ class Show extends Component
     {
         $this->authorize('update', $this->employee);
 
+        $joinDate = $this->employee->join_date;
+
         $this->validate([
-            'newPunchDate' => ['required', 'date'],
+            'newPunchDate' => ['required', 'date', 'after_or_equal:'.$joinDate->format('Y-m-d'), 'before_or_equal:'.today()->format('Y-m-d')],
             'newPunchTime' => ['required', 'date_format:H:i'],
             'newPunchType' => ['required', 'in:in,out'],
+        ], [
+            'newPunchDate.after_or_equal' => "A punch can't be dated before this employee's start date ({$joinDate->format('M j, Y')}).",
+            'newPunchDate.before_or_equal' => "A punch can't be dated in the future.",
         ]);
 
         $punchedAt = Carbon::parse($this->newPunchDate.' '.$this->newPunchTime);
+
+        if ($punchedAt->gt(now())) {
+            $this->addError('newPunchTime', "A punch can't be later than the current time (".AttendanceTime::format(now()).').');
+
+            return;
+        }
 
         // The unique index is (employee_id, punched_at, source) — no
         // voided_at involved (adding it would let MySQL treat every voided

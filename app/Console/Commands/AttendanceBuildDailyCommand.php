@@ -115,12 +115,20 @@ class AttendanceBuildDailyCommand extends Command
     private function parseDate(string $value, string $option): ?Carbon
     {
         try {
-            return Carbon::createFromFormat('Y-m-d', $value)->startOfDay();
+            $parsed = Carbon::createFromFormat('Y-m-d', $value)->startOfDay();
         } catch (Throwable) {
             $this->error("Invalid {$option} value \"{$value}\" — expected Y-m-d.");
 
             return null;
         }
+
+        if ($parsed->gt(Carbon::today())) {
+            $this->error("{$option} {$value} is in the future (today is ".Carbon::today()->format('Y-m-d').') — attendance can only be built up to and including today.');
+
+            return null;
+        }
+
+        return $parsed;
     }
 
     /**

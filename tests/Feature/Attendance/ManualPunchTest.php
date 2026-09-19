@@ -12,6 +12,7 @@ use App\Models\WorkSchedule;
 use App\Services\Attendance\DailySummaryBuilder;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -51,6 +52,74 @@ class ManualPunchTest extends TestCase
     private function build(Employee $employee, string $date): DailyAttendance
     {
         return app(DailySummaryBuilder::class)->build($employee, Carbon::parse($date));
+    }
+
+    /**
+     * @return array{0: Testable, 1: Employee}
+     */
+    private function punchForm(string $joinDate, string $date, string $time): array
+    {
+        $employee = Employee::factory()->create(['join_date' => $joinDate]);
+
+        $component = Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', substr($date, 0, 7))
+            ->call('startAddingPunch', $date)
+            ->set('newPunchDate', $date)
+            ->set('newPunchTime', $time)
+            ->set('newPunchType', 'in');
+
+        return [$component, $employee];
+    }
+
+    public function test_a_punch_dated_before_the_employees_start_date_is_rejected_and_nothing_is_written(): void
+    {
+        [$component, $employee] = $this->punchForm('2026-02-02', '2026-02-01', '08:00');
+
+        $component->call('addPunch')->assertHasErrors(['newPunchDate']);
+
+        $this->assertStringContainsString("before this employee's start date (Feb 2, 2026)", $component->errors()->first('newPunchDate'));
+        $this->assertSame(0, AttendanceLog::where('employee_id', $employee->id)->count());
+        $this->assertSame(0, DailyAttendance::where('employee_id', $employee->id)->count());
+    }
+
+    public function test_a_punch_on_the_start_date_itself_is_accepted(): void
+    {
+        [$component, $employee] = $this->punchForm('2026-02-02', '2026-02-02', '07:55');
+
+        $component->call('addPunch')->assertHasNoErrors();
+
+        $this->assertSame(1, AttendanceLog::where('employee_id', $employee->id)->count());
+    }
+
+    public function test_a_punch_dated_in_the_future_is_rejected_and_nothing_is_written(): void
+    {
+        $this->travelTo(Carbon::parse('2026-02-10 12:00:00'));
+
+        [$component, $employee] = $this->punchForm('2020-01-01', '2026-02-11', '08:00');
+
+        $component->call('addPunch')->assertHasErrors(['newPunchDate']);
+
+        $this->assertStringContainsString('in the future', $component->errors()->first('newPunchDate'));
+        $this->assertSame(0, AttendanceLog::where('employee_id', $employee->id)->count());
+        $this->assertSame(0, DailyAttendance::where('employee_id', $employee->id)->count());
+    }
+
+    public function test_a_punch_today_is_rejected_only_if_it_is_later_than_the_current_time(): void
+    {
+        $this->travelTo(Carbon::parse('2026-02-10 10:00:00'));
+
+        [$component, $employee] = $this->punchForm('2020-01-01', '2026-02-10', '10:30');
+
+        $component->call('addPunch')->assertHasErrors(['newPunchTime']);
+
+        $this->assertStringContainsString('later than the current time (10:00 AM)', $component->errors()->first('newPunchTime'));
+        $this->assertSame(0, AttendanceLog::where('employee_id', $employee->id)->count());
+
+        // Exactly now is not in the future.
+        $component->set('newPunchTime', '10:00')->call('addPunch')->assertHasNoErrors();
+
+        $this->assertSame(1, AttendanceLog::where('employee_id', $employee->id)->count());
     }
 
     public function test_adding_a_manual_in_punch_turns_absent_into_incomplete(): void
