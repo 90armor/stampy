@@ -209,6 +209,9 @@ class FormModal extends Component
         $this->authorize('update', $this->editing);
 
         $user = $this->editing->user;
+
+        abort_if($user === null, 422, 'This employee has no login account, so there is no password to reset.');
+
         $temporary = TemporaryPassword::generate();
 
         $user->forceFill([

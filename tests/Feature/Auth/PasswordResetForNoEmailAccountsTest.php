@@ -53,6 +53,23 @@ class PasswordResetForNoEmailAccountsTest extends TestCase
         $this->assertTrue($user->temporary_password_expires_at->betweenIncluded(now()->addHours(47), now()->addHours(49)));
     }
 
+    public function test_resetting_the_password_of_an_employee_with_no_login_fails_cleanly(): void
+    {
+        $admin = $this->admin();
+        $employee = Employee::factory()->create(['user_id' => null]);
+        $usersBefore = User::count();
+
+        Livewire::actingAs($admin)
+            ->test(FormModal::class)
+            ->call('edit', $employee->id)
+            ->call('resetPassword')
+            ->assertStatus(422);
+
+        // Nothing was created or altered on the way to refusing.
+        $this->assertSame($usersBefore, User::count());
+        $this->assertNull($employee->fresh()->user_id);
+    }
+
     public function test_a_manager_cannot_reset_a_password(): void
     {
         $manager = User::factory()->create()->assignRole('manager');
