@@ -3,6 +3,7 @@
 namespace Tests\Feature\Attendance;
 
 use App\Enums\AttendanceStatus;
+use App\Exceptions\NoDefaultWorkScheduleException;
 use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
 use App\Models\Employee;
@@ -46,6 +47,32 @@ class DailySummaryBuilderTest extends TestCase
             'punched_at' => $dateTime,
             'punch_type' => $type,
         ]);
+    }
+
+    public function test_an_employee_with_no_schedule_and_no_default_fails_with_a_clear_domain_error(): void
+    {
+        $employee = Employee::factory()->create(['employee_code' => 'EMP-4242', 'work_schedule_id' => null]);
+        $this->assertSame(0, WorkSchedule::count());
+
+        try {
+            app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::MONDAY));
+            $this->fail('Expected NoDefaultWorkScheduleException.');
+        } catch (NoDefaultWorkScheduleException $e) {
+            $this->assertStringContainsString('No default work schedule exists', $e->getMessage());
+            $this->assertStringContainsString('EMP-4242', $e->getMessage());
+            $this->assertStringContainsString('WorkScheduleSeeder', $e->getMessage());
+        }
+
+        $this->assertSame(0, DailyAttendance::count());
+    }
+
+    public function test_a_missing_default_only_matters_for_employees_without_their_own_schedule(): void
+    {
+        $own = $this->employeeOn($this->schedule(['is_default' => false]));
+
+        $row = app(DailySummaryBuilder::class)->build($own, Carbon::parse(self::MONDAY));
+
+        $this->assertSame(AttendanceStatus::Absent, $row->status);
     }
 
     public function test_normal_day_is_present_with_correct_worked_minutes(): void

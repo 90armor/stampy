@@ -59,6 +59,17 @@ class AttendanceBuildDailyCommandTest extends TestCase
         $this->assertSame(1, DailyAttendance::count());
     }
 
+    public function test_a_missing_default_schedule_is_reported_as_the_real_problem_not_a_stack_trace(): void
+    {
+        WorkSchedule::query()->delete();
+
+        $this->artisan('attendance:build-daily', ['--date' => '2026-02-02'])
+            ->expectsOutputToContain('No default work schedule exists')
+            ->assertFailed();
+
+        $this->assertSame(0, DailyAttendance::count());
+    }
+
     public function test_a_past_date_is_still_built(): void
     {
         $this->artisan('attendance:build-daily', ['--date' => '2026-02-02'])->assertSuccessful();

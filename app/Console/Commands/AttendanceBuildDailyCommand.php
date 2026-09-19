@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Exceptions\NoDefaultWorkScheduleException;
 use App\Models\Employee;
 use App\Services\Attendance\DailySummaryBuilder;
 use Carbon\Carbon;
@@ -37,21 +38,27 @@ class AttendanceBuildDailyCommand extends Command
         $updated = 0;
         $byStatus = [];
 
-        foreach ($employees as $employee) {
-            // join_date is the only hire/start-date column on employees —
-            // don't build days before someone was hired.
-            $date = $employee->join_date->gt($from) ? $employee->join_date->copy() : $from->copy();
+        try {
+            foreach ($employees as $employee) {
+                // join_date is the only hire/start-date column on employees —
+                // don't build days before someone was hired.
+                $date = $employee->join_date->gt($from) ? $employee->join_date->copy() : $from->copy();
 
-            while ($date->lte($to)) {
-                $row = $builder->build($employee, $date);
+                while ($date->lte($to)) {
+                    $row = $builder->build($employee, $date);
 
-                $row->wasRecentlyCreated ? $created++ : $updated++;
+                    $row->wasRecentlyCreated ? $created++ : $updated++;
 
-                $statusValue = $row->status->value;
-                $byStatus[$statusValue] = ($byStatus[$statusValue] ?? 0) + 1;
+                    $statusValue = $row->status->value;
+                    $byStatus[$statusValue] = ($byStatus[$statusValue] ?? 0) + 1;
 
-                $date = $date->copy()->addDay();
+                    $date = $date->copy()->addDay();
+                }
             }
+        } catch (NoDefaultWorkScheduleException $e) {
+            $this->error($e->getMessage());
+
+            return self::FAILURE;
         }
 
         $this->info("Built daily attendance for {$from->format('Y-m-d')} to {$to->format('Y-m-d')} ({$employees->count()} employee(s)).");

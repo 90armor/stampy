@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Exceptions\NoDefaultWorkScheduleException;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -84,7 +85,9 @@ class Employee extends Model
 
     public function effectiveSchedule(): WorkSchedule
     {
-        return $this->workSchedule ?? WorkSchedule::default();
+        return $this->workSchedule
+            ?? WorkSchedule::default()
+            ?? throw new NoDefaultWorkScheduleException($this);
     }
 
     /**
