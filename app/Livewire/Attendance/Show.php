@@ -451,6 +451,11 @@ class Show extends Component
 
     public function render()
     {
+        // Every request ends here — re-assert access rather than trusting Livewire to keep $employee pinned.
+        if ($this->employee !== null) {
+            $this->authorize('view', $this->employee);
+        }
+
         // request()->routeIs(), not stored mount()-time state: mount() only
         // runs on the initial load, but render() runs on every subsequent
         // request too (e.g. clicking prev/next month), and the route name
