@@ -11,6 +11,7 @@ use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -66,6 +67,13 @@ class DashboardTest extends TestCase
 
         $response->assertOk();
         $response->assertViewHas('stats', fn ($stats) => $stats['total_employees'] === 3);
+    }
+
+    public function test_attendance_logs_has_an_index_for_the_admin_recent_activity_query(): void
+    {
+        // recentActivity() for an admin is `WHERE voided_at IS NULL ORDER BY punched_at DESC LIMIT n`
+        // with no employee filter; without this index that is a full table scan plus filesort.
+        $this->assertTrue(Schema::hasIndex('attendance_logs', ['voided_at', 'punched_at']));
     }
 
     public function test_new_this_month_counts_only_joiners_from_the_current_month_and_year(): void
