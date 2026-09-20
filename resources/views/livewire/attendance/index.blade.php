@@ -26,7 +26,8 @@
         // family, which would repeat present's hue.
         'in_progress' => ['icon' => 'clock', 'badge' => 'blue', 'iconClass' => 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'],
         'holiday' => ['icon' => 'flag', 'badge' => 'fuchsia', 'iconClass' => 'bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-900/30 dark:text-fuchsia-300'],
-        'leave' => ['icon' => 'calendar-days', 'badge' => 'slate', 'iconClass' => 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'],
+        // Accent + briefcase, matching Attendance\Show's calendar — a day off that used leave balance must not look like a weekend (off).
+        'leave' => ['icon' => 'briefcase', 'badge' => 'accent', 'iconClass' => 'bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300'],
     ];
 
     $isToday = $fromDate === $toDate && $fromDate === today()->format('Y-m-d');

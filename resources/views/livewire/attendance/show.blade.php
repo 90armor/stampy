@@ -55,7 +55,7 @@
         'holiday' => ['badge' => 'fuchsia', 'icon' => 'flag', 'bg' => 'bg-fuchsia-50 dark:bg-fuchsia-900/20', 'text' => 'text-fuchsia-700 dark:text-fuchsia-300', 'ring' => 'ring-fuchsia-600/20 dark:ring-fuchsia-500/30'],
         // Doesn't occur yet — nothing assigns Leave until Phase 3 — defined
         // now so the palette/icon exists, no lookup built beyond that.
-        'leave' => ['badge' => 'slate', 'icon' => 'briefcase', 'bg' => 'bg-accent-50 dark:bg-accent-900/20', 'text' => 'text-accent-700 dark:text-accent-300', 'ring' => 'ring-accent-600/20 dark:ring-accent-500/30'],
+        'leave' => ['badge' => 'accent', 'icon' => 'briefcase', 'bg' => 'bg-accent-50 dark:bg-accent-900/20', 'text' => 'text-accent-700 dark:text-accent-300', 'ring' => 'ring-accent-600/20 dark:ring-accent-500/30'],
     ];
 
     // Not a real AttendanceStatus (no daily_attendances row exists at all)

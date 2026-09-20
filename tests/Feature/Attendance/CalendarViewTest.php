@@ -84,6 +84,27 @@ class CalendarViewTest extends TestCase
             ->assertSeeHtml($tableHeader);
     }
 
+    public function test_leave_and_a_day_off_are_visibly_different_in_the_table_view(): void
+    {
+        $employee = Employee::factory()->create();
+
+        // Mon Mar 2 on leave; Sun Mar 1 simply not a working day.
+        DailyAttendance::factory()->create(['employee_id' => $employee->id, 'work_date' => '2026-03-02', 'status' => AttendanceStatus::Leave]);
+        DailyAttendance::factory()->create(['employee_id' => $employee->id, 'work_date' => '2026-03-01', 'status' => AttendanceStatus::Off]);
+
+        $html = Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', self::SUNDAY_START_MONTH)
+            ->set('view', 'table')
+            ->html();
+
+        $leaveBadge = 'bg-accent-50 text-accent-700 ring-accent-600/20 dark:bg-accent-900/30';
+        $offBadge = 'bg-slate-100 text-slate-600 ring-slate-500/10 dark:bg-slate-800';
+
+        $this->assertSame(1, substr_count($html, $leaveBadge), 'exactly one accent (leave) badge');
+        $this->assertGreaterThanOrEqual(1, substr_count($html, $offBadge), 'the off day keeps the slate badge');
+    }
+
     public function test_first_column_is_sunday_for_a_month_starting_on_a_sunday(): void
     {
         $employee = Employee::factory()->create();

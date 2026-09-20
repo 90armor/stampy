@@ -70,6 +70,18 @@ class AttendanceIndexTest extends TestCase
             ->assertSee('Admin List Target');
     }
 
+    public function test_a_leave_row_in_the_list_uses_the_accent_colour_not_slate(): void
+    {
+        $this->attendanceRow(today()->format('Y-m-d'), AttendanceStatus::Leave, ['full_name' => 'Away On Leave']);
+
+        Livewire::actingAs($this->admin())
+            ->test(Index::class)
+            ->assertSee('Away On Leave')
+            // The status badge is accent (mint), the documented leave colour — not the slate that `off` uses.
+            ->assertSeeHtml('bg-accent-50 text-accent-700 ring-accent-600/20')
+            ->assertDontSeeHtml('bg-slate-100 text-slate-600 ring-slate-500/10');
+    }
+
     public function test_employee_role_cannot_view_the_attendance_list(): void
     {
         $employee = User::factory()->create()->assignRole('employee');
