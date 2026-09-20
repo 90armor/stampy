@@ -6,8 +6,9 @@ use App\Contracts\AttendanceSource;
 use App\Data\PunchRecord;
 use App\Enums\PunchType;
 use App\Exceptions\AttendanceImportException;
-use Carbon\Carbon;
+use App\Support\StrictDate;
 use Carbon\CarbonInterface;
+use InvalidArgumentException;
 use Throwable;
 
 /**
@@ -15,11 +16,11 @@ use Throwable;
  * and the datetime format all come from config/attendance.php since the
  * real device's format is unknown and will need tuning once one arrives.
  *
- * A bad individual row (wrong field count, missing fields, unparseable date)
- * is recorded via errors() and skipped rather than aborting the whole file.
- * File-level problems (missing file, missing configured column) and any error
- * the reader didn't anticipate throw AttendanceImportException instead — the
- * latter with the line number.
+ * A bad individual row (wrong field count, missing fields, unparseable or
+ * impossible date) is recorded via errors() and skipped rather than aborting
+ * the whole file. File-level problems (missing file, missing configured
+ * column) and any error the reader didn't anticipate throw
+ * AttendanceImportException instead — the latter with the line number.
  */
 class CsvAttendanceSource implements AttendanceSource
 {
@@ -135,12 +136,8 @@ class CsvAttendanceSource implements AttendanceSource
         }
 
         try {
-            $punchedAt = Carbon::createFromFormat($format, $rawPunchedAt);
-
-            if ($punchedAt === false) {
-                throw new \UnexpectedValueException;
-            }
-        } catch (Throwable) {
+            $punchedAt = StrictDate::parse($format, $rawPunchedAt);
+        } catch (InvalidArgumentException) {
             $this->errors[] = ['line' => $line, 'reason' => "unparseable date: \"{$rawPunchedAt}\""];
 
             return null;

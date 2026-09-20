@@ -194,6 +194,29 @@ class CsvAttendanceSourceTest extends TestCase
         $this->assertSame([['line' => 4, 'reason' => 'wrong number of fields (expected 3, found 2)']], $source->errors());
     }
 
+    public function test_an_impossible_date_or_time_is_recorded_not_silently_rolled_over(): void
+    {
+        foreach (['2026-02-30 08:00:00', '2026-13-01 08:00:00', '2026-01-05 25:00:00', '2026-01-05 08:61:00'] as $impossible) {
+            $source = $this->csv("user_id,timestamp,state\n1001,{$impossible},0\n1002,2026-01-05 09:00:00,0\n");
+
+            $punches = $this->punches($source);
+
+            $this->assertSame(['1002'], array_map(fn ($p) => $p->deviceUserId, $punches), $impossible);
+            $this->assertCount(1, $source->errors(), $impossible);
+            $this->assertSame(2, $source->errors()[0]['line'], $impossible);
+            $this->assertStringStartsWith("unparseable date: \"{$impossible}\"", $source->errors()[0]['reason'], $impossible);
+        }
+    }
+
+    public function test_an_unpadded_but_real_date_is_still_accepted(): void
+    {
+        // PHP's parser is lenient about leading zeros; only dates that are not real get rejected.
+        $punches = $this->punches($this->csv("user_id,timestamp,state\n1001,2026-1-5 8:52:00,0\n"));
+
+        $this->assertCount(1, $punches);
+        $this->assertSame('2026-01-05 08:52:00', $punches[0]->punchedAt->format('Y-m-d H:i:s'));
+    }
+
     public function test_an_unexpected_error_in_a_row_fails_the_import_with_the_line_number(): void
     {
         // A punch_type_map value that isn't a real PunchType — a config mistake the reader can't anticipate.

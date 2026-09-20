@@ -5,10 +5,11 @@ namespace App\Console\Commands;
 use App\Exceptions\NoDefaultWorkScheduleException;
 use App\Models\Employee;
 use App\Services\Attendance\DailySummaryBuilder;
+use App\Support\StrictDate;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
-use Throwable;
+use InvalidArgumentException;
 
 class AttendanceBuildDailyCommand extends Command
 {
@@ -122,9 +123,9 @@ class AttendanceBuildDailyCommand extends Command
     private function parseDate(string $value, string $option): ?Carbon
     {
         try {
-            $parsed = Carbon::createFromFormat('Y-m-d', $value)->startOfDay();
-        } catch (Throwable) {
-            $this->error("Invalid {$option} value \"{$value}\" — expected Y-m-d.");
+            $parsed = StrictDate::parse('Y-m-d', $value)->startOfDay();
+        } catch (InvalidArgumentException $e) {
+            $this->error("Invalid {$option} value \"{$value}\" — {$e->getMessage()}.");
 
             return null;
         }

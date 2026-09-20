@@ -76,6 +76,31 @@ class AttendanceBuildDailyCommandTest extends TestCase
         $this->assertSame(0, DailyAttendance::count());
     }
 
+    public function test_an_impossible_calendar_date_is_rejected_not_rolled_over(): void
+    {
+        foreach ([
+            ['--date' => '2026-02-30'],
+            ['--date' => '2026-13-01'],
+            ['--from' => '2026-02-30', '--to' => '2026-03-05'],
+            ['--from' => '2026-02-01', '--to' => '2026-02-30'],
+        ] as $options) {
+            $option = array_key_first(array_filter($options, fn ($v) => in_array($v, ['2026-02-30', '2026-13-01'], true)));
+
+            $this->artisan('attendance:build-daily', $options)
+                ->expectsOutputToContain("Invalid {$option} value \"{$options[$option]}\" — that is not a real calendar date.")
+                ->assertFailed();
+        }
+
+        $this->assertSame(0, DailyAttendance::count());
+    }
+
+    public function test_an_unpadded_but_real_date_is_still_accepted(): void
+    {
+        $this->artisan('attendance:build-daily', ['--date' => '2026-2-3'])
+            ->expectsOutputToContain('Built daily attendance for 2026-02-03 to 2026-02-03')
+            ->assertSuccessful();
+    }
+
     public function test_an_employee_can_be_selected_by_id_or_by_code(): void
     {
         $other = Employee::factory()->create(['employee_code' => 'EMP-7777']);

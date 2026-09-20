@@ -95,14 +95,16 @@ class AttendanceImportCommandTest extends TestCase
             '1001,2026-01-05 08:00:00,0',   // 2  good
             '1002',                          // 3  truncated
             '1002,2026-01-05 08:10:00,0,',   // 4  trailing comma
-            '1004,2026-01-05 09:00:00,0',    // 5  good
-            '1005,2026-01-05 17:00:00,1',    // 6  good
+            '1003,2026-02-30 08:00:00,0',    // 5  impossible date
+            '1004,2026-01-05 09:00:00,0',    // 6  good
+            '1005,2026-01-05 17:00:00,1',    // 7  good
         ])."\n");
 
         $this->artisan('attendance:import', ['file' => $path])
             ->expectsOutputToContain('Imported: 3')
             ->expectsOutputToContain('Line 3: wrong number of fields (expected 3, found 1)')
             ->expectsOutputToContain('Line 4: wrong number of fields (expected 3, found 4)')
+            ->expectsOutputToContain('Line 5: unparseable date: "2026-02-30 08:00:00"')
             ->assertSuccessful();
 
         $this->assertSame(3, AttendanceLog::count());
