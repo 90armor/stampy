@@ -1,0 +1,290 @@
+<?php
+
+namespace App\Services\Attendance;
+
+use App\Enums\AttendanceStatus;
+use App\Enums\PunchType;
+use App\Models\AttendanceLog;
+use App\Models\DailyAttendance;
+use App\Models\Employee;
+use App\Models\Holiday;
+use App\Models\WorkSchedule;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
+
+/**
+ * Computes (or recomputes) one employee's daily_attendances row for one
+ * date, purely from attendance_logs. daily_attendances is derived data and
+ * must always be fully recomputable — nothing else may write to it.
+ *
+ * Every attendance_logs query here uses AttendanceLog::notVoided() — a
+ * voided punch (e.g. someone else's finger matched the device) must never
+ * contribute to first_in, last_out, or the overnight lookback in either
+ * direction, so each of the four queries below carries the scope
+ * individually rather than relying on a single shared starting point.
+ */
+class DailySummaryBuilder
+{
+    /**
+     * A last_out more than this many hours after first_in is not paired with
+     * it — the shift is left incomplete rather than pairing punches that are
+     * probably unrelated (e.g. the start of the *next* shift).
+     */
+    private const MAX_SHIFT_HOURS = 18;
+
+    public function build(Employee $employee, CarbonInterface $date): DailyAttendance
+    {
+        $workDate = Carbon::instance($date)->startOfDay();
+        $schedule = $employee->effectiveSchedule();
+
+        $isWorkday = in_array($workDate->dayOfWeekIso, $schedule->workdays, true);
+
+        $firstIn = AttendanceLog::query()
+            ->notVoided()
+            ->where('employee_id', $employee->id)
+            ->where('punch_type', PunchType::In->value)
+            ->whereBetween('punched_at', [$workDate, $workDate->copy()->endOfDay()])
+            ->orderBy('punched_at')
+            ->first();
+
+        // When this day HAS a first_in, last_out is looked up relative to it
+        // and must be strictly after it — so an out-punch this day's
+        // first_in consumes can never also be picked up as some other day's
+        // own last_out (it would fail that day's own ">first_in" test, since
+        // it precedes that day's first_in), and it can never become another
+        // day's first_in at all (wrong punch type). The one case this
+        // doesn't fully rule out: two "in" punches on consecutive calendar
+        // days whose 18h windows overlap (e.g. one at 20:00 and the next at
+        // 06:00) could both reach for the same out-punch in between. That
+        // doesn't happen with a single morning check-in per day, which is
+        // all this app currently produces, but a future multi-shift-per-day
+        // pattern would need to revisit this.
+        //
+        // When this day has NO first_in, the symmetric risk is an out-punch
+        // that isn't this day's own data at all — it's the tail end of the
+        // PREVIOUS day's overnight shift. The else-branch below excludes
+        // those explicitly (see its comment).
+        $lastOut = null;
+
+        if ($firstIn) {
+            $lastOut = AttendanceLog::query()
+                ->notVoided()
+                ->where('employee_id', $employee->id)
+                ->where('punch_type', PunchType::Out->value)
+                ->where('punched_at', '>', $firstIn->punched_at)
+                ->where('punched_at', '<=', $firstIn->punched_at->copy()->addHours(self::MAX_SHIFT_HOURS))
+                ->orderByDesc('punched_at')
+                ->first();
+        } else {
+            // No in-punch to pair from, but an out-punch on this calendar day
+            // still needs recording — otherwise "out only" is indistinguishable
+            // from "no punches at all". It's not paired with anything (there's
+            // no first_in), so it never contributes worked/late/early minutes.
+            //
+            // But an out-punch here could just as easily be the tail end of
+            // an *earlier* day's overnight shift (that day's first_in, up to
+            // MAX_SHIFT_HOURS before it, already claims it) rather than a
+            // genuine "forgot to punch in" signal for today. Walk candidates
+            // latest-first and skip any that pair to an earlier in-punch,
+            // computed directly from the punches — not from whatever the
+            // previous day's daily_attendances row says — so the result
+            // doesn't depend on the order dates are built in.
+            $candidates = AttendanceLog::query()
+                ->notVoided()
+                ->where('employee_id', $employee->id)
+                ->where('punch_type', PunchType::Out->value)
+                ->whereBetween('punched_at', [$workDate, $workDate->copy()->endOfDay()])
+                ->orderByDesc('punched_at')
+                ->get();
+
+            foreach ($candidates as $candidate) {
+                $claimedByEarlierShift = AttendanceLog::query()
+                    ->notVoided()
+                    ->where('employee_id', $employee->id)
+                    ->where('punch_type', PunchType::In->value)
+                    ->where('punched_at', '<', $candidate->punched_at)
+                    ->where('punched_at', '>=', $candidate->punched_at->copy()->subHours(self::MAX_SHIFT_HOURS))
+                    ->exists();
+
+                if (! $claimedByEarlierShift) {
+                    $lastOut = $candidate;
+
+                    break;
+                }
+            }
+        }
+
+        $isHoliday = Holiday::query()->whereDate('date', $workDate)->exists();
+
+        $attributes = $this->calculate($schedule, $workDate, $isWorkday, $firstIn, $lastOut, $isHoliday);
+        $attributes['work_schedule_id'] = $schedule->id;
+
+        // Not updateOrCreate(): work_date has a 'date' cast, which formats
+        // through the connection's full datetime format when set on the
+        // model but is compared here as a plain 'Y-m-d' string — on SQLite
+        // (no real DATE column type) those never string-match, so every call
+        // after the first would find nothing and collide with the unique
+        // index on insert. whereDate() compares only the date part, correctly,
+        // on every driver.
+        $existing = DailyAttendance::query()
+            ->where('employee_id', $employee->id)
+            ->whereDate('work_date', $workDate)
+            ->first();
+
+        if ($existing) {
+            $existing->fill($attributes)->save();
+
+            return $existing;
+        }
+
+        $new = new DailyAttendance($attributes);
+        $new->employee_id = $employee->id;
+        $new->work_date = $workDate;
+        $new->save();
+
+        return $new;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function calculate(
+        WorkSchedule $schedule,
+        Carbon $workDate,
+        bool $isWorkday,
+        ?AttendanceLog $firstIn,
+        ?AttendanceLog $lastOut,
+        bool $isHoliday,
+    ): array {
+        $hasIn = $firstIn !== null;
+        $hasOut = $lastOut !== null;
+        $hasBoth = $hasIn && $hasOut;
+
+        $workedMinutes = 0;
+        $lateMinutes = 0;
+        $earlyLeaveMinutes = 0;
+
+        if ($hasBoth) {
+            $workedSeconds = $lastOut->punched_at->getTimestamp() - $firstIn->punched_at->getTimestamp();
+            $workedMinutes = max(0, intdiv($workedSeconds, 60) - $schedule->break_minutes);
+
+            // Working a holiday is never late or early-leaving, regardless of
+            // when they clocked in/out — matters for OT later, where a
+            // holiday's worked hours must not also register as a timing
+            // exception. isWorkday is deliberately still checked alongside
+            // isHoliday: a holiday landing on a weekend is caught by the
+            // status match() below (-> Off) before this is ever reached with
+            // hasBoth true, but the guard here is the one that actually
+            // stops late/early from being computed either way.
+            if ($isWorkday && ! $isHoliday) {
+                $scheduledStart = Carbon::parse($workDate->format('Y-m-d').' '.$schedule->start_time);
+                $scheduledEnd = Carbon::parse($workDate->format('Y-m-d').' '.$schedule->end_time);
+
+                // Grace only decides WHETHER first_in counts as late, not how
+                // much: once outside grace, late_minutes is the full gap from
+                // start_time, not the remainder past the grace period.
+                $minutesAfterStart = intdiv($firstIn->punched_at->getTimestamp() - $scheduledStart->getTimestamp(), 60);
+
+                if ($minutesAfterStart > $schedule->grace_minutes) {
+                    $lateMinutes = $minutesAfterStart;
+                }
+
+                $minutesBeforeEnd = intdiv($scheduledEnd->getTimestamp() - $lastOut->punched_at->getTimestamp(), 60);
+                $earlyLeaveMinutes = max(0, $minutesBeforeEnd);
+            }
+        }
+
+        // Status precedence, highest to lowest — the one place this is
+        // decided; every rule below is a special case of "what wins when
+        // several could apply to the same punch-less or punch-partial day":
+        //
+        //   1. off         — no punches at all, and not a scheduled workday.
+        //                    Wins outright, holiday or not: a holiday
+        //                    landing on a weekend doesn't change anything,
+        //                    it's already non-working — but this is
+        //                    specifically the no-punches case. Someone who
+        //                    works a non-workday (holiday or an ordinary
+        //                    weekend) is covered by rule 3, not this one —
+        //                    that already worked before holidays existed
+        //                    and holidays don't change it.
+        //   2. holiday      — no punches at all, a workday, marked as a
+        //                    holiday. Beats absent and in_progress (an
+        //                    unworked holiday is never "still open", it's
+        //                    just a holiday) but not present: see 3.
+        //   3. present      — both punches exist, on any day (workday,
+        //                    holiday, or an ordinary weekend someone came in
+        //                    on). A holiday doesn't need to override this —
+        //                    it already zeroed late/early above — and a
+        //                    fully-punched day is never "in progress"
+        //                    regardless of the time of day.
+        //   4. in_progress  — today, the schedule's end_time hasn't passed
+        //                    yet, and punches so far would otherwise resolve
+        //                    to incomplete or absent below. Only ever
+        //                    applies to today (see isInProgress()); not
+        //                    conditioned on isWorkday, matching rule 5's own
+        //                    workday-agnostic incomplete rule.
+        //   5. incomplete   — exactly one of {in, out}, on any day. This
+        //                    includes a one-sided punch on a holiday: the
+        //                    punch being incomplete is a device-defect fact
+        //                    independent of whether the day was a holiday,
+        //                    so holiday does not suppress it the way it does
+        //                    for "no punches at all" in rule 2.
+        //   6. absent       — a workday, no punches, not a holiday, and not
+        //                    (today and still before end_time).
+        //
+        // Timing is a separate dimension from all of this — see
+        // AttendanceStatus's doc comment for why a `Late` status doesn't
+        // exist here.
+        $status = match (true) {
+            ! $hasIn && ! $hasOut && ! $isWorkday => AttendanceStatus::Off,
+            ! $hasIn && ! $hasOut && $isHoliday => AttendanceStatus::Holiday,
+            $hasBoth => AttendanceStatus::Present,
+            $this->isInProgress($workDate, $schedule) => AttendanceStatus::InProgress,
+            $hasIn xor $hasOut => AttendanceStatus::Incomplete,
+            default => AttendanceStatus::Absent,
+        };
+
+        if (! $isWorkday || $isHoliday) {
+            $lateMinutes = 0;
+            $earlyLeaveMinutes = 0;
+        }
+
+        // InProgress isn't listed here: it can only ever be reached when
+        // hasBoth is false (rule 3 above claims every hasBoth day as
+        // Present first), so worked_minutes is already 0 from its
+        // initialization above, same as it already was for a one-sided
+        // Incomplete punch before InProgress existed.
+        if ($status === AttendanceStatus::Incomplete || $status === AttendanceStatus::Absent) {
+            $workedMinutes = 0;
+        }
+
+        return [
+            'first_in' => $firstIn?->punched_at,
+            'last_out' => $lastOut?->punched_at,
+            'worked_minutes' => $workedMinutes,
+            'late_minutes' => $lateMinutes,
+            'early_leave_minutes' => $earlyLeaveMinutes,
+            'status' => $status->value,
+        ];
+    }
+
+    /**
+     * Only ever true for today: a day already in the past is either fully
+     * resolved (present/incomplete) or definitively absent by now, and a
+     * future date is never built at all. Rebuilding today after end_time has
+     * passed must downgrade this to absent/incomplete on its own — there is
+     * no separate "un-in-progress" step, it's simply that this returns false
+     * once now() has caught up, and the match() above falls through to
+     * whichever of those two the punches actually resolve to.
+     */
+    private function isInProgress(Carbon $workDate, WorkSchedule $schedule): bool
+    {
+        if (! $workDate->isToday()) {
+            return false;
+        }
+
+        $scheduledEnd = Carbon::parse($workDate->format('Y-m-d').' '.$schedule->end_time);
+
+        return now()->lt($scheduledEnd);
+    }
+}

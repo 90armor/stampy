@@ -148,7 +148,7 @@
                                             <x-icon name="pencil" class="w-4 h-4" />
                                         </button>
                                     @endcan
-                                    @can('delete', $employee)
+                                    @can('deactivate', $employee)
                                         @if ($employee->status === 'active')
                                             <button
                                                 type="button"

@@ -1,9 +1,24 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find /Users/90Amr/Projects/employee-attendance-system-2/app -type f | sort; echo \"---components---\"; find /Users/90Amr/Projects/employee-attendance-system-2/components -type f | sort)",
-      "Read(//Users/90Amr/Projects/employee-attendance-system-2/app/**)",
-      "Read(//Users/90Amr/Projects/employee-attendance-system-2/components/**)"
+      "Bash(mkdir -p /Users/90Amr/Projects/NAMR/stampy/resources/views/components/attendance)",
+      "Bash(php -l app/Livewire/Attendance/Show.php)"
+    ],
+    "additionalDirectories": [
+      "/Users/90Amr/Projects/NAMR/stampy/resources/views/components"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/stop-check.sh"
+          }
+        ]
+      }
     ]
   }
 }

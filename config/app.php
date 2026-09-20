@@ -59,13 +59,21 @@ return [
     | Application Timezone
     |--------------------------------------------------------------------------
     |
-    | Here you may specify the default timezone for your application, which
-    | will be used by the PHP date and date-time functions. The timezone
-    | is set to "UTC" by default as it is suitable for most use cases.
+    | Every core Attendance rule is a local-time rule: "today" (work_date,
+    | in_progress), "has end_time passed" (in_progress), and the 18h
+    | overnight pairing window all only make sense evaluated against the
+    | office's own clock. Asia/Phnom_Penh is UTC+7 with no DST, so this
+    | never needs revisiting for a seasonal offset change. now()/today()/
+    | Carbon::parse() all resolve against this automatically (Laravel sets
+    | PHP's default timezone from this value at bootstrap) — nothing in
+    | app code needs to reference it directly. See CLAUDE.md's Database
+    | schema section for why this matters and what was checked before
+    | changing it (MySQL's own session timezone, the seeders, the CSV
+    | import path).
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => 'Asia/Phnom_Penh',
 
     /*
     |--------------------------------------------------------------------------

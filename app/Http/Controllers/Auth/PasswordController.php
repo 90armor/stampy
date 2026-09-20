@@ -20,8 +20,17 @@ class PasswordController extends Controller
             'password' => ['required', Password::defaults(), 'confirmed'],
         ]);
 
+        // Same bookkeeping as the other two paths that result in a genuinely
+        // new, self-chosen password (ForcePasswordChangeController,
+        // NewPasswordController) — this route is normally unreachable while
+        // must_change_password is set (EnsureMustChangePassword blocks it),
+        // but clearing it here too keeps all three paths consistent rather
+        // than relying on that being the only thing preventing a stale flag.
         $request->user()->update([
             'password' => Hash::make($validated['password']),
+            'must_change_password' => false,
+            'password_changed_at' => now(),
+            'temporary_password_expires_at' => null,
         ]);
 
         return back()->with('status', 'password-updated');
