@@ -9,7 +9,7 @@ $colors = [
     'slate' => 'bg-slate-100 text-slate-600 ring-slate-500/10 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-500/20',
     // Added for Attendance's Incomplete status, so its table badge matches
     // the calendar/day-modal's violet instead of sharing Late's amber (see
-    // CLAUDE.md's "Status colors" note). dark:text-violet-300 (not -400):
+    // CLAUDE.md's displayVariant() colour table). dark:text-violet-300 (not -400):
     // 9.06:1 measured against this badge's own composited background,
     // matching the other entries' actual-not-assumed contrast.
     'violet' => 'bg-violet-50 text-violet-700 ring-violet-600/20 dark:bg-violet-900/30 dark:text-violet-300 dark:ring-violet-500/30',

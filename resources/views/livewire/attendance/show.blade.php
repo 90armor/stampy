@@ -19,7 +19,7 @@
         'present' => ['badge' => 'green', 'icon' => 'check', 'bg' => 'bg-green-50 dark:bg-green-900/20', 'text' => 'text-green-700 dark:text-green-400', 'ring' => 'ring-green-600/20 dark:ring-green-500/30'],
         'timing' => ['badge' => 'amber', 'icon' => 'check', 'bg' => 'bg-amber-50 dark:bg-amber-900/20', 'text' => 'text-amber-700 dark:text-amber-400', 'ring' => 'ring-amber-600/20 dark:ring-amber-500/30'],
         // A deliberate one-time addition to the palette — see CLAUDE.md's
-        // "Status colors" note. A timing exception (employee behavior,
+        // displayVariant() colour table. A timing exception (employee behavior,
         // correct data) and Incomplete (a device defect — the person
         // worked, nothing recorded it) used to share amber and read as the
         // same thing in light mode. text-violet-700/violet-300 measured

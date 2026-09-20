@@ -13,15 +13,15 @@
         'present' => ['icon' => 'check', 'badge' => 'green', 'iconClass' => 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400'],
         'timing' => ['icon' => 'clock', 'badge' => 'amber', 'iconClass' => 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'],
         // violet, not amber — matches Attendance\Show's calendar/day-modal/
-        // table (see CLAUDE.md's "Status colors" note): Incomplete is a
+        // table (see CLAUDE.md's displayVariant() colour table): Incomplete is a
         // device defect (a punch never recorded), a late/early timing
         // exception is normal employee behavior, and the two used to be
         // visually indistinguishable here.
         'incomplete' => ['icon' => 'exclamation-triangle', 'badge' => 'violet', 'iconClass' => 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300'],
         'absent' => ['icon' => 'user-x', 'badge' => 'red', 'iconClass' => 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400'],
         'off' => ['icon' => 'calendar-days', 'badge' => 'slate', 'iconClass' => 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'],
-        // blue/fuchsia — see Attendance\Show's calendar (same "Status colors"
-        // reasoning: in_progress must not read as red/amber ("not yet", not
+        // blue/fuchsia — see Attendance\Show's calendar (same reasoning as
+        // CLAUDE.md's displayVariant() table: in_progress must not read as red/amber ("not yet", not
         // a failure), and holiday must not reuse primary/accent's own green
         // family, which would repeat present's hue.
         'in_progress' => ['icon' => 'clock', 'badge' => 'blue', 'iconClass' => 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'],
