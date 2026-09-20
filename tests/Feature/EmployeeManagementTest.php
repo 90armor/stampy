@@ -179,6 +179,16 @@ class EmployeeManagementTest extends TestCase
         $this->assertDatabaseMissing('employees', ['employee_code' => 'EMP-9200']);
     }
 
+    public function test_the_deactivate_control_is_shown_to_an_admin_and_not_to_a_manager(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        $manager = User::factory()->create()->assignRole('manager');
+        Employee::factory()->create(['status' => 'active']);
+
+        $this->actingAs($admin)->get(route('employees.index'))->assertOk()->assertSeeHtml('title="Deactivate"');
+        $this->actingAs($manager)->get(route('employees.index'))->assertOk()->assertDontSeeHtml('title="Deactivate"');
+    }
+
     public function test_manager_cannot_deactivate_an_employee(): void
     {
         $manager = User::factory()->create()->assignRole('manager');

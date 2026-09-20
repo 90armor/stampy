@@ -54,7 +54,8 @@ class EmployeePolicy
         return $user->hasRole('admin');
     }
 
-    public function delete(User $user, Employee $employee): bool
+    // No delete() on purpose: employees are never removed (CLAUDE.md, Employee lifecycle) — only deactivated.
+    public function deactivate(User $user, Employee $employee): bool
     {
         return $user->hasRole('admin');
     }
