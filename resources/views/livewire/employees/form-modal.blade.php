@@ -9,13 +9,27 @@
         maxWidth="employee-form"
         panelClass="mt-10"
     >
-        @if ($generatedPassword)
+        @if ($resetPasswordValue)
+            <div class="p-6">
+                <h3 class="text-base font-semibold text-green-700 dark:text-green-400">Password reset</h3>
+                <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                    Share this temporary password with {{ $editing->full_name }}. It's shown once and can't be retrieved later — resetting again replaces it. It expires in 48 hours and must be changed on first login.
+                </p>
+                <dl class="mt-3 space-y-1 text-sm">
+                    <div class="flex gap-2"><dt class="font-medium text-slate-500 dark:text-slate-400 w-36">Temporary password</dt><dd class="font-mono text-slate-900 dark:text-slate-100">{{ $resetPasswordValue }}</dd></div>
+                </dl>
+                <div class="mt-4">
+                    <x-button type="button" variant="primary" wire:click="$set('resetPasswordValue', null)">Done</x-button>
+                </div>
+            </div>
+        @elseif ($generatedPassword)
             <div class="p-6">
                 <h3 class="text-base font-semibold text-green-700 dark:text-green-400">Employee saved — account created</h3>
                 <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
                     Share these credentials with {{ $full_name }}. This password is shown once and cannot be retrieved later.
                 </p>
                 <dl class="mt-3 space-y-1 text-sm">
+                    <div class="flex gap-2"><dt class="font-medium text-slate-500 dark:text-slate-400 w-20">Username</dt><dd class="text-slate-900 dark:text-slate-100">{{ $username }}</dd></div>
                     <div class="flex gap-2"><dt class="font-medium text-slate-500 dark:text-slate-400 w-20">Email</dt><dd class="text-slate-900 dark:text-slate-100">{{ $email }}</dd></div>
                     <div class="flex gap-2"><dt class="font-medium text-slate-500 dark:text-slate-400 w-20">Password</dt><dd class="font-mono text-slate-900 dark:text-slate-100">{{ $generatedPassword }}</dd></div>
                 </dl>
@@ -117,6 +131,22 @@
 
                                 <div class="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
                                     <div class="sm:max-w-[240px]">
+                                        <x-input-label for="emp_manager_id" value="Manager" class="!mb-0" />
+                                        <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Leave blank for a top-level employee.</p>
+                                    </div>
+                                    <div class="sm:w-[320px] sm:shrink-0">
+                                        <x-select id="emp_manager_id" surface="solid" wire:model="manager_id">
+                                            <option value="">No manager</option>
+                                            @foreach ($managerOptions as $manager)
+                                                <option value="{{ $manager->id }}">{{ $manager->full_name }} ({{ $manager->employee_code }})</option>
+                                            @endforeach
+                                        </x-select>
+                                        <x-input-error :messages="$errors->get('manager_id')" class="mt-1" />
+                                    </div>
+                                </div>
+
+                                <div class="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+                                    <div class="sm:max-w-[240px]">
                                         <x-input-label for="emp_join_date" value="Join date" class="!mb-0" />
                                     </div>
                                     <div class="sm:w-[320px] sm:shrink-0">
@@ -157,9 +187,33 @@
                                 </div>
 
                                 @if ($editing?->user_id)
-                                    <div class="flex items-start gap-2 py-4">
-                                        <x-icon name="info" class="mt-0.5 h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
-                                        <p class="text-sm text-slate-500 dark:text-slate-400">This employee already has a linked login account.</p>
+                                    <div class="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between">
+                                        <div class="flex items-start gap-2">
+                                            <x-icon name="info" class="mt-0.5 h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
+                                            <p class="text-sm text-slate-500 dark:text-slate-400">This employee already has a linked login account.</p>
+                                        </div>
+                                        {{-- Native <button>, not <x-button>: @js() doesn't compile when
+                                        nested inside a Blade COMPONENT tag's attribute string — Blade's
+                                        component-tag compiler captures the raw attribute text before the
+                                        directive pass reaches inside it, so it was reaching the browser
+                                        as literal, invalid JS ("@js('Reset the password for '....")
+                                        rather than a compiled string, breaking Alpine's click handler.
+                                        Every other confirm-dialog trigger in the app already uses a
+                                        native button for exactly this reason; classes below are
+                                        x-button's own secondary-variant output, kept in sync manually. --}}
+                                        <button
+                                            type="button"
+                                            @click="$dispatch('confirm-dialog-form-modal', {
+                                                title: 'Reset password',
+                                                message: @js('Reset the password for '.$editing->full_name.'? Their current password stops working immediately.'),
+                                                confirmText: 'Reset password',
+                                                method: 'resetPassword',
+                                                args: [],
+                                            })"
+                                            class="inline-flex shrink-0 items-center justify-center gap-x-1.5 rounded-lg px-3.5 py-2 text-sm font-medium shadow-none transition focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 bg-white text-slate-700 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-700"
+                                        >
+                                            Reset password
+                                        </button>
                                     </div>
                                 @else
                                     <div class="py-4">
@@ -170,6 +224,17 @@
 
                                         @if ($create_user)
                                             <div class="mt-4 space-y-4 border-t border-slate-200/60 pt-4 dark:border-slate-800/60">
+                                                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+                                                    <div class="sm:max-w-[240px]">
+                                                        <x-input-label for="emp_username" value="Username" class="!mb-0" />
+                                                        <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Login identifier. Defaults to the employee code.</p>
+                                                    </div>
+                                                    <div class="sm:w-[320px] sm:shrink-0">
+                                                        <x-text-input id="emp_username" type="text" surface="solid" wire:model="username" />
+                                                        <x-input-error :messages="$errors->get('username')" class="mt-1" />
+                                                    </div>
+                                                </div>
+
                                                 <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
                                                     <div class="sm:max-w-[240px]">
                                                         <x-input-label for="emp_email" value="Email" class="!mb-0" />
@@ -217,4 +282,10 @@
         @endif
     </x-modal>
 @endif
+
+{{-- Own event name, not the default 'confirm-dialog': this component is
+embedded on both Employees\Index and Employees\Show, and Index already
+mounts its own <x-confirm-dialog> for deactivate/reactivate — sharing the
+default event would pop both dialogs at once for a single dispatch. --}}
+<x-confirm-dialog event="confirm-dialog-form-modal" />
 </div>

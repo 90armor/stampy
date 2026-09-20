@@ -46,6 +46,15 @@ class NewPasswordController extends Controller
                 $user->forceFill([
                     'password' => Hash::make($request->password),
                     'remember_token' => Str::random(60),
+                    // A self-chosen password via the email link is exactly as
+                    // final as one set through the forced-change screen
+                    // (Phase 2.4d) — without clearing these, a user who still
+                    // had a pending admin reset would set a real password
+                    // here and then get sent right back to /password/change
+                    // on their next login, as if nothing had happened.
+                    'must_change_password' => false,
+                    'password_changed_at' => now(),
+                    'temporary_password_expires_at' => null,
                 ])->save();
 
                 event(new PasswordReset($user));

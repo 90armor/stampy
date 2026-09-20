@@ -14,9 +14,24 @@ return new class extends Migration
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('email')->unique();
+            $table->string('username')->unique();
+            $table->string('email')->nullable()->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
+            $table->boolean('must_change_password')->default(false);
+            $table->timestamp('password_changed_at')->nullable();
+            // An admin-issued temporary password (Phase 2.4d) is a distinct
+            // event from the user's own password_changed_at above — it's an
+            // audit record of the reset itself, kept even after the user
+            // changes it, not a live flag (must_change_password/
+            // temporary_password_expires_at are the live flags, cleared on
+            // change). Self-referencing FK, same pattern as
+            // employees.manager_id in its own create migration.
+            $table->foreignId('password_reset_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->timestamp('password_reset_at')->nullable();
+            // Checked at login against this stored value, not inferred from
+            // updated_at (any unrelated row change would reset that).
+            $table->timestamp('temporary_password_expires_at')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });

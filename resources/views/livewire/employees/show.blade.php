@@ -54,12 +54,17 @@
         </dl>
     </x-card>
 
-    <x-card class="mt-6">
-        <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Attendance</p>
-        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            Attendance history for this employee will appear here once device integration ships.
-        </p>
-    </x-card>
+    @can('view', $employee)
+        <x-card class="mt-6">
+            <div class="flex items-center justify-between gap-4">
+                <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Attendance</p>
+                <a href="{{ route('attendance.show', $employee) }}" wire:navigate class="inline-flex items-center gap-1 text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300">
+                    View monthly attendance
+                    <x-icon name="chevron-right" class="h-4 w-4" />
+                </a>
+            </div>
+        </x-card>
+    @endcan
 
     <livewire:employees.form-modal />
 </div>

@@ -7,7 +7,7 @@
     <p class="mb-1.5 text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Account recovery</p>
     <h2 class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Reset your password</h2>
     <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
-        {{ __('Enter your work email and we\'ll email you a secure link to choose a new one.') }}
+        {{ __('Enter your email or username and we\'ll email you a secure link to choose a new one, if your account has an email on file.') }}
     </p>
 
     <!-- Session Status -->
@@ -25,10 +25,10 @@
         <form method="POST" action="{{ route('password.email') }}" class="mt-8 space-y-5">
             @csrf
 
-            <!-- Email Address -->
+            <!-- Email or username -->
             <div>
-                <x-input-label for="email" :value="__('Work email')" />
-                <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autofocus placeholder="you@company.com" />
+                <x-input-label for="email" :value="__('Email or username')" />
+                <x-text-input id="email" class="block mt-1 w-full" type="text" name="email" :value="old('email')" required autofocus placeholder="you@company.com or username" />
                 <x-input-error :messages="$errors->get('email')" class="mt-2" />
             </div>
 

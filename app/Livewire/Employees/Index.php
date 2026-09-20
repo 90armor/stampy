@@ -44,7 +44,7 @@ class Index extends Component
 
     public function deactivate(Employee $employee): void
     {
-        $this->authorize('delete', $employee);
+        $this->authorize('deactivate', $employee);
 
         // Status change only — the record (and its attendance history, once
         // that exists) is preserved. Never soft- or hard-delete here.

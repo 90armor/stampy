@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ config('app.name', 'Laravel') }}</title>
+        <title>{{ isset($pageTitle) ? $pageTitle.' – '.config('app.name', 'Laravel') : config('app.name', 'Laravel') }}</title>
 
         <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 
@@ -31,7 +31,7 @@
         @livewireStyles
     </head>
     <body class="font-sans text-slate-900 antialiased dark:text-slate-100">
-        <div class="min-h-screen grid grid-cols-1 lg:grid-cols-[46%_54%] bg-slate-50 dark:bg-slate-950 bg-shell">
+        <div class="min-h-screen min-h-dvh grid grid-cols-1 lg:grid-cols-[46%_54%] bg-slate-50 dark:bg-slate-950 bg-shell">
             <!-- Hero panel -->
             <section class="hidden lg:flex flex-col bg-primary-700 text-white px-16 py-12">
                 <x-logo-lockup size="32" variant="dark" />
@@ -51,20 +51,21 @@
             </section>
 
             <!-- Form panel -->
-            <section class="flex items-center justify-center relative px-6 py-10 sm:px-12">
+            <section class="relative flex items-start justify-center px-6 py-20 sm:px-12 sm:py-24 lg:items-center lg:py-10">
                 <button
                     type="button"
-                    x-data="{}"
-                    @click="document.documentElement.classList.toggle('dark'); localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light')"
-                    class="absolute top-6 right-6 rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                    aria-label="Toggle theme"
+                    x-data="{ isDark: document.documentElement.classList.contains('dark') }"
+                    @click="document.documentElement.classList.toggle('dark'); isDark = document.documentElement.classList.contains('dark'); localStorage.setItem('theme', isDark ? 'dark' : 'light')"
+                    class="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 sm:right-6 sm:top-6 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100 dark:focus:ring-offset-slate-950"
+                    :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
+                    :aria-pressed="isDark.toString()"
                 >
                     <x-icon name="sun" class="w-5 h-5 hidden dark:block" />
                     <x-icon name="moon" class="w-5 h-5 dark:hidden" />
                 </button>
 
-                <div class="w-full max-w-sm">
-                    <div class="mb-10 flex flex-col items-center text-center lg:hidden">
+                <div class="w-full max-w-[26rem]">
+                    <div class="mb-8 flex flex-col items-center text-center sm:mb-10 lg:hidden">
                         <x-logo-lockup size="40" />
                         <p class="mt-2 text-sm text-slate-500">attendance, stamped in seconds</p>
                     </div>
