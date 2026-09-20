@@ -13,6 +13,7 @@ use App\Models\WorkSchedule;
 use App\Services\Attendance\DailySummaryBuilder;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -226,5 +227,51 @@ class HolidayManagementTest extends TestCase
         $this->assertSame(AttendanceStatus::Present, $reverted->status);
         $this->assertSame(25, $reverted->late_minutes);
         $this->assertSame(60, $reverted->early_leave_minutes);
+    }
+
+    /**
+     * The component's mount() refuses anyone but an admin, so to drive an
+     * action directly the page is opened as an admin and the acting user is
+     * then swapped — the action must re-check on its own, not lean on mount().
+     */
+    private function pageOpenedByAnAdminThenDowngradedTo(string $role): Testable
+    {
+        $component = Livewire::actingAs(User::factory()->create()->assignRole('admin'))->test(Index::class);
+
+        $this->actingAs(User::factory()->create()->assignRole($role));
+
+        return $component;
+    }
+
+    public function test_a_non_admin_cannot_mount_the_component_directly(): void
+    {
+        foreach (['manager', 'employee'] as $role) {
+            Livewire::actingAs(User::factory()->create()->assignRole($role))
+                ->test(Index::class)
+                ->assertForbidden();
+        }
+    }
+
+    public function test_every_action_re_authorizes_when_driven_directly_by_a_non_admin(): void
+    {
+        $existing = Holiday::factory()->create(['name' => 'Existing Holiday', 'date' => '2026-03-03']);
+
+        foreach (['manager', 'employee'] as $role) {
+            $this->pageOpenedByAnAdminThenDowngradedTo($role)->call('create')->assertForbidden();
+
+            $this->pageOpenedByAnAdminThenDowngradedTo($role)->call('edit', $existing->id)->assertForbidden();
+
+            // save() without going through create()/edit() first.
+            $this->pageOpenedByAnAdminThenDowngradedTo($role)
+                ->set('date', '2026-04-04')
+                ->set('name', 'Direct Save')
+                ->call('save')
+                ->assertForbidden();
+
+            $this->pageOpenedByAnAdminThenDowngradedTo($role)->call('delete', $existing->id)->assertForbidden();
+        }
+
+        $this->assertDatabaseHas('holidays', ['id' => $existing->id]);
+        $this->assertDatabaseMissing('holidays', ['name' => 'Direct Save']);
     }
 }

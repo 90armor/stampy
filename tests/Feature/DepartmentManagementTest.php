@@ -7,6 +7,7 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -110,5 +111,50 @@ class DepartmentManagementTest extends TestCase
         $this->actingAs($manager)
             ->get(route('organization.index'))
             ->assertForbidden();
+    }
+
+    /**
+     * The component's mount() refuses anyone but an admin, so to drive an
+     * action directly the page is opened as an admin and the acting user is
+     * then swapped — the action must re-check on its own, not lean on mount().
+     */
+    private function pageOpenedByAnAdminThenDowngradedTo(string $role): Testable
+    {
+        $component = Livewire::actingAs(User::factory()->create()->assignRole('admin'))->test(Index::class);
+
+        $this->actingAs(User::factory()->create()->assignRole($role));
+
+        return $component;
+    }
+
+    public function test_a_non_admin_cannot_mount_the_component_directly(): void
+    {
+        foreach (['manager', 'employee'] as $role) {
+            Livewire::actingAs(User::factory()->create()->assignRole($role))
+                ->test(Index::class)
+                ->assertForbidden();
+        }
+    }
+
+    public function test_every_action_re_authorizes_when_driven_directly_by_a_non_admin(): void
+    {
+        $existing = Department::factory()->create(['name' => 'Existing Department']);
+
+        foreach (['manager', 'employee'] as $role) {
+            $this->pageOpenedByAnAdminThenDowngradedTo($role)->call('create')->assertForbidden();
+
+            $this->pageOpenedByAnAdminThenDowngradedTo($role)->call('edit', $existing->id)->assertForbidden();
+
+            // save() without going through create()/edit() first.
+            $this->pageOpenedByAnAdminThenDowngradedTo($role)
+                ->set('name', 'Direct Save')
+                ->call('save')
+                ->assertForbidden();
+
+            $this->pageOpenedByAnAdminThenDowngradedTo($role)->call('delete', $existing->id)->assertForbidden();
+        }
+
+        $this->assertDatabaseHas('departments', ['id' => $existing->id]);
+        $this->assertDatabaseMissing('departments', ['name' => 'Direct Save']);
     }
 }
