@@ -121,7 +121,7 @@
                                 'amber' => 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
                             ];
                         @endphp
-                        <ul class="mt-3 divide-y divide-slate-100 dark:divide-slate-800">
+                        <ul class="mt-3 divide-y divide-slate-200/60 dark:divide-slate-800/60">
                             @foreach ($attendance['needsAttention'] as $person)
                                 <li class="flex items-center gap-x-3 py-2.5 first:pt-0 last:pb-0">
                                     <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold {{ $attentionAvatarClass[$person['badge']] }}">
@@ -266,7 +266,7 @@
                 </div>
 
                 @if (count($attendance['recent']))
-                    <div class="mt-4 divide-y divide-slate-100 dark:divide-slate-800">
+                    <div class="mt-4 divide-y divide-slate-200/60 dark:divide-slate-800/60">
                         @foreach ($attendance['recent'] as $activity)
                             @php
                                 $tone = match ($activity['tone']) {
