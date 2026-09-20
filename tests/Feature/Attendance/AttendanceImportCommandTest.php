@@ -79,4 +79,50 @@ class AttendanceImportCommandTest extends TestCase
             ->assertFailed()
             ->expectsOutputToContain('not found');
     }
+
+    private function tempCsv(string $contents): string
+    {
+        $path = tempnam(sys_get_temp_dir(), 'attendance-csv');
+        file_put_contents($path, $contents);
+
+        return $path;
+    }
+
+    public function test_one_malformed_row_does_not_stop_the_good_rows_and_the_summary_names_the_bad_lines(): void
+    {
+        $path = $this->tempCsv(implode("\n", [
+            'user_id,timestamp,state',
+            '1001,2026-01-05 08:00:00,0',   // 2  good
+            '1002',                          // 3  truncated
+            '1002,2026-01-05 08:10:00,0,',   // 4  trailing comma
+            '1004,2026-01-05 09:00:00,0',    // 5  good
+            '1005,2026-01-05 17:00:00,1',    // 6  good
+        ])."\n");
+
+        $this->artisan('attendance:import', ['file' => $path])
+            ->expectsOutputToContain('Imported: 3')
+            ->expectsOutputToContain('Line 3: wrong number of fields (expected 3, found 1)')
+            ->expectsOutputToContain('Line 4: wrong number of fields (expected 3, found 4)')
+            ->assertSuccessful();
+
+        $this->assertSame(3, AttendanceLog::count());
+        $this->assertSame(['1001', '1004', '1005'], AttendanceLog::with('employee')->orderBy('id')->get()->pluck('employee.device_user_id')->all());
+
+        unlink($path);
+    }
+
+    public function test_an_unexpected_error_in_a_row_is_a_clear_failure_with_the_line_number(): void
+    {
+        config(['attendance.csv.punch_type_map' => ['0' => 'bogus']]);
+        $path = $this->tempCsv("user_id,timestamp,state\n1001,2026-01-05 08:00:00,0\n");
+
+        $this->artisan('attendance:import', ['file' => $path])
+            ->expectsOutputToContain('line 2')
+            ->assertFailed();
+
+        $this->assertSame(0, AttendanceLog::count());
+
+        unlink($path);
+    }
+
 }

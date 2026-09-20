@@ -162,4 +162,47 @@ class CsvAttendanceSourceTest extends TestCase
         $this->assertSame([], $source->errors());
     }
 
+    public function test_a_row_with_fewer_fields_than_the_header_is_recorded_and_skipped(): void
+    {
+        $source = $this->csv("user_id,timestamp,state\n1001\n1002,2026-01-05 08:00:00,0\n");
+
+        $punches = $this->punches($source);
+
+        $this->assertCount(1, $punches);
+        $this->assertSame('1002', $punches[0]->deviceUserId);
+        $this->assertSame([['line' => 2, 'reason' => 'wrong number of fields (expected 3, found 1)']], $source->errors());
+    }
+
+    public function test_a_row_with_more_fields_than_the_header_such_as_a_trailing_comma_is_recorded_and_skipped(): void
+    {
+        $source = $this->csv("user_id,timestamp,state\n1001,2026-01-05 08:00:00,0,\n1002,2026-01-05 09:00:00,0\n");
+
+        $punches = $this->punches($source);
+
+        $this->assertCount(1, $punches);
+        $this->assertSame('1002', $punches[0]->deviceUserId);
+        $this->assertSame([['line' => 2, 'reason' => 'wrong number of fields (expected 3, found 4)']], $source->errors());
+    }
+
+    public function test_a_truncated_final_line_does_not_lose_the_rows_before_it(): void
+    {
+        $source = $this->csv("user_id,timestamp,state\n1001,2026-01-05 08:00:00,0\n1001,2026-01-05 17:00:00,1\n1002,2026-01-05 08:1");
+
+        $punches = $this->punches($source);
+
+        $this->assertSame(['08:00:00', '17:00:00'], array_map(fn ($p) => $p->punchedAt->format('H:i:s'), $punches));
+        $this->assertSame([['line' => 4, 'reason' => 'wrong number of fields (expected 3, found 2)']], $source->errors());
+    }
+
+    public function test_an_unexpected_error_in_a_row_fails_the_import_with_the_line_number(): void
+    {
+        // A punch_type_map value that isn't a real PunchType — a config mistake the reader can't anticipate.
+        config(['attendance.csv.punch_type_map' => ['0' => 'bogus']]);
+
+        $this->expectException(AttendanceImportException::class);
+        $this->expectExceptionMessage('line 3');
+
+        $this->punches($this->csv("user_id,timestamp,state\n1001,2026-01-05 08:00:00,\n1001,2026-01-05 09:00:00,0\n"));
+    }
+
 }
