@@ -9,6 +9,7 @@ use App\Models\Employee;
 use App\Models\Position;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -213,5 +214,178 @@ class EmployeeManagementTest extends TestCase
             ->assertForbidden();
 
         $this->assertSame('inactive', $employee->fresh()->status);
+    }
+
+    /**
+     * A create form filled in with valid values, ready for one field to be broken.
+     */
+    private function validCreateForm(User $admin, array $overrides = []): Testable
+    {
+        $values = array_merge([
+            'full_name' => 'Valid Person',
+            'employee_code' => 'EMP-9500',
+            'department_id' => Department::factory()->create()->id,
+            'position_id' => Position::factory()->create()->id,
+            'join_date' => '2026-01-01',
+        ], $overrides);
+
+        $component = Livewire::actingAs($admin)->test(FormModal::class)->call('create');
+
+        foreach ($values as $field => $value) {
+            $component->set($field, $value);
+        }
+
+        return $component;
+    }
+
+    public function test_admin_can_reactivate_an_inactive_employee(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        $employee = Employee::factory()->create(['status' => 'inactive']);
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->call('reactivate', $employee->id);
+
+        $this->assertSame('active', $employee->fresh()->status);
+    }
+
+    public function test_device_user_id_must_be_unique(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        Employee::factory()->create(['device_user_id' => '7001']);
+
+        $this->validCreateForm($admin, ['device_user_id' => '7001'])
+            ->call('save')
+            ->assertHasErrors(['device_user_id']);
+
+        $this->assertDatabaseMissing('employees', ['employee_code' => 'EMP-9500']);
+    }
+
+    public function test_an_employee_can_keep_their_own_device_user_id_when_edited(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        $employee = Employee::factory()->create(['device_user_id' => '7002', 'full_name' => 'Before Edit']);
+
+        Livewire::actingAs($admin)
+            ->test(FormModal::class)
+            ->call('edit', $employee->id)
+            ->set('full_name', 'After Edit')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertSame('After Edit', $employee->fresh()->full_name);
+        $this->assertSame('7002', $employee->fresh()->device_user_id);
+    }
+
+    public function test_several_employees_may_have_no_device_user_id(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+
+        // A blank id is stored as NULL, not '' — two empty strings would collide on the unique index.
+        foreach (['EMP-9500', 'EMP-9502'] as $code) {
+            $this->validCreateForm($admin, ['employee_code' => $code, 'device_user_id' => ''])
+                ->call('save')
+                ->assertHasNoErrors();
+        }
+
+        $this->assertSame(2, Employee::whereIn('employee_code', ['EMP-9500', 'EMP-9502'])->whereNull('device_user_id')->count());
+    }
+
+    public function test_the_required_fields_are_validated_and_nothing_is_created_without_them(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        $before = Employee::count();
+
+        Livewire::actingAs($admin)
+            ->test(FormModal::class)
+            ->call('create')
+            ->call('save')
+            ->assertHasErrors(['full_name', 'employee_code', 'department_id', 'position_id', 'join_date']);
+
+        $this->assertSame($before, Employee::count());
+    }
+
+    public function test_a_department_or_position_that_does_not_exist_is_rejected(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+
+        $this->validCreateForm($admin, ['department_id' => 999999])
+            ->call('save')
+            ->assertHasErrors(['department_id']);
+
+        $this->validCreateForm($admin, ['employee_code' => 'EMP-9501', 'position_id' => 999999])
+            ->call('save')
+            ->assertHasErrors(['position_id']);
+
+        $this->assertSame(0, Employee::whereIn('employee_code', ['EMP-9500', 'EMP-9501'])->count());
+    }
+
+    public function test_a_malformed_join_date_or_status_is_rejected(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+
+        $this->validCreateForm($admin, ['join_date' => 'not-a-date'])
+            ->call('save')
+            ->assertHasErrors(['join_date']);
+
+        $this->validCreateForm($admin, ['employee_code' => 'EMP-9501', 'status' => 'banana'])
+            ->call('save')
+            ->assertHasErrors(['status']);
+    }
+
+    public function test_a_login_requires_a_valid_email_and_creates_nothing_when_it_is_missing_or_malformed(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        $usersBefore = User::count();
+
+        foreach (['not-an-email', ''] as $i => $email) {
+            $this->validCreateForm($admin, ['employee_code' => 'EMP-950'.$i])
+                ->set('create_user', true)
+                ->set('email', $email)
+                ->call('save')
+                ->assertHasErrors(['email']);
+        }
+
+        $this->assertSame($usersBefore, User::count());
+        $this->assertSame(0, Employee::where('employee_code', 'like', 'EMP-950%')->count());
+    }
+
+    public function test_a_login_role_must_be_one_of_the_real_roles(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        $usersBefore = User::count();
+
+        $this->validCreateForm($admin)
+            ->set('create_user', true)
+            ->set('email', 'new.person@example.com')
+            ->set('role', 'superuser')
+            ->call('save')
+            ->assertHasErrors(['role']);
+
+        $this->assertSame($usersBefore, User::count());
+        $this->assertDatabaseMissing('employees', ['employee_code' => 'EMP-9500']);
+    }
+
+    public function test_a_login_email_or_username_already_in_use_is_rejected(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        $taken = User::factory()->create(['email' => 'taken@example.com', 'username' => 'taken.user']);
+
+        $this->validCreateForm($admin)
+            ->set('create_user', true)
+            ->set('email', $taken->email)
+            ->set('username', 'someone.new')
+            ->call('save')
+            ->assertHasErrors(['email']);
+
+        $this->validCreateForm($admin, ['employee_code' => 'EMP-9501'])
+            ->set('create_user', true)
+            ->set('email', 'fresh@example.com')
+            ->set('username', $taken->username)
+            ->call('save')
+            ->assertHasErrors(['username']);
+
+        $this->assertSame(0, Employee::whereIn('employee_code', ['EMP-9500', 'EMP-9501'])->count());
     }
 }
