@@ -178,6 +178,117 @@ class DashboardTest extends TestCase
         });
     }
 
+    public function test_weekly_trend_is_seven_days_ending_today_as_the_present_share_of_active_employees(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 12:00:00')); // a Wednesday: the window is Thu Mar 5 through Wed Mar 11
+
+        [$a, $b, $c] = Employee::factory()->count(3)->create()->all();
+        Employee::factory()->create(['status' => 'inactive']); // never part of the denominator
+
+        // Mar 5, the first day of the window: all three present.
+        foreach ([$a, $b, $c] as $employee) {
+            $this->attendanceRow($employee, AttendanceStatus::Present, ['work_date' => '2026-03-05']);
+        }
+
+        // Mar 10: two present — a late arrival is still present.
+        $this->attendanceRow($a, AttendanceStatus::Present, ['work_date' => '2026-03-10']);
+        $this->attendanceRow($b, AttendanceStatus::Present, ['work_date' => '2026-03-10', 'late_minutes' => 20]);
+
+        // Mar 11, today: one present; incomplete and absent don't count.
+        $this->attendanceRow($a, AttendanceStatus::Present);
+        $this->attendanceRow($b, AttendanceStatus::Incomplete);
+        $this->attendanceRow($c, AttendanceStatus::Absent);
+
+        // Mar 4 is one day before the window opens, so it appears nowhere.
+        $this->attendanceRow($a, AttendanceStatus::Present, ['work_date' => '2026-03-04']);
+
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertViewHas('attendance', fn ($attendance) => $attendance['trend'] === [
+                ['label' => 'Thu', 'value' => 100.0],
+                ['label' => 'Fri', 'value' => 0.0],
+                ['label' => 'Sat', 'value' => 0.0],
+                ['label' => 'Sun', 'value' => 0.0],
+                ['label' => 'Mon', 'value' => 0.0],
+                ['label' => 'Tue', 'value' => 66.7],
+                ['label' => 'Wed', 'value' => 33.3],
+            ]);
+    }
+
+    public function test_weekly_trend_is_empty_when_there_are_no_active_employees(): void
+    {
+        Employee::factory()->create(['status' => 'inactive']);
+
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertViewHas('attendance', fn ($attendance) => $attendance['trend'] === []);
+    }
+
+    public function test_a_managers_weekly_trend_only_counts_their_own_team(): void
+    {
+        $managerEmployee = Employee::factory()->create();
+        $manager = $this->managerUser($managerEmployee);
+        $report = Employee::factory()->create(['manager_id' => $managerEmployee->id]);
+        $outsider = Employee::factory()->create();
+
+        $this->attendanceRow($report, AttendanceStatus::Present);
+        $this->attendanceRow($outsider, AttendanceStatus::Present);
+        $this->attendanceRow($managerEmployee, AttendanceStatus::Absent);
+
+        // Team of two, one present today = 50.0. Company-wide it would be 2 of 3 = 66.7.
+        $this->actingAs($manager)
+            ->get(route('dashboard'))
+            ->assertViewHas('attendance', fn ($attendance) => end($attendance['trend'])['value'] === 50.0);
+    }
+
+    public function test_a_managers_needs_attention_only_lists_their_own_team(): void
+    {
+        $managerEmployee = Employee::factory()->create();
+        $manager = $this->managerUser($managerEmployee);
+
+        $mine = Employee::factory()->create(['manager_id' => $managerEmployee->id, 'full_name' => 'My Absent Report']);
+        $this->attendanceRow($mine, AttendanceStatus::Absent);
+
+        $outsider = Employee::factory()->create(['full_name' => 'Elsewhere Absent']);
+        $this->attendanceRow($outsider, AttendanceStatus::Absent);
+        $lateOutsider = Employee::factory()->create(['full_name' => 'Elsewhere Late']);
+        $this->attendanceRow($lateOutsider, AttendanceStatus::Present, ['late_minutes' => 9]);
+
+        $this->actingAs($manager)
+            ->get(route('dashboard'))
+            ->assertViewHas('attendance', fn ($attendance) => collect($attendance['needsAttention'])->pluck('name')->all() === ['My Absent Report']);
+
+        // The same data for an admin includes everyone, so the scoping above is doing the filtering.
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertViewHas('attendance', fn ($attendance) => collect($attendance['needsAttention'])->pluck('name')->sort()->values()->all() === ['Elsewhere Absent', 'Elsewhere Late', 'My Absent Report']);
+    }
+
+    public function test_a_managers_recent_activity_only_shows_their_own_teams_punches(): void
+    {
+        $managerEmployee = Employee::factory()->create();
+        $manager = $this->managerUser($managerEmployee);
+
+        $mine = Employee::factory()->create(['manager_id' => $managerEmployee->id, 'full_name' => 'My Punching Report']);
+        $outsider = Employee::factory()->create(['full_name' => 'Elsewhere Puncher']);
+
+        foreach ([$mine, $outsider] as $employee) {
+            AttendanceLog::factory()->create([
+                'employee_id' => $employee->id,
+                'punch_type' => PunchType::In,
+                'punched_at' => today()->setTime(8, 30),
+            ]);
+        }
+
+        $this->actingAs($manager)
+            ->get(route('dashboard'))
+            ->assertViewHas('attendance', fn ($attendance) => collect($attendance['recent'])->pluck('name')->all() === ['My Punching Report']);
+
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertViewHas('attendance', fn ($attendance) => collect($attendance['recent'])->pluck('name')->sort()->values()->all() === ['Elsewhere Puncher', 'My Punching Report']);
+    }
+
     public function test_department_attendance_omits_departments_with_no_one_in_the_managers_scope(): void
     {
         $managerEmployee = Employee::factory()->create();
