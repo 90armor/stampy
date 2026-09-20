@@ -5,6 +5,7 @@ namespace Tests\Feature\Attendance;
 use App\Models\AttendanceLog;
 use App\Models\Employee;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\RefusingStreamWrapper;
 use Tests\TestCase;
 
 class AttendanceImportCommandTest extends TestCase
@@ -127,4 +128,16 @@ class AttendanceImportCommandTest extends TestCase
         unlink($path);
     }
 
+    public function test_a_file_that_cannot_be_opened_fails_with_the_clean_message_not_a_stack_trace(): void
+    {
+        RefusingStreamWrapper::register();
+
+        try {
+            $this->artisan('attendance:import', ['file' => 'refuse://file.csv'])
+                ->expectsOutputToContain('Unable to open attendance CSV: refuse://file.csv')
+                ->assertFailed();
+        } finally {
+            RefusingStreamWrapper::unregister();
+        }
+    }
 }

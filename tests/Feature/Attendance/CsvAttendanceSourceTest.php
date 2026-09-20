@@ -7,6 +7,7 @@ use App\Enums\PunchType;
 use App\Exceptions\AttendanceImportException;
 use App\Services\Attendance\CsvAttendanceSource;
 use Carbon\Carbon;
+use Tests\Support\RefusingStreamWrapper;
 use Tests\TestCase;
 
 class CsvAttendanceSourceTest extends TestCase
@@ -19,6 +20,8 @@ class CsvAttendanceSourceTest extends TestCase
         foreach ($this->tempFiles as $file) {
             @unlink($file);
         }
+
+        RefusingStreamWrapper::unregister();
 
         parent::tearDown();
     }
@@ -228,4 +231,13 @@ class CsvAttendanceSourceTest extends TestCase
         $this->punches($this->csv("user_id,timestamp,state\n1001,2026-01-05 08:00:00,\n1001,2026-01-05 09:00:00,0\n"));
     }
 
+    public function test_a_file_that_exists_but_cannot_be_opened_gives_the_clean_message(): void
+    {
+        RefusingStreamWrapper::register();
+
+        $this->expectException(AttendanceImportException::class);
+        $this->expectExceptionMessage('Unable to open attendance CSV: refuse://file.csv');
+
+        $this->punches(new CsvAttendanceSource('refuse://file.csv'));
+    }
 }

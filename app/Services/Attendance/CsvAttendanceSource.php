@@ -18,8 +18,8 @@ use Throwable;
  *
  * A bad individual row (wrong field count, missing fields, unparseable or
  * impossible date) is recorded via errors() and skipped rather than aborting
- * the whole file. File-level problems (missing file, missing configured
- * column) and any error the reader didn't anticipate throw
+ * the whole file. File-level problems (missing or unopenable file, missing
+ * configured column) and any error the reader didn't anticipate throw
  * AttendanceImportException instead — the latter with the line number.
  */
 class CsvAttendanceSource implements AttendanceSource
@@ -52,10 +52,14 @@ class CsvAttendanceSource implements AttendanceSource
         $format = $config['datetime_format'];
         $hasHeader = $config['has_header'] ?? true;
 
-        $handle = fopen($this->path, 'r');
+        // @: Laravel turns an fopen() warning into an ErrorException before the false check below could run.
+        error_clear_last();
+        $handle = @fopen($this->path, 'r');
 
         if ($handle === false) {
-            throw new AttendanceImportException("Unable to open attendance CSV: {$this->path}");
+            $reason = preg_replace('/^fopen\(.*?\): /', '', error_get_last()['message'] ?? '');
+
+            throw new AttendanceImportException("Unable to open attendance CSV: {$this->path}".($reason !== '' ? " ({$reason})" : ''));
         }
 
         try {
