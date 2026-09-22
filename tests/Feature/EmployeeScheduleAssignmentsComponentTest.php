@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\WorkSchedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use ReflectionProperty;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -138,5 +139,34 @@ class EmployeeScheduleAssignmentsComponentTest extends TestCase
         Livewire::actingAs($manager)
             ->test(ScheduleAssignments::class, ['employee' => $peer])
             ->assertForbidden();
+    }
+
+    private function forgetCachedSubordinates(): void
+    {
+        (new ReflectionProperty(Employee::class, 'subordinateIdsCache'))->setValue(null, []);
+    }
+
+    public function test_a_page_opened_while_authorized_stops_serving_data_once_access_is_revoked(): void
+    {
+        // This component is its own Livewire component with its own signed
+        // snapshot — an update request aimed at it never routes through the
+        // parent's (Employees\Show) render(), so the parent's own identical
+        // test doesn't cover this one; construct the scenario independently.
+        $top = Employee::factory()->create();
+        $report = Employee::factory()->create(['manager_id' => $top->id]);
+
+        $component = Livewire::actingAs($this->managerUser($top))
+            ->test(ScheduleAssignments::class, ['employee' => $report])
+            ->assertOk();
+
+        $report->update(['manager_id' => null]);
+        $this->forgetCachedSubordinates();
+
+        // No mutating action, and this component has no listener a
+        // dispatched event could trigger the way Employees\Show's own
+        // refreshEmployee() does — set() is the plainest way to force
+        // another request/render cycle here, isolating render()'s own
+        // check from create()/assign()/deleteAssignment()'s.
+        $component->set('work_schedule_id', '')->assertForbidden();
     }
 }

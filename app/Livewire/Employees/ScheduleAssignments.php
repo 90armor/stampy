@@ -14,8 +14,13 @@ use Livewire\Component;
  * The employee profile's schedule-assignment history: list, assign a new
  * one (effective-dated), delete a row. Mounted directly with the employee
  * (unlike Employees\FormModal, this is only ever used from one profile page
- * at a time, not shared across a list) — see render()'s own comment for why
- * it still re-authorizes on every request despite that.
+ * at a time, not shared across a list) — but still its own Livewire
+ * component with its own signed snapshot and its own update requests, which
+ * never route through the parent's (Employees\Show) render(). So it follows
+ * the full Authorization convention with no exception: authorize in
+ * mount(), again in every mutating action, and again in render() — see
+ * render()'s own comment for why that last one matters even though mount()
+ * already checked once.
  */
 class ScheduleAssignments extends Component
 {
@@ -29,6 +34,8 @@ class ScheduleAssignments extends Component
 
     public function mount(Employee $employee): void
     {
+        $this->authorize('view', $employee);
+
         $this->employee = $employee;
     }
 
