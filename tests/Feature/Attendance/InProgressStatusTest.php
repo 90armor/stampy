@@ -44,12 +44,19 @@ class InProgressStatusTest extends TestCase
             'grace_minutes' => 10,
             'break_minutes' => 60,
             'workdays' => [1, 2, 3, 4, 5],
+            'is_default' => true,
         ]);
     }
 
     private function employee(): Employee
     {
-        return Employee::factory()->create(['work_schedule_id' => $this->schedule()->id]);
+        // Assigned automatically at creation, to whatever's default — see
+        // Employee::booted(). Marking this schedule the default (above) is
+        // what puts a new employee on it, now that there's no per-employee
+        // work_schedule_id to set directly.
+        $this->schedule();
+
+        return Employee::factory()->create();
     }
 
     public function test_today_before_end_time_with_no_punches_is_in_progress(): void
@@ -166,8 +173,12 @@ class InProgressStatusTest extends TestCase
         $this->assertSame(0, $row->worked_minutes);
     }
 
-    public function test_employee_with_no_schedule_uses_the_default_schedules_end_time(): void
+    public function test_a_newly_created_employee_uses_the_default_schedules_end_time(): void
     {
+        // No explicit assignment made — proves the builder resolves a fresh
+        // employee's automatic default-schedule assignment (Employee::booted())
+        // correctly via scheduleOn(), not just an employee this file's own
+        // employee() helper has deliberately pinned to a specific schedule.
         WorkSchedule::factory()->create([
             'start_time' => '08:00:00',
             'end_time' => '17:00:00',
@@ -175,7 +186,7 @@ class InProgressStatusTest extends TestCase
             'is_default' => true,
         ]);
 
-        $employee = Employee::factory()->create(['work_schedule_id' => null]);
+        $employee = Employee::factory()->create();
 
         Carbon::setTestNow(Carbon::parse(self::TODAY.' 12:00:00'));
         $before = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::TODAY));

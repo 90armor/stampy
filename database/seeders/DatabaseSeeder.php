@@ -3,16 +3,21 @@
 namespace Database\Seeders;
 
 use Carbon\Carbon;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Artisan;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
     /**
      * Seed the application's database.
+     *
+     * Deliberately NOT `use WithoutModelEvents;` (Laravel's default stub
+     * had it from the very first commit, with no seeder here ever relying
+     * on it): EmployeeSeeder's employees need Employee::booted()'s created()
+     * listener to fire, which assigns each one their initial
+     * employee_work_schedules row — silencing model events left every
+     * seeded employee with zero assignments, the exact data-integrity state
+     * scheduleOn() exists to catch.
      */
     public function run(): void
     {

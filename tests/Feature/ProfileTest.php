@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Employee;
 use App\Models\User;
+use App\Models\WorkSchedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
@@ -11,6 +12,14 @@ use Tests\TestCase;
 class ProfileTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Every employee is now assigned a schedule at creation, which needs a default to exist.
+        WorkSchedule::factory()->create(['is_default' => true]);
+    }
 
     public function test_profile_page_is_displayed(): void
     {

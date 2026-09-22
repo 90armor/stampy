@@ -34,12 +34,19 @@ class HolidayAttendanceTest extends TestCase
             'grace_minutes' => 10,
             'break_minutes' => 60,
             'workdays' => [1, 2, 3, 4, 5],
+            'is_default' => true,
         ]);
     }
 
     private function employee(): Employee
     {
-        return Employee::factory()->create(['work_schedule_id' => $this->schedule()->id]);
+        // Assigned automatically at creation, to whatever's default — see
+        // Employee::booted(). Marking this schedule the default (above) is
+        // what puts a new employee on it, now that there's no per-employee
+        // work_schedule_id to set directly.
+        $this->schedule();
+
+        return Employee::factory()->create();
     }
 
     public function test_a_workday_holiday_with_no_punches_is_holiday(): void

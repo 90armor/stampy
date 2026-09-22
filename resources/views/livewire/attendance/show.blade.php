@@ -558,12 +558,12 @@
                     $modalRecord = $recordsByDate->get($viewingDay);
                     $modalStyle = $modalRecord ? $variantStyles[$modalRecord->displayVariant()] : $notCalculatedStyle;
                     // The schedule actually used for this day's calculation
-                    // when a row exists (an employee's schedule can change
-                    // over time, so this is more correct than "whatever
-                    // their CURRENT schedule is"); falls back to the current
-                    // effective schedule as a "this is what would apply"
-                    // hint when nothing's been calculated yet.
-                    $modalSchedule = $modalRecord?->workSchedule ?? $employee->effectiveSchedule();
+                    // when a row exists; falls back to scheduleOn() for this
+                    // same date as a "this is what would apply" hint when
+                    // nothing's been calculated yet — not necessarily the
+                    // employee's CURRENT schedule, if they've since been
+                    // reassigned effective some other date.
+                    $modalSchedule = $modalRecord?->workSchedule ?? $employee->scheduleOn($modalDate);
                     $modalMarkedLate = $modalRecord && $modalRecord->isLate();
                     $modalMarkedEarly = $modalRecord && $modalRecord->leftEarly();
                     $markedTimeClass = 'text-red-700 underline decoration-red-600 decoration-2 underline-offset-2 dark:text-red-300 dark:decoration-red-400';

@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Exceptions\NoDefaultWorkScheduleException;
+use App\Exceptions\NoScheduleAssignmentException;
 use App\Models\Employee;
 use App\Services\Attendance\DailySummaryBuilder;
 use App\Support\StrictDate;
@@ -56,7 +56,7 @@ class AttendanceBuildDailyCommand extends Command
                     $date = $date->copy()->addDay();
                 }
             }
-        } catch (NoDefaultWorkScheduleException $e) {
+        } catch (NoScheduleAssignmentException $e) {
             $this->error($e->getMessage());
 
             return self::FAILURE;

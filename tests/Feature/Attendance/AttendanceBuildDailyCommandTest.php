@@ -4,6 +4,7 @@ namespace Tests\Feature\Attendance;
 
 use App\Models\DailyAttendance;
 use App\Models\Employee;
+use App\Models\EmployeeWorkSchedule;
 use App\Models\WorkSchedule;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -204,12 +205,17 @@ class AttendanceBuildDailyCommandTest extends TestCase
         $this->assertSame(1, DailyAttendance::count());
     }
 
-    public function test_a_missing_default_schedule_is_reported_as_the_real_problem_not_a_stack_trace(): void
+    public function test_a_missing_schedule_assignment_is_reported_as_the_real_problem_not_a_stack_trace(): void
     {
-        WorkSchedule::query()->delete();
+        // "No default schedule exists" can no longer happen at build time —
+        // every employee is assigned one at creation, and a schedule
+        // referenced by any assignment can't be deleted. What's still
+        // possible is the data-integrity case this simulates directly: an
+        // employee whose assignment rows were removed some other way.
+        EmployeeWorkSchedule::query()->delete();
 
         $this->artisan('attendance:build-daily', ['--date' => '2026-02-02'])
-            ->expectsOutputToContain('No default work schedule exists')
+            ->expectsOutputToContain('has no work schedule assignment at all')
             ->assertFailed();
 
         $this->assertSame(0, DailyAttendance::count());

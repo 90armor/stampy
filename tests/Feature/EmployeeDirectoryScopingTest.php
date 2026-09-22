@@ -6,6 +6,7 @@ use App\Livewire\Employees\Index;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\User;
+use App\Models\WorkSchedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use Livewire\Livewire;
@@ -19,6 +20,9 @@ class EmployeeDirectoryScopingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Every employee is now assigned a schedule at creation, which needs a default to exist.
+        WorkSchedule::factory()->create(['is_default' => true]);
 
         foreach (['admin', 'manager', 'employee'] as $role) {
             Role::firstOrCreate(['name' => $role]);

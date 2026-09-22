@@ -8,6 +8,7 @@ use App\Models\DailyAttendance;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\User;
+use App\Models\WorkSchedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
@@ -20,6 +21,9 @@ class AttendanceIndexTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Every employee is now assigned a schedule at creation, which needs a default to exist.
+        WorkSchedule::factory()->create(['is_default' => true]);
 
         foreach (['admin', 'manager', 'employee'] as $role) {
             Role::firstOrCreate(['name' => $role]);

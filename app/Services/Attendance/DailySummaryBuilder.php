@@ -35,7 +35,7 @@ class DailySummaryBuilder
     public function build(Employee $employee, CarbonInterface $date): DailyAttendance
     {
         $workDate = Carbon::instance($date)->startOfDay();
-        $schedule = $employee->effectiveSchedule();
+        $schedule = $employee->scheduleOn($workDate);
 
         $isWorkday = in_array($workDate->dayOfWeekIso, $schedule->workdays, true);
 

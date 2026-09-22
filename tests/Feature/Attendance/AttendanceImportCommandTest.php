@@ -5,6 +5,7 @@ namespace Tests\Feature\Attendance;
 use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
 use App\Models\Employee;
+use App\Models\EmployeeWorkSchedule;
 use App\Models\WorkSchedule;
 use App\Services\Attendance\DailySummaryBuilder;
 use Carbon\Carbon;
@@ -229,12 +230,23 @@ class AttendanceImportCommandTest extends TestCase
         unlink($path);
     }
 
-    public function test_a_missing_default_schedule_keeps_the_punches_and_says_how_to_recover(): void
+    public function test_a_missing_schedule_assignment_keeps_the_punches_and_says_how_to_recover(): void
     {
-        WorkSchedule::query()->delete();
+        // The scenario this once was — no default work schedule exists — can no
+        // longer happen at rebuild time: every employee is assigned one at
+        // creation (see Employee::booted()), and a schedule referenced by any
+        // assignment can't be deleted (restrictOnDelete). What CAN still fail
+        // is the data-integrity case NoScheduleAssignmentException guards
+        // against: an employee whose assignment rows were removed some other
+        // way, simulated here directly.
+        EmployeeWorkSchedule::query()->delete();
 
+        // Only one substring check per actual output line: Mockery's mock
+        // here only credits the first matching expectation against a given
+        // doWrite call, so two checks that both match the SAME line (e.g.
+        // the whole error() line) would leave the second one unsatisfied.
         $this->artisan('attendance:import', ['file' => $this->fixture])
-            ->expectsOutputToContain('The punches were imported, but daily attendance could not be rebuilt: No default work schedule exists')
+            ->expectsOutputToContain('has no work schedule assignment at all')
             ->expectsOutputToContain('Run attendance:build-daily for the imported dates')
             ->assertFailed();
 

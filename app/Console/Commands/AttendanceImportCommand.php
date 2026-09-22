@@ -4,7 +4,7 @@ namespace App\Console\Commands;
 
 use App\Enums\PunchSource;
 use App\Exceptions\AttendanceImportException;
-use App\Exceptions\NoDefaultWorkScheduleException;
+use App\Exceptions\NoScheduleAssignmentException;
 use App\Models\Employee;
 use App\Services\Attendance\CsvAttendanceSource;
 use App\Services\Attendance\DailySummaryBuilder;
@@ -58,7 +58,7 @@ class AttendanceImportCommand extends Command
         if (! $dryRun && $summary->earliestImported !== null) {
             try {
                 $rebuilt = $this->rebuild($builder, $summary);
-            } catch (NoDefaultWorkScheduleException $e) {
+            } catch (NoScheduleAssignmentException $e) {
                 $rebuildFailure = $e->getMessage();
             }
         }
