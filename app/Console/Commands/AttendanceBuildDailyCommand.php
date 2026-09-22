@@ -38,13 +38,14 @@ class AttendanceBuildDailyCommand extends Command
         $created = 0;
         $updated = 0;
         $byStatus = [];
+        $skipped = [];
 
-        try {
-            foreach ($employees as $employee) {
-                // join_date is the only hire/start-date column on employees —
-                // don't build days before someone was hired.
-                $date = $employee->join_date->gt($from) ? $employee->join_date->copy() : $from->copy();
+        foreach ($employees as $employee) {
+            // join_date is the only hire/start-date column on employees —
+            // don't build days before someone was hired.
+            $date = $employee->join_date->gt($from) ? $employee->join_date->copy() : $from->copy();
 
+            try {
                 while ($date->lte($to)) {
                     $row = $builder->build($employee, $date);
 
@@ -55,11 +56,17 @@ class AttendanceBuildDailyCommand extends Command
 
                     $date = $date->copy()->addDay();
                 }
-            }
-        } catch (NoScheduleAssignmentException $e) {
-            $this->error($e->getMessage());
+            } catch (NoScheduleAssignmentException) {
+                // Caught per employee, not around the whole loop: one
+                // employee with zero assignment rows (a data-integrity bug,
+                // not a normal "nothing configured yet" case — see the
+                // exception's own doc comment) shouldn't stop every other
+                // employee in the run from being built. Move on and name
+                // every affected employee at the end, not just the first.
+                $skipped[] = "{$employee->employee_code} ({$employee->full_name})";
 
-            return self::FAILURE;
+                continue;
+            }
         }
 
         $this->info("Built daily attendance for {$from->format('Y-m-d')} to {$to->format('Y-m-d')} ({$employees->count()} employee(s)).");
@@ -68,6 +75,16 @@ class AttendanceBuildDailyCommand extends Command
 
         foreach ($byStatus as $status => $count) {
             $this->line("  {$status}: {$count}");
+        }
+
+        if ($skipped !== []) {
+            $this->error(count($skipped).' employee(s) have no work schedule assignment at all and were skipped — this is a data-integrity problem, not a missing default (see NoScheduleAssignmentException):');
+
+            foreach ($skipped as $description) {
+                $this->line("  {$description}");
+            }
+
+            return self::FAILURE;
         }
 
         return self::SUCCESS;

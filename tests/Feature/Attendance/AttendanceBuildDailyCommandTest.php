@@ -215,10 +215,34 @@ class AttendanceBuildDailyCommandTest extends TestCase
         EmployeeWorkSchedule::query()->delete();
 
         $this->artisan('attendance:build-daily', ['--date' => '2026-02-02'])
-            ->expectsOutputToContain('has no work schedule assignment at all')
+            ->expectsOutputToContain('have no work schedule assignment at all')
             ->assertFailed();
 
         $this->assertSame(0, DailyAttendance::count());
+    }
+
+    public function test_one_employee_missing_an_assignment_does_not_stop_the_rest_from_being_built(): void
+    {
+        // The base setUp() employee keeps its assignment; two more are added
+        // here, one of which loses its assignment rows entirely — simulates
+        // the data-integrity case without pretending it's the norm.
+        $fine1 = Employee::factory()->create(['full_name' => 'Fine One']);
+        $broken = Employee::factory()->create(['employee_code' => 'EMP-BROKEN', 'full_name' => 'Broken Employee']);
+        $fine2 = Employee::factory()->create(['full_name' => 'Fine Two']);
+
+        EmployeeWorkSchedule::where('employee_id', $broken->id)->delete();
+
+        $this->artisan('attendance:build-daily', ['--date' => '2026-02-02'])
+            ->expectsOutputToContain('1 employee(s) have no work schedule assignment')
+            ->expectsOutputToContain('EMP-BROKEN (Broken Employee)')
+            ->assertFailed();
+
+        // The setUp() employee plus both "fine" ones still got built — only
+        // the broken one was skipped, not the whole run.
+        $this->assertSame(3, DailyAttendance::count());
+        $this->assertSame(0, DailyAttendance::where('employee_id', $broken->id)->count());
+        $this->assertSame(1, DailyAttendance::where('employee_id', $fine1->id)->count());
+        $this->assertSame(1, DailyAttendance::where('employee_id', $fine2->id)->count());
     }
 
     public function test_a_past_date_is_still_built(): void
