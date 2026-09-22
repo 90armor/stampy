@@ -5,8 +5,10 @@ namespace Tests\Feature;
 use App\Livewire\Employees\Show;
 use App\Models\Employee;
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use ReflectionProperty;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -131,5 +133,59 @@ class EmployeeShowTest extends TestCase
         Livewire::actingAs($manager)
             ->test(Show::class, ['employee' => $top])
             ->assertOk();
+    }
+
+    /**
+     * A real request starts with an empty per-process cache; within one test
+     * process it would otherwise still hold the previous "request's" answer.
+     */
+    private function forgetCachedSubordinates(): void
+    {
+        (new ReflectionProperty(Employee::class, 'subordinateIdsCache'))->setValue(null, []);
+    }
+
+    public function test_render_re_asserts_access_even_if_the_employee_property_is_set_directly(): void
+    {
+        $top = Employee::factory()->create();
+        $peer = Employee::factory()->create();
+
+        $this->actingAs($this->managerUser($top));
+
+        $component = new Show;
+        $component->employee = $peer;
+
+        $this->expectException(AuthorizationException::class);
+
+        $component->render();
+    }
+
+    public function test_render_still_serves_the_page_to_someone_who_may_view_it(): void
+    {
+        $top = Employee::factory()->create();
+        $report = Employee::factory()->create(['manager_id' => $top->id]);
+
+        $component = new Show;
+        $component->employee = $report;
+
+        $this->actingAs($this->managerUser($top));
+
+        $this->assertNotNull($component->render());
+    }
+
+    public function test_a_page_opened_while_authorized_stops_serving_data_once_access_is_revoked(): void
+    {
+        $top = Employee::factory()->create();
+        $report = Employee::factory()->create(['manager_id' => $top->id, 'full_name' => 'Revoked Report']);
+
+        $component = Livewire::actingAs($this->managerUser($top))
+            ->test(Show::class, ['employee' => $report])
+            ->assertSee('Revoked Report');
+
+        // The report is moved out of this manager's team while their page is still open, then an
+        // edit elsewhere (the FormModal) fires the event this component re-renders on.
+        $report->update(['manager_id' => null]);
+        $this->forgetCachedSubordinates();
+
+        $component->dispatch('employee-saved')->assertForbidden();
     }
 }
