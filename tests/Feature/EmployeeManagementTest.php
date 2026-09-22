@@ -184,10 +184,13 @@ class EmployeeManagementTest extends TestCase
     {
         $admin = User::factory()->create()->assignRole('admin');
         $manager = User::factory()->create()->assignRole('manager');
-        Employee::factory()->create(['status' => 'active']);
+        $managerEmployee = Employee::factory()->create(['user_id' => $manager->id]);
+        Employee::factory()->create(['full_name' => 'A Report', 'manager_id' => $managerEmployee->id, 'status' => 'active']);
 
         $this->actingAs($admin)->get(route('employees.index'))->assertOk()->assertSeeHtml('title="Deactivate"');
-        $this->actingAs($manager)->get(route('employees.index'))->assertOk()->assertDontSeeHtml('title="Deactivate"');
+
+        // The manager's directory has rows (their team), so the absence is about the control, not an empty page.
+        $this->actingAs($manager)->get(route('employees.index'))->assertOk()->assertSee('A Report')->assertDontSeeHtml('title="Deactivate"');
     }
 
     public function test_manager_cannot_deactivate_an_employee(): void
@@ -276,6 +279,38 @@ class EmployeeManagementTest extends TestCase
 
         $this->assertSame('After Edit', $employee->fresh()->full_name);
         $this->assertSame('7002', $employee->fresh()->device_user_id);
+    }
+
+    public function test_editing_an_employees_full_name_updates_their_linked_users_name(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        $user = User::factory()->create(['name' => 'Before Edit']);
+        $employee = Employee::factory()->create(['user_id' => $user->id, 'full_name' => 'Before Edit']);
+
+        Livewire::actingAs($admin)
+            ->test(FormModal::class)
+            ->call('edit', $employee->id)
+            ->set('full_name', 'After Edit')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertSame('After Edit', $employee->fresh()->full_name);
+        $this->assertSame('After Edit', $user->fresh()->name);
+    }
+
+    public function test_editing_an_employee_with_no_linked_user_does_not_error(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        $employee = Employee::factory()->create(['user_id' => null, 'full_name' => 'Before Edit']);
+
+        Livewire::actingAs($admin)
+            ->test(FormModal::class)
+            ->call('edit', $employee->id)
+            ->set('full_name', 'After Edit')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertSame('After Edit', $employee->fresh()->full_name);
     }
 
     public function test_several_employees_may_have_no_device_user_id(): void

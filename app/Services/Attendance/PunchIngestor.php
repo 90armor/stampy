@@ -68,7 +68,16 @@ class PunchIngestor
             }
         }
 
-        return new IngestionSummary($imported, $skippedDuplicate, $skippedUnknown, array_keys($unknownDeviceIds));
+        $times = array_map(fn (array $row) => Carbon::parse($row['punched_at']), $rows);
+
+        return new IngestionSummary(
+            $imported,
+            $skippedDuplicate,
+            $skippedUnknown,
+            array_keys($unknownDeviceIds),
+            $times === [] ? null : min($times),
+            $times === [] ? null : max($times),
+        );
     }
 
     /**

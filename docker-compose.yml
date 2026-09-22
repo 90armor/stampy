@@ -1,23 +1,33 @@
 name: stampy
 
+# One definition shared by `app` and `scheduler`, so they always run the same image with the same environment.
+x-laravel: &laravel
+    image: stampy-app
+    build:
+        context: .
+        dockerfile: docker/php/Dockerfile
+    volumes:
+        - .:/var/www/html
+        - vendor:/var/www/html/vendor
+    environment:
+        DB_CONNECTION: mysql
+        DB_HOST: mysql
+        DB_PORT: 3306
+        DB_DATABASE: stampy
+        DB_USERNAME: attendance
+        DB_PASSWORD: secret
+    depends_on:
+        mysql:
+            condition: service_healthy
+
 services:
     app:
-        build:
-            context: .
-            dockerfile: docker/php/Dockerfile
-        volumes:
-            - .:/var/www/html
-            - vendor:/var/www/html/vendor
-        environment:
-            DB_CONNECTION: mysql
-            DB_HOST: mysql
-            DB_PORT: 3306
-            DB_DATABASE: stampy
-            DB_USERNAME: attendance
-            DB_PASSWORD: secret
-        depends_on:
-            mysql:
-                condition: service_healthy
+        <<: *laravel
+
+    scheduler:
+        <<: *laravel
+        command: php artisan schedule:work
+        restart: unless-stopped
 
     nginx:
         image: nginx:alpine

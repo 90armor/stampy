@@ -53,18 +53,18 @@ class HolidayCalendarDisplayTest extends TestCase
     {
         $employee = Employee::factory()->create();
         // Deliberately no DailyAttendance row for this date at all.
-        Holiday::factory()->create(['date' => '2026-03-20', 'name' => 'Thingyan Water Festival']);
+        Holiday::factory()->create(['date' => '2026-03-20', 'name' => 'Second Test Holiday']);
 
         Livewire::actingAs($this->admin())
             ->test(Show::class, ['employee' => $employee])
             ->set('month', self::MONTH)
-            ->assertSee('Thingyan Water Festival');
+            ->assertSee('Second Test Holiday');
     }
 
     public function test_a_built_workday_holiday_shows_both_its_name_and_the_holiday_colour(): void
     {
         $employee = Employee::factory()->create();
-        Holiday::factory()->create(['date' => '2026-03-02', 'name' => 'Union Day']);
+        Holiday::factory()->create(['date' => '2026-03-02', 'name' => 'Test Holiday']);
         DailyAttendance::factory()->create([
             'employee_id' => $employee->id,
             'work_date' => '2026-03-02',
@@ -76,7 +76,7 @@ class HolidayCalendarDisplayTest extends TestCase
             ->set('month', self::MONTH)
             ->html();
 
-        $this->assertStringContainsString('Union Day', $html);
+        $this->assertStringContainsString('Test Holiday', $html);
         $this->assertStringContainsString('bg-fuchsia-50 dark:bg-fuchsia-900/20', $html);
     }
 
@@ -102,7 +102,7 @@ class HolidayCalendarDisplayTest extends TestCase
     public function test_a_worked_holiday_shows_the_name_with_the_present_colour(): void
     {
         $employee = Employee::factory()->create();
-        Holiday::factory()->create(['date' => '2026-03-02', 'name' => 'Union Day']);
+        Holiday::factory()->create(['date' => '2026-03-02', 'name' => 'Test Holiday']);
         DailyAttendance::factory()->create([
             'employee_id' => $employee->id,
             'work_date' => '2026-03-02',
@@ -116,7 +116,7 @@ class HolidayCalendarDisplayTest extends TestCase
             ->set('month', self::MONTH)
             ->html();
 
-        $this->assertStringContainsString('Union Day', $html);
+        $this->assertStringContainsString('Test Holiday', $html);
         $this->assertStringContainsString('bg-green-50 dark:bg-green-900/20', $html);
     }
 

@@ -45,18 +45,7 @@
     </div>
 
     @if ($scopeHasNoEmployeeRecord)
-        {{-- A manager-role account with no linked employees row has no
-        position in the org tree, so scopedEmployeeIds() is deliberately
-        empty rather than "all employees" — filters/stat cards would be
-        meaningless over zero rows, so this replaces them entirely with an
-        explanation instead of a bare "no results" table. --}}
-        <x-card>
-            <x-empty-state
-                icon="user-x"
-                title="Your account isn't linked to an employee record"
-                description="Attendance can't be scoped to you until an admin links this login to an employee profile. Contact an admin to get this set up."
-            />
-        </x-card>
+        <x-no-employee-record subject="Attendance" />
     @else
     {{-- Always exactly these 3 (Present/Absent/Incomplete), 0 shown plainly
     when a status has no rows — not appear/disappear based on whether data

@@ -183,6 +183,16 @@ class FormModal extends Component
             $this->editing = Employee::create($data);
         }
 
+        // Keep the linked account's name in sync — Profile shows it read-only
+        // for a linked user (name is HR data, admin-owned; see
+        // ProfileController::update()), so this is the only path left that
+        // writes users.name once an employee already has an account. A no-op
+        // when the name didn't change, and harmless to also run right after
+        // create_user above sets it to the same value.
+        if ($this->editing->user_id) {
+            $this->editing->user->update(['name' => $data['full_name']]);
+        }
+
         // Lets any page embedding this modal (the list, the detail page) refresh
         // the employee data it's displaying.
         $this->dispatch('employee-saved');

@@ -13,6 +13,9 @@
         @endcan
     </div>
 
+    @if ($scopeHasNoEmployeeRecord)
+        <x-no-employee-record subject="The employee directory" />
+    @else
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <x-stat-card icon="users" label="Total employees" :value="$stats['total_employees']" icon-class="bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300" />
 
@@ -194,6 +197,7 @@
         </div>
     @endif
     </x-card>
+    @endif
 
     <livewire:employees.form-modal />
 
