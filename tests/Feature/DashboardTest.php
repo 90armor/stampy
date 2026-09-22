@@ -20,8 +20,8 @@ use Tests\TestCase;
  * App\Support\DashboardAttendance, replacing the old DemoAttendance
  * placeholder. These tests cover the one thing that placeholder never had to
  * get right: row-level scoping (a manager sees only their own team's
- * attendance figures, mirroring Attendance\Index/Show — see routes/web.php's
- * comment on why Total employees stays company-wide while these don't).
+ * attendance AND headcount figures, via the same EmployeeScope the employee
+ * directory uses — mirroring Attendance\Index/Show and Employees\Index).
  */
 class DashboardTest extends TestCase
 {
@@ -110,7 +110,7 @@ class DashboardTest extends TestCase
         });
     }
 
-    public function test_manager_only_sees_their_own_teams_attendance_but_the_full_company_headcount(): void
+    public function test_manager_only_sees_their_own_teams_attendance_and_headcount(): void
     {
         $managerEmployee = Employee::factory()->create(['full_name' => 'Team Manager']);
         $manager = $this->managerUser($managerEmployee);
@@ -124,9 +124,9 @@ class DashboardTest extends TestCase
 
         $response = $this->actingAs($manager)->get(route('dashboard'));
 
-        // Total employees stays company-wide (matches Employees\Index's own
-        // unscoped precedent) — 3 total: manager + their report + the outsider.
-        $response->assertViewHas('stats', fn ($stats) => $stats['total_employees'] === 3);
+        // Total employees is scoped like the employee directory's own stats —
+        // 2, not 3: manager + their report, not the outsider.
+        $response->assertViewHas('stats', fn ($stats) => $stats['total_employees'] === 2);
 
         $response->assertViewHas('attendance', function ($attendance) {
             $absentSegment = collect($attendance['today']['segments'])->firstWhere('key', 'absent');
@@ -134,6 +134,21 @@ class DashboardTest extends TestCase
             return $attendance['today']['present']['count'] === 1
                 && ($absentSegment['count'] ?? 0) === 0;
         });
+    }
+
+    public function test_a_managers_new_this_month_only_counts_their_own_team(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-15 12:00:00'));
+
+        $managerEmployee = Employee::factory()->create(['join_date' => '2020-01-01']);
+        $manager = $this->managerUser($managerEmployee);
+
+        Employee::factory()->create(['manager_id' => $managerEmployee->id, 'join_date' => '2026-03-10']); // in scope, this month
+        Employee::factory()->create(['join_date' => '2026-03-12']); // outsider, must not count
+
+        $this->actingAs($manager)
+            ->get(route('dashboard'))
+            ->assertViewHas('stats', fn ($stats) => $stats['new_this_month'] === 1);
     }
 
     public function test_a_manager_with_no_linked_employee_sees_an_empty_scope_not_an_error(): void
@@ -147,6 +162,9 @@ class DashboardTest extends TestCase
         $response->assertOk();
         $response->assertViewHas('attendance', fn ($attendance) => $attendance['today']['present']['count'] === 0
             && $attendance['needsAttention'] === []
+        );
+        $response->assertViewHas('stats', fn ($stats) => $stats['total_employees'] === 0
+            && $stats['new_this_month'] === 0
         );
     }
 

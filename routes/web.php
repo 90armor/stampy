@@ -23,24 +23,26 @@ Route::get('/dashboard', function () {
     if (auth()->user()->hasAnyRole(['admin', 'manager'])) {
         $user = auth()->user();
 
-        // Total employees / new this month stay company-wide headcount even for a
-        // manager — unlike the employee directory and its own stats, which are
-        // scoped to their team. Only the ATTENDANCE figures below get the
-        // manager's own-team-only scope, matching Attendance\Index/Show.
-        $totalEmployees = Employee::count();
-
-        $stats = [
-            'total_employees' => $totalEmployees,
-            'new_this_month' => Employee::whereMonth('join_date', now()->month)
-                ->whereYear('join_date', now()->year)
-                ->count(),
-        ];
-
         // The shared scope rule: null = admin, no restriction; a manager gets
         // themself plus their reports; one with no linked employee record gets
         // an empty scope (every figure below reads all-zero, which is accurate —
-        // they have no team to show attendance for).
+        // they have no team to show attendance for). Total employees / new this
+        // month use it too, same as the employee directory's own stats, so a
+        // manager's dashboard agrees with the directory beside it.
         $employeeIds = EmployeeScope::for($user, 'Dashboard')->ids;
+
+        $totalEmployees = Employee::query()
+            ->when($employeeIds !== null, fn ($query) => $query->whereIn('id', $employeeIds))
+            ->count();
+
+        $stats = [
+            'total_employees' => $totalEmployees,
+            'new_this_month' => Employee::query()
+                ->when($employeeIds !== null, fn ($query) => $query->whereIn('id', $employeeIds))
+                ->whereMonth('join_date', now()->month)
+                ->whereYear('join_date', now()->year)
+                ->count(),
+        ];
 
         $departments = Department::withCount(['employees' => fn ($query) => $query
             ->where('status', 'active')
