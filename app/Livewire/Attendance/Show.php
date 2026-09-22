@@ -244,30 +244,12 @@ class Show extends Component
     }
 
     /**
-     * Rebuilds the punch's own date PLUS the day before and the day after.
-     *
-     * The brief that prompted this only asked for "the affected date and
-     * the day before it" — the day-before case is the obvious one (an
-     * overnight out-punch added/voided near midnight is the previous day's
-     * last_out, via DailySummaryBuilder's forward 18h lookahead from that
-     * day's first_in). But the day-after case is real too: when a day has
-     * no first_in of its own, DailySummaryBuilder walks that day's out-punch
-     * candidates and excludes any one already "claimed" by an in-punch up to
-     * 18h *before* it — including an in-punch on the PREVIOUS calendar day.
-     * Adding or voiding a late in-punch today can flip tomorrow's candidate
-     * from claimed to unclaimed (or vice versa) without tomorrow's own data
-     * changing at all. Rebuilding only today and yesterday would leave that
-     * stale. Two days forward is never needed: 18h from even a midnight
-     * in-punch can't reach the day after next.
+     * The punch's own date plus the day before and after — the shared rule
+     * lives in DailySummaryBuilder::rebuildAround(), with the reasoning.
      */
     private function rebuildAround(Carbon $punchedAt): void
     {
-        $builder = app(DailySummaryBuilder::class);
-        $day = $punchedAt->copy()->startOfDay();
-
-        $builder->build($this->employee, $day->copy()->subDay());
-        $builder->build($this->employee, $day);
-        $builder->build($this->employee, $day->copy()->addDay());
+        app(DailySummaryBuilder::class)->rebuildAround($this->employee, $punchedAt);
     }
 
     /**

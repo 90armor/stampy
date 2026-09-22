@@ -83,6 +83,20 @@ class ManualPunchTest extends TestCase
         $this->assertSame(0, DailyAttendance::where('employee_id', $employee->id)->count());
     }
 
+    public function test_a_punch_today_on_the_hire_date_creates_no_row_before_hire_or_for_tomorrow(): void
+    {
+        $this->travelTo(Carbon::parse('2026-02-09 12:00:00'));
+
+        [$component, $employee] = $this->punchForm('2026-02-09', '2026-02-09', '08:00');
+        $component->call('addPunch')->assertHasNoErrors();
+
+        // The day before is pre-hire and the day after hasn't happened: neither is real history.
+        $this->assertSame(
+            ['2026-02-09'],
+            DailyAttendance::where('employee_id', $employee->id)->get()->map(fn ($row) => $row->work_date->format('Y-m-d'))->all()
+        );
+    }
+
     public function test_a_punch_on_the_start_date_itself_is_accepted(): void
     {
         [$component, $employee] = $this->punchForm('2026-02-02', '2026-02-02', '07:55');

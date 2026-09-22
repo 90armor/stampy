@@ -4,6 +4,7 @@ namespace App\Livewire\Employees;
 
 use App\Models\Department;
 use App\Models\Employee;
+use App\Support\EmployeeScope;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -70,7 +71,14 @@ class Index extends Component
 
     public function render()
     {
-        $employees = Employee::query()
+        $scope = EmployeeScope::for(auth()->user(), 'Employee directory');
+
+        // Everything on this page — rows, stats, the department filter — is
+        // drawn from the same scope, so no count or option describes anyone the
+        // viewer couldn't open. Admin: unrestricted.
+        $visible = fn () => Employee::query()->when($scope->ids !== null, fn ($query) => $query->whereIn('id', $scope->ids));
+
+        $employees = $visible()
             ->with(['department', 'position'])
             ->when($this->search, fn ($query) => $query->where(function ($query) {
                 $query->where('full_name', 'like', "%{$this->search}%")
@@ -83,12 +91,16 @@ class Index extends Component
 
         return view('livewire.employees.index', [
             'employees' => $employees,
-            'departments' => Department::orderBy('name')->get(),
-            'hasAnyEmployees' => Employee::query()->exists(),
+            'departments' => Department::query()
+                ->when($scope->ids !== null, fn ($query) => $query->whereHas('employees', fn ($q) => $q->whereIn('id', $scope->ids)))
+                ->orderBy('name')
+                ->get(),
+            'hasAnyEmployees' => $visible()->exists(),
+            'scopeHasNoEmployeeRecord' => $scope->hasNoEmployeeRecord,
             'stats' => [
-                'total_employees' => Employee::count(),
-                'active_employees' => Employee::where('status', 'active')->count(),
-                'inactive_employees' => Employee::where('status', 'inactive')->count(),
+                'total_employees' => $visible()->count(),
+                'active_employees' => $visible()->where('status', 'active')->count(),
+                'inactive_employees' => $visible()->where('status', 'inactive')->count(),
             ],
         ])->layout('layouts.app', ['header' => 'Employees']);
     }

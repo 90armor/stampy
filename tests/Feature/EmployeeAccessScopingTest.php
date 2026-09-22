@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Employee;
 use App\Models\User;
+use App\Support\EmployeeScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use Spatie\Permission\Models\Role;
@@ -121,6 +122,45 @@ class EmployeeAccessScopingTest extends TestCase
         $this->assertEqualsCanonicalizing(array_slice($ids, 0, 10), $resolved);
         $this->assertNotContains($ids[10], $resolved);
         Log::shouldHaveReceived('warning')->once();
+    }
+
+    /**
+     * The list scope (EmployeeScope) and the policy answer the same question — "may this
+     * user see this employee?" — for a list and for one record. This keeps them from drifting.
+     */
+    public function test_the_list_scope_and_the_view_policy_agree_for_every_kind_of_user(): void
+    {
+        $top = Employee::factory()->create();
+        $mid = Employee::factory()->create(['manager_id' => $top->id]);
+        $leaf = Employee::factory()->create(['manager_id' => $mid->id]);
+        $peer = Employee::factory()->create();
+        $otherBranch = Employee::factory()->create(['manager_id' => $peer->id]);
+        $pool = [$top, $mid, $leaf, $peer, $otherBranch];
+
+        $roleless = User::factory()->create();
+        $leaf->update(['user_id' => $roleless->id]);
+
+        $employeeRole = User::factory()->create()->assignRole('employee');
+        $peer->update(['user_id' => $employeeRole->id]);
+
+        $users = [
+            'admin' => User::factory()->create()->assignRole('admin'),
+            'manager with reports' => $this->managerUser($top),
+            'manager with no employee record' => User::factory()->create()->assignRole('manager'),
+            'employee-role user with their own record' => $employeeRole,
+            'user with no role but an employee record' => $roleless,
+            'user with no role and no record' => User::factory()->create(),
+        ];
+
+        foreach ($users as $label => $user) {
+            $ids = EmployeeScope::for($user, 'test')->ids;
+
+            foreach ($pool as $employee) {
+                $inScope = $ids === null || in_array($employee->id, $ids, true);
+
+                $this->assertSame($user->can('view', $employee), $inScope, "{$label} / employee {$employee->id}");
+            }
+        }
     }
 
     public function test_policy_allows_admin_to_view_any_employee(): void
