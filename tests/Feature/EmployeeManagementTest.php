@@ -184,10 +184,13 @@ class EmployeeManagementTest extends TestCase
     {
         $admin = User::factory()->create()->assignRole('admin');
         $manager = User::factory()->create()->assignRole('manager');
-        Employee::factory()->create(['status' => 'active']);
+        $managerEmployee = Employee::factory()->create(['user_id' => $manager->id]);
+        Employee::factory()->create(['full_name' => 'A Report', 'manager_id' => $managerEmployee->id, 'status' => 'active']);
 
         $this->actingAs($admin)->get(route('employees.index'))->assertOk()->assertSeeHtml('title="Deactivate"');
-        $this->actingAs($manager)->get(route('employees.index'))->assertOk()->assertDontSeeHtml('title="Deactivate"');
+
+        // The manager's directory has rows (their team), so the absence is about the control, not an empty page.
+        $this->actingAs($manager)->get(route('employees.index'))->assertOk()->assertSee('A Report')->assertDontSeeHtml('title="Deactivate"');
     }
 
     public function test_manager_cannot_deactivate_an_employee(): void

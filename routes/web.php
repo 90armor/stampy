@@ -9,7 +9,7 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Position;
 use App\Support\DashboardAttendance;
-use Illuminate\Support\Facades\Log;
+use App\Support\EmployeeScope;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -23,14 +23,10 @@ Route::get('/dashboard', function () {
     if (auth()->user()->hasAnyRole(['admin', 'manager'])) {
         $user = auth()->user();
 
-        // Total employees / new this month are organisational headcount
-        // facts, not attendance records — the employee directory itself
-        // (Employees\Index) is fully visible to both admin and manager with
-        // no row-level scoping, so these stay unscoped too. Only the
-        // ATTENDANCE figures below get the manager's own-team-only scope,
-        // matching Attendance\Index/Show's row-level rule (attendance
-        // records are the sensitive, team-specific data here, not the
-        // directory).
+        // Total employees / new this month stay company-wide headcount even for a
+        // manager — unlike the employee directory and its own stats, which are
+        // scoped to their team. Only the ATTENDANCE figures below get the
+        // manager's own-team-only scope, matching Attendance\Index/Show.
         $totalEmployees = Employee::count();
 
         $stats = [
@@ -40,24 +36,11 @@ Route::get('/dashboard', function () {
                 ->count(),
         ];
 
-        // null = admin, no restriction. A manager with no linked employee
-        // record gets an empty scope (matching Attendance\Index's own
-        // handling of that edge case) rather than an error — every figure
-        // below just reads as all-zero/empty, which is accurate: they have
-        // no team to show attendance for.
-        $employeeIds = null;
-
-        if ($user->hasRole('manager')) {
-            $employee = $user->employee;
-
-            if ($employee === null) {
-                Log::warning('Dashboard viewed by a manager with no linked employee record — showing an empty scope.', [
-                    'user_id' => $user->id,
-                ]);
-            }
-
-            $employeeIds = $employee ? [$employee->id, ...$employee->subordinateIds()] : [];
-        }
+        // The shared scope rule: null = admin, no restriction; a manager gets
+        // themself plus their reports; one with no linked employee record gets
+        // an empty scope (every figure below reads all-zero, which is accurate —
+        // they have no team to show attendance for).
+        $employeeIds = EmployeeScope::for($user, 'Dashboard')->ids;
 
         $departments = Department::withCount(['employees' => fn ($query) => $query
             ->where('status', 'active')

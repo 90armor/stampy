@@ -6,9 +6,9 @@ use App\Enums\AttendanceStatus;
 use App\Models\DailyAttendance;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Support\EmployeeScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -27,11 +27,7 @@ class Index extends Component
      *
      * @var int[]|null
      */
-    private ?array $scopedEmployeeIds = null;
-
-    private bool $scopeResolved = false;
-
-    private bool $scopeHasNoEmployeeRecord = false;
+    private ?EmployeeScope $scope = null;
 
     #[Url(as: 'from', history: true)]
     public string $fromDate = '';
@@ -183,52 +179,24 @@ class Index extends Component
     }
 
     /**
-     * Row-level scope for the acting user, mirroring EmployeePolicy::view:
-     * admin sees everyone (null = no restriction, avoids a pointless
-     * whereIn over every employee id); a manager sees themself plus their
-     * transitive subordinates; anyone else sees only their own record. A
-     * manager-role user with no linked employee record has no position in
-     * the org tree — returns an empty (not null) array so the query
-     * correctly yields zero rows, and the view shows an explicit message
-     * rather than a plain "no results" empty state.
-     *
-     * Resolved once per request: baseQuery(), summaryQuery(), and the
-     * department dropdown in render() all call this, and memoizing means
-     * the subordinate BFS (one query per org-tree level, not per row) only
-     * runs once.
-     *
-     * @return int[]|null
+     * Row-level scope for the acting user — the shared EmployeeScope rule,
+     * resolved once per request: baseQuery(), summaryQuery(), and the
+     * department dropdown in render() all call this, and memoizing means the
+     * subordinate BFS (one query per org-tree level, not per row) only runs
+     * once. A user with no linked employee record gets an empty scope and the
+     * view shows an explicit message instead of a plain "no results".
+     */
+    private function scope(): EmployeeScope
+    {
+        return $this->scope ??= EmployeeScope::for(auth()->user(), 'Attendance list');
+    }
+
+    /**
+     * @return int[]|null null = no restriction
      */
     private function scopedEmployeeIds(): ?array
     {
-        if ($this->scopeResolved) {
-            return $this->scopedEmployeeIds;
-        }
-
-        $this->scopeResolved = true;
-        $user = auth()->user();
-
-        if ($user->hasRole('admin')) {
-            return $this->scopedEmployeeIds = null;
-        }
-
-        $employee = $user->employee;
-
-        if ($employee === null) {
-            $this->scopeHasNoEmployeeRecord = true;
-
-            Log::warning('Attendance list viewed by a user with no linked employee record — showing an empty scope.', [
-                'user_id' => $user->id,
-            ]);
-
-            return $this->scopedEmployeeIds = [];
-        }
-
-        if ($user->hasRole('manager')) {
-            return $this->scopedEmployeeIds = [$employee->id, ...$employee->subordinateIds()];
-        }
-
-        return $this->scopedEmployeeIds = [$employee->id];
+        return $this->scope()->ids;
     }
 
     /**
@@ -372,7 +340,7 @@ class Index extends Component
             'summary' => $summary,
             'maxBuiltDate' => DailyAttendance::max('work_date'),
             'allStatuses' => AttendanceStatus::cases(),
-            'scopeHasNoEmployeeRecord' => $this->scopeHasNoEmployeeRecord,
+            'scopeHasNoEmployeeRecord' => $this->scope()->hasNoEmployeeRecord,
         ])->layout('layouts.app', ['header' => 'Attendance']);
     }
 }
