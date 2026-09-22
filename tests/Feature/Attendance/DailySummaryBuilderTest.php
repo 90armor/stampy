@@ -75,6 +75,55 @@ class DailySummaryBuilderTest extends TestCase
         $this->assertSame(AttendanceStatus::Absent, $row->status);
     }
 
+    /**
+     * @return list<string> the Y-m-d dates that have a row for the employee
+     */
+    private function datesBuilt(Employee $employee): array
+    {
+        return DailyAttendance::where('employee_id', $employee->id)->orderBy('work_date')->get()
+            ->map(fn ($row) => $row->work_date->format('Y-m-d'))->all();
+    }
+
+    public function test_rebuild_around_covers_the_day_before_and_after_a_single_date(): void
+    {
+        $employee = $this->employeeOn($this->schedule());
+
+        $built = app(DailySummaryBuilder::class)->rebuildAround($employee, Carbon::parse('2026-02-04'));
+
+        $this->assertSame(3, $built);
+        $this->assertSame(['2026-02-03', '2026-02-04', '2026-02-05'], $this->datesBuilt($employee));
+    }
+
+    public function test_rebuild_around_widens_a_range_by_one_day_each_side(): void
+    {
+        $employee = $this->employeeOn($this->schedule());
+
+        $built = app(DailySummaryBuilder::class)->rebuildAround($employee, Carbon::parse('2026-02-04'), Carbon::parse('2026-02-06'));
+
+        $this->assertSame(5, $built);
+        $this->assertSame(['2026-02-03', '2026-02-04', '2026-02-05', '2026-02-06', '2026-02-07'], $this->datesBuilt($employee));
+    }
+
+    public function test_rebuild_around_never_builds_before_the_join_date(): void
+    {
+        $this->travelTo(Carbon::parse('2026-02-20 12:00:00'));
+        $employee = Employee::factory()->create(['work_schedule_id' => $this->schedule()->id, 'join_date' => '2026-02-04']);
+
+        app(DailySummaryBuilder::class)->rebuildAround($employee, Carbon::parse('2026-02-04'));
+
+        $this->assertSame(['2026-02-04', '2026-02-05'], $this->datesBuilt($employee));
+    }
+
+    public function test_rebuild_around_never_builds_after_today(): void
+    {
+        $this->travelTo(Carbon::parse('2026-02-04 12:00:00'));
+        $employee = $this->employeeOn($this->schedule());
+
+        app(DailySummaryBuilder::class)->rebuildAround($employee, Carbon::parse('2026-02-04'));
+
+        $this->assertSame(['2026-02-03', '2026-02-04'], $this->datesBuilt($employee));
+    }
+
     public function test_normal_day_is_present_with_correct_worked_minutes(): void
     {
         $employee = $this->employeeOn($this->schedule());

@@ -3,7 +3,12 @@
 namespace Tests\Feature\Attendance;
 
 use App\Models\AttendanceLog;
+use App\Models\DailyAttendance;
 use App\Models\Employee;
+use App\Models\WorkSchedule;
+use App\Services\Attendance\DailySummaryBuilder;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\RefusingStreamWrapper;
 use Tests\TestCase;
@@ -19,6 +24,9 @@ class AttendanceImportCommandTest extends TestCase
         parent::setUp();
 
         $this->fixture = base_path('tests/Fixtures/zkteco-sample.csv');
+
+        // An import now rebuilds the days it touched, which needs a schedule to measure against.
+        WorkSchedule::factory()->create(['is_default' => true]);
 
         foreach (['1001', '1002', '1003', '1004', '1005'] as $deviceUserId) {
             Employee::factory()->create(['device_user_id' => $deviceUserId]);
@@ -139,5 +147,98 @@ class AttendanceImportCommandTest extends TestCase
         } finally {
             RefusingStreamWrapper::unregister();
         }
+    }
+
+    /**
+     * @return list<string> the Y-m-d dates that have a daily_attendances row for one employee
+     */
+    private function rebuiltDates(string $deviceUserId): array
+    {
+        return DailyAttendance::where('employee_id', Employee::where('device_user_id', $deviceUserId)->value('id'))
+            ->orderBy('work_date')->get()
+            ->map(fn ($row) => $row->work_date->format('Y-m-d'))->all();
+    }
+
+    public function test_an_import_rebuilds_the_touched_days_plus_the_day_before_and_after(): void
+    {
+        // The fixture punches on 2026-01-05 and 2026-01-06, so the window is 01-04 through 01-07.
+        $this->artisan('attendance:import', ['file' => $this->fixture])
+            ->expectsOutputToContain('Rebuilt daily attendance: 2026-01-04 to 2026-01-07 (5 employee(s), 20 day(s)).')
+            ->assertSuccessful();
+
+        $this->assertSame(['2026-01-04', '2026-01-05', '2026-01-06', '2026-01-07'], $this->rebuiltDates('1001'));
+        $this->assertSame(20, DailyAttendance::count());
+    }
+
+    public function test_the_rebuild_runs_once_at_the_end_not_per_row(): void
+    {
+        $counter = new class extends DailySummaryBuilder
+        {
+            public int $builds = 0;
+
+            public function build(Employee $employee, CarbonInterface $date): DailyAttendance
+            {
+                $this->builds++;
+
+                return parent::build($employee, $date);
+            }
+        };
+        $this->app->instance(DailySummaryBuilder::class, $counter);
+
+        $this->artisan('attendance:import', ['file' => $this->fixture])->assertSuccessful();
+
+        // 5 employees x 4 days, once — not 18 imported rows each triggering their own rebuild.
+        $this->assertSame(20, $counter->builds);
+    }
+
+    public function test_a_dry_run_rebuilds_nothing(): void
+    {
+        $this->artisan('attendance:import', ['file' => $this->fixture, '--dry-run' => true])
+            ->doesntExpectOutputToContain('Rebuilt')
+            ->assertSuccessful();
+
+        $this->assertSame(0, AttendanceLog::count());
+        $this->assertSame(0, DailyAttendance::count());
+    }
+
+    public function test_an_import_that_adds_nothing_rebuilds_nothing(): void
+    {
+        $this->artisan('attendance:import', ['file' => $this->fixture])->assertSuccessful();
+
+        DailyAttendance::query()->delete();
+
+        $this->artisan('attendance:import', ['file' => $this->fixture])
+            ->expectsOutputToContain('Imported: 0')
+            ->expectsOutputToContain('No new punches — nothing to rebuild.')
+            ->assertSuccessful();
+
+        $this->assertSame(0, DailyAttendance::count());
+    }
+
+    public function test_the_widened_window_never_reaches_tomorrow(): void
+    {
+        $this->travelTo(Carbon::parse('2026-02-10 12:00:00'));
+        $path = $this->tempCsv("user_id,timestamp,state\n1001,2026-02-10 08:00:00,0\n");
+
+        $this->artisan('attendance:import', ['file' => $path])
+            ->expectsOutputToContain('Rebuilt daily attendance: 2026-02-09 to 2026-02-10')
+            ->assertSuccessful();
+
+        $this->assertSame(['2026-02-09', '2026-02-10'], $this->rebuiltDates('1001'));
+
+        unlink($path);
+    }
+
+    public function test_a_missing_default_schedule_keeps_the_punches_and_says_how_to_recover(): void
+    {
+        WorkSchedule::query()->delete();
+
+        $this->artisan('attendance:import', ['file' => $this->fixture])
+            ->expectsOutputToContain('The punches were imported, but daily attendance could not be rebuilt: No default work schedule exists')
+            ->expectsOutputToContain('Run attendance:build-daily for the imported dates')
+            ->assertFailed();
+
+        $this->assertSame(18, AttendanceLog::count());
+        $this->assertSame(0, DailyAttendance::count());
     }
 }

@@ -146,6 +146,43 @@ class DailySummaryBuilder
     }
 
     /**
+     * Rebuilds a date (or a from..to range) PLUS the day before and the day
+     * after — the one place this rule lives, shared by a manual punch and by
+     * an import.
+     *
+     * The day-before case is the obvious one: an overnight out-punch added
+     * or imported near midnight is the previous day's last_out, via the
+     * forward 18h lookahead from that day's first_in. The day-after case is
+     * real too: when a day has no first_in of its own, build() walks that
+     * day's out-punch candidates and excludes any one already "claimed" by an
+     * in-punch up to 18h *before* it — including an in-punch on the PREVIOUS
+     * calendar day. Adding or voiding a late in-punch today can flip
+     * tomorrow's candidate from claimed to unclaimed (or vice versa) without
+     * tomorrow's own data changing at all. Two days out is never needed: 18h
+     * from even a midnight in-punch can't reach the day after next.
+     *
+     * The widened window is clamped to the employee's real history — never
+     * before their join_date, never after today — so widening can't invent a
+     * pre-hire or future row (CLAUDE.md: builds can't reach outside real time).
+     *
+     * @return int the number of days built
+     */
+    public function rebuildAround(Employee $employee, CarbonInterface $from, ?CarbonInterface $to = null): int
+    {
+        $first = Carbon::instance($from)->startOfDay()->subDay()->max($employee->join_date->copy()->startOfDay());
+        $last = Carbon::instance($to ?? $from)->startOfDay()->addDay()->min(today());
+
+        $built = 0;
+
+        for ($day = $first->copy(); $day->lte($last); $day->addDay()) {
+            $this->build($employee, $day);
+            $built++;
+        }
+
+        return $built;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function calculate(
