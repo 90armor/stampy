@@ -56,10 +56,10 @@ class HolidayManagementTest extends TestCase
             ->test(Index::class)
             ->call('create')
             ->set('date', self::WORKDAY)
-            ->set('name', 'Union Day')
+            ->set('name', 'Test Holiday')
             ->call('save');
 
-        $this->assertDatabaseHas('holidays', ['date' => self::WORKDAY, 'name' => 'Union Day']);
+        $this->assertDatabaseHas('holidays', ['date' => self::WORKDAY, 'name' => 'Test Holiday']);
     }
 
     public function test_admin_can_edit_a_holiday(): void
@@ -79,7 +79,7 @@ class HolidayManagementTest extends TestCase
     public function test_duplicate_date_is_a_validation_error_naming_the_existing_holiday(): void
     {
         $admin = $this->admin();
-        Holiday::factory()->create(['date' => self::WORKDAY, 'name' => 'Union Day']);
+        Holiday::factory()->create(['date' => self::WORKDAY, 'name' => 'Test Holiday']);
 
         Livewire::actingAs($admin)
             ->test(Index::class)
@@ -88,7 +88,7 @@ class HolidayManagementTest extends TestCase
             ->set('name', 'Something Else')
             ->call('save')
             ->assertHasErrors(['date'])
-            ->assertSee('Union Day');
+            ->assertSee('Test Holiday');
 
         // Not a second row for the same date.
         $this->assertSame(1, Holiday::where('date', self::WORKDAY)->count());
@@ -97,13 +97,13 @@ class HolidayManagementTest extends TestCase
     public function test_editing_a_holiday_can_keep_its_own_date(): void
     {
         $admin = $this->admin();
-        $holiday = Holiday::factory()->create(['date' => self::WORKDAY, 'name' => 'Union Day']);
+        $holiday = Holiday::factory()->create(['date' => self::WORKDAY, 'name' => 'Test Holiday']);
 
         Livewire::actingAs($admin)
             ->test(Index::class)
             ->call('edit', $holiday->id)
             ->set('date', self::WORKDAY)
-            ->set('name', 'Union Day (renamed)')
+            ->set('name', 'Test Holiday (renamed)')
             ->call('save')
             ->assertHasNoErrors();
     }
@@ -132,7 +132,7 @@ class HolidayManagementTest extends TestCase
             ->test(Index::class)
             ->call('create')
             ->set('date', self::WORKDAY)
-            ->set('name', 'Union Day')
+            ->set('name', 'Test Holiday')
             ->call('save');
 
         $this->assertSame(
@@ -151,7 +151,7 @@ class HolidayManagementTest extends TestCase
     {
         $admin = $this->admin();
         $employee = Employee::factory()->create(['status' => 'active']);
-        $holiday = Holiday::factory()->create(['date' => self::WORKDAY, 'name' => 'Union Day']);
+        $holiday = Holiday::factory()->create(['date' => self::WORKDAY, 'name' => 'Test Holiday']);
         app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::WORKDAY));
         $this->assertSame(
             AttendanceStatus::Holiday,
@@ -175,7 +175,7 @@ class HolidayManagementTest extends TestCase
         $employee = Employee::factory()->create(['status' => 'active']);
         $oldDate = self::WORKDAY;
         $newDate = Carbon::parse(self::WORKDAY)->addDay()->format('Y-m-d'); // Tuesday — also a workday
-        $holiday = Holiday::factory()->create(['date' => $oldDate, 'name' => 'Union Day']);
+        $holiday = Holiday::factory()->create(['date' => $oldDate, 'name' => 'Test Holiday']);
 
         app(DailySummaryBuilder::class)->build($employee, Carbon::parse($oldDate));
         app(DailySummaryBuilder::class)->build($employee, Carbon::parse($newDate));
@@ -205,7 +205,7 @@ class HolidayManagementTest extends TestCase
         // minutes once the holiday is gone, not just flip a status label.
         $admin = $this->admin();
         $employee = Employee::factory()->create(['status' => 'active']);
-        $holiday = Holiday::factory()->create(['date' => self::WORKDAY, 'name' => 'Union Day']);
+        $holiday = Holiday::factory()->create(['date' => self::WORKDAY, 'name' => 'Test Holiday']);
         AttendanceLog::factory()->create([
             'employee_id' => $employee->id,
             'punched_at' => self::WORKDAY.' 08:25:00',

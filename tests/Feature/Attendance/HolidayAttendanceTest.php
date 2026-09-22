@@ -44,7 +44,7 @@ class HolidayAttendanceTest extends TestCase
 
     public function test_a_workday_holiday_with_no_punches_is_holiday(): void
     {
-        Holiday::factory()->create(['date' => self::WORKDAY, 'name' => 'Union Day']);
+        Holiday::factory()->create(['date' => self::WORKDAY, 'name' => 'Test Holiday']);
         $employee = $this->employee();
 
         $row = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::WORKDAY));
@@ -54,7 +54,7 @@ class HolidayAttendanceTest extends TestCase
 
     public function test_a_workday_holiday_with_punches_is_present_with_no_timing_exception(): void
     {
-        Holiday::factory()->create(['date' => self::WORKDAY, 'name' => 'Union Day']);
+        Holiday::factory()->create(['date' => self::WORKDAY, 'name' => 'Test Holiday']);
         $employee = $this->employee();
         AttendanceLog::factory()->create([
             'employee_id' => $employee->id,
@@ -122,7 +122,7 @@ class HolidayAttendanceTest extends TestCase
         // A missing punch is a device-defect fact independent of whether
         // the day was a holiday — holiday only suppresses Absent for a
         // completely unpunched day, not Incomplete for a partly-punched one.
-        Holiday::factory()->create(['date' => self::WORKDAY, 'name' => 'Union Day']);
+        Holiday::factory()->create(['date' => self::WORKDAY, 'name' => 'Test Holiday']);
         $employee = $this->employee();
         AttendanceLog::factory()->create([
             'employee_id' => $employee->id,

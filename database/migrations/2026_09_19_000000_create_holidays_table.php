@@ -10,10 +10,11 @@ return new class extends Migration
     {
         Schema::create('holidays', function (Blueprint $table) {
             $table->id();
-            // One row per actual date, no recurrence — most Myanmar public
-            // holidays follow the lunar calendar and shift every year,
-            // announced by government rather than computable. Also covers
-            // an ad-hoc single day off with no extra mechanism.
+            // One row per actual date, no recurrence — several Cambodian
+            // public holidays (Khmer New Year, Pchum Ben, the Water Festival)
+            // have no fixed date and are announced by the government each
+            // year, so they aren't computable. Also covers an ad-hoc single
+            // day off with no extra mechanism.
             $table->date('date')->unique();
             $table->string('name');
             $table->string('note')->nullable();
