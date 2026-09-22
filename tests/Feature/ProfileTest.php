@@ -43,6 +43,29 @@ class ProfileTest extends TestCase
         $this->assertSame('test@example.com', $user->email);
     }
 
+    public function test_a_user_with_no_email_can_save_their_profile(): void
+    {
+        // Many employees have no email at all (users.email is nullable) and sign
+        // in with their username instead — the form must not force one on them.
+        $user = User::factory()->create(['email' => null]);
+
+        $response = $this
+            ->actingAs($user)
+            ->patch('/profile', [
+                'name' => 'No Email User',
+                'email' => '',
+            ]);
+
+        $response
+            ->assertSessionHasNoErrors()
+            ->assertRedirect('/profile');
+
+        $user->refresh();
+
+        $this->assertSame('No Email User', $user->name);
+        $this->assertNull($user->email);
+    }
+
     public function test_the_profile_page_offers_no_way_to_delete_the_account(): void
     {
         $user = User::factory()->create();

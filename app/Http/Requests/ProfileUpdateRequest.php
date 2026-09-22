@@ -18,8 +18,12 @@ class ProfileUpdateRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
+            // Nullable: many employees have no email at all (users.email is
+            // nullable — see LoginRequest's own doc comment on the same
+            // point) and sign in with their username instead. Still unique
+            // and a valid address when one is given.
             'email' => [
-                'required',
+                'nullable',
                 'string',
                 'lowercase',
                 'email',
