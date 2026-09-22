@@ -17,9 +17,24 @@
             <div class="mx-6 my-4 rounded-lg bg-primary-50 px-4 py-3 text-sm text-primary-700 ring-1 ring-inset ring-primary-200 dark:bg-primary-900/20 dark:text-primary-300 dark:ring-primary-900">
                 Reassigned {{ $bulkResult['employees'] }} {{ Str::plural('employee', $bulkResult['employees']) }}, rebuilding {{ $bulkResult['days'] }} {{ Str::plural('day', $bulkResult['days']) }} of attendance.
             </div>
+
+            {{-- The reassignment itself already succeeded whenever this shows
+                 — every employee was moved — only the rebuild after it failed
+                 partway, so this is a warning (amber), not a failure (red). --}}
+            @if ($bulkResult['rebuildError'])
+                <div class="mx-6 mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-900">
+                    {{ $bulkResult['rebuildError'] }}
+                </div>
+            @endif
         @endif
 
         <form wire:submit="bulkReassign" class="px-6 py-2 space-y-4">
+            @error('form')
+                <div class="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-900">
+                    {{ $message }}
+                </div>
+            @enderror
+
             <div>
                 <x-input-label for="bulk_from" value="Move everyone currently on" />
                 <x-select id="bulk_from" surface="solid" wire:model="bulk_from_id" class="mt-1 block w-full">

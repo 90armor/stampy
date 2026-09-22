@@ -19,6 +19,15 @@
         </div>
     @enderror
 
+    {{-- The assignment/deletion itself already succeeded whenever this shows
+         — only its attendance rebuild failed partway — so it's a warning
+         (amber), not a failure (red). --}}
+    @error('rebuild')
+        <div class="mt-3 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-900">
+            {{ $message }}
+        </div>
+    @enderror
+
     <ul class="mt-3 space-y-2">
         @foreach ($assignments as $assignment)
             <li class="group flex items-center justify-between gap-3 rounded-lg border border-slate-200/60 px-3 py-2 dark:border-slate-800/60 {{ $loop->last ? 'ring-1 ring-inset ring-primary-200/60 dark:ring-primary-800/60' : '' }}">

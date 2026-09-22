@@ -304,4 +304,42 @@ class ScheduleManagementTest extends TestCase
 
         $this->pageOpenedByAnAdminThenDowngradedTo('manager')->call('bulkReassign')->assertForbidden();
     }
+
+    public function test_bulk_reassign_more_than_60_days_back_is_rejected_at_the_form_layer(): void
+    {
+        $a = $this->schedule(['name' => 'A', 'is_default' => true]);
+        $b = $this->schedule(['name' => 'B']);
+        $onA = Employee::factory()->create();
+
+        Livewire::actingAs($this->admin())
+            ->test(Index::class)
+            ->call('openBulkReassign')
+            ->set('bulk_from_id', (string) $a->id)
+            ->set('bulk_to_id', (string) $b->id)
+            ->set('bulk_effective_from', today()->subDays(61)->format('Y-m-d'))
+            ->call('bulkReassign')
+            ->assertHasErrors(['bulk_effective_from']);
+
+        // Rejected before EmployeeScheduleAssigner ever ran — nothing moved.
+        $this->assertSame($a->id, $onA->fresh()->scheduleOn(today())->id);
+    }
+
+    public function test_bulk_reassign_exactly_60_days_back_is_allowed(): void
+    {
+        $a = $this->schedule(['name' => 'A', 'is_default' => true]);
+        $b = $this->schedule(['name' => 'B']);
+        $onA = Employee::factory()->create(['join_date' => today()->subYears(2)->format('Y-m-d')]);
+
+        Livewire::actingAs($this->admin())
+            ->test(Index::class)
+            ->call('openBulkReassign')
+            ->set('bulk_from_id', (string) $a->id)
+            ->set('bulk_to_id', (string) $b->id)
+            ->set('bulk_effective_from', today()->subDays(60)->format('Y-m-d'))
+            ->call('bulkReassign')
+            ->assertHasNoErrors()
+            ->assertSet('bulkResult.employees', 1);
+
+        $this->assertSame($b->id, $onA->fresh()->scheduleOn(today())->id);
+    }
 }

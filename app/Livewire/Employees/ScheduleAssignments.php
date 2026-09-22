@@ -8,7 +8,9 @@ use App\Models\WorkSchedule;
 use App\Services\Attendance\DailySummaryBuilder;
 use App\Services\Attendance\EmployeeScheduleAssigner;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
+use Throwable;
 
 /**
  * The employee profile's schedule-assignment history: list, assign a new
@@ -66,10 +68,19 @@ class ScheduleAssignments extends Component
 
         $schedule = WorkSchedule::findOrFail($this->work_schedule_id);
 
-        $assigner->assign($this->employee, $schedule, Carbon::parse($this->effective_from));
+        $result = $assigner->assign($this->employee, $schedule, Carbon::parse($this->effective_from));
 
         $this->showModal = false;
         $this->reset(['work_schedule_id', 'effective_from']);
+
+        // The assignment itself always succeeded by this point (assign()
+        // never rolls it back for a rebuild failure — see its own doc
+        // comment) — so the modal still closes. A rebuild failure is
+        // reported as a standing warning on the page, not a blocking error,
+        // since there's nothing left for the admin to retry here.
+        if ($result['rebuildError'] !== null) {
+            $this->addError('rebuild', $result['rebuildError']);
+        }
 
         // Attendance for this employee may have just changed (a backdated
         // assignment rebuilds through today) — let any sibling component
@@ -78,7 +89,7 @@ class ScheduleAssignments extends Component
         $this->dispatch('employee-saved');
     }
 
-    public function deleteAssignment(EmployeeWorkSchedule $assignment, DailySummaryBuilder $builder): void
+    public function deleteAssignment(EmployeeWorkSchedule $assignment, DailySummaryBuilder $builder, EmployeeScheduleAssigner $assigner): void
     {
         $this->authorize('update', $this->employee);
 
@@ -101,7 +112,21 @@ class ScheduleAssignments extends Component
         // via render()) is now stale too — see EmployeeScheduleAssigner::
         // assign()'s identical comment.
         $this->employee->unsetRelation('scheduleAssignments');
-        $builder->rebuildFrom($this->employee, $effectiveFrom);
+
+        // The delete itself already succeeded by this point and is never
+        // rolled back for a rebuild failure — same reasoning as
+        // EmployeeScheduleAssigner::assign(), which this mirrors: a single
+        // employee's rebuild is cheap to heal by hand, so a failure here is
+        // reported, not treated as if the deletion itself failed.
+        try {
+            $builder->rebuildFrom($this->employee, $effectiveFrom);
+        } catch (Throwable $e) {
+            $message = $assigner->rebuildRecoveryMessage($effectiveFrom, "--employee={$this->employee->employee_code}");
+
+            Log::error("Schedule assignment deletion for {$this->employee->employee_code}: rebuild failed partway ({$e->getMessage()}). {$message}");
+
+            $this->addError('rebuild', $message);
+        }
 
         $this->dispatch('employee-saved');
     }

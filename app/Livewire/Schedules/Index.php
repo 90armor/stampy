@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Schedules;
 
+use App\Exceptions\BulkReassignmentTooFarBackException;
 use App\Exceptions\InvalidWorkScheduleException;
 use App\Exceptions\WorkScheduleInUseException;
 use App\Exceptions\WorkScheduleIsDefaultException;
@@ -44,7 +45,7 @@ class Index extends Component
 
     public string $bulk_effective_from = '';
 
-    /** @var ?array{employees: int, days: int} */
+    /** @var ?array{employees: int, days: int, rebuildError: ?string} */
     public ?array $bulkResult = null;
 
     public function mount(): void
@@ -157,15 +158,27 @@ class Index extends Component
         $this->validate([
             'bulk_from_id' => ['required', 'exists:work_schedules,id', 'different:bulk_to_id'],
             'bulk_to_id' => ['required', 'exists:work_schedules,id'],
-            'bulk_effective_from' => ['required', 'date'],
+            'bulk_effective_from' => [
+                'required',
+                'date',
+                'after_or_equal:'.today()->subDays(EmployeeScheduleAssigner::MAX_BULK_LOOKBACK_DAYS)->format('Y-m-d'),
+            ],
         ], [
             'bulk_from_id.different' => 'Choose two different schedules.',
+            'bulk_effective_from.after_or_equal' => 'Bulk reassignment can\'t be backdated more than '.EmployeeScheduleAssigner::MAX_BULK_LOOKBACK_DAYS.' days — for a correction further back, reassign the affected employees individually, or run attendance:build-daily by hand.',
         ]);
 
         $from = WorkSchedule::findOrFail($this->bulk_from_id);
         $to = WorkSchedule::findOrFail($this->bulk_to_id);
 
-        $this->bulkResult = $assigner->bulkReassign($from, $to, Carbon::parse($this->bulk_effective_from));
+        // The Livewire rule above is the friendly, inline copy of this same
+        // cap — this catch is defense in depth (e.g. a stale form re-posted
+        // after the clock ticks past midnight), not the primary check.
+        try {
+            $this->bulkResult = $assigner->bulkReassign($from, $to, Carbon::parse($this->bulk_effective_from));
+        } catch (BulkReassignmentTooFarBackException $e) {
+            $this->addError('form', $e->getMessage());
+        }
     }
 
     private function resetForm(): void

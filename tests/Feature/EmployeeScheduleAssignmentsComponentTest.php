@@ -8,6 +8,8 @@ use App\Models\Employee;
 use App\Models\EmployeeWorkSchedule;
 use App\Models\User;
 use App\Models\WorkSchedule;
+use App\Services\Attendance\DailySummaryBuilder;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use ReflectionProperty;
@@ -44,7 +46,7 @@ class EmployeeScheduleAssignmentsComponentTest extends TestCase
 
     public function test_admin_can_assign_a_backdated_schedule(): void
     {
-        $this->travelTo(\Carbon\Carbon::parse('2026-02-10 12:00:00'));
+        $this->travelTo(Carbon::parse('2026-02-10 12:00:00'));
         $employee = Employee::factory()->create(['join_date' => '2020-01-01']);
         $morning = WorkSchedule::factory()->create(['name' => 'Morning shift']);
 
@@ -83,7 +85,7 @@ class EmployeeScheduleAssignmentsComponentTest extends TestCase
         // — deleting the earliest row below rebuilds from its effective_from
         // (the join date) through today, so a years-old default here would
         // make this test itself rebuild years of history for no reason.
-        $this->travelTo(\Carbon\Carbon::parse('2026-02-10 12:00:00'));
+        $this->travelTo(Carbon::parse('2026-02-10 12:00:00'));
         $employee = Employee::factory()->create(['join_date' => '2026-02-01']);
         $schedule = WorkSchedule::factory()->create();
 
@@ -115,6 +117,56 @@ class EmployeeScheduleAssignmentsComponentTest extends TestCase
             ->assertHasErrors(['delete']);
 
         $this->assertDatabaseHas('employee_work_schedules', ['id' => $only->id]);
+    }
+
+    public function test_a_rebuild_failure_on_assign_still_closes_the_modal_but_shows_a_warning(): void
+    {
+        $this->travelTo(Carbon::parse('2026-02-10 12:00:00'));
+        $employee = Employee::factory()->create(['join_date' => '2020-01-01']);
+        $morning = WorkSchedule::factory()->create(['name' => 'Morning shift']);
+
+        $this->mock(DailySummaryBuilder::class, function ($mock) {
+            $mock->shouldReceive('rebuildFrom')->andThrow(new \RuntimeException('simulated failure'));
+        });
+
+        Livewire::actingAs($this->admin())
+            ->test(ScheduleAssignments::class, ['employee' => $employee])
+            ->call('create')
+            ->set('work_schedule_id', (string) $morning->id)
+            ->set('effective_from', '2026-02-06')
+            ->call('assign')
+            ->assertSet('showModal', false)
+            ->assertHasErrors(['rebuild']);
+
+        // The assignment itself still landed — only its rebuild failed.
+        $this->assertSame($morning->id, $employee->refresh()->scheduleOn(today())->id);
+    }
+
+    public function test_a_rebuild_failure_on_delete_still_removes_the_row_but_shows_a_warning(): void
+    {
+        $this->travelTo(Carbon::parse('2026-02-10 12:00:00'));
+        $employee = Employee::factory()->create(['join_date' => '2026-02-01']);
+        $schedule = WorkSchedule::factory()->create();
+
+        Livewire::actingAs($this->admin())
+            ->test(ScheduleAssignments::class, ['employee' => $employee])
+            ->call('create')
+            ->set('work_schedule_id', (string) $schedule->id)
+            ->set('effective_from', today()->format('Y-m-d'))
+            ->call('assign');
+
+        $original = EmployeeWorkSchedule::where('employee_id', $employee->id)->orderBy('effective_from')->first();
+
+        $this->mock(DailySummaryBuilder::class, function ($mock) {
+            $mock->shouldReceive('rebuildFrom')->andThrow(new \RuntimeException('simulated failure'));
+        });
+
+        Livewire::actingAs($this->admin())
+            ->test(ScheduleAssignments::class, ['employee' => $employee])
+            ->call('deleteAssignment', $original->id)
+            ->assertHasErrors(['rebuild']);
+
+        $this->assertDatabaseMissing('employee_work_schedules', ['id' => $original->id]);
     }
 
     public function test_manager_viewing_their_reports_profile_cannot_assign_or_delete(): void
