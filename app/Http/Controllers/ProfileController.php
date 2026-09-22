@@ -25,7 +25,20 @@ class ProfileController extends Controller
      */
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
-        $request->user()->fill($request->validated())->save();
+        $user = $request->user();
+        $data = $request->validated();
+
+        // Name is HR data once a user is linked to an employee record —
+        // admins own it (see Employees\FormModal::save(), which keeps it in
+        // sync), and the form renders it read-only. That's presentation
+        // only, so a submitted 'name' — however it got there — is dropped
+        // here rather than trusted, whether it matches the current value or
+        // not.
+        if ($user->employee !== null) {
+            unset($data['name']);
+        }
+
+        $user->fill($data)->save();
 
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }
