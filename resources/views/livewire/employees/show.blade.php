@@ -66,5 +66,9 @@
         </x-card>
     @endcan
 
+    <x-card class="mt-6">
+        <livewire:employees.schedule-assignments :employee="$employee" :key="'schedule-assignments-'.$employee->id" />
+    </x-card>
+
     <livewire:employees.form-modal />
 </div>

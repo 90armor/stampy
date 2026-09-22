@@ -2,7 +2,10 @@
     $dayLabels = [1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => 'Sat', 7 => 'Sun'];
 @endphp
 <div class="space-y-6">
-    <div class="flex flex-wrap items-center justify-end gap-4">
+    <div class="flex flex-wrap items-center justify-end gap-3">
+        <x-button type="button" variant="secondary" wire:click="openBulkReassign">
+            Bulk Reassign
+        </x-button>
         <x-button variant="primary" wire:click="create">
             <x-icon name="plus" class="w-4 h-4" />
             New Schedule
@@ -98,6 +101,7 @@
     </x-card>
 
     @include('livewire.schedules.partials.modal')
+    @include('livewire.schedules.partials.bulk-reassign-modal')
 
     <x-confirm-dialog event="confirm-dialog-schedules" />
 </div>

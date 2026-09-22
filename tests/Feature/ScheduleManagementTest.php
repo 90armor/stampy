@@ -264,4 +264,44 @@ class ScheduleManagementTest extends TestCase
 
         $this->actingAs($employee)->get('/organization')->assertForbidden();
     }
+
+    public function test_bulk_reassign_moves_everyone_on_one_schedule_to_another(): void
+    {
+        $a = $this->schedule(['name' => 'A', 'is_default' => true]);
+        $b = $this->schedule(['name' => 'B']);
+        $onA = Employee::factory()->create();
+
+        Livewire::actingAs($this->admin())
+            ->test(Index::class)
+            ->call('openBulkReassign')
+            ->set('bulk_from_id', (string) $a->id)
+            ->set('bulk_to_id', (string) $b->id)
+            ->set('bulk_effective_from', today()->format('Y-m-d'))
+            ->call('bulkReassign')
+            ->assertHasNoErrors()
+            ->assertSet('bulkResult.employees', 1);
+
+        $this->assertSame($b->id, $onA->fresh()->scheduleOn(today())->id);
+    }
+
+    public function test_bulk_reassign_rejects_the_same_schedule_on_both_sides(): void
+    {
+        $a = $this->schedule(['name' => 'A', 'is_default' => true]);
+
+        Livewire::actingAs($this->admin())
+            ->test(Index::class)
+            ->call('openBulkReassign')
+            ->set('bulk_from_id', (string) $a->id)
+            ->set('bulk_to_id', (string) $a->id)
+            ->set('bulk_effective_from', today()->format('Y-m-d'))
+            ->call('bulkReassign')
+            ->assertHasErrors(['bulk_from_id']);
+    }
+
+    public function test_manager_cannot_bulk_reassign(): void
+    {
+        $this->schedule(['is_default' => true]);
+
+        $this->pageOpenedByAnAdminThenDowngradedTo('manager')->call('bulkReassign')->assertForbidden();
+    }
 }

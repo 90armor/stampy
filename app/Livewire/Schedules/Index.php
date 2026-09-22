@@ -8,6 +8,8 @@ use App\Exceptions\WorkScheduleIsDefaultException;
 use App\Exceptions\WorkScheduleLockedException;
 use App\Models\Employee;
 use App\Models\WorkSchedule;
+use App\Services\Attendance\EmployeeScheduleAssigner;
+use Illuminate\Support\Carbon;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -33,6 +35,17 @@ class Index extends Component
     public array $workdays = [1, 2, 3, 4, 5];
 
     public bool $is_default = false;
+
+    public bool $showBulkModal = false;
+
+    public ?int $bulk_from_id = null;
+
+    public ?int $bulk_to_id = null;
+
+    public string $bulk_effective_from = '';
+
+    /** @var ?array{employees: int, days: int} */
+    public ?array $bulkResult = null;
 
     public function mount(): void
     {
@@ -121,6 +134,40 @@ class Index extends Component
         $schedule->update(['is_default' => true]);
     }
 
+    public function openBulkReassign(): void
+    {
+        $this->authorize('create', WorkSchedule::class);
+
+        $this->reset(['bulk_from_id', 'bulk_to_id', 'bulkResult']);
+        $this->bulk_effective_from = today()->format('Y-m-d');
+        $this->resetErrorBag();
+        $this->showBulkModal = true;
+    }
+
+    /**
+     * "Move everyone currently on schedule A to schedule B, effective date
+     * D" — without this, changing company hours means editing every
+     * employee by hand. See EmployeeScheduleAssigner::bulkReassign() for
+     * exactly who counts as "currently on" A and which employees are moved.
+     */
+    public function bulkReassign(EmployeeScheduleAssigner $assigner): void
+    {
+        $this->authorize('create', WorkSchedule::class);
+
+        $this->validate([
+            'bulk_from_id' => ['required', 'exists:work_schedules,id', 'different:bulk_to_id'],
+            'bulk_to_id' => ['required', 'exists:work_schedules,id'],
+            'bulk_effective_from' => ['required', 'date'],
+        ], [
+            'bulk_from_id.different' => 'Choose two different schedules.',
+        ]);
+
+        $from = WorkSchedule::findOrFail($this->bulk_from_id);
+        $to = WorkSchedule::findOrFail($this->bulk_to_id);
+
+        $this->bulkResult = $assigner->bulkReassign($from, $to, Carbon::parse($this->bulk_effective_from));
+    }
+
     private function resetForm(): void
     {
         $this->reset(['editing', 'name', 'grace_minutes', 'break_minutes', 'is_default']);
@@ -160,6 +207,9 @@ class Index extends Component
     {
         return view('livewire.schedules.index', [
             'schedules' => WorkSchedule::query()->orderBy('name')->paginate(15, ['*'], 'schedulesPage'),
+            // Unpaginated, for the bulk-reassign modal's two dropdowns — that
+            // needs every schedule to choose from, not just the current page.
+            'allSchedules' => WorkSchedule::query()->orderBy('name')->get(),
             'assignedCounts' => $this->currentAssignmentCounts(),
             'editingIsLocked' => $this->editing?->isReferenced() ?? false,
         ]);
