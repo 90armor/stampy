@@ -68,12 +68,11 @@ Route::get('/dashboard', function () {
     }
 
     return view('dashboard', ['stats' => $stats, 'attendance' => $attendance]);
-})->middleware(['auth', 'verified'])->name('dashboard');
+})->middleware('auth')->name('dashboard');
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     // No role restriction: resolves the viewer's own linked employee record
     // (EmployeePolicy::view already allows anyone to view their own record
@@ -82,14 +81,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/my-attendance', AttendanceShow::class)->name('attendance.mine');
 });
 
-Route::middleware(['auth', 'verified', 'role:admin|manager'])->group(function () {
+Route::middleware(['auth', 'role:admin|manager'])->group(function () {
     Route::get('/employees', EmployeesIndex::class)->name('employees.index');
     Route::get('/employees/{employee}', ShowEmployee::class)->name('employees.show');
     Route::get('/attendance', AttendanceIndex::class)->name('attendance.index');
     Route::get('/attendance/{employee}', AttendanceShow::class)->name('attendance.show');
 });
 
-Route::middleware(['auth', 'verified', 'role:admin'])->group(function () {
+Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::get('/organization', function () {
         return view('organization');
     })->name('organization.index');
