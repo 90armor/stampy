@@ -585,25 +585,16 @@
                                 </p>
                             @endif
                         </div>
-                        {{-- Status pill shows the real attendance status ("Present"); a
-                        timing exception is a separate amber chip alongside it, since
-                        status and timing are independent facts (see AttendanceStatus's
-                        doc comment). This is the only place the chips appear: the
-                        month table and the attendance list show status only, because
-                        their Late/Early leave columns and marked In/Out times already
-                        carry the timing. The chips here summarise it at a glance; the
-                        detail list below repeats the same minutes. --}}
+                        {{-- Status pill shows the real attendance status ("Present"), coloured by
+                        displayVariant() — a timing exception reads as an amber "Present", not a
+                        separate chip. The grid's own Late / Early leave fields below (and their
+                        marked In/Out times) already carry the timing; a chip here would just
+                        repeat them, the same reasoning the table/list Status columns document. --}}
                         <div class="flex flex-wrap items-center justify-end gap-1.5">
                             <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset {{ $modalStyle['bg'] }} {{ $modalStyle['text'] }} {{ $modalStyle['ring'] }}">
                                 <x-icon :name="$modalStyle['icon']" class="h-3.5 w-3.5" />
                                 {{ $modalRecord ? $modalRecord->status->label() : 'Not calculated' }}
                             </span>
-                            @if ($modalMarkedLate)
-                                <x-badge color="amber">Late {{ $modalRecord->late_minutes }}m</x-badge>
-                            @endif
-                            @if ($modalMarkedEarly)
-                                <x-badge color="amber">Early {{ $modalRecord->early_leave_minutes }}m</x-badge>
-                            @endif
                         </div>
                     </div>
 
