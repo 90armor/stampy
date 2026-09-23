@@ -360,4 +360,53 @@ class DashboardTest extends TestCase
         $response->assertOk();
         $response->assertViewHas('stats', fn ($stats) => $stats === null);
     }
+
+    /**
+     * Quick Actions is gated per-item by the exact ability its destination
+     * enforces (EmployeePolicy::create/viewAny, DepartmentPolicy::viewAny),
+     * not a role list — this pins what each role actually sees, which is
+     * the test that would have caught the bug this replaced: the card used
+     * to render for anyone with $stats set (admin or manager), hardcoding
+     * all four actions regardless of whether the viewer could open them.
+     */
+    public function test_admin_sees_every_quick_action(): void
+    {
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('Quick Actions')
+            ->assertSee('Add employee')
+            ->assertSee('Add department')
+            ->assertSee('View employees')
+            ->assertSee('Organization settings');
+    }
+
+    public function test_manager_sees_no_quick_actions_card_at_all(): void
+    {
+        // create() on both Employee and Department is admin-only, so
+        // filtering by ability leaves a manager with exactly one action —
+        // "View employees" — which duplicates the sidebar's own "Employees"
+        // link one-for-one. The whole card is skipped rather than shown
+        // with that single redundant link.
+        $managerEmployee = Employee::factory()->create();
+        $manager = $this->managerUser($managerEmployee);
+
+        $this->actingAs($manager)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertDontSee('Quick Actions')
+            ->assertDontSee('Add employee')
+            ->assertDontSee('Add department')
+            ->assertDontSee('Organization settings');
+    }
+
+    public function test_employee_role_sees_no_quick_actions_card_either(): void
+    {
+        $employee = User::factory()->create()->assignRole('employee');
+
+        $this->actingAs($employee)
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertDontSee('Quick Actions');
+    }
 }
