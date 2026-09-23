@@ -15,7 +15,13 @@
 
         @if ($bulkResult)
             <div class="mx-6 my-4 rounded-lg bg-primary-50 px-4 py-3 text-sm text-primary-700 ring-1 ring-inset ring-primary-200 dark:bg-primary-900/20 dark:text-primary-300 dark:ring-primary-900">
-                Reassigned {{ $bulkResult['employees'] }} {{ Str::plural('employee', $bulkResult['employees']) }}, rebuilding {{ $bulkResult['days'] }} {{ Str::plural('day', $bulkResult['days']) }} of attendance.
+                {{-- $bulkResult['days'] sums each moved employee's own
+                     rebuilt range (EmployeeScheduleAssigner::bulkReassign())
+                     — an employee-day count, not a count of calendar dates.
+                     "rebuilding 34 days of attendance" read as 34 dates;
+                     "employee-days" (a standard unit, like "person-days") is
+                     what actually disambiguates it. --}}
+                Reassigned {{ $bulkResult['employees'] }} {{ Str::plural('employee', $bulkResult['employees']) }} — {{ $bulkResult['days'] }} employee-{{ Str::plural('day', $bulkResult['days']) }} of attendance recalculated.
             </div>
 
             {{-- The reassignment itself already succeeded whenever this shows

@@ -166,6 +166,10 @@ class Index extends Component
         ], [
             'bulk_from_id.different' => 'Choose two different schedules.',
             'bulk_effective_from.after_or_equal' => 'Bulk reassignment can\'t be backdated more than '.EmployeeScheduleAssigner::MAX_BULK_LOOKBACK_DAYS.' days — for a correction further back, reassign the affected employees individually, or run attendance:build-daily by hand.',
+        ], [
+            'bulk_from_id' => 'schedule to move from',
+            'bulk_to_id' => 'schedule to move to',
+            'bulk_effective_from' => 'effective date',
         ]);
 
         $from = WorkSchedule::findOrFail($this->bulk_from_id);

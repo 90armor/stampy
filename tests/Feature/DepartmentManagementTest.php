@@ -69,6 +69,22 @@ class DepartmentManagementTest extends TestCase
             ->assertHasErrors(['name']);
     }
 
+    public function test_reopening_the_create_modal_clears_a_previous_validation_error(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+
+        $component = Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->call('create')
+            ->set('name', '')
+            ->call('save')
+            ->assertHasErrors(['name']);
+
+        // Reopening "Add Department" (without saving) must not still show
+        // the previous submit's error.
+        $component->call('create')->assertHasNoErrors();
+    }
+
     public function test_editing_a_department_can_keep_its_own_name(): void
     {
         $admin = User::factory()->create()->assignRole('admin');

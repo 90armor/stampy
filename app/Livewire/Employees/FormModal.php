@@ -82,6 +82,17 @@ class FormModal extends Component
         ];
     }
 
+    protected function validationAttributes(): array
+    {
+        return [
+            'department_id' => 'department',
+            'position_id' => 'position',
+            'manager_id' => 'manager',
+            'device_user_id' => 'device user ID',
+            'create_user' => 'create a login account',
+        ];
+    }
+
     /**
      * Only meaningful in edit mode — a new employee has no id yet, so it
      * can't equal the chosen manager and can't already have subordinates.

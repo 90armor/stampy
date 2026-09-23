@@ -79,6 +79,26 @@ class EmployeeScheduleAssignmentsComponentTest extends TestCase
             ->assertHasErrors(['effective_from']);
     }
 
+    public function test_assign_validation_messages_are_human_readable_not_raw_field_names(): void
+    {
+        // Laravel's default attribute-name fallback would otherwise read
+        // "The work schedule id field is required." — the raw property
+        // name with its "_id" left dangling.
+        $employee = Employee::factory()->create();
+
+        $component = Livewire::actingAs($this->admin())
+            ->test(ScheduleAssignments::class, ['employee' => $employee])
+            ->call('create')
+            ->set('effective_from', '')
+            ->call('assign');
+
+        $component->assertHasErrors(['work_schedule_id', 'effective_from']);
+
+        $message = collect($component->errors()->all())->first(fn ($m) => str_contains($m, 'schedule'));
+        $this->assertNotNull($message);
+        $this->assertStringNotContainsString('work schedule id', $message);
+    }
+
     public function test_admin_can_delete_an_assignment_row_when_more_than_one_exists(): void
     {
         // A recent join date, not EmployeeFactory's fixed 2020-01-01 default

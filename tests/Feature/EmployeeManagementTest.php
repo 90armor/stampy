@@ -101,6 +101,30 @@ class EmployeeManagementTest extends TestCase
             ->assertHasErrors(['employee_code']);
     }
 
+    public function test_employee_form_validation_messages_are_human_readable_not_raw_field_names(): void
+    {
+        // Laravel's default attribute-name fallback would otherwise read
+        // "The department id field is required." etc. — the raw column
+        // name with its "_id" left dangling.
+        $admin = User::factory()->create()->assignRole('admin');
+
+        $component = Livewire::actingAs($admin)
+            ->test(FormModal::class)
+            ->call('create')
+            ->call('save');
+
+        $component->assertHasErrors(['department_id', 'position_id']);
+
+        $messages = $component->errors()->all();
+        $this->assertTrue(collect($messages)->contains(fn ($m) => str_contains($m, 'The department field is required')));
+        $this->assertTrue(collect($messages)->contains(fn ($m) => str_contains($m, 'The position field is required')));
+
+        foreach ($messages as $message) {
+            $this->assertStringNotContainsString('department id', $message);
+            $this->assertStringNotContainsString('position id', $message);
+        }
+    }
+
     public function test_admin_can_deactivate_an_employee(): void
     {
         $admin = User::factory()->create()->assignRole('admin');

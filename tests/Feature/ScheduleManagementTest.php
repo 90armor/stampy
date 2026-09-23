@@ -284,6 +284,26 @@ class ScheduleManagementTest extends TestCase
         $this->assertSame($b->id, $onA->fresh()->scheduleOn(today())->id);
     }
 
+    public function test_bulk_reassign_success_message_names_employee_days_not_bare_days(): void
+    {
+        // "Reassigned 34 employees, rebuilding 34 days of attendance" read
+        // as 34 calendar dates — it's actually a sum across every moved
+        // employee's own range. "employee-days" is what disambiguates it.
+        $a = $this->schedule(['name' => 'A', 'is_default' => true]);
+        $b = $this->schedule(['name' => 'B']);
+        Employee::factory()->count(2)->create();
+
+        Livewire::actingAs($this->admin())
+            ->test(Index::class)
+            ->call('openBulkReassign')
+            ->set('bulk_from_id', (string) $a->id)
+            ->set('bulk_to_id', (string) $b->id)
+            ->set('bulk_effective_from', today()->format('Y-m-d'))
+            ->call('bulkReassign')
+            ->assertHasNoErrors()
+            ->assertSee('employee-days of attendance recalculated');
+    }
+
     public function test_bulk_reassign_rejects_the_same_schedule_on_both_sides(): void
     {
         $a = $this->schedule(['name' => 'A', 'is_default' => true]);
@@ -296,6 +316,32 @@ class ScheduleManagementTest extends TestCase
             ->set('bulk_effective_from', today()->format('Y-m-d'))
             ->call('bulkReassign')
             ->assertHasErrors(['bulk_from_id']);
+    }
+
+    public function test_bulk_reassign_validation_messages_are_human_readable_not_raw_field_names(): void
+    {
+        // Laravel's default attribute-name fallback would otherwise read
+        // "The bulk from id field is required." — the raw property name
+        // with its "_id" left dangling. Custom attribute names fix this for
+        // every field on the form, not just these two.
+        $component = Livewire::actingAs($this->admin())
+            ->test(Index::class)
+            ->call('openBulkReassign')
+            ->set('bulk_effective_from', '')
+            ->call('bulkReassign');
+
+        $component->assertHasErrors(['bulk_from_id', 'bulk_to_id', 'bulk_effective_from']);
+
+        $messages = $component->errors()->all();
+        $this->assertTrue(collect($messages)->contains(fn ($m) => str_contains($m, 'schedule to move from')));
+        $this->assertTrue(collect($messages)->contains(fn ($m) => str_contains($m, 'schedule to move to')));
+        $this->assertTrue(collect($messages)->contains(fn ($m) => str_contains($m, 'effective date')));
+
+        foreach ($messages as $message) {
+            $this->assertStringNotContainsString('bulk from id', $message);
+            $this->assertStringNotContainsString('bulk to id', $message);
+            $this->assertStringNotContainsString('bulk effective from', $message);
+        }
     }
 
     public function test_manager_cannot_bulk_reassign(): void

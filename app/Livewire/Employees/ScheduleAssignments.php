@@ -64,6 +64,9 @@ class ScheduleAssignments extends Component
             ],
         ], [
             'effective_from.after_or_equal' => 'The effective date can\'t be before this employee\'s join date ('.$this->employee->join_date->format('M j, Y').').',
+        ], [
+            'work_schedule_id' => 'schedule',
+            'effective_from' => 'effective date',
         ]);
 
         $schedule = WorkSchedule::findOrFail($this->work_schedule_id);
