@@ -487,6 +487,13 @@ class Show extends Component
             'holidaysByDate' => $this->holidaysByDate(),
             'lastBuiltInMonth' => $lastBuiltInMonth,
             'monthFullyBuilt' => $lastBuiltInMonth === $days->last()['date']->format('Y-m-d'),
+            // Same reasoning as $layoutData just above: nobody reaches
+            // /my-attendance via the list (it's a sidebar destination, and a
+            // plain employee can't open /attendance at all), so a "Back to
+            // attendance" link there is a dead end for everyone, not just
+            // employees — it used to render unconditionally regardless of
+            // route.
+            'viaSelfView' => $viaSelfView,
         ])->layout('layouts.app', $layoutData);
     }
 }

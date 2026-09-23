@@ -99,12 +99,14 @@
             />
         </x-card>
     @else
-        <div>
-            <a href="{{ route('attendance.index') }}" wire:navigate class="inline-flex items-center gap-x-1 text-sm font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100">
-                <x-icon name="chevron-left" class="h-4 w-4" />
-                Back to attendance
-            </a>
-        </div>
+        @unless ($viaSelfView)
+            <div>
+                <a href="{{ route('attendance.index') }}" wire:navigate class="inline-flex items-center gap-x-1 text-sm font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100">
+                    <x-icon name="chevron-left" class="h-4 w-4" />
+                    Back to attendance
+                </a>
+            </div>
+        @endunless
 
         <div class="flex flex-wrap items-center justify-between gap-4">
             <div class="flex items-center gap-x-4">

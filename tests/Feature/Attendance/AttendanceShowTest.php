@@ -162,6 +162,41 @@ class AttendanceShowTest extends TestCase
             ->assertSee('Self Viewer');
     }
 
+    public function test_my_attendance_never_shows_a_back_to_attendance_link(): void
+    {
+        // Nobody reaches /my-attendance via the /attendance list (it's a
+        // sidebar destination), and a plain employee can't open /attendance
+        // at all — so the link is a dead end for everyone here, not just
+        // employees. Checked for both an employee and an admin, since an
+        // admin viewing their own attendance via /my-attendance still hits
+        // this same route, not /attendance/{id}.
+        $employee = User::factory()->create()->assignRole('employee');
+        Employee::factory()->create(['user_id' => $employee->id]);
+
+        $this->actingAs($employee)
+            ->get(route('attendance.mine'))
+            ->assertOk()
+            ->assertDontSee('Back to attendance');
+
+        $admin = $this->admin();
+        Employee::factory()->create(['user_id' => $admin->id]);
+
+        $this->actingAs($admin)
+            ->get(route('attendance.mine'))
+            ->assertOk()
+            ->assertDontSee('Back to attendance');
+    }
+
+    public function test_attendance_show_via_the_list_still_shows_a_back_to_attendance_link(): void
+    {
+        $employee = Employee::factory()->create();
+
+        $this->actingAs($this->admin())
+            ->get(route('attendance.show', $employee))
+            ->assertOk()
+            ->assertSee('Back to attendance');
+    }
+
     public function test_my_attendance_shows_a_clear_message_when_theres_no_linked_employee(): void
     {
         $user = User::factory()->create()->assignRole('employee');

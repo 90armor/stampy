@@ -57,7 +57,7 @@
                                 method: 'deleteAssignment',
                                 args: [{{ $assignment->id }}],
                             })"
-                            class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 dark:text-slate-500 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                            class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 dark:text-slate-500 dark:hover:bg-red-900/30 dark:hover:text-red-400"
                             title="Delete assignment"
                         >
                             <x-icon name="trash" class="h-3.5 w-3.5" />

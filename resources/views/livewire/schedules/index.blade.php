@@ -56,7 +56,7 @@
                             </div>
                         </div>
 
-                        <div class="flex items-center gap-1 shrink-0 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+                        <div class="flex items-center gap-1 shrink-0">
                             @unless ($schedule->is_default)
                                 <button
                                     type="button"
