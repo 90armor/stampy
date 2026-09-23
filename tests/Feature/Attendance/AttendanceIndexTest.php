@@ -422,6 +422,10 @@ class AttendanceIndexTest extends TestCase
         $this->assertStringContainsString('of which', $html);
         $this->assertStringContainsString('2 late', $html);
         $this->assertStringContainsString('1 left early', $html);
+        // The exact joined text, not just its pieces — interleaved
+        // @if/@endif directives around static text used to leave a stray
+        // space where the raw HTML between them collapsed on render.
+        $this->assertStringContainsString('of which 2 late · 1 left early', $html);
     }
 
     public function test_no_breakdown_subtext_when_nothing_is_late_or_early(): void

@@ -351,6 +351,73 @@ class ScheduleManagementTest extends TestCase
         $this->pageOpenedByAnAdminThenDowngradedTo('manager')->call('bulkReassign')->assertForbidden();
     }
 
+    public function test_bulk_reassign_shows_no_preview_until_a_source_schedule_is_picked(): void
+    {
+        $this->schedule(['name' => 'A', 'is_default' => true]);
+
+        Livewire::actingAs($this->admin())
+            ->test(Index::class)
+            ->call('openBulkReassign')
+            ->assertDontSee('will move')
+            ->assertDontSee('nothing to move');
+    }
+
+    public function test_bulk_reassign_previews_the_count_and_names_of_who_would_move(): void
+    {
+        $a = $this->schedule(['name' => 'A', 'is_default' => true]);
+        $this->schedule(['name' => 'B']);
+        Employee::factory()->create(['full_name' => 'Preview One']);
+        Employee::factory()->create(['full_name' => 'Preview Two']);
+        // Inactive — excluded from the preview, same as bulkReassign() itself excludes them.
+        Employee::factory()->create(['full_name' => 'Inactive Person', 'status' => 'inactive']);
+
+        Livewire::actingAs($this->admin())
+            ->test(Index::class)
+            ->call('openBulkReassign')
+            ->set('bulk_from_id', (string) $a->id)
+            ->assertSee('2 employees will move')
+            ->assertSee('Preview One')
+            ->assertSee('Preview Two')
+            ->assertDontSee('Inactive Person');
+    }
+
+    public function test_bulk_reassign_preview_says_so_when_nobody_is_on_the_source_schedule(): void
+    {
+        $this->schedule(['name' => 'A', 'is_default' => true]);
+        $empty = $this->schedule(['name' => 'Unused']);
+
+        Livewire::actingAs($this->admin())
+            ->test(Index::class)
+            ->call('openBulkReassign')
+            ->set('bulk_from_id', (string) $empty->id)
+            ->assertSee('nothing to move');
+    }
+
+    public function test_bulk_reassign_preview_matches_who_actually_gets_moved(): void
+    {
+        // The preview and the real move share one query
+        // (EmployeeScheduleAssigner::employeesCurrentlyOn()) — this pins
+        // that they agree, not just that each works in isolation.
+        $a = $this->schedule(['name' => 'A', 'is_default' => true]);
+        $b = $this->schedule(['name' => 'B']);
+        $onA = Employee::factory()->create(['full_name' => 'Moves Around']);
+
+        $component = Livewire::actingAs($this->admin())
+            ->test(Index::class)
+            ->call('openBulkReassign')
+            ->set('bulk_from_id', (string) $a->id)
+            ->assertSee('1 employee will move')
+            ->assertSee('Moves Around');
+
+        $component
+            ->set('bulk_to_id', (string) $b->id)
+            ->set('bulk_effective_from', today()->format('Y-m-d'))
+            ->call('bulkReassign')
+            ->assertSet('bulkResult.employees', 1);
+
+        $this->assertSame($b->id, $onA->fresh()->scheduleOn(today())->id);
+    }
+
     public function test_bulk_reassign_more_than_60_days_back_is_rejected_at_the_form_layer(): void
     {
         $a = $this->schedule(['name' => 'A', 'is_default' => true]);

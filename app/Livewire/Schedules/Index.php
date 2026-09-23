@@ -220,8 +220,10 @@ class Index extends Component
         return $counts;
     }
 
-    public function render()
+    public function render(EmployeeScheduleAssigner $assigner)
     {
+        $bulkFromSchedule = $this->bulk_from_id ? WorkSchedule::find($this->bulk_from_id) : null;
+
         return view('livewire.schedules.index', [
             'schedules' => WorkSchedule::query()->orderBy('name')->paginate(15, ['*'], 'schedulesPage'),
             // Unpaginated, for the bulk-reassign modal's two dropdowns — that
@@ -229,6 +231,11 @@ class Index extends Component
             'allSchedules' => WorkSchedule::query()->orderBy('name')->get(),
             'assignedCounts' => $this->currentAssignmentCounts(),
             'editingIsLocked' => $this->editing?->isReferenced() ?? false,
+            // Who the bulk-reassign modal would actually move, shown once a
+            // source schedule is picked and before the admin confirms — the
+            // same selection bulkReassign() itself uses (employeesCurrentlyOn()),
+            // so the preview can never disagree with what actually happens.
+            'bulkFromEmployees' => $bulkFromSchedule ? $assigner->employeesCurrentlyOn($bulkFromSchedule) : null,
         ]);
     }
 }

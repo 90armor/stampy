@@ -7,8 +7,8 @@ use App\Livewire\Attendance\Show;
 use App\Models\DailyAttendance;
 use App\Models\Employee;
 use App\Models\User;
-use Illuminate\Auth\Access\AuthorizationException;
 use App\Models\WorkSchedule;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use ReflectionProperty;
@@ -272,5 +272,36 @@ class AttendanceShowTest extends TestCase
         $this->assertSame(1, $summary['absent']);
         $this->assertSame(0, $summary['incomplete']);
         $this->assertSame(4, $summary['workdays']);
+    }
+
+    public function test_the_of_which_breakdown_has_no_stray_space_before_the_closing_paren(): void
+    {
+        // Interleaved @if/@endif directives around the literal "(...)" text
+        // used to leave the raw HTML between them (indentation/newlines) in
+        // the rendered output, which collapses to a single stray space —
+        // "...left early )" instead of "...left early)".
+        $month = today()->startOfMonth();
+        $employee = Employee::factory()->create();
+
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => $month->format('Y-m-d'),
+            'status' => AttendanceStatus::Present,
+            'late_minutes' => 12,
+        ]);
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => $month->copy()->addDay()->format('Y-m-d'),
+            'status' => AttendanceStatus::Present,
+            'early_leave_minutes' => 9,
+        ]);
+
+        $html = Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', $month->format('Y-m'))
+            ->html();
+
+        $this->assertStringContainsString('(of which 1 late · 1 left early)', $html);
+        $this->assertStringNotContainsString('left early )', $html);
     }
 }

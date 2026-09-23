@@ -126,6 +126,28 @@ class EmployeeScheduleAssignmentsComponentTest extends TestCase
         $this->assertDatabaseMissing('employee_work_schedules', ['id' => $original->id]);
     }
 
+    public function test_admin_sees_a_bulk_reassign_hint_but_a_manager_does_not(): void
+    {
+        // The hint links to the Schedules tab, which is
+        // WorkSchedulePolicy::create (admin-only) — same ability
+        // Schedules\Index::openBulkReassign() itself checks, so nobody who
+        // can't actually reach it is shown a link to it.
+        $employee = Employee::factory()->create();
+
+        Livewire::actingAs($this->admin())
+            ->test(ScheduleAssignments::class, ['employee' => $employee])
+            ->assertSee('Bulk reassign on the Schedules tab')
+            ->assertSeeHtml('organization?tab=schedules');
+
+        $managerEmployee = Employee::factory()->create();
+        $manager = $this->managerUser($managerEmployee);
+        $report = Employee::factory()->create(['manager_id' => $managerEmployee->id]);
+
+        Livewire::actingAs($manager)
+            ->test(ScheduleAssignments::class, ['employee' => $report])
+            ->assertDontSee('Bulk reassign on the Schedules tab');
+    }
+
     public function test_admin_cannot_delete_the_only_assignment_row(): void
     {
         $employee = Employee::factory()->create();

@@ -13,6 +13,21 @@
         @endcan
     </div>
 
+    {{-- Only for whoever can actually reach it (WorkSchedulePolicy::create,
+    the same ability Schedules\Index::openBulkReassign() itself checks) —
+    a manager sees the read-only history above with no hint of a page they'd
+    403 on, same reasoning as CLAUDE.md's "gate by the ability the
+    destination checks" note. --}}
+    @can('create', \App\Models\WorkSchedule::class)
+        <a
+            href="{{ route('organization.index') }}?tab=schedules"
+            wire:navigate
+            class="mt-1 inline-block text-xs text-slate-400 underline decoration-slate-300 decoration-1 underline-offset-2 hover:text-primary-600 hover:decoration-primary-400 dark:text-slate-500 dark:decoration-slate-700 dark:hover:text-primary-400"
+        >
+            Moving more than one employee? Bulk reassign on the Schedules tab
+        </a>
+    @endcan
+
     @error('delete')
         <div class="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-900">
             {{ $message }}

@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\EmployeeWorkSchedule;
 use App\Models\WorkSchedule;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -90,6 +91,25 @@ class EmployeeScheduleAssigner
     }
 
     /**
+     * Every active employee currently on $schedule (per scheduleOn(today())
+     * — the same resolution the builder itself uses, not a separate SQL
+     * approximation). The one definition of "who bulkReassign() would move"
+     * — Schedules\Index's bulk-reassign modal calls this too, to preview
+     * who's affected before the admin confirms, so the preview and the
+     * actual move can never quietly disagree about who counts.
+     *
+     * @return Collection<int, Employee>
+     */
+    public function employeesCurrentlyOn(WorkSchedule $schedule): Collection
+    {
+        return Employee::query()
+            ->where('status', 'active')
+            ->get()
+            ->filter(fn (Employee $employee) => $employee->scheduleOn(today())->id === $schedule->id)
+            ->values();
+    }
+
+    /**
      * Moves every active employee currently on $from (per scheduleOn(today()),
      * the same resolution the builder itself uses) to $to, effective
      * $effectiveFrom — inactive employees are left alone, matching
@@ -106,10 +126,7 @@ class EmployeeScheduleAssigner
             throw new BulkReassignmentTooFarBackException($effectiveFrom, self::MAX_BULK_LOOKBACK_DAYS);
         }
 
-        $employees = Employee::query()
-            ->where('status', 'active')
-            ->get()
-            ->filter(fn (Employee $employee) => $employee->scheduleOn(today())->id === $from->id);
+        $employees = $this->employeesCurrentlyOn($from);
 
         // Every assignment, written in one transaction, BEFORE any
         // rebuilding starts: the admin's intent either lands completely or

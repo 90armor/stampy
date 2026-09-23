@@ -43,13 +43,41 @@
 
             <div>
                 <x-input-label for="bulk_from" value="Move everyone currently on" />
-                <x-select id="bulk_from" surface="solid" wire:model="bulk_from_id" class="mt-1 block w-full">
+                {{-- .live: without it wire:model only syncs on submit
+                (Livewire 3's default), so the preview below couldn't react
+                to picking a schedule until the admin had already confirmed
+                — too late to be a preview. --}}
+                <x-select id="bulk_from" surface="solid" wire:model.live="bulk_from_id" class="mt-1 block w-full">
                     <option value="">Select a schedule&hellip;</option>
                     @foreach ($allSchedules as $schedule)
                         <option value="{{ $schedule->id }}">{{ $schedule->name }}</option>
                     @endforeach
                 </x-select>
                 <x-input-error :messages="$errors->get('bulk_from_id')" class="mt-1" />
+
+                {{-- Who this would actually move, before the admin confirms
+                — $bulkFromEmployees is resolved by the exact same query
+                bulkReassign() itself uses (EmployeeScheduleAssigner::
+                employeesCurrentlyOn()), so this can never show a different
+                set of people than the ones who actually get moved. --}}
+                @if ($bulkFromEmployees !== null)
+                    <div class="mt-2 rounded-lg border border-slate-200/60 px-3 py-2.5 text-xs dark:border-slate-700/60">
+                        @if ($bulkFromEmployees->isEmpty())
+                            <p class="text-slate-500 dark:text-slate-400">No active employees are currently on this schedule — nothing to move.</p>
+                        @else
+                            <p class="font-medium text-slate-700 dark:text-slate-300">
+                                {{ $bulkFromEmployees->count() }} {{ Str::plural('employee', $bulkFromEmployees->count()) }} will move
+                            </p>
+                            {{-- One expression, not an @if tacked onto the end —
+                            same stray-space lesson as the "of which" summary:
+                            raw HTML between directives collapses to a stray
+                            space on render ("...Win , and 27 more"). --}}
+                            <p class="mt-1 text-slate-500 dark:text-slate-400">{{ $bulkFromEmployees->count() > 8
+                                ? $bulkFromEmployees->take(8)->pluck('full_name')->implode(', ').', and '.($bulkFromEmployees->count() - 8).' more'
+                                : $bulkFromEmployees->pluck('full_name')->implode(', ') }}</p>
+                        @endif
+                    </div>
+                @endif
             </div>
 
             <div>
