@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Employee;
 use App\Models\User;
+use App\Models\WorkSchedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
@@ -11,6 +12,14 @@ use Tests\TestCase;
 class ProfileTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Every employee is now assigned a schedule at creation, which needs a default to exist.
+        WorkSchedule::factory()->create(['is_default' => true]);
+    }
 
     public function test_profile_page_is_displayed(): void
     {
@@ -117,6 +126,60 @@ class ProfileTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $this->assertSame('New Name', $user->fresh()->name);
+    }
+
+    public function test_a_linked_users_profile_shows_their_employee_summary(): void
+    {
+        $manager = Employee::factory()->create(['full_name' => 'Manager Person']);
+        $user = User::factory()->create();
+        $employee = Employee::factory()->create([
+            'user_id' => $user->id,
+            'employee_code' => 'EMP-1234',
+            'manager_id' => $manager->id,
+            'join_date' => '2024-03-15',
+        ]);
+
+        $response = $this->actingAs($user)->get('/profile');
+
+        $response->assertOk();
+        $response->assertSee('EMP-1234');
+        $response->assertSee($employee->department->name);
+        $response->assertSee($employee->position->name);
+        // Not a link — a plain employee can't view an arbitrary manager's
+        // profile (EmployeePolicy::view), so x-employee-details-card falls
+        // back to plain text for them, same as it does on Employees\Show.
+        $response->assertSee('Manager Person');
+        $response->assertDontSee(route('employees.show', $manager));
+        $response->assertSee('Mar 15, 2024');
+    }
+
+    public function test_an_unlinked_users_profile_shows_no_employee_summary(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/profile');
+
+        $response->assertOk();
+        $response->assertDontSee('Employee record');
+        $response->assertDontSee('Details');
+        $response->assertDontSee('Schedule');
+    }
+
+    public function test_a_linked_users_profile_embeds_their_schedule_history_read_only(): void
+    {
+        $user = User::factory()->create();
+        Employee::factory()->create(['user_id' => $user->id]);
+
+        $response = $this->actingAs($user)->get('/profile');
+
+        $response->assertOk();
+        // The schedule-assignments component renders (its own view() call
+        // authorizes via EmployeePolicy::view, which any role passes for
+        // their own record) but its assign/delete controls are gated on
+        // EmployeePolicy::update — admin-only — so a plain employee viewing
+        // their own profile sees the history with no way to change it.
+        $response->assertSee('Schedule');
+        $response->assertDontSee('Assign schedule');
     }
 
     public function test_the_profile_page_offers_no_way_to_delete_the_account(): void

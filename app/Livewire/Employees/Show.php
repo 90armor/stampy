@@ -14,7 +14,7 @@ class Show extends Component
     {
         $this->authorize('view', $employee);
 
-        $this->employee = $employee->load(['department', 'position']);
+        $this->employee = $employee->load(['department', 'position', 'manager', 'user']);
     }
 
     /**
@@ -24,7 +24,7 @@ class Show extends Component
     #[On('employee-saved')]
     public function refreshEmployee(): void
     {
-        $this->employee->refresh()->load(['department', 'position']);
+        $this->employee->refresh()->load(['department', 'position', 'manager', 'user']);
     }
 
     public function render()

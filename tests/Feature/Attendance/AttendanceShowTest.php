@@ -7,6 +7,7 @@ use App\Livewire\Attendance\Show;
 use App\Models\DailyAttendance;
 use App\Models\Employee;
 use App\Models\User;
+use App\Models\WorkSchedule;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -21,6 +22,9 @@ class AttendanceShowTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Every employee is now assigned a schedule at creation, which needs a default to exist.
+        WorkSchedule::factory()->create(['is_default' => true]);
 
         foreach (['admin', 'manager', 'employee'] as $role) {
             Role::firstOrCreate(['name' => $role]);
@@ -158,6 +162,41 @@ class AttendanceShowTest extends TestCase
             ->assertSee('Self Viewer');
     }
 
+    public function test_my_attendance_never_shows_a_back_to_attendance_link(): void
+    {
+        // Nobody reaches /my-attendance via the /attendance list (it's a
+        // sidebar destination), and a plain employee can't open /attendance
+        // at all — so the link is a dead end for everyone here, not just
+        // employees. Checked for both an employee and an admin, since an
+        // admin viewing their own attendance via /my-attendance still hits
+        // this same route, not /attendance/{id}.
+        $employee = User::factory()->create()->assignRole('employee');
+        Employee::factory()->create(['user_id' => $employee->id]);
+
+        $this->actingAs($employee)
+            ->get(route('attendance.mine'))
+            ->assertOk()
+            ->assertDontSee('Back to attendance');
+
+        $admin = $this->admin();
+        Employee::factory()->create(['user_id' => $admin->id]);
+
+        $this->actingAs($admin)
+            ->get(route('attendance.mine'))
+            ->assertOk()
+            ->assertDontSee('Back to attendance');
+    }
+
+    public function test_attendance_show_via_the_list_still_shows_a_back_to_attendance_link(): void
+    {
+        $employee = Employee::factory()->create();
+
+        $this->actingAs($this->admin())
+            ->get(route('attendance.show', $employee))
+            ->assertOk()
+            ->assertSee('Back to attendance');
+    }
+
     public function test_my_attendance_shows_a_clear_message_when_theres_no_linked_employee(): void
     {
         $user = User::factory()->create()->assignRole('employee');
@@ -233,5 +272,36 @@ class AttendanceShowTest extends TestCase
         $this->assertSame(1, $summary['absent']);
         $this->assertSame(0, $summary['incomplete']);
         $this->assertSame(4, $summary['workdays']);
+    }
+
+    public function test_the_of_which_breakdown_has_no_stray_space_before_the_closing_paren(): void
+    {
+        // Interleaved @if/@endif directives around the literal "(...)" text
+        // used to leave the raw HTML between them (indentation/newlines) in
+        // the rendered output, which collapses to a single stray space —
+        // "...left early )" instead of "...left early)".
+        $month = today()->startOfMonth();
+        $employee = Employee::factory()->create();
+
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => $month->format('Y-m-d'),
+            'status' => AttendanceStatus::Present,
+            'late_minutes' => 12,
+        ]);
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => $month->copy()->addDay()->format('Y-m-d'),
+            'status' => AttendanceStatus::Present,
+            'early_leave_minutes' => 9,
+        ]);
+
+        $html = Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', $month->format('Y-m'))
+            ->html();
+
+        $this->assertStringContainsString('(of which 1 late · 1 left early)', $html);
+        $this->assertStringNotContainsString('left early )', $html);
     }
 }

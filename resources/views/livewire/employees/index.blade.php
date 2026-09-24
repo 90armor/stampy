@@ -140,7 +140,7 @@
                                     <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
                                 @endunless
 
-                                <div class="flex items-center justify-end gap-1 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+                                <div class="flex items-center justify-end gap-1">
                                     @can('update', $employee)
                                         <button
                                             type="button"

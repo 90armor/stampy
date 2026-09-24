@@ -70,19 +70,19 @@
             :value="$summary['present']"
             :icon-class="$variantStyles['present']['iconClass']"
         >
+            {{-- One expression rather than interleaved @if/@endif around static
+            text, same reasoning as Attendance\Show's identical sub-line: the
+            raw HTML Blade leaves between directives — here, the newline/
+            indentation around each @if — collapses to a stray trailing space
+            once rendered. --}}
             @if ($summary['late'] > 0 || $summary['early'] > 0)
-                <x-slot name="subtext">
-                    of which
-                    @if ($summary['late'] > 0)
-                        {{ $summary['late'] }} late
-                    @endif
-                    @if ($summary['late'] > 0 && $summary['early'] > 0)
-                        &middot;
-                    @endif
-                    @if ($summary['early'] > 0)
-                        {{ $summary['early'] }} left early
-                    @endif
-                </x-slot>
+                @php
+                    $timingParts = array_filter([
+                        $summary['late'] > 0 ? $summary['late'].' late' : null,
+                        $summary['early'] > 0 ? $summary['early'].' left early' : null,
+                    ]);
+                @endphp
+                <x-slot name="subtext">of which {{ implode(' · ', $timingParts) }}</x-slot>
             @endif
         </x-stat-card>
         <x-stat-card

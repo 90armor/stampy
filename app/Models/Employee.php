@@ -3,10 +3,14 @@
 namespace App\Models;
 
 use App\Exceptions\NoDefaultWorkScheduleException;
+use App\Exceptions\NoScheduleAssignmentException;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class Employee extends Model
@@ -31,10 +35,47 @@ class Employee extends Model
         'position_id',
         'join_date',
         'device_user_id',
-        'work_schedule_id',
         'manager_id',
         'status',
     ];
+
+    /**
+     * Assigns a freshly-created employee the current default schedule,
+     * effective from their join_date — every employee must have at least
+     * one employee_work_schedules row from this point on (see scheduleOn()).
+     * save() below wraps this in the same transaction as the employee insert
+     * itself, so a missing default leaves neither row behind.
+     */
+    protected static function booted(): void
+    {
+        static::created(function (self $employee) {
+            $default = WorkSchedule::default() ?? throw new NoDefaultWorkScheduleException($employee);
+
+            $employee->scheduleAssignments()->create([
+                'work_schedule_id' => $default->id,
+                'effective_from' => $employee->join_date,
+                'created_by' => auth()->id(),
+            ]);
+        });
+    }
+
+    /**
+     * Only a brand-new row is wrapped: the created() listener above inserts
+     * this employee's initial schedule assignment as part of this very same
+     * save() call (Eloquent fires model events synchronously, inside the
+     * call that triggered them), and the two must succeed or fail together
+     * — without this, a missing default would leave a committed employee row
+     * with no schedule at all, the exact state scheduleOn() must never see.
+     * An update never touches that invariant, so it isn't wrapped.
+     */
+    public function save(array $options = []): bool
+    {
+        if ($this->exists) {
+            return parent::save($options);
+        }
+
+        return DB::transaction(fn () => parent::save($options));
+    }
 
     protected function casts(): array
     {
@@ -58,9 +99,17 @@ class Employee extends Model
         return $this->belongsTo(Position::class);
     }
 
-    public function workSchedule(): BelongsTo
+    /**
+     * Every schedule this employee has ever been assigned, oldest first,
+     * with each row's workSchedule eager-loaded — accessing this (or calling
+     * scheduleOn()) queries once per Employee instance and is cached on it
+     * for the rest of the request, the same way subordinateIds() is cached
+     * across calls; a build run that reuses one Employee across many dates
+     * (attendance:build-daily, rebuildAround()) only pays for this once.
+     */
+    public function scheduleAssignments(): HasMany
     {
-        return $this->belongsTo(WorkSchedule::class);
+        return $this->hasMany(EmployeeWorkSchedule::class)->with('workSchedule')->orderBy('effective_from');
     }
 
     public function manager(): BelongsTo
@@ -83,11 +132,36 @@ class Employee extends Model
         return $this->hasMany(DailyAttendance::class);
     }
 
-    public function effectiveSchedule(): WorkSchedule
+    /**
+     * The schedule in force on a given date — the employee's latest
+     * assignment whose effective_from is on or before it, so a later
+     * reassignment never changes what an earlier date resolves to. If the
+     * date is before their earliest assignment (e.g. join_date was edited
+     * to something earlier after the fact), the earliest one is used
+     * instead of throwing — every date from join_date onward must resolve
+     * to *something*. Works for a future date with no daily_attendances row
+     * at all, and for one long before or after any date ever built.
+     *
+     * Every employee has at least one assignment from the moment they're
+     * created (see booted() above) — reaching the empty case here means the
+     * assignment(s) were removed some other way, a data-integrity problem
+     * distinct from "no default schedule exists" (which can only happen at
+     * creation time now, not here).
+     */
+    public function scheduleOn(CarbonInterface $date): WorkSchedule
     {
-        return $this->workSchedule
-            ?? WorkSchedule::default()
-            ?? throw new NoDefaultWorkScheduleException($this);
+        $date = Carbon::instance($date)->startOfDay();
+
+        $assignments = $this->scheduleAssignments;
+
+        if ($assignments->isEmpty()) {
+            throw new NoScheduleAssignmentException($this);
+        }
+
+        $match = $assignments->filter(fn (EmployeeWorkSchedule $a) => $a->effective_from->lte($date))->last()
+            ?? $assignments->first();
+
+        return $match->workSchedule;
     }
 
     /**

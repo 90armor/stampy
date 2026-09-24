@@ -31,26 +31,38 @@
         </div>
     </div>
 
-    <x-card>
-        <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Details</p>
+    <x-employee-details-card :employee="$employee" />
+
+    <x-card class="mt-6">
+        <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Login</p>
 
         <dl class="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2">
             <div>
-                <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Department</dt>
-                <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">{{ $employee->department->name }}</dd>
+                <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Account</dt>
+                <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">
+                    @if ($employee->user)
+                        <x-badge color="green">Has an account</x-badge>
+                    @else
+                        <x-badge color="slate">No account</x-badge>
+                    @endif
+                </dd>
             </div>
-            <div>
-                <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Position</dt>
-                <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">{{ $employee->position->name }}</dd>
-            </div>
-            <div>
-                <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Start date</dt>
-                <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">{{ $employee->join_date->format('M j, Y') }}</dd>
-            </div>
-            <div>
-                <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Device user ID</dt>
-                <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">{{ $employee->device_user_id ?? '—' }}</dd>
-            </div>
+            @if ($employee->user)
+                <div>
+                    <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Username</dt>
+                    <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">{{ $employee->user->username }}</dd>
+                </div>
+                <div>
+                    <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Password</dt>
+                    <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">
+                        @if ($employee->user->must_change_password)
+                            <x-badge color="amber">Change pending</x-badge>
+                        @else
+                            <span class="text-slate-500 dark:text-slate-400">Up to date</span>
+                        @endif
+                    </dd>
+                </div>
+            @endif
         </dl>
     </x-card>
 
@@ -65,6 +77,10 @@
             </div>
         </x-card>
     @endcan
+
+    <x-card class="mt-6">
+        <livewire:employees.schedule-assignments :employee="$employee" :key="'schedule-assignments-'.$employee->id" />
+    </x-card>
 
     <livewire:employees.form-modal />
 </div>

@@ -1,11 +1,12 @@
 <section>
     <header>
-        <h2 class="text-lg font-medium text-slate-900 dark:text-slate-100">
-            {{ __('Profile Information') }}
+        <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Account</p>
+        <h2 class="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">
+            {{ __('Profile information') }}
         </h2>
 
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            {{ __("Update your account's profile information and email address.") }}
+            {{ __('Your name and email address.') }}
         </p>
     </header>
 
@@ -28,7 +29,18 @@
 
         <div>
             <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" name="email" type="email" class="mt-1 block w-full" :value="old('email', $user->email)" autocomplete="username" @if ($user->employee) autofocus @endif />
+            {{-- A Blade @if/@endif embedded directly inside a self-closing
+            <x-component /> tag's attribute list breaks Blade's component-tag
+            compiler entirely (it only recognizes a fixed set of attribute
+            token shapes there) — the whole tag then passes through
+            uncompiled, which browsers silently drop as an unrecognized
+            custom element. That's what made this input disappear. Branch
+            outside the tag instead, the same way the Name field above does. --}}
+            @if ($user->employee)
+                <x-text-input id="email" name="email" type="email" class="mt-1 block w-full" :value="old('email', $user->email)" autocomplete="username" autofocus />
+            @else
+                <x-text-input id="email" name="email" type="email" class="mt-1 block w-full" :value="old('email', $user->email)" autocomplete="username" />
+            @endif
             <x-input-error class="mt-2" :messages="$errors->get('email')" />
         </div>
 

@@ -30,6 +30,23 @@ $surfaceClass = match ($surface) {
 $showJs = $entangle ? "\$wire.entangle('{$entangle}').live" : \Illuminate\Support\Js::from($show);
 @endphp
 
+{{--
+    x-teleport moves this element to be a direct child of <body> at runtime.
+    Without it, a modal embedded inside anything with backdrop-blur/backdrop-
+    filter (every x-card, and this app's cards are glass by design) gets
+    clipped: per the CSS spec, a non-none backdrop-filter establishes a
+    containing block for its fixed-position descendants, the same way
+    transform/filter do — so this modal's "fixed inset-0" would resolve
+    against that small card box instead of the viewport. Confirmed by
+    reproducing it in isolation (a bare backdrop-filter div with a
+    position:fixed child renders confined to the div, not the viewport) and
+    confirming the teleported version doesn't. Employees\ScheduleAssignments'
+    "Assign schedule" panel — nested inside x-card on both Employees\Show and
+    the profile page — hit exactly this; every other modal in the app
+    happened to dodge it only because its include sits beside its card, not
+    inside one, which was luck, not something to keep relying on.
+--}}
+<template x-teleport="body">
 <div
     x-data="{
         show: {{ $showJs }},
@@ -101,3 +118,4 @@ $showJs = $entangle ? "\$wire.entangle('{$entangle}').live" : \Illuminate\Suppor
         {{ $slot }}
     </div>
 </div>
+</template>

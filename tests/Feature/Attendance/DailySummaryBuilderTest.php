@@ -3,7 +3,6 @@
 namespace Tests\Feature\Attendance;
 
 use App\Enums\AttendanceStatus;
-use App\Exceptions\NoDefaultWorkScheduleException;
 use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
 use App\Models\Employee;
@@ -35,9 +34,26 @@ class DailySummaryBuilderTest extends TestCase
         ], $overrides));
     }
 
+    /**
+     * An employee on a specific schedule, regardless of whether it's the
+     * current default: creation always assigns whatever IS default at the
+     * time (see Employee::booted()), so this overwrites that one automatic
+     * assignment — still the employee's only row, still effective from
+     * their join_date — to point at $schedule instead. See
+     * EmployeeScheduleAssignmentTest for creation/scheduleOn() resolution
+     * itself; this file only cares that build() uses whatever schedule ends
+     * up assigned.
+     */
     private function employeeOn(WorkSchedule $schedule): Employee
     {
-        return Employee::factory()->create(['work_schedule_id' => $schedule->id]);
+        if (WorkSchedule::default() === null) {
+            WorkSchedule::factory()->create(['is_default' => true]);
+        }
+
+        $employee = Employee::factory()->create();
+        $employee->scheduleAssignments()->update(['work_schedule_id' => $schedule->id]);
+
+        return $employee;
     }
 
     private function punch(Employee $employee, string $dateTime, string $type): AttendanceLog
@@ -47,32 +63,6 @@ class DailySummaryBuilderTest extends TestCase
             'punched_at' => $dateTime,
             'punch_type' => $type,
         ]);
-    }
-
-    public function test_an_employee_with_no_schedule_and_no_default_fails_with_a_clear_domain_error(): void
-    {
-        $employee = Employee::factory()->create(['employee_code' => 'EMP-4242', 'work_schedule_id' => null]);
-        $this->assertSame(0, WorkSchedule::count());
-
-        try {
-            app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::MONDAY));
-            $this->fail('Expected NoDefaultWorkScheduleException.');
-        } catch (NoDefaultWorkScheduleException $e) {
-            $this->assertStringContainsString('No default work schedule exists', $e->getMessage());
-            $this->assertStringContainsString('EMP-4242', $e->getMessage());
-            $this->assertStringContainsString('WorkScheduleSeeder', $e->getMessage());
-        }
-
-        $this->assertSame(0, DailyAttendance::count());
-    }
-
-    public function test_a_missing_default_only_matters_for_employees_without_their_own_schedule(): void
-    {
-        $own = $this->employeeOn($this->schedule(['is_default' => false]));
-
-        $row = app(DailySummaryBuilder::class)->build($own, Carbon::parse(self::MONDAY));
-
-        $this->assertSame(AttendanceStatus::Absent, $row->status);
     }
 
     /**
@@ -107,7 +97,8 @@ class DailySummaryBuilderTest extends TestCase
     public function test_rebuild_around_never_builds_before_the_join_date(): void
     {
         $this->travelTo(Carbon::parse('2026-02-20 12:00:00'));
-        $employee = Employee::factory()->create(['work_schedule_id' => $this->schedule()->id, 'join_date' => '2026-02-04']);
+        $employee = $this->employeeOn($this->schedule());
+        $employee->update(['join_date' => '2026-02-04']);
 
         app(DailySummaryBuilder::class)->rebuildAround($employee, Carbon::parse('2026-02-04'));
 
@@ -122,6 +113,39 @@ class DailySummaryBuilderTest extends TestCase
         app(DailySummaryBuilder::class)->rebuildAround($employee, Carbon::parse('2026-02-04'));
 
         $this->assertSame(['2026-02-03', '2026-02-04'], $this->datesBuilt($employee));
+    }
+
+    public function test_rebuild_from_covers_the_effective_date_through_today(): void
+    {
+        $this->travelTo(Carbon::parse('2026-02-10 12:00:00'));
+        $employee = $this->employeeOn($this->schedule());
+
+        $built = app(DailySummaryBuilder::class)->rebuildFrom($employee, Carbon::parse('2026-02-06'));
+
+        $this->assertSame(5, $built);
+        $this->assertSame(['2026-02-06', '2026-02-07', '2026-02-08', '2026-02-09', '2026-02-10'], $this->datesBuilt($employee));
+    }
+
+    public function test_rebuild_from_never_builds_before_the_join_date(): void
+    {
+        $this->travelTo(Carbon::parse('2026-02-10 12:00:00'));
+        $employee = $this->employeeOn($this->schedule());
+        $employee->update(['join_date' => '2026-02-08']);
+
+        app(DailySummaryBuilder::class)->rebuildFrom($employee, Carbon::parse('2026-02-01'));
+
+        $this->assertSame(['2026-02-08', '2026-02-09', '2026-02-10'], $this->datesBuilt($employee));
+    }
+
+    public function test_rebuild_from_a_future_date_builds_nothing(): void
+    {
+        $this->travelTo(Carbon::parse('2026-02-10 12:00:00'));
+        $employee = $this->employeeOn($this->schedule());
+
+        $built = app(DailySummaryBuilder::class)->rebuildFrom($employee, Carbon::parse('2026-02-15'));
+
+        $this->assertSame(0, $built);
+        $this->assertSame([], $this->datesBuilt($employee));
     }
 
     public function test_normal_day_is_present_with_correct_worked_minutes(): void
@@ -654,7 +678,7 @@ class DailySummaryBuilderTest extends TestCase
     }
 
     // --- Schedule variation: factory-made schedules, not the seeder. These
-    // only prove the work_schedule_id path is used, not the default's. ---
+    // only prove the employee's own assigned schedule is used, not the default's. ---
 
     public function test_short_morning_schedule_normal_day(): void
     {
