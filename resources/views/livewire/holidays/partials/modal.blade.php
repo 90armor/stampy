@@ -3,7 +3,6 @@
         name="holiday-form-modal"
         :show="true"
         entangle="showModal"
-        surface="solid"
         backdrop="bg-slate-900/50"
         maxWidth="md"
         panelClass="mt-16"
@@ -21,7 +20,7 @@
                         <x-input-label for="holiday_date" value="Date" class="!mb-0" />
                     </div>
                     <div class="min-w-0">
-                        <x-text-input id="holiday_date" type="date" surface="solid" wire:model="date" autofocus />
+                        <x-text-input id="holiday_date" type="date" wire:model="date" autofocus />
                         <x-input-error :messages="$errors->get('date')" class="mt-1" />
                     </div>
                 </div>
@@ -31,7 +30,7 @@
                         <x-input-label for="holiday_name" value="Name" class="!mb-0" />
                     </div>
                     <div class="min-w-0">
-                        <x-text-input id="holiday_name" type="text" surface="solid" wire:model="name" />
+                        <x-text-input id="holiday_name" type="text" wire:model="name" />
                         <x-input-error :messages="$errors->get('name')" class="mt-1" />
                     </div>
                 </div>
@@ -42,7 +41,7 @@
                         <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Optional.</p>
                     </div>
                     <div class="min-w-0">
-                        <x-textarea id="holiday_note" rows="2" surface="solid" wire:model="note">{{ $note }}</x-textarea>
+                        <x-textarea id="holiday_note" rows="2" wire:model="note">{{ $note }}</x-textarea>
                         <x-input-error :messages="$errors->get('note')" class="mt-1" />
                     </div>
                 </div>

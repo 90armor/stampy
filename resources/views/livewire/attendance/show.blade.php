@@ -197,7 +197,7 @@
                     <button
                         type="button"
                         wire:click="previousMonth"
-                        class="rounded-lg border border-slate-300 bg-white/80 p-1.5 text-slate-500 shadow-sm hover:bg-white hover:text-slate-700 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-400 dark:hover:bg-slate-800"
+                        class="rounded-lg border border-slate-300 bg-white p-1.5 text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
                         aria-label="Previous month"
                     >
                         <x-icon name="chevron-left" class="h-4 w-4" />
@@ -206,7 +206,7 @@
                     <button
                         type="button"
                         wire:click="nextMonth"
-                        class="rounded-lg border border-slate-300 bg-white/80 p-1.5 text-slate-500 shadow-sm hover:bg-white hover:text-slate-700 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-400 dark:hover:bg-slate-800"
+                        class="rounded-lg border border-slate-300 bg-white p-1.5 text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
                         aria-label="Next month"
                     >
                         <x-icon name="chevron-right" class="h-4 w-4" />
@@ -218,7 +218,7 @@
                     @endunless
                 </div>
 
-                <div class="inline-flex rounded-lg border border-slate-300 bg-white/80 p-0.5 dark:border-slate-700 dark:bg-slate-800/70" role="group" aria-label="View">
+                <div class="inline-flex rounded-lg border border-slate-300 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-800" role="group" aria-label="View">
                     <button
                         type="button"
                         wire:click="$set('view', 'calendar')"
@@ -621,7 +621,7 @@
                         marked In/Out times) already carry the timing; a chip here would just
                         repeat them, the same reasoning the table/list Status columns document. --}}
                         <div class="flex flex-wrap items-center justify-end gap-1.5">
-                            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset {{ $modalStyle['bg'] }} {{ $modalStyle['text'] }} {{ $modalStyle['ring'] }}">
+                            <span class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ring-1 ring-inset {{ $modalStyle['bg'] }} {{ $modalStyle['text'] }} {{ $modalStyle['ring'] }}">
                                 <x-icon :name="$modalStyle['icon']" class="h-3.5 w-3.5" />
                                 {{ $modalRecord ? $modalRecord->status->label() : 'Not calculated' }}
                             </span>

@@ -7,8 +7,7 @@
         "dev": "vite"
     },
     "dependencies": {
-        "chart.js": "^4.4.0",
-        "geist": "^1.7.2"
+        "chart.js": "^4.4.0"
     },
     "devDependencies": {
         "@tailwindcss/forms": "^0.5.2",

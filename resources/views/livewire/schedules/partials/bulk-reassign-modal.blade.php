@@ -3,7 +3,6 @@
         name="schedule-bulk-reassign-modal"
         :show="true"
         entangle="showBulkModal"
-        surface="solid"
         backdrop="bg-slate-900/50"
         maxWidth="sm"
         panelClass="mt-16"
@@ -47,7 +46,7 @@
                 (Livewire 3's default), so the preview below couldn't react
                 to picking a schedule until the admin had already confirmed
                 — too late to be a preview. --}}
-                <x-select id="bulk_from" surface="solid" wire:model.live="bulk_from_id" class="mt-1 block w-full">
+                <x-select id="bulk_from" wire:model.live="bulk_from_id" class="mt-1 block w-full">
                     <option value="">Select a schedule&hellip;</option>
                     @foreach ($allSchedules as $schedule)
                         <option value="{{ $schedule->id }}">{{ $schedule->name }}</option>
@@ -82,7 +81,7 @@
 
             <div>
                 <x-input-label for="bulk_to" value="Onto" />
-                <x-select id="bulk_to" surface="solid" wire:model="bulk_to_id" class="mt-1 block w-full">
+                <x-select id="bulk_to" wire:model="bulk_to_id" class="mt-1 block w-full">
                     <option value="">Select a schedule&hellip;</option>
                     @foreach ($allSchedules as $schedule)
                         <option value="{{ $schedule->id }}">{{ $schedule->name }}</option>
@@ -93,7 +92,7 @@
 
             <div>
                 <x-input-label for="bulk_effective_from" value="Effective from" />
-                <x-text-input id="bulk_effective_from" type="date" surface="solid" wire:model="bulk_effective_from" class="mt-1 block w-full" />
+                <x-text-input id="bulk_effective_from" type="date" wire:model="bulk_effective_from" class="mt-1 block w-full" />
                 <x-input-error :messages="$errors->get('bulk_effective_from')" class="mt-1" />
             </div>
 

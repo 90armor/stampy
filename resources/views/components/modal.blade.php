@@ -3,8 +3,7 @@
     'show' => false,
     'maxWidth' => '2xl',
     'entangle' => null,
-    'surface' => 'glass',
-    'backdrop' => 'bg-gray-500 opacity-75',
+    'backdrop' => 'bg-slate-950/60 backdrop-blur-sm',
     'panelClass' => 'mb-6',
 ])
 
@@ -22,18 +21,12 @@ $maxWidth = [
     'employee-form' => 'sm:max-w-[620px]',
 ][$maxWidth];
 
-$surfaceClass = match ($surface) {
-    'solid' => 'bg-white ring-1 ring-slate-200 shadow-lg dark:bg-slate-900 dark:ring-slate-800/70',
-    default => 'bg-white/80 backdrop-blur-xl dark:bg-slate-900/80 shadow-xl',
-};
-
 $showJs = $entangle ? "\$wire.entangle('{$entangle}').live" : \Illuminate\Support\Js::from($show);
 @endphp
 
 {{--
     x-teleport moves this element to be a direct child of <body> at runtime.
-    Without it, a modal embedded inside anything with backdrop-blur/backdrop-
-    filter (every x-card, and this app's cards are glass by design) gets
+    Without it, a modal embedded inside an ancestor with backdrop-filter gets
     clipped: per the CSS spec, a non-none backdrop-filter establishes a
     containing block for its fixed-position descendants, the same way
     transform/filter do — so this modal's "fixed inset-0" would resolve
@@ -107,7 +100,7 @@ $showJs = $entangle ? "\$wire.entangle('{$entangle}').live" : \Illuminate\Suppor
 
     <div
         x-show="show"
-        class="relative mx-auto {{ $panelClass }} {{ $surfaceClass }} rounded-lg overflow-hidden transform transition-all sm:w-full {{ $maxWidth }}"
+        class="relative mx-auto {{ $panelClass }} rounded-2xl bg-white shadow-xl ring-1 ring-slate-200 transform transition-all dark:bg-slate-900 dark:ring-slate-800/70 sm:w-full {{ $maxWidth }}"
         x-transition:enter="ease-out duration-300"
         x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
         x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"

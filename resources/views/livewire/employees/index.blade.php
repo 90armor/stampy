@@ -41,18 +41,18 @@
                 type="text"
                 wire:model.live.debounce.300ms="search"
                 placeholder="Search people…"
-                class="block w-full rounded-lg border-slate-300 bg-white/80 backdrop-blur-sm pl-9 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-800/70 dark:border-slate-700 dark:text-slate-100 dark:placeholder-slate-500"
+                class="block w-full rounded-lg border-slate-300 bg-white pl-9 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:placeholder-slate-500"
             >
         </div>
 
-        <select wire:model.live="departmentFilter" class="rounded-lg border-slate-300 bg-white/80 backdrop-blur-sm text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-800/70 dark:border-slate-700 dark:text-slate-100">
+        <select wire:model.live="departmentFilter" class="rounded-lg border-slate-300 bg-white text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100">
             <option value="">All departments</option>
             @foreach ($departments as $department)
                 <option value="{{ $department->id }}">{{ $department->name }}</option>
             @endforeach
         </select>
 
-        <select wire:model.live="statusFilter" class="rounded-lg border-slate-300 bg-white/80 backdrop-blur-sm text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-800/70 dark:border-slate-700 dark:text-slate-100">
+        <select wire:model.live="statusFilter" class="rounded-lg border-slate-300 bg-white text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100">
             <option value="">All status</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>

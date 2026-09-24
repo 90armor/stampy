@@ -3,7 +3,6 @@
         name="department-form-modal"
         :show="true"
         entangle="showModal"
-        surface="solid"
         backdrop="bg-slate-900/50"
         maxWidth="md"
         panelClass="mt-16"
@@ -21,7 +20,7 @@
                         <x-input-label for="dept_name" value="Name" class="!mb-0" />
                     </div>
                     <div class="min-w-0">
-                        <x-text-input id="dept_name" type="text" surface="solid" wire:model="name" autofocus />
+                        <x-text-input id="dept_name" type="text" wire:model="name" autofocus />
                         <x-input-error :messages="$errors->get('name')" class="mt-1" />
                     </div>
                 </div>
@@ -32,7 +31,7 @@
                         <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Optional.</p>
                     </div>
                     <div class="min-w-0">
-                        <x-textarea id="dept_description" rows="3" surface="solid" wire:model="description">{{ $description }}</x-textarea>
+                        <x-textarea id="dept_description" rows="3" wire:model="description">{{ $description }}</x-textarea>
                         <x-input-error :messages="$errors->get('description')" class="mt-1" />
                     </div>
                 </div>

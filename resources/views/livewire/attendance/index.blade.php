@@ -121,18 +121,15 @@
                 <button
                     type="button"
                     @click="open = !open"
-                    class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white/80 backdrop-blur-sm px-3 py-2 text-sm text-slate-700 shadow-sm hover:bg-white focus:border-primary-500 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-200 dark:hover:bg-slate-800"
+                    class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-50 focus:border-primary-500 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                 >
                     <x-icon name="calendar-days" class="h-4 w-4 text-slate-400 dark:text-slate-500" />
                     {{ $rangeLabel }}
                 </button>
 
-                {{-- Deliberately opaque, not glass: this overlays the solid
-                status chips and table rows right below it, and even a 95%
-                translucent + blurred surface let their color bleed through
-                enough to hurt legibility. The topbar's dropdown (x-dropdown)
-                gets away with glass because it never sits over saturated
-                content — this one does, so it's a narrow exception.
+                {{-- Popovers are content surfaces and therefore opaque. This
+                also prevents the status chips and rows below from bleeding
+                through and reducing legibility.
 
                 Not teleported to <body>: tried that for a suspected
                 vertical-overflow issue, but the actual bug was the date
@@ -150,7 +147,7 @@
                 <div
                     x-show="open"
                     x-cloak
-                    class="absolute left-0 z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-lg bg-white p-4 shadow-xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800"
+                    class="absolute left-0 z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl bg-white p-4 shadow-xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800"
                 >
                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Quick ranges</p>
                     <div class="mt-2 grid grid-cols-2 gap-2">
@@ -180,7 +177,7 @@
                                     id="attendance-from"
                                     type="date"
                                     wire:model.live="fromDate"
-                                    class="block w-full min-w-0 rounded-lg border-slate-300 bg-white/80 backdrop-blur-sm text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-800/70 dark:border-slate-700 dark:text-slate-100"
+                                    class="block w-full min-w-0 rounded-lg border-slate-300 bg-white text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
                                 >
                             </div>
                             <div class="min-w-0">
@@ -189,7 +186,7 @@
                                     id="attendance-to"
                                     type="date"
                                     wire:model.live="toDate"
-                                    class="block w-full min-w-0 rounded-lg border-slate-300 bg-white/80 backdrop-blur-sm text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-800/70 dark:border-slate-700 dark:text-slate-100"
+                                    class="block w-full min-w-0 rounded-lg border-slate-300 bg-white text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
                                 >
                             </div>
                         </div>
@@ -204,7 +201,7 @@
                     type="text"
                     wire:model.live.debounce.300ms="employeeFilter"
                     placeholder="Name or employee code…"
-                    class="block w-full rounded-lg border-slate-300 bg-white/80 backdrop-blur-sm pl-9 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-800/70 dark:border-slate-700 dark:text-slate-100 dark:placeholder-slate-500"
+                    class="block w-full rounded-lg border-slate-300 bg-white pl-9 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:placeholder-slate-500"
                 >
             </div>
 
@@ -230,7 +227,7 @@
                     type="button"
                     wire:click="toggleStatus('{{ $status->value }}')"
                     @class([
-                        'inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition',
+                        'inline-flex items-center rounded-lg px-3 py-1 text-xs font-medium transition',
                         'bg-primary-600 text-white shadow-sm dark:bg-primary-500' => $selected,
                         'bg-transparent text-slate-500 ring-1 ring-inset ring-slate-300 hover:border-slate-400 hover:text-slate-700 dark:text-slate-400 dark:ring-slate-700 dark:hover:text-slate-200' => ! $selected,
                     ])
@@ -254,7 +251,7 @@
                     type="button"
                     wire:click="toggleTimingFilter('{{ $value }}')"
                     @class([
-                        'inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition',
+                        'inline-flex items-center rounded-lg px-3 py-1 text-xs font-medium transition',
                         'bg-amber-600 text-white shadow-sm dark:bg-amber-500' => $selected,
                         'bg-transparent text-slate-500 ring-1 ring-inset ring-slate-300 hover:border-slate-400 hover:text-slate-700 dark:text-slate-400 dark:ring-slate-700 dark:hover:text-slate-200' => ! $selected,
                     ])

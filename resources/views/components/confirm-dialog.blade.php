@@ -40,7 +40,9 @@ delete click in one tab silently arms the other tab's (hidden) dialog too. --}}
         <div class="fixed inset-0 bg-slate-900/50" @click="open = false" x-show="open" x-transition.opacity></div>
 
         <div x-show="open" x-transition class="relative w-full max-w-sm">
-            <x-card>
+            {{-- An alert dialog is a large overlay panel, so it intentionally
+            overrides x-card's content-surface radius with the modal radius. --}}
+            <x-card class="!rounded-2xl">
                 <div class="flex items-start gap-3">
                     <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
                         <x-icon name="exclamation-triangle" class="w-5 h-5" />

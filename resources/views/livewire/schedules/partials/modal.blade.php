@@ -3,7 +3,6 @@
         name="schedule-form-modal"
         :show="true"
         entangle="showModal"
-        surface="solid"
         backdrop="bg-slate-900/50"
         maxWidth="lg"
         panelClass="mt-16"
@@ -34,7 +33,7 @@
                         <x-input-label for="schedule_name" value="Name" class="!mb-0" />
                     </div>
                     <div class="min-w-0">
-                        <x-text-input id="schedule_name" type="text" surface="solid" wire:model="name" autofocus />
+                        <x-text-input id="schedule_name" type="text" wire:model="name" autofocus />
                         <x-input-error :messages="$errors->get('name')" class="mt-1" />
                     </div>
                 </div>
@@ -44,9 +43,9 @@
                         <x-input-label value="Hours" class="!mb-0" />
                     </div>
                     <div class="min-w-0 flex items-center gap-3">
-                        <x-text-input type="time" surface="solid" wire:model="start_time" :disabled="$editingIsLocked" />
+                        <x-text-input type="time" wire:model="start_time" :disabled="$editingIsLocked" />
                         <span class="text-slate-400">&ndash;</span>
-                        <x-text-input type="time" surface="solid" wire:model="end_time" :disabled="$editingIsLocked" />
+                        <x-text-input type="time" wire:model="end_time" :disabled="$editingIsLocked" />
                     </div>
                     <div></div>
                     <div class="min-w-0">
@@ -61,7 +60,7 @@
                         <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Minutes.</p>
                     </div>
                     <div class="min-w-0">
-                        <x-text-input id="schedule_grace" type="number" min="0" surface="solid" wire:model="grace_minutes" :disabled="$editingIsLocked" />
+                        <x-text-input id="schedule_grace" type="number" min="0" wire:model="grace_minutes" :disabled="$editingIsLocked" />
                         <x-input-error :messages="$errors->get('grace_minutes')" class="mt-1" />
                     </div>
                 </div>
@@ -72,7 +71,7 @@
                         <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Minutes.</p>
                     </div>
                     <div class="min-w-0">
-                        <x-text-input id="schedule_break" type="number" min="0" surface="solid" wire:model="break_minutes" :disabled="$editingIsLocked" />
+                        <x-text-input id="schedule_break" type="number" min="0" wire:model="break_minutes" :disabled="$editingIsLocked" />
                         <x-input-error :messages="$errors->get('break_minutes')" class="mt-1" />
                     </div>
                 </div>

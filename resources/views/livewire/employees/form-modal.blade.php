@@ -4,7 +4,6 @@
         name="employee-form-modal"
         :show="true"
         entangle="showModal"
-        surface="solid"
         backdrop="bg-slate-900/50"
         maxWidth="employee-form"
         panelClass="mt-10"
@@ -70,7 +69,7 @@
                                         <x-input-label for="emp_full_name" value="Full name" class="!mb-0" />
                                     </div>
                                     <div class="sm:w-[320px] sm:shrink-0">
-                                        <x-text-input id="emp_full_name" type="text" surface="solid" wire:model="full_name" autofocus />
+                                        <x-text-input id="emp_full_name" type="text" wire:model="full_name" autofocus />
                                         <x-input-error :messages="$errors->get('full_name')" class="mt-1" />
                                     </div>
                                 </div>
@@ -86,7 +85,7 @@
                                         @if ($editing)
                                             <p id="emp_employee_code" class="text-sm text-slate-500 dark:text-slate-400">{{ $employee_code }}</p>
                                         @else
-                                            <x-text-input id="emp_employee_code" type="text" surface="solid" wire:model="employee_code" />
+                                            <x-text-input id="emp_employee_code" type="text" wire:model="employee_code" />
                                             <x-input-error :messages="$errors->get('employee_code')" class="mt-1" />
                                         @endif
                                     </div>
@@ -104,7 +103,7 @@
                                         <x-input-label for="emp_department_id" value="Department" class="!mb-0" />
                                     </div>
                                     <div class="sm:w-[320px] sm:shrink-0">
-                                        <x-select id="emp_department_id" surface="solid" wire:model="department_id">
+                                        <x-select id="emp_department_id" wire:model="department_id">
                                             <option value="">Select department</option>
                                             @foreach ($departments as $department)
                                                 <option value="{{ $department->id }}">{{ $department->name }}</option>
@@ -119,7 +118,7 @@
                                         <x-input-label for="emp_position_id" value="Position" class="!mb-0" />
                                     </div>
                                     <div class="sm:w-[320px] sm:shrink-0">
-                                        <x-select id="emp_position_id" surface="solid" wire:model="position_id">
+                                        <x-select id="emp_position_id" wire:model="position_id">
                                             <option value="">Select position</option>
                                             @foreach ($positions as $position)
                                                 <option value="{{ $position->id }}">{{ $position->name }}</option>
@@ -135,7 +134,7 @@
                                         <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Leave blank for a top-level employee.</p>
                                     </div>
                                     <div class="sm:w-[320px] sm:shrink-0">
-                                        <x-select id="emp_manager_id" surface="solid" wire:model="manager_id">
+                                        <x-select id="emp_manager_id" wire:model="manager_id">
                                             <option value="">No manager</option>
                                             @foreach ($managerOptions as $manager)
                                                 <option value="{{ $manager->id }}">{{ $manager->full_name }} ({{ $manager->employee_code }})</option>
@@ -150,7 +149,7 @@
                                         <x-input-label for="emp_join_date" value="Join date" class="!mb-0" />
                                     </div>
                                     <div class="sm:w-[320px] sm:shrink-0">
-                                        <x-text-input id="emp_join_date" type="date" surface="solid" wire:model="join_date" />
+                                        <x-text-input id="emp_join_date" type="date" wire:model="join_date" />
                                         <x-input-error :messages="$errors->get('join_date')" class="mt-1" />
                                     </div>
                                 </div>
@@ -168,7 +167,7 @@
                                         <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Must match the user ID enrolled on the fingerprint device.</p>
                                     </div>
                                     <div class="sm:w-[320px] sm:shrink-0">
-                                        <x-text-input id="emp_device_user_id" type="text" surface="solid" wire:model="device_user_id" placeholder="ZKTeco device user ID" />
+                                        <x-text-input id="emp_device_user_id" type="text" wire:model="device_user_id" placeholder="ZKTeco device user ID" />
                                         <x-input-error :messages="$errors->get('device_user_id')" class="mt-1" />
                                     </div>
                                 </div>
@@ -178,7 +177,7 @@
                                         <x-input-label for="emp_status" value="Status" class="!mb-0" />
                                     </div>
                                     <div class="sm:w-[320px] sm:shrink-0">
-                                        <x-select id="emp_status" surface="solid" wire:model="status">
+                                        <x-select id="emp_status" wire:model="status">
                                             <option value="active">Active</option>
                                             <option value="inactive">Inactive</option>
                                         </x-select>
@@ -230,7 +229,7 @@
                                                         <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Login identifier. Defaults to the employee code.</p>
                                                     </div>
                                                     <div class="sm:w-[320px] sm:shrink-0">
-                                                        <x-text-input id="emp_username" type="text" surface="solid" wire:model="username" />
+                                                        <x-text-input id="emp_username" type="text" wire:model="username" />
                                                         <x-input-error :messages="$errors->get('username')" class="mt-1" />
                                                     </div>
                                                 </div>
@@ -240,7 +239,7 @@
                                                         <x-input-label for="emp_email" value="Email" class="!mb-0" />
                                                     </div>
                                                     <div class="sm:w-[320px] sm:shrink-0">
-                                                        <x-text-input id="emp_email" type="email" surface="solid" wire:model="email" />
+                                                        <x-text-input id="emp_email" type="email" wire:model="email" />
                                                         <x-input-error :messages="$errors->get('email')" class="mt-1" />
                                                     </div>
                                                 </div>
@@ -250,7 +249,7 @@
                                                         <x-input-label for="emp_role" value="Role" class="!mb-0" />
                                                     </div>
                                                     <div class="sm:w-[320px] sm:shrink-0">
-                                                        <x-select id="emp_role" surface="solid" wire:model="role">
+                                                        <x-select id="emp_role" wire:model="role">
                                                             <option value="admin">Admin</option>
                                                             <option value="manager">Manager</option>
                                                             <option value="employee">Employee</option>

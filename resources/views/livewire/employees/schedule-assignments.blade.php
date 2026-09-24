@@ -88,7 +88,6 @@
             name="schedule-assignment-modal"
             :show="true"
             entangle="showModal"
-            surface="solid"
             backdrop="bg-slate-900/50"
             maxWidth="sm"
             panelClass="mt-16"
@@ -100,7 +99,7 @@
             <form wire:submit="assign" class="px-6 py-4 space-y-4">
                 <div>
                     <x-input-label for="assign_schedule" value="Schedule" />
-                    <x-select id="assign_schedule" surface="solid" wire:model="work_schedule_id" class="mt-1 block w-full">
+                    <x-select id="assign_schedule" wire:model="work_schedule_id" class="mt-1 block w-full">
                         <option value="">Select a schedule&hellip;</option>
                         @foreach ($schedules as $schedule)
                             <option value="{{ $schedule->id }}">{{ $schedule->name }}</option>
@@ -111,7 +110,7 @@
 
                 <div>
                     <x-input-label for="assign_effective_from" value="Effective from" />
-                    <x-text-input id="assign_effective_from" type="date" surface="solid" wire:model="effective_from" class="mt-1 block w-full" />
+                    <x-text-input id="assign_effective_from" type="date" wire:model="effective_from" class="mt-1 block w-full" />
                     <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">Past dates correct a wrong assignment; future dates schedule a change ahead. Rebuilds this employee's attendance from this date through today — never a future date.</p>
                     <x-input-error :messages="$errors->get('effective_from')" class="mt-1" />
                 </div>

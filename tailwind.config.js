@@ -14,7 +14,7 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                sans: ['Geist', 'Inter', ...defaultTheme.fontFamily.sans],
+                sans: ['Inter', ...defaultTheme.fontFamily.sans],
                 serif: ['"DM Serif Display"', 'Georgia', 'serif'],
             },
             colors: {
