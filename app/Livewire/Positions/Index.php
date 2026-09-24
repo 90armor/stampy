@@ -36,6 +36,7 @@ class Index extends Component
         $this->authorize('create', Position::class);
 
         $this->reset(['name', 'description', 'editing']);
+        $this->resetErrorBag();
         $this->showModal = true;
     }
 
@@ -46,6 +47,7 @@ class Index extends Component
         $this->editing = $position;
         $this->name = $position->name;
         $this->description = $position->description;
+        $this->resetErrorBag();
         $this->showModal = true;
     }
 

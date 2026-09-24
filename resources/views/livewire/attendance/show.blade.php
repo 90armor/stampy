@@ -99,12 +99,14 @@
             />
         </x-card>
     @else
-        <div>
-            <a href="{{ route('attendance.index') }}" wire:navigate class="inline-flex items-center gap-x-1 text-sm font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100">
-                <x-icon name="chevron-left" class="h-4 w-4" />
-                Back to attendance
-            </a>
-        </div>
+        @unless ($viaSelfView)
+            <div>
+                <a href="{{ route('attendance.index') }}" wire:navigate class="inline-flex items-center gap-x-1 text-sm font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100">
+                    <x-icon name="chevron-left" class="h-4 w-4" />
+                    Back to attendance
+                </a>
+            </div>
+        @endunless
 
         <div class="flex flex-wrap items-center justify-between gap-4">
             <div class="flex items-center gap-x-4">
@@ -140,18 +142,23 @@
                 list page's Present stat card, for the same reason. --}}
                 <span class="text-slate-500 dark:text-slate-400">
                     Present <strong class="font-semibold text-slate-900 dark:text-slate-100">{{ $summary['present'] }}</strong>
+                    {{-- Built as one expression rather than interleaved @if/@endif
+                    directives around static "(...)" text: Blade passes the raw
+                    HTML between directives through untouched, including the
+                    newlines/indentation this partial's source has around each
+                    @if — the browser then collapses that whitespace to a single
+                    space, landing right before the closing ")" ("...left early
+                    )"). One {{ }} expression, built here, sandwiched directly
+                    between literal "(of which " and ")" with no raw HTML in
+                    between, has no such gap to collapse. --}}
                     @if ($summary['late'] > 0 || $summary['early_leave_days'] > 0)
-                        <span class="text-xs text-slate-400 dark:text-slate-500">(of which
-                            @if ($summary['late'] > 0)
-                                {{ $summary['late'] }} late
-                            @endif
-                            @if ($summary['late'] > 0 && $summary['early_leave_days'] > 0)
-                                &middot;
-                            @endif
-                            @if ($summary['early_leave_days'] > 0)
-                                {{ $summary['early_leave_days'] }} left early
-                            @endif
-                        )</span>
+                        @php
+                            $timingParts = array_filter([
+                                $summary['late'] > 0 ? $summary['late'].' late' : null,
+                                $summary['early_leave_days'] > 0 ? $summary['early_leave_days'].' left early' : null,
+                            ]);
+                        @endphp
+                        <span class="text-xs text-slate-400 dark:text-slate-500">(of which {{ implode(' · ', $timingParts) }})</span>
                     @endif
                 </span>
                 <span class="text-slate-500 dark:text-slate-400">Absent <strong class="font-semibold text-slate-900 dark:text-slate-100">{{ $summary['absent'] }}</strong></span>
@@ -293,8 +300,21 @@
                                 same hex, visibly weaker in dark mode. dark:*-primary-400 restores
                                 4.9-5.7:1, back in the light mode's range — the same "one shade
                                 lighter for dark" pattern already used for every status ring/text
-                                pair in this file, not a one-off. --}}
-                                class="group relative flex h-16 flex-col items-start gap-1 rounded-lg p-1.5 text-left ring-1 ring-inset transition hover:ring-2 hover:ring-primary-500 dark:hover:ring-primary-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:focus-visible:ring-primary-400 sm:h-24 sm:p-2 {{ $style['bg'] }} {{ $style['ring'] }} {{ $cell['date']->isToday() ? 'ring-2 ring-primary-500' : '' }}"
+                                pair in this file, not a one-off.
+
+                                The isToday() ring below used to be ring-primary-500 with no dark:
+                                variant at all — not just weaker in dark mode, invisible: with no
+                                dark: override, Tailwind's dark: rule for the cell's OWN status ring
+                                ($style['ring']'s dark:ring-{color}-500/30) wins the cascade whenever
+                                dark mode is active (that's what dark: is for), so "today" silently
+                                collapsed into an ordinary status-coloured ring, 1px wider and
+                                otherwise indistinguishable from any other day of the same status.
+                                Confirmed via computed getComputedStyle().boxShadow before this fix:
+                                rgb(63, 130, 102) — primary-500 — in light mode, but rgba(245, 158,
+                                11, 0.3) — the cell's own amber dark ring — once .dark was added,
+                                for the exact same cell. Needs the same dark:ring-primary-400 this
+                                comment already describes for hover/focus, not a new pattern. --}}
+                                class="group relative flex h-16 flex-col items-start gap-1 rounded-lg p-1.5 text-left ring-1 ring-inset transition hover:ring-2 hover:ring-primary-500 dark:hover:ring-primary-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:focus-visible:ring-primary-400 sm:h-24 sm:p-2 {{ $style['bg'] }} {{ $style['ring'] }} {{ $cell['date']->isToday() ? 'ring-2 ring-primary-500 dark:ring-primary-400' : '' }}"
                             >
                                 <div class="flex w-full items-center justify-between">
                                     {{-- Day number is the largest, boldest thing in the
@@ -314,7 +334,17 @@
                                 calculated) — this label is just the name, independent of
                                 which of those the cell turned out to be. --}}
                                 @if ($holiday)
-                                    <span class="w-full truncate text-[10px] font-medium leading-tight text-fuchsia-700 dark:text-fuchsia-300" title="{{ $holiday->name }}">
+                                    {{-- line-clamp-2, not truncate (1 line): a name like "Company
+                                    Anniversary (demo)" fits in two short lines at this width but
+                                    not one, and a single-line ellipsis was cutting off names that
+                                    didn't need to be cut at all. Still bounded — a genuinely long
+                                    name clamps with an ellipsis on the 2nd line rather than
+                                    growing the cell — and title= stays as a full-text fallback for
+                                    whatever's still cut off; @title doesn't need a touch/at-rest
+                                    equivalent the way an interactive control would (1.2's rule),
+                                    since it's supplementary here, not the only way to read the
+                                    name — line-clamp already shows as much as fits. --}}
+                                    <span class="w-full line-clamp-2 text-[10px] font-medium leading-tight text-fuchsia-700 dark:text-fuchsia-300" title="{{ $holiday->name }}">
                                         {{ $holiday->name }}
                                     </span>
                                 @endif
@@ -558,12 +588,12 @@
                     $modalRecord = $recordsByDate->get($viewingDay);
                     $modalStyle = $modalRecord ? $variantStyles[$modalRecord->displayVariant()] : $notCalculatedStyle;
                     // The schedule actually used for this day's calculation
-                    // when a row exists (an employee's schedule can change
-                    // over time, so this is more correct than "whatever
-                    // their CURRENT schedule is"); falls back to the current
-                    // effective schedule as a "this is what would apply"
-                    // hint when nothing's been calculated yet.
-                    $modalSchedule = $modalRecord?->workSchedule ?? $employee->effectiveSchedule();
+                    // when a row exists; falls back to scheduleOn() for this
+                    // same date as a "this is what would apply" hint when
+                    // nothing's been calculated yet — not necessarily the
+                    // employee's CURRENT schedule, if they've since been
+                    // reassigned effective some other date.
+                    $modalSchedule = $modalRecord?->workSchedule ?? $employee->scheduleOn($modalDate);
                     $modalMarkedLate = $modalRecord && $modalRecord->isLate();
                     $modalMarkedEarly = $modalRecord && $modalRecord->leftEarly();
                     $markedTimeClass = 'text-red-700 underline decoration-red-600 decoration-2 underline-offset-2 dark:text-red-300 dark:decoration-red-400';

@@ -6,6 +6,7 @@ use App\Livewire\Employees\Show;
 use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
+use App\Models\WorkSchedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use ReflectionProperty;
@@ -19,6 +20,9 @@ class EmployeeShowTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Every employee is now assigned a schedule at creation, which needs a default to exist.
+        WorkSchedule::factory()->create(['is_default' => true]);
 
         foreach (['admin', 'manager', 'employee'] as $role) {
             Role::firstOrCreate(['name' => $role]);
@@ -46,6 +50,80 @@ class EmployeeShowTest extends TestCase
             ->get(route('employees.show', $employee))
             ->assertOk()
             ->assertSee('Profile Target');
+    }
+
+    public function test_the_profile_shows_no_manager_as_a_dash(): void
+    {
+        $employee = Employee::factory()->create(['manager_id' => null]);
+
+        $this->actingAs($this->admin())
+            ->get(route('employees.show', $employee))
+            ->assertOk()
+            ->assertSeeHtml('&mdash;');
+    }
+
+    public function test_an_admin_sees_the_manager_as_a_link(): void
+    {
+        $manager = Employee::factory()->create(['full_name' => 'Boss Person']);
+        $employee = Employee::factory()->create(['manager_id' => $manager->id]);
+
+        $this->actingAs($this->admin())
+            ->get(route('employees.show', $employee))
+            ->assertOk()
+            ->assertSee('Boss Person')
+            ->assertSeeHtml('href="'.route('employees.show', $manager).'"');
+    }
+
+    public function test_a_manager_viewing_their_own_profile_sees_their_own_manager_as_plain_text(): void
+    {
+        // isManagerOf() only ever walks manager_id DOWNWARD, so a manager who
+        // can view a page at all (here, their own record — always allowed)
+        // has no policy access to their own superior, one level UP. The
+        // manager link must therefore fall back to plain text rather than a
+        // link to a page this viewer would just be denied.
+        $superior = Employee::factory()->create(['full_name' => 'Superior Person']);
+        $self = Employee::factory()->create(['full_name' => 'Acting Manager', 'manager_id' => $superior->id]);
+
+        $this->actingAs($this->managerUser($self))
+            ->get(route('employees.show', $self))
+            ->assertOk()
+            ->assertSee('Superior Person')
+            ->assertDontSeeHtml('href="'.route('employees.show', $superior).'"');
+    }
+
+    public function test_the_profile_shows_no_account_when_unlinked(): void
+    {
+        $employee = Employee::factory()->create(['user_id' => null]);
+
+        $this->actingAs($this->admin())
+            ->get(route('employees.show', $employee))
+            ->assertOk()
+            ->assertSee('No account');
+    }
+
+    public function test_the_profile_shows_the_username_and_password_state_for_a_linked_account(): void
+    {
+        $user = User::factory()->create(['username' => 'jane.doe', 'must_change_password' => true]);
+        $employee = Employee::factory()->create(['user_id' => $user->id]);
+
+        $this->actingAs($this->admin())
+            ->get(route('employees.show', $employee))
+            ->assertOk()
+            ->assertSee('Has an account')
+            ->assertSee('jane.doe')
+            ->assertSee('Change pending');
+    }
+
+    public function test_the_profile_shows_no_pending_password_change_once_its_cleared(): void
+    {
+        $user = User::factory()->create(['must_change_password' => false]);
+        $employee = Employee::factory()->create(['user_id' => $user->id]);
+
+        $this->actingAs($this->admin())
+            ->get(route('employees.show', $employee))
+            ->assertOk()
+            ->assertSee('Up to date')
+            ->assertDontSee('Change pending');
     }
 
     public function test_a_manager_can_view_their_own_profile(): void

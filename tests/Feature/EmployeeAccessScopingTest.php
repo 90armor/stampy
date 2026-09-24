@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Employee;
 use App\Models\User;
 use App\Support\EmployeeScope;
+use App\Models\WorkSchedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use Spatie\Permission\Models\Role;
@@ -17,6 +18,9 @@ class EmployeeAccessScopingTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Every employee is now assigned a schedule at creation, which needs a default to exist.
+        WorkSchedule::factory()->create(['is_default' => true]);
 
         foreach (['admin', 'manager', 'employee'] as $role) {
             Role::firstOrCreate(['name' => $role]);

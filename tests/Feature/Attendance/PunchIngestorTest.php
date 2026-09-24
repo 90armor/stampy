@@ -7,6 +7,7 @@ use App\Enums\PunchSource;
 use App\Enums\PunchType;
 use App\Models\AttendanceLog;
 use App\Models\Employee;
+use App\Models\WorkSchedule;
 use App\Services\Attendance\PunchIngestor;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -16,6 +17,14 @@ use Tests\TestCase;
 class PunchIngestorTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Every employee is now assigned a schedule at creation, which needs a default to exist.
+        WorkSchedule::factory()->create(['is_default' => true]);
+    }
 
     public function test_punch_type_is_inferred_by_alternating_when_absent(): void
     {

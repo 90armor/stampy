@@ -72,6 +72,26 @@ class ManualPunchTest extends TestCase
         return [$component, $employee];
     }
 
+    public function test_punch_validation_messages_are_human_readable_not_raw_property_names(): void
+    {
+        // Laravel's default attribute-name fallback would otherwise read
+        // "The new punch time field is required." — the raw Livewire
+        // property name, not what the field is labelled on the form.
+        $employee = Employee::factory()->create();
+
+        $component = Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', substr(self::DAY, 0, 7))
+            ->call('startAddingPunch', self::DAY)
+            ->call('addPunch');
+
+        $component->assertHasErrors(['newPunchTime']);
+
+        $message = $component->errors()->first('newPunchTime');
+        $this->assertStringContainsString('punch time', $message);
+        $this->assertStringNotContainsString('new punch time', $message);
+    }
+
     public function test_a_punch_dated_before_the_employees_start_date_is_rejected_and_nothing_is_written(): void
     {
         [$component, $employee] = $this->punchForm('2026-02-02', '2026-02-01', '08:00');

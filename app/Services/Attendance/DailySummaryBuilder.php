@@ -35,7 +35,7 @@ class DailySummaryBuilder
     public function build(Employee $employee, CarbonInterface $date): DailyAttendance
     {
         $workDate = Carbon::instance($date)->startOfDay();
-        $schedule = $employee->effectiveSchedule();
+        $schedule = $employee->scheduleOn($workDate);
 
         $isWorkday = in_array($workDate->dayOfWeekIso, $schedule->workdays, true);
 
@@ -172,6 +172,39 @@ class DailySummaryBuilder
         $first = Carbon::instance($from)->startOfDay()->subDay()->max($employee->join_date->copy()->startOfDay());
         $last = Carbon::instance($to ?? $from)->startOfDay()->addDay()->min(today());
 
+        return $this->buildRange($employee, $first, $last);
+    }
+
+    /**
+     * Rebuilds a schedule assignment's effect: from its effective date to
+     * today. A reassignment can change how every day from that date forward
+     * resolves (Employee::scheduleOn() is what changed, not the punches
+     * themselves), so — unlike rebuildAround()'s D-1/D+1 window, which
+     * exists for punch changes specifically — the whole range needs
+     * rebuilding, not just a day either side of one date.
+     *
+     * Clamped the same way rebuildAround() clamps its own window: never
+     * before the employee's join_date, never after today. A future-dated
+     * effective_from (still after today once clamped to join_date) rebuilds
+     * nothing — correct, since nothing about "today" has changed yet for an
+     * assignment that doesn't take effect until later.
+     *
+     * @return int the number of days built (0 for a future-dated assignment)
+     */
+    public function rebuildFrom(Employee $employee, CarbonInterface $effectiveFrom): int
+    {
+        $first = Carbon::instance($effectiveFrom)->startOfDay()->max($employee->join_date->copy()->startOfDay());
+        $last = today();
+
+        if ($first->gt($last)) {
+            return 0;
+        }
+
+        return $this->buildRange($employee, $first, $last);
+    }
+
+    private function buildRange(Employee $employee, Carbon $first, Carbon $last): int
+    {
         $built = 0;
 
         for ($day = $first->copy(); $day->lte($last); $day->addDay()) {

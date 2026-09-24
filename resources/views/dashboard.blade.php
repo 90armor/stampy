@@ -146,34 +146,63 @@
             </x-card>
 
             <div class="flex flex-col gap-4">
-                <x-card>
-                    <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Shortcuts</p>
-                    <h2 class="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">Quick Actions</h2>
+                @php
+                    // Gated by the exact ability its destination enforces —
+                    // not a role list — so this can never drift the way it
+                    // did before: this card used to hardcode all four links
+                    // behind "$stats is set", which silently came to mean
+                    // "admin or manager" (routes/web.php) rather than
+                    // "admin", so a manager saw "Add department" and
+                    // "Organization settings" (organization.index is
+                    // role:admin only) and got a 403 on either one.
+                    $quickActions = collect([
+                        ['label' => 'Add employee', 'route' => 'employees.index', 'icon' => 'plus', 'accent' => true, 'ability' => ['create', \App\Models\Employee::class]],
+                        ['label' => 'Add department', 'route' => 'organization.index', 'icon' => 'plus', 'accent' => true, 'ability' => ['create', \App\Models\Department::class]],
+                        ['label' => 'View employees', 'route' => 'employees.index', 'icon' => 'users', 'accent' => false, 'ability' => ['viewAny', \App\Models\Employee::class]],
+                        ['label' => 'Organization settings', 'route' => 'organization.index', 'icon' => 'building-office', 'accent' => false, 'ability' => ['viewAny', \App\Models\Department::class]],
+                    ])->filter(fn ($action) => auth()->user()->can(...$action['ability']))->values();
 
-                    <div class="mt-4 space-y-1.5">
-                        @foreach ([
-                            ['label' => 'Add employee', 'route' => 'employees.index', 'icon' => 'plus', 'accent' => true],
-                            ['label' => 'Add department', 'route' => 'organization.index', 'icon' => 'plus', 'accent' => true],
-                            ['label' => 'View employees', 'route' => 'employees.index', 'icon' => 'users', 'accent' => false],
-                            ['label' => 'Organization settings', 'route' => 'organization.index', 'icon' => 'building-office', 'accent' => false],
-                        ] as $action)
-                            <a
-                                href="{{ route($action['route']) }}"
-                                wire:navigate
-                                class="group flex items-center gap-x-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100/70 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:bg-slate-800/60 dark:hover:text-white"
-                            >
-                                <span @class([
-                                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
-                                    'bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300' => $action['accent'],
-                                    'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' => ! $action['accent'],
-                                ])>
-                                    <x-icon :name="$action['icon']" class="h-4 w-4" />
-                                </span>
-                                {{ $action['label'] }}
-                            </a>
-                        @endforeach
-                    </div>
-                </x-card>
+                    // "View employees" duplicates the sidebar's own
+                    // "Employees" link one-for-one (same viewAny ability,
+                    // same route, always visible to the same audience) — if
+                    // ability filtering above leaves exactly that one
+                    // action, the whole card would just be a worse copy of
+                    // something already one click away, so skip the card
+                    // rather than show it with a single redundant link.
+                    // Written as a redundancy check on what survived
+                    // filtering, not a role check, so it stays correct if a
+                    // future ability change ever leaves someone else in the
+                    // same spot — today that's every manager, since create()
+                    // on both Employee and Department is admin-only.
+                    $showQuickActions = $quickActions->isNotEmpty()
+                        && ! ($quickActions->count() === 1 && $quickActions->first()['route'] === 'employees.index');
+                @endphp
+
+                @if ($showQuickActions)
+                    <x-card>
+                        <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Shortcuts</p>
+                        <h2 class="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">Quick Actions</h2>
+
+                        <div class="mt-4 space-y-1.5">
+                            @foreach ($quickActions as $action)
+                                <a
+                                    href="{{ route($action['route']) }}"
+                                    wire:navigate
+                                    class="group flex items-center gap-x-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100/70 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:bg-slate-800/60 dark:hover:text-white"
+                                >
+                                    <span @class([
+                                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+                                        'bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300' => $action['accent'],
+                                        'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' => ! $action['accent'],
+                                    ])>
+                                        <x-icon :name="$action['icon']" class="h-4 w-4" />
+                                    </span>
+                                    {{ $action['label'] }}
+                                </a>
+                            @endforeach
+                        </div>
+                    </x-card>
+                @endif
 
                 <x-card>
                     <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Getting started</p>

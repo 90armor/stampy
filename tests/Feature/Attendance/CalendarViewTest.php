@@ -7,6 +7,7 @@ use App\Livewire\Attendance\Show;
 use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
 use App\Models\Employee;
+use App\Models\Holiday;
 use App\Models\User;
 use App\Models\WorkSchedule;
 use App\Services\Attendance\DailySummaryBuilder;
@@ -257,6 +258,50 @@ class CalendarViewTest extends TestCase
             ->test(Show::class, ['employee' => $employee])
             ->set('month', self::SUNDAY_START_MONTH)
             ->assertSeeHtml('M4.5 12.75l6 6 9-13.5');
+    }
+
+    public function test_todays_cell_ring_has_a_dark_mode_variant(): void
+    {
+        // ring-primary-500 (the isToday() ring) with no dark: variant loses
+        // the cascade in dark mode to the cell's own status ring, which DOES
+        // have one (dark:ring-{color}-500/30, by design — that's what dark:
+        // is for) — "today" then reads as an ordinary status-coloured cell,
+        // 1px wider and otherwise indistinguishable. Confirmed in a real
+        // browser: computed box-shadow was rgb(63,130,102) — primary-500 —
+        // in light mode, but the cell's own amber dark ring once .dark was
+        // added, before dark:ring-primary-400 was added here. This only
+        // pins the class is present; the cascade behaviour itself isn't
+        // something a server-rendered-HTML assertion can check.
+        $this->travelTo(Carbon::parse('2026-03-15 12:00:00'));
+        $employee = Employee::factory()->create();
+
+        Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', self::SUNDAY_START_MONTH)
+            ->assertSeeHtml('ring-2 ring-primary-500 dark:ring-primary-400');
+    }
+
+    public function test_a_long_holiday_name_wraps_instead_of_truncating_to_one_line(): void
+    {
+        // "Company Anniversary (demo)" (HolidaySeeder's own wording) used to
+        // hard-truncate to one line ("Company Anniversary (dem…") even
+        // though the cell has vertical room for two. line-clamp-2 (not
+        // truncate) shows the full name across two lines when it fits, and
+        // only ellipsizes what still doesn't — confirmed visually at both
+        // mobile and desktop widths, in a real browser, since this is a
+        // wrapping/layout behaviour no server-rendered-HTML assertion can
+        // check on its own. title= stays as a fallback for names that are
+        // still cut off after two lines.
+        $employee = Employee::factory()->create();
+        Holiday::factory()->create(['date' => '2026-03-05', 'name' => 'Company Anniversary (demo)']);
+
+        Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', self::SUNDAY_START_MONTH)
+            ->assertDontSeeHtml('class="w-full truncate')
+            ->assertSeeHtml('class="w-full line-clamp-2')
+            ->assertSeeHtml('title="Company Anniversary (demo)"')
+            ->assertSee('Company Anniversary (demo)');
     }
 
     public function test_every_cell_carries_an_accessible_label(): void

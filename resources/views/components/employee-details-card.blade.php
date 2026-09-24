@@ -1,0 +1,52 @@
+@props(['employee'])
+
+{{--
+    The employee record's read-only "Details" summary — department,
+    position, manager (linked only if the viewer can open it), start date,
+    device user ID. Shared by Employees\Show and the profile page, rather
+    than each keeping its own copy: the profile page shows a user their own
+    employee record the same way an admin sees it on Employees\Show, so this
+    is the one place that markup lives.
+--}}
+<x-card {{ $attributes }}>
+    <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Details</p>
+
+    <dl class="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <div>
+            <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Department</dt>
+            <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">{{ $employee->department->name }}</dd>
+        </div>
+        <div>
+            <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Position</dt>
+            <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">{{ $employee->position->name }}</dd>
+        </div>
+        <div>
+            <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Manager</dt>
+            <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">
+                @if ($employee->manager)
+                    @can('view', $employee->manager)
+                        <a
+                            href="{{ route('employees.show', $employee->manager) }}"
+                            wire:navigate
+                            class="rounded text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-2 hover:decoration-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:decoration-primary-700 dark:hover:decoration-primary-400"
+                        >
+                            {{ $employee->manager->full_name }}
+                        </a>
+                    @else
+                        {{ $employee->manager->full_name }}
+                    @endcan
+                @else
+                    &mdash;
+                @endif
+            </dd>
+        </div>
+        <div>
+            <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Start date</dt>
+            <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">{{ $employee->join_date->format('M j, Y') }}</dd>
+        </div>
+        <div>
+            <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Device user ID</dt>
+            <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">{{ $employee->device_user_id ?? '—' }}</dd>
+        </div>
+    </dl>
+</x-card>

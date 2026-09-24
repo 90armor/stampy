@@ -15,8 +15,14 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): View
     {
+        $user = $request->user();
+
+        // Same relations Employees\Show eager-loads for the identical
+        // Details card this page now also renders (x-employee-details-card).
+        $user->employee?->load(['department', 'position', 'manager']);
+
         return view('profile.edit', [
-            'user' => $request->user(),
+            'user' => $user,
         ]);
     }
 
