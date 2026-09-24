@@ -42,6 +42,18 @@ return new class extends Migration
             // index exists to prevent. Confirmed empirically against MySQL,
             // not assumed.
             $table->unique(['employee_id', 'punched_at', 'source']);
+
+            // A second, plain (non-unique) index for exactly one query: the
+            // admin dashboard's DashboardAttendance::recentActivity(), which
+            // runs `WHERE voided_at IS NULL ORDER BY punched_at DESC LIMIT n`
+            // with no employee_id filter — the unique index above can't serve
+            // that (its leading column is unconstrained), so without this
+            // it's a full table scan plus filesort on every dashboard load,
+            // growing with every punch ever recorded. Measured at 208,800
+            // punches (200 employees × ~2 years): type: ALL becomes type:
+            // ref with a backward index scan and no filesort, ~66ms down to
+            // ~0.11ms.
+            $table->index(['voided_at', 'punched_at']);
         });
     }
 

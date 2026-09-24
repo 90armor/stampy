@@ -16,7 +16,12 @@ return new class extends Migration
             $table->string('name');
             $table->string('username')->unique();
             $table->string('email')->nullable()->unique();
-            $table->timestamp('email_verified_at')->nullable();
+            // No email_verified_at: registration/verification were never
+            // built (see CLAUDE.md's Tech stack section) — User never
+            // implemented MustVerifyEmail, so the column would have stayed
+            // permanently unused. Removed in Phase 2.5c rather than left as
+            // dead weight now that schema changes are no longer interim
+            // alter-migrations.
             $table->string('password');
             $table->boolean('must_change_password')->default(false);
             $table->timestamp('password_changed_at')->nullable();

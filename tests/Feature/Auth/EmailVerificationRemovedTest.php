@@ -11,6 +11,8 @@ use Tests\TestCase;
  * Email verification was removed: accounts are provisioned by an admin, many have no
  * email at all, and User never implemented MustVerifyEmail, so nothing enforced it.
  * These pin that it stays gone, and that nothing has quietly started gating on it.
+ * email_verified_at itself was dropped in Phase 2.5c — there's no "unverified"
+ * state left to construct at all, so every user here is just a user.
  */
 class EmailVerificationRemovedTest extends TestCase
 {
@@ -35,9 +37,9 @@ class EmailVerificationRemovedTest extends TestCase
         }
     }
 
-    public function test_a_user_without_a_verified_email_can_use_the_app_and_edit_their_email(): void
+    public function test_a_user_can_use_the_app_and_edit_their_email_with_no_verification_step(): void
     {
-        $user = User::factory()->create(['email_verified_at' => null]);
+        $user = User::factory()->create();
 
         $this->actingAs($user)->get('/dashboard')->assertOk();
 

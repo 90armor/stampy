@@ -34,7 +34,6 @@ class EmployeeSeeder extends Seeder
                         'name' => $data['full_name'],
                         'username' => $username,
                         'password' => Hash::make('password'),
-                        'email_verified_at' => now(),
                     ]
                 );
 

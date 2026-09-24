@@ -180,7 +180,6 @@ class FormModal extends Component
                 'username' => $this->username,
                 'email' => $this->email,
                 'password' => Hash::make($password),
-                'email_verified_at' => now(),
             ]);
 
             $user->assignRole($this->role);
