@@ -22,6 +22,9 @@ function initAttendanceTrendChart() {
 
     Chart.getChart(canvas)?.destroy();
 
+    const dark = document.documentElement.classList.contains('dark');
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     new Chart(canvas, {
         type: 'line',
         data: {
@@ -33,7 +36,7 @@ function initAttendanceTrendChart() {
                 borderWidth: 2,
                 pointRadius: 3,
                 pointBackgroundColor: '#26b57e',
-                pointBorderColor: '#ffffff',
+                pointBorderColor: dark ? '#1c1917' : '#ffffff',
                 pointBorderWidth: 2,
                 tension: 0.35,
                 fill: true,
@@ -42,12 +45,13 @@ function initAttendanceTrendChart() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: reducedMotion ? false : undefined,
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: '#1c1917',
-                    titleColor: '#f5f5f4',
-                    bodyColor: '#d6d3d1',
+                    backgroundColor: dark ? '#f5f5f4' : '#1c1917',
+                    titleColor: dark ? '#1c1917' : '#f5f5f4',
+                    bodyColor: dark ? '#57534e' : '#d6d3d1',
                     padding: 10,
                     displayColors: false,
                     callbacks: {
@@ -58,14 +62,14 @@ function initAttendanceTrendChart() {
             scales: {
                 x: {
                     grid: { display: false },
-                    ticks: { color: '#78716c', font: { size: 12 } },
+                    ticks: { color: dark ? '#a8a29e' : '#78716c', font: { size: 12 } },
                 },
                 y: {
                     min: 0,
                     max: 100,
-                    grid: { color: 'rgba(120, 113, 108, 0.12)' },
+                    grid: { color: dark ? 'rgba(168, 162, 158, 0.14)' : 'rgba(120, 113, 108, 0.12)' },
                     ticks: {
-                        color: '#78716c',
+                        color: dark ? '#a8a29e' : '#78716c',
                         font: { size: 12 },
                         stepSize: 25,
                         callback: (value) => `${value}%`,
@@ -78,3 +82,9 @@ function initAttendanceTrendChart() {
 
 document.addEventListener('DOMContentLoaded', initAttendanceTrendChart);
 document.addEventListener('livewire:navigated', initAttendanceTrendChart);
+
+new MutationObserver((mutations) => {
+    if (mutations.some((mutation) => mutation.attributeName === 'class')) {
+        initAttendanceTrendChart();
+    }
+}).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
