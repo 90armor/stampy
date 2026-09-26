@@ -1,5 +1,7 @@
 # Stampy Design System v1
 
+Attendance-specific presentation and responsive-table guidance lives in [Attendance UI](ATTENDANCE_UI.md).
+
 This document is the source of truth for Stampy's visual interface. It records conventions supported by the current Laravel, Blade, Livewire, Alpine.js, Tailwind CSS, and Heroicons implementation. It is a foundation for incremental page modernization, not a mandate for a whole-application redesign.
 
 ## Principles

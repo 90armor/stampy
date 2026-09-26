@@ -419,13 +419,12 @@ class AttendanceIndexTest extends TestCase
         // A late/early day is already counted in Present, not a peer tile
         // (see CLAUDE.md's "Status vs. timing" note) — the containment is
         // shown as a sub-line, not a fourth "Late" stat card.
-        $this->assertStringContainsString('of which', $html);
         $this->assertStringContainsString('2 late', $html);
-        $this->assertStringContainsString('1 left early', $html);
+        $this->assertStringContainsString('1 early', $html);
         // The exact joined text, not just its pieces — interleaved
         // @if/@endif directives around static text used to leave a stray
         // space where the raw HTML between them collapsed on render.
-        $this->assertStringContainsString('of which 2 late · 1 left early', $html);
+        $this->assertStringContainsString('2 late · 1 early', $html);
     }
 
     public function test_no_breakdown_subtext_when_nothing_is_late_or_early(): void
@@ -442,7 +441,8 @@ class AttendanceIndexTest extends TestCase
 
         $html = Livewire::actingAs($admin)->test(Index::class)->html();
 
-        $this->assertStringNotContainsString('of which', $html);
+        $this->assertStringNotContainsString(' late', $html);
+        $this->assertStringNotContainsString(' early', $html);
     }
 
     public function test_a_late_arrival_marks_the_in_time_with_a_red_underline_and_a_label(): void

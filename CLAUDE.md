@@ -1,5 +1,7 @@
 # Attendance Management System
 
+Attendance presentation conventions for status, timing, filters, dense tables, responsive overflow, empty/loading states, and accessibility are maintained in `docs/ATTENDANCE_UI.md`. Keep that contract aligned with the implementation when changing Attendance views.
+
 Internal HR tool for managing employee attendance, leave, and overtime. Built as a Laravel monolith across 5 phases. This document is the source of truth for tech stack decisions, schema, conventions, and roadmap — keep it updated as each phase lands.
 
 ## Tech stack (fixed — do not substitute)

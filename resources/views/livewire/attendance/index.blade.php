@@ -36,95 +36,91 @@
         $fromDate === $toDate => \Illuminate\Support\Carbon::parse($fromDate)->format('M j, Y'),
         default => \Illuminate\Support\Carbon::parse($fromDate)->format('M j').' – '.\Illuminate\Support\Carbon::parse($toDate)->format('M j, Y'),
     };
+    $defaultStatuses = collect($allStatuses)
+        ->reject(fn ($status) => $status === \App\Enums\AttendanceStatus::Off)
+        ->pluck('value')
+        ->sort()
+        ->values()
+        ->all();
+    $selectedStatuses = collect($statuses)->sort()->values()->all();
+    $filtersActive = ! $isToday
+        || $employeeFilter !== ''
+        || $departmentFilter !== ''
+        || $selectedStatuses !== $defaultStatuses
+        || $timingFilters !== [];
 @endphp
 
 <div class="space-y-6">
     <div>
-        <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Attendance</p>
-        <h1 class="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Daily attendance</h1>
+        <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Daily attendance</h1>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Review attendance records, timing exceptions, and calculated work time.</p>
     </div>
 
     @if ($scopeHasNoEmployeeRecord)
         <x-no-employee-record subject="Attendance" />
     @else
-    {{-- Always exactly these 3 (Present/Absent/Incomplete), 0 shown plainly
-    when a status has no rows — not appear/disappear based on whether data
-    exists — same as Employees' Total/Active/Inactive. Off/Holiday/Leave are
-    passive/expected states, not KPIs an admin needs to monitor, so they're
-    left out here (still filterable as chips below, and still shown as a
-    badge on individual table rows).
-
-    Late/Early leave are NOT peer tiles here, even though they used to be:
-    a late or early day is already one of the Present rows counted above,
-    not an additional one (see CLAUDE.md's "Status vs. timing" note) — a
-    separate "Late" tile next to "Present" implied they were disjoint and
-    summed to a total, which was true back when Late was its own status but
-    is wrong now. Shown as a sub-line under Present instead ("of which..."),
-    which is the containment made visible with the least structural change —
-    the alternative (nesting Present/Late/Early into one grouped card) would
-    need a new component for something this page is the only user of. --}}
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <x-stat-card
-            :icon="$variantStyles['present']['icon']"
-            label="Present"
-            :value="$summary['present']"
-            :icon-class="$variantStyles['present']['iconClass']"
-        >
-            {{-- One expression rather than interleaved @if/@endif around static
-            text, same reasoning as Attendance\Show's identical sub-line: the
-            raw HTML Blade leaves between directives — here, the newline/
-            indentation around each @if — collapses to a stray trailing space
-            once rendered. --}}
-            @if ($summary['late'] > 0 || $summary['early'] > 0)
-                @php
-                    $timingParts = array_filter([
-                        $summary['late'] > 0 ? $summary['late'].' late' : null,
-                        $summary['early'] > 0 ? $summary['early'].' left early' : null,
-                    ]);
-                @endphp
-                <x-slot name="subtext">of which {{ implode(' · ', $timingParts) }}</x-slot>
-            @endif
-        </x-stat-card>
-        <x-stat-card
-            :icon="$variantStyles['absent']['icon']"
-            label="Absent"
-            :value="$summary['absent']"
-            :icon-class="$variantStyles['absent']['iconClass']"
-        />
-        <x-stat-card
-            :icon="$variantStyles['incomplete']['icon']"
-            label="Incomplete"
-            :value="$summary['incomplete']"
-            :icon-class="$variantStyles['incomplete']['iconClass']"
-        />
-    </div>
+    @php
+        $timingParts = array_filter([
+            $summary['late'] > 0 ? $summary['late'].' late' : null,
+            $summary['early'] > 0 ? $summary['early'].' early' : null,
+        ]);
+    @endphp
+    <x-card :padding="false">
+        <div class="grid grid-cols-3 divide-x divide-slate-200/60 dark:divide-slate-800/60">
+            @foreach ([
+                ['key' => 'present', 'label' => 'Present'],
+                ['key' => 'absent', 'label' => 'Absent'],
+                ['key' => 'incomplete', 'label' => 'Incomplete'],
+            ] as $metric)
+                <div class="min-w-0 p-4 sm:flex sm:items-center sm:gap-3">
+                    <span class="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:flex {{ $variantStyles[$metric['key']]['iconClass'] }}">
+                        <x-icon :name="$variantStyles[$metric['key']]['icon']" class="h-4 w-4" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ $metric['label'] }}</p>
+                        <p class="mt-0.5 text-xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ $summary[$metric['key']] }}</p>
+                        @if ($metric['key'] === 'present' && $timingParts)
+                            <p class="mt-0.5 text-[11px] leading-4 text-slate-500 dark:text-slate-400 sm:text-xs">{{ implode(' · ', $timingParts) }}</p>
+                        @endif
+                    </div>
+                </div>
+            @endforeach
+        </div>
+    </x-card>
 
     <x-card :padding="false">
-        <div class="flex flex-wrap items-center justify-between gap-4 p-6 pb-0">
+        <div class="flex flex-wrap items-center justify-between gap-3 p-5 pb-0 sm:p-6 sm:pb-0">
             <h2 class="flex items-baseline gap-x-2 text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-                All attendance
-                <span class="text-xs font-medium text-slate-400 dark:text-slate-500">{{ $attendances->total() }} shown</span>
+                Attendance records
+                <span class="text-xs font-normal text-slate-500 dark:text-slate-400">{{ $attendances->total() }} {{ $attendances->total() === 1 ? 'record' : 'records' }}</span>
             </h2>
 
-            <button
-                type="button"
-                wire:click="resetFilters"
-                class="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-primary-600 dark:text-slate-400 dark:hover:text-primary-400"
-            >
-                <x-icon name="x-mark" class="h-3.5 w-3.5" />
-                Reset filters
-            </button>
+            <div class="flex items-center gap-3">
+                <span wire:loading.delay class="text-xs text-slate-500 dark:text-slate-400" role="status">Updating…</span>
+                @if ($filtersActive)
+                    <button
+                        type="button"
+                        wire:click="resetFilters"
+                        class="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-primary-300"
+                    >
+                        <x-icon name="x-mark" class="h-3.5 w-3.5" />
+                        Reset filters
+                    </button>
+                @endif
+            </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-3 p-6">
-            <div class="relative" x-data="{ open: false }" @click.outside="open = false">
+        <div class="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 sm:p-6 lg:grid-cols-[auto_minmax(16rem,1fr)_14rem]">
+            <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="open = false">
                 <button
                     type="button"
                     @click="open = !open"
-                    class="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm hover:bg-slate-50 focus:border-primary-500 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                    :aria-expanded="open"
+                    aria-controls="attendance-date-panel"
+                    class="inline-flex w-full items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 lg:w-auto"
                 >
-                    <x-icon name="calendar-days" class="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                    {{ $rangeLabel }}
+                    <span class="inline-flex items-center gap-2"><x-icon name="calendar-days" class="h-4 w-4 text-slate-400 dark:text-slate-500" />{{ $rangeLabel }}</span>
+                    <x-icon name="chevron-down" class="h-4 w-4 text-slate-400 dark:text-slate-500" />
                 </button>
 
                 {{-- Popovers are content surfaces and therefore opaque. This
@@ -145,17 +141,16 @@
                 solve it with max-height + overflow-y-auto on the panel, or
                 flip it to open upward, not with teleport. --}}
                 <div
+                    id="attendance-date-panel"
                     x-show="open"
                     x-cloak
                     class="absolute left-0 z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl bg-white p-4 shadow-xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800"
                 >
                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Quick ranges</p>
                     <div class="mt-2 grid grid-cols-2 gap-2">
-                        <button type="button" wire:click="setRange('today')" @click="open = false" class="rounded-lg px-2 py-1.5 text-left text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">Today</button>
-                        <button type="button" wire:click="setRange('yesterday')" @click="open = false" class="rounded-lg px-2 py-1.5 text-left text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">Yesterday</button>
-                        <button type="button" wire:click="setRange('last7')" @click="open = false" class="rounded-lg px-2 py-1.5 text-left text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">Last 7 days</button>
-                        <button type="button" wire:click="setRange('last30')" @click="open = false" class="rounded-lg px-2 py-1.5 text-left text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">Last 30 days</button>
-                        <button type="button" wire:click="setRange('thisMonth')" @click="open = false" class="rounded-lg px-2 py-1.5 text-left text-sm text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">This month</button>
+                        @foreach (['today' => 'Today', 'yesterday' => 'Yesterday', 'last7' => 'Last 7 days', 'last30' => 'Last 30 days', 'thisMonth' => 'This month'] as $preset => $label)
+                            <button type="button" wire:click="setRange('{{ $preset }}')" @click="open = false" class="rounded-lg px-2 py-1.5 text-left text-sm text-slate-600 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:bg-slate-800">{{ $label }}</button>
+                        @endforeach
                     </div>
 
                     {{-- From/To stacked, not side-by-side: a native date
@@ -194,7 +189,8 @@
                 </div>
             </div>
 
-            <div class="relative min-w-[200px] flex-1">
+            <div class="relative min-w-0 sm:col-span-2 lg:col-span-1">
+                <label for="attendance-search" class="sr-only">Search by employee name or code</label>
                 <x-icon name="search" class="pointer-events-none absolute left-3 top-2.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
                 <input
                     id="attendance-search"
@@ -205,8 +201,9 @@
                 >
             </div>
 
-            <div>
-                <x-select id="attendance-department" wire:model.live="departmentFilter">
+            <div class="min-w-0">
+                <label for="attendance-department" class="sr-only">Department</label>
+                <x-select id="attendance-department" wire:model.live="departmentFilter" class="w-full">
                     <option value="">All departments</option>
                     @foreach ($departments as $department)
                         <option value="{{ $department->id }}">{{ $department->name }}</option>
@@ -219,23 +216,28 @@
         row is the whole point, since Status and Timing combine with AND
         between them (and OR within each), and nothing about the chips
         themselves signals that grouping. --}}
-        <p class="px-6 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Status</p>
-        <div class="flex flex-wrap gap-2 px-6 pb-4">
+        <div class="grid gap-4 border-t border-slate-200/60 px-5 py-4 dark:border-slate-800/60 sm:px-6 xl:grid-cols-[minmax(0,1fr)_auto]">
+        <fieldset>
+        <legend class="text-xs font-medium text-slate-700 dark:text-slate-300">Status</legend>
+        <div class="mt-2 flex flex-wrap gap-2">
             @foreach ($allStatuses as $status)
                 @php $selected = in_array($status->value, $statuses, true); @endphp
                 <button
                     type="button"
                     wire:click="toggleStatus('{{ $status->value }}')"
+                    aria-pressed="{{ $selected ? 'true' : 'false' }}"
                     @class([
-                        'inline-flex items-center rounded-lg px-3 py-1 text-xs font-medium transition',
-                        'bg-primary-600 text-white shadow-sm dark:bg-primary-500' => $selected,
-                        'bg-transparent text-slate-500 ring-1 ring-inset ring-slate-300 hover:border-slate-400 hover:text-slate-700 dark:text-slate-400 dark:ring-slate-700 dark:hover:text-slate-200' => ! $selected,
+                        'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-slate-900',
+                        'bg-primary-700 text-white shadow-sm hover:bg-primary-800 active:bg-primary-900 dark:bg-primary-600 dark:hover:bg-primary-500 dark:active:bg-primary-700' => $selected,
+                        'bg-white text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-700 dark:hover:text-white dark:active:bg-slate-600' => ! $selected,
                     ])
                 >
+                    @if ($selected)<x-icon name="check" class="h-3.5 w-3.5" />@endif
                     {{ $status->label() }}
                 </button>
             @endforeach
         </div>
+        </fieldset>
 
         {{-- Timing (late arrival / early departure) is independent of status
         (see AttendanceStatus's doc comment) — filtering for it used to be
@@ -243,22 +245,27 @@
         "early leave" ever was. Same chip styling and OR-across-selected
         semantics as the status chips above, just a separate #[Url]-bound
         property so the two filters combine independently. --}}
-        <p class="px-6 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Timing</p>
-        <div class="flex flex-wrap gap-2 px-6 pb-6">
+        <fieldset>
+        <legend class="text-xs font-medium text-slate-700 dark:text-slate-300">Timing</legend>
+        <div class="mt-2 flex flex-wrap gap-2">
             @foreach (['late' => 'Late arrival', 'early' => 'Early departure'] as $value => $label)
                 @php $selected = in_array($value, $timingFilters, true); @endphp
                 <button
                     type="button"
                     wire:click="toggleTimingFilter('{{ $value }}')"
+                    aria-pressed="{{ $selected ? 'true' : 'false' }}"
                     @class([
-                        'inline-flex items-center rounded-lg px-3 py-1 text-xs font-medium transition',
-                        'bg-amber-600 text-white shadow-sm dark:bg-amber-500' => $selected,
-                        'bg-transparent text-slate-500 ring-1 ring-inset ring-slate-300 hover:border-slate-400 hover:text-slate-700 dark:text-slate-400 dark:ring-slate-700 dark:hover:text-slate-200' => ! $selected,
+                        'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-slate-900',
+                        'bg-primary-700 text-white shadow-sm hover:bg-primary-800 active:bg-primary-900 dark:bg-primary-600 dark:hover:bg-primary-500 dark:active:bg-primary-700' => $selected,
+                        'bg-white text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-700 dark:hover:text-white dark:active:bg-slate-600' => ! $selected,
                     ])
                 >
+                    @if ($selected)<x-icon name="check" class="h-3.5 w-3.5" />@endif
                     {{ $label }}
                 </button>
             @endforeach
+        </div>
+        </fieldset>
         </div>
 
         @if ($maxBuiltDate && $toDate > $maxBuiltDate)
@@ -272,14 +279,22 @@
         @endif
 
         @if ($attendances->isEmpty())
-            <x-empty-state
-                icon="clock"
-                title="No attendance records"
-                description="Try widening the date range or adjusting the filters above."
-            />
+            <div class="border-t border-slate-200/60 px-6 py-10 text-center dark:border-slate-800/60">
+                <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+                    <x-icon name="clock" class="h-5 w-5" />
+                </span>
+                <h3 class="mt-3 text-sm font-medium text-slate-900 dark:text-slate-100">No attendance records</h3>
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Try widening the date range or adjusting the filters above.</p>
+            </div>
         @else
-            <div class="overflow-x-auto">
-                <table class="min-w-full">
+            <div class="border-t border-slate-200/60 dark:border-slate-800/60">
+                <div class="flex items-center justify-end gap-1.5 px-5 py-2 text-xs text-slate-500 dark:text-slate-400 lg:hidden" aria-hidden="true">
+                    <span>Scroll to view all columns</span>
+                    <x-icon name="chevron-right" class="h-3.5 w-3.5" />
+                </div>
+
+                <div class="overflow-x-auto transition-opacity" wire:loading.class="opacity-60">
+                    <table class="min-w-[72rem] w-full">
                     <thead>
                         <tr class="relative text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
                             <th class="whitespace-nowrap px-6 py-3">Date</th>
@@ -313,8 +328,8 @@
                                 $markedTimeClass = 'text-red-700 underline decoration-red-600 decoration-2 underline-offset-2 dark:text-red-300 dark:decoration-red-400';
                             @endphp
                             <tr wire:key="daily-attendance-{{ $attendance->id }}" class="group relative hover:bg-slate-50 dark:hover:bg-slate-800/60">
-                                <td class="whitespace-nowrap px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{{ $attendance->work_date->format('D j M') }}</td>
-                                <td class="px-6 py-4">
+                                <td class="whitespace-nowrap px-6 py-3 text-sm tabular-nums text-slate-700 dark:text-slate-300">{{ $attendance->work_date->format('D j M') }}</td>
+                                <td class="px-6 py-3">
                                     {{-- Resting-state accent color (not just on hover) + underline-on-hover
                                     + a visible focus ring is the app's new "this is a link" convention —
                                     see CLAUDE.md's Design system → Links. Hover alone isn't enough on
@@ -328,8 +343,8 @@
                                         <div class="text-sm text-slate-500 dark:text-slate-400">{{ $attendance->employee->employee_code }}</div>
                                     </a>
                                 </td>
-                                <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{{ $attendance->employee->department->name }}</td>
-                                <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">
+                                <td class="px-6 py-3 text-sm text-slate-700 dark:text-slate-300">{{ $attendance->employee->department->name }}</td>
+                                <td class="whitespace-nowrap px-6 py-3 text-sm tabular-nums text-slate-700 dark:text-slate-300">
                                     @if ($attendance->first_in)
                                         @if ($markedLate)
                                             <x-time :time="$attendance->first_in" class="{{ $markedTimeClass }}" aria-label="Arrived {{ $attendance->late_minutes }} minute{{ $attendance->late_minutes === 1 ? '' : 's' }} late" />
@@ -340,7 +355,7 @@
                                         —
                                     @endif
                                 </td>
-                                <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">
+                                <td class="whitespace-nowrap px-6 py-3 text-sm tabular-nums text-slate-700 dark:text-slate-300">
                                     @if ($attendance->last_out)
                                         @if ($markedEarly)
                                             <x-time :time="$attendance->last_out" class="{{ $markedTimeClass }}" aria-label="Left {{ $attendance->early_leave_minutes }} minute{{ $attendance->early_leave_minutes === 1 ? '' : 's' }} early" />
@@ -354,10 +369,10 @@
                                         —
                                     @endif
                                 </td>
-                                <td class="px-6 py-4 text-right text-sm text-slate-700 dark:text-slate-300">{{ $attendance->formattedWorkedMinutes() ?? '—' }}</td>
-                                <td class="px-6 py-4 text-right text-sm text-slate-700 dark:text-slate-300">{{ $attendance->isLate() ? $attendance->late_minutes.'m' : '—' }}</td>
-                                <td class="px-6 py-4 text-right text-sm text-slate-700 dark:text-slate-300">{{ $attendance->leftEarly() ? $attendance->early_leave_minutes.'m' : '—' }}</td>
-                                <td class="px-6 py-4">
+                                <td class="whitespace-nowrap px-6 py-3 text-right text-sm tabular-nums text-slate-700 dark:text-slate-300">{{ $attendance->formattedWorkedMinutes() ?? '—' }}</td>
+                                <td class="whitespace-nowrap px-6 py-3 text-right text-sm tabular-nums text-slate-700 dark:text-slate-300">{{ $attendance->isLate() ? $attendance->late_minutes.'m' : '—' }}</td>
+                                <td class="whitespace-nowrap px-6 py-3 text-right text-sm tabular-nums text-slate-700 dark:text-slate-300">{{ $attendance->leftEarly() ? $attendance->early_leave_minutes.'m' : '—' }}</td>
+                                <td class="px-6 py-3">
                                     {{-- Status only — the adjacent Late/Early leave columns
                                     already show the minutes (aligned, scannable), and the
                                     marked In/Out times already point at which one; a third
@@ -366,8 +381,10 @@
                                     a timing exception still reads amber, not green. --}}
                                     <x-badge :color="$style['badge']">{{ $attendance->status->label() }}</x-badge>
                                 </td>
-                                <td class="py-4 pl-2 pr-6 text-right">
-                                    <x-icon name="chevron-right" class="ml-auto h-4 w-4 text-slate-400 transition group-hover:text-primary-600 dark:text-slate-500 dark:group-hover:text-primary-400" />
+                                <td class="py-3 pl-2 pr-6 text-right">
+                                    <a href="{{ route('attendance.show', $attendance->employee) }}" wire:navigate aria-label="View attendance details for {{ $attendance->employee->full_name }}" class="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-primary-50 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover:text-primary-600 dark:text-slate-500 dark:hover:bg-primary-900/30 dark:hover:text-primary-300 dark:group-hover:text-primary-400">
+                                        <x-icon name="chevron-right" class="h-4 w-4" />
+                                    </a>
                                     @unless ($loop->last)
                                         <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
                                     @endunless
@@ -375,7 +392,8 @@
                             </tr>
                         @endforeach
                     </tbody>
-                </table>
+                    </table>
+                </div>
             </div>
 
             <div class="mx-6 border-t border-slate-200/60 py-4 dark:border-slate-800/60">
