@@ -15,7 +15,7 @@ $navItems = [
 
 <div class="flex h-full w-[242px] flex-col bg-white/70 backdrop-blur-xl border-r border-slate-200/60 dark:bg-slate-900/60 dark:border-slate-800/70">
     <div class="flex h-16 shrink-0 items-center px-6">
-        <a href="{{ route('dashboard') }}" wire:navigate class="flex items-center gap-2.5">
+        <a href="{{ route('dashboard') }}" wire:navigate class="flex items-center gap-2.5 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
             <x-logo size="28" />
             <span class="text-xl font-medium text-slate-900 dark:text-slate-100">Stampy</span>
         </a>
@@ -36,7 +36,7 @@ $navItems = [
                 <a
                     href="{{ route($item['route']) }}"
                     wire:navigate
-                    class="group relative flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm transition
+                    class="group relative flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500
                         {{ $active ? 'bg-primary-100/80 font-semibold text-primary-700 dark:bg-primary-900/50 dark:text-primary-300' : 'font-medium text-slate-500 hover:bg-slate-100/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white' }}"
                 >
                     @if ($active)

@@ -104,11 +104,17 @@ The modal backdrop may use transparency and `backdrop-blur-sm`. This is an overl
 
 Prefer composition over adding props that expose implementation choices. Props should express genuine behavior or content, not optional design-system rules.
 
+### Entity detail pages
+
+Entity detail pages are operational records, not dashboards or profile heroes. Lead with a compact identity header, then place structured metadata and primary operational state in the main reading area while lower-density account or related-workflow sections may use a narrower supporting column on desktop. Preserve a single logical mobile reading order, use description lists for labeled metadata, and keep management, contextual, and navigation actions visually distinct and permission-aware.
+
 ## Interaction states
 
-- Every interactive element has a visible rest state and a keyboard focus indicator.
+- Every interactive element has a visible rest state and a keyboard focus indicator. Equivalent primitives use the existing primary/evergreen palette for a clear, no-layout-shift `focus-visible` ring; the treatment respects the component type rather than forcing the same border construction onto buttons, links, fields, and navigation.
 - Hover may strengthen an existing affordance; it must not reveal the only action or link cue.
-- Disabled controls use reduced contrast and `cursor-not-allowed` where appropriate, while remaining readable.
+- Pressed (`:active`) feedback is temporary and distinct from focus and selected/current state. Pointer activation must not create a decorative persistent ring.
+- Disabled controls use reduced contrast and `cursor-not-allowed` where appropriate, while remaining readable. Loading actions remain disabled against repeat submission and retain meaningful copy or an accessible loading indicator.
+- Text-entry and selection controls may retain a visible `focus` border/ring while being edited; action controls and links prefer `focus-visible` so keyboard focus is prominent without adding unnecessary pointer-click persistence.
 - Destructive actions use red semantics and require confirmation when the effect is material.
 - Row navigation must be keyboard reachable. A cell link uses visible primary-colored underlined text; a fully clickable row uses cursor, hover, and `focus-visible` treatment.
 - Preserve user-entered state during Livewire updates and restore focus after modal dismissal.

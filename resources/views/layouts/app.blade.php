@@ -46,7 +46,7 @@
 
                 <div x-show="sidebarOpen" x-transition:enter="transition ease-in-out duration-200 transform" x-transition:enter-start="-translate-x-full" x-transition:enter-end="translate-x-0" x-transition:leave="transition ease-in-out duration-200 transform" x-transition:leave-start="translate-x-0" x-transition:leave-end="-translate-x-full" class="fixed inset-y-0 left-0 flex w-[242px]">
                     @include('layouts.partials.sidebar')
-                    <button type="button" class="absolute top-4 -right-10 text-white" @click="sidebarOpen = false">
+                    <button type="button" class="absolute top-4 -right-10 rounded-lg text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400" @click="sidebarOpen = false">
                         <x-icon name="x-mark" class="w-6 h-6" />
                     </button>
                 </div>

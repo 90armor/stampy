@@ -209,7 +209,7 @@
                                                 method: 'resetPassword',
                                                 args: [],
                                             })"
-                                            class="inline-flex shrink-0 items-center justify-center gap-x-1.5 rounded-lg px-3.5 py-2 text-sm font-medium shadow-none transition focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 bg-white text-slate-700 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-700"
+                                            class="inline-flex shrink-0 items-center justify-center gap-x-1.5 rounded-lg bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-none ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-700 dark:active:bg-slate-600 dark:focus-visible:ring-offset-slate-900"
                                         >
                                             Reset password
                                         </button>
