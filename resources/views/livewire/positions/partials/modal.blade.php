@@ -39,8 +39,11 @@
         </form>
 
         <div class="mx-6 flex items-center justify-end gap-3 border-t border-slate-200/60 py-4 dark:border-slate-800/60">
-            <x-button type="button" variant="secondary" wire:click="$set('showModal', false)">Cancel</x-button>
-            <x-button type="submit" form="position-form" variant="primary">Save</x-button>
+            <x-button type="button" variant="secondary" wire:click="$set('showModal', false)" wire:loading.attr="disabled" wire:target="save">Cancel</x-button>
+            <x-button type="submit" form="position-form" variant="primary" wire:loading.attr="disabled" wire:target="save">
+                <span wire:loading.remove wire:target="save">Save</span>
+                <span wire:loading wire:target="save">Saving&hellip;</span>
+            </x-button>
         </div>
     </x-modal>
 @endif
