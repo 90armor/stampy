@@ -148,6 +148,32 @@ class EmployeeScheduleAssignmentsComponentTest extends TestCase
             ->assertDontSee('Bulk reassign on the Schedules tab');
     }
 
+    public function test_current_schedule_is_presented_before_assignment_history(): void
+    {
+        $employee = Employee::factory()->create();
+        $originalScheduleName = $employee->scheduleAssignments()
+            ->with('workSchedule')
+            ->sole()
+            ->workSchedule
+            ->name;
+        $newSchedule = WorkSchedule::factory()->create(['name' => 'Current Evening Shift']);
+
+        EmployeeWorkSchedule::factory()->create([
+            'employee_id' => $employee->id,
+            'work_schedule_id' => $newSchedule->id,
+            'effective_from' => today(),
+        ]);
+
+        $html = Livewire::actingAs($this->admin())
+            ->test(ScheduleAssignments::class, ['employee' => $employee])
+            ->html();
+
+        $this->assertStringContainsString('Current Evening Shift', $html);
+        $this->assertLessThan(strpos($html, $originalScheduleName), strpos($html, 'Current Evening Shift'));
+        $this->assertLessThan(strpos($html, 'Assign schedule'), strpos($html, 'Current Evening Shift'));
+        $this->assertLessThan(strpos($html, 'Assignment history'), strpos($html, 'Assign schedule'));
+    }
+
     public function test_admin_cannot_delete_the_only_assignment_row(): void
     {
         $employee = Employee::factory()->create();

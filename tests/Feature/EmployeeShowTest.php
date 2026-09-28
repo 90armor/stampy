@@ -49,7 +49,22 @@ class EmployeeShowTest extends TestCase
         $this->actingAs($this->admin())
             ->get(route('employees.show', $employee))
             ->assertOk()
-            ->assertSee('Profile Target');
+            ->assertSee('Profile Target')
+            ->assertSee('Edit employee')
+            ->assertSeeHtml('href="'.route('attendance.show', $employee).'"');
+    }
+
+    public function test_a_manager_can_view_a_report_without_employee_management_actions(): void
+    {
+        $managerEmployee = Employee::factory()->create();
+        $report = Employee::factory()->create(['manager_id' => $managerEmployee->id, 'full_name' => 'Read Only Report']);
+
+        $this->actingAs($this->managerUser($managerEmployee))
+            ->get(route('employees.show', $report))
+            ->assertOk()
+            ->assertSee('Read Only Report')
+            ->assertDontSee('Edit employee')
+            ->assertDontSee('Assign schedule');
     }
 
     public function test_the_profile_shows_no_manager_as_a_dash(): void
