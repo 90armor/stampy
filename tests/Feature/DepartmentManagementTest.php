@@ -42,6 +42,26 @@ class DepartmentManagementTest extends TestCase
         $this->assertDatabaseHas('departments', ['name' => 'Human Resources']);
     }
 
+    public function test_organization_workspace_and_department_actions_are_accessible(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        $department = Department::factory()->create(['name' => 'Customer Success']);
+
+        $this->actingAs($admin)
+            ->get(route('organization.index'))
+            ->assertOk()
+            ->assertSee('<h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Organization</h1>', false)
+            ->assertDontSee('Departments, Positions, Holidays &amp; Schedules', false)
+            ->assertSee('aria-label="Organization sections"', false);
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->assertSee('Define the teams employees belong to.')
+            ->assertSee('aria-label="Edit Customer Success department"', false)
+            ->assertSee('aria-label="Delete Customer Success department"', false)
+            ->assertSee('role="tooltip"', false);
+    }
+
     public function test_admin_can_edit_a_department(): void
     {
         $admin = User::factory()->create()->assignRole('admin');
