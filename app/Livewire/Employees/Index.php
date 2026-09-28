@@ -38,6 +38,12 @@ class Index extends Component
         $this->resetPage();
     }
 
+    public function resetFilters(): void
+    {
+        $this->reset(['search', 'departmentFilter', 'statusFilter']);
+        $this->resetPage();
+    }
+
     public function mount(): void
     {
         $this->authorize('viewAny', Employee::class);
@@ -97,6 +103,7 @@ class Index extends Component
                 ->get(),
             'hasAnyEmployees' => $visible()->exists(),
             'scopeHasNoEmployeeRecord' => $scope->hasNoEmployeeRecord,
+            'filtersActive' => $this->search !== '' || $this->departmentFilter !== '' || $this->statusFilter !== '',
             'stats' => [
                 'total_employees' => $visible()->count(),
                 'active_employees' => $visible()->where('status', 'active')->count(),

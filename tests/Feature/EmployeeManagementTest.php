@@ -151,6 +151,40 @@ class EmployeeManagementTest extends TestCase
             ->assertDontSee('Bob Builder');
     }
 
+    public function test_reset_filters_restores_the_default_directory_state(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        $department = Department::factory()->create();
+        Employee::factory()->create(['full_name' => 'Reset Target', 'department_id' => $department->id, 'status' => 'inactive']);
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->set('search', 'Missing')
+            ->set('departmentFilter', (string) $department->id)
+            ->set('statusFilter', 'active')
+            ->assertSee('No employees found')
+            ->call('resetFilters')
+            ->assertSet('search', '')
+            ->assertSet('departmentFilter', '')
+            ->assertSet('statusFilter', '')
+            ->assertSee('Reset Target');
+    }
+
+    public function test_employee_link_and_row_actions_have_explicit_accessible_targets(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        $employee = Employee::factory()->create(['full_name' => 'Accessible Person']);
+
+        $this->actingAs($admin)
+            ->get(route('employees.index'))
+            ->assertOk()
+            ->assertSeeHtml('href="'.route('employees.show', $employee).'"')
+            ->assertSeeHtml('aria-label="Edit Accessible Person"')
+            ->assertSeeHtml('aria-label="Deactivate Accessible Person"')
+            ->assertSee('Edit employee')
+            ->assertSee('Deactivate employee');
+    }
+
     public function test_employee_without_a_role_cannot_view_the_employee_list(): void
     {
         $employee = User::factory()->create()->assignRole('employee');
@@ -215,10 +249,10 @@ class EmployeeManagementTest extends TestCase
         $managerEmployee = Employee::factory()->create(['user_id' => $manager->id]);
         Employee::factory()->create(['full_name' => 'A Report', 'manager_id' => $managerEmployee->id, 'status' => 'active']);
 
-        $this->actingAs($admin)->get(route('employees.index'))->assertOk()->assertSeeHtml('title="Deactivate"');
+        $this->actingAs($admin)->get(route('employees.index'))->assertOk()->assertSeeHtml('aria-label="Deactivate A Report"');
 
         // The manager's directory has rows (their team), so the absence is about the control, not an empty page.
-        $this->actingAs($manager)->get(route('employees.index'))->assertOk()->assertSee('A Report')->assertDontSeeHtml('title="Deactivate"');
+        $this->actingAs($manager)->get(route('employees.index'))->assertOk()->assertSee('A Report')->assertDontSeeHtml('aria-label="Deactivate A Report"');
     }
 
     public function test_manager_cannot_deactivate_an_employee(): void
