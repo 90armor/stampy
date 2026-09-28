@@ -62,6 +62,75 @@ class HolidayManagementTest extends TestCase
         $this->assertDatabaseHas('holidays', ['date' => self::WORKDAY, 'name' => 'Test Holiday']);
     }
 
+    public function test_holiday_workspace_presents_year_context_and_accessible_actions(): void
+    {
+        Carbon::setTestNow('2026-09-28 10:00:00');
+        $admin = $this->admin();
+        Holiday::factory()->create(['date' => self::WORKDAY, 'name' => 'Constitution Day']);
+
+        $component = Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->assertSet('yearFilter', '2026')
+            ->assertSee('Configure company-wide dates that affect attendance.')
+            ->assertSee('aria-label="Holidays for 2026"', false)
+            ->assertSee('datetime="2026-02-02"', false)
+            ->assertSee('aria-label="Edit Constitution Day holiday on February 2, 2026"', false)
+            ->assertSee('aria-label="Delete Constitution Day holiday on February 2, 2026"', false)
+            ->assertSee('role="tooltip"', false);
+
+        $component->call('create')
+            ->assertSee('Saving changes recalculates attendance for active employees on the affected date or dates.')
+            ->assertSee('maxlength="255"', false)
+            ->assertSee('wire:loading.attr="disabled"', false)
+            ->assertSee('Saving&hellip;', false);
+    }
+
+    public function test_holiday_note_matches_the_database_string_limit(): void
+    {
+        $admin = $this->admin();
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->call('create')
+            ->set('date', self::WORKDAY)
+            ->set('name', 'Test Holiday')
+            ->set('note', str_repeat('a', 255))
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('holidays', [
+            'date' => self::WORKDAY,
+            'note' => str_repeat('a', 255),
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->call('create')
+            ->set('date', '2026-02-03')
+            ->set('name', 'Another Holiday')
+            ->set('note', str_repeat('a', 256))
+            ->call('save')
+            ->assertHasErrors(['note' => 'max']);
+
+        $this->assertDatabaseMissing('holidays', ['date' => '2026-02-03']);
+    }
+
+    public function test_year_filter_is_chronological_and_names_an_empty_year(): void
+    {
+        Carbon::setTestNow('2026-09-28 10:00:00');
+        $admin = $this->admin();
+        Holiday::factory()->create(['date' => '2026-11-09', 'name' => 'Later Holiday']);
+        Holiday::factory()->create(['date' => '2026-01-07', 'name' => 'Earlier Holiday']);
+        Holiday::factory()->create(['date' => '2027-01-01', 'name' => 'Next Year Holiday']);
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->assertSeeInOrder(['Earlier Holiday', 'Later Holiday'])
+            ->assertDontSee('Next Year Holiday')
+            ->set('yearFilter', '2028')
+            ->assertSee('No holidays for 2028');
+    }
+
     public function test_admin_can_edit_a_holiday(): void
     {
         $admin = $this->admin();
