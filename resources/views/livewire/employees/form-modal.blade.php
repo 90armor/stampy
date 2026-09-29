@@ -217,7 +217,7 @@
                                 @else
                                     <div class="py-4">
                                         <label class="flex items-center gap-2">
-                                            <input type="checkbox" wire:model.live="create_user" class="rounded border-slate-300 text-primary-600 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800">
+                                            <input type="checkbox" wire:model.live="create_user">
                                             <span class="text-sm font-medium text-slate-700 dark:text-slate-300">Create a login account for this employee</span>
                                         </label>
 

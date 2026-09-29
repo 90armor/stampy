@@ -80,7 +80,7 @@
         <!-- Remember Me -->
         <div class="flex flex-col items-stretch gap-1 min-[360px]:flex-row min-[360px]:items-center min-[360px]:justify-between">
             <label for="remember_me" class="inline-flex min-h-11 cursor-pointer items-center gap-x-2 text-sm text-slate-700 dark:text-slate-300">
-                <input id="remember_me" type="checkbox" class="rounded border-slate-300 text-primary-600 shadow-sm checked:border-primary-600 checked:bg-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:checked:border-primary-600 dark:checked:bg-primary-600" name="remember">
+                <input id="remember_me" type="checkbox" class="shadow-sm" name="remember">
                 {{ __('Keep me signed in on this device') }}
             </label>
 

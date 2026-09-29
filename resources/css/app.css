@@ -2,6 +2,49 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Native selection controls extend Tailwind Forms as one shared control
+   family. Explicit checked selectors keep the evergreen state from being
+   replaced by a dark neutral background, including when the control is
+   disabled. The native checkmark/dot continues to carry selected meaning. */
+input:where([type='checkbox']),
+input:where([type='radio']) {
+    @apply cursor-pointer border-slate-300 bg-white text-primary-600 focus:ring-0 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed dark:border-slate-700 dark:bg-slate-800 dark:focus-visible:ring-offset-slate-900;
+}
+
+input:where([type='checkbox']) {
+    @apply rounded;
+}
+
+input:where([type='checkbox']):not(:disabled):not(:checked):hover,
+input:where([type='radio']):not(:disabled):not(:checked):hover {
+    @apply border-primary-400;
+}
+
+input:where([type='checkbox']):checked,
+input:where([type='radio']):checked {
+    @apply border-primary-600 bg-primary-600 dark:border-primary-500 dark:bg-primary-500;
+}
+
+input:where([type='checkbox']):checked:not(:disabled):hover,
+input:where([type='radio']):checked:not(:disabled):hover {
+    @apply border-primary-700 bg-primary-700 dark:border-primary-400 dark:bg-primary-400;
+}
+
+input:where([type='checkbox']):disabled:not(:checked),
+input:where([type='radio']):disabled:not(:checked) {
+    @apply border-slate-300 bg-slate-100 dark:border-slate-700 dark:bg-slate-900;
+}
+
+input:where([type='checkbox']):disabled:checked,
+input:where([type='radio']):disabled:checked {
+    @apply border-primary-400 bg-primary-400 text-primary-400 dark:border-primary-500 dark:bg-primary-500 dark:text-primary-500;
+}
+
+input:where([type='checkbox'])[aria-invalid='true'],
+input:where([type='radio'])[aria-invalid='true'] {
+    @apply border-red-500 focus-visible:ring-red-500;
+}
+
 [x-cloak] {
     display: none !important;
 }
