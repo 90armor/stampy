@@ -52,7 +52,12 @@ class DepartmentManagementTest extends TestCase
             ->assertOk()
             ->assertSee('<h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Organization</h1>', false)
             ->assertDontSee('Departments, Positions, Holidays &amp; Schedules', false)
-            ->assertSee('aria-label="Organization sections"', false);
+            ->assertSee('aria-label="Organization sections"', false)
+            ->assertSee('role="alertdialog"', false)
+            ->assertSee('aria-modal="true"', false)
+            ->assertSee('aria-labelledby="confirm-dialog-departments-title"', false)
+            ->assertSee('aria-describedby="confirm-dialog-departments-description"', false)
+            ->assertSee('@keydown.tab="trapTab($event)"', false);
 
         Livewire::actingAs($admin)
             ->test(Index::class)
