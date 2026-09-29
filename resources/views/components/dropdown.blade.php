@@ -13,8 +13,38 @@ $width = match ($width) {
 };
 @endphp
 
-<div class="relative" x-data="{ open: false }" @click.outside="open = false" @close.stop="open = false">
-    <div @click="open = ! open">
+<div
+    class="relative"
+    x-data="{
+        open: false,
+        triggerEl: null,
+        toggle() {
+            if (this.open) {
+                this.open = false;
+                return;
+            }
+
+            this.triggerEl = document.activeElement;
+            this.open = true;
+        },
+        close(restoreFocus = false) {
+            this.open = false;
+
+            if (restoreFocus) {
+                const trigger = this.triggerEl;
+                this.$nextTick(() => {
+                    if (trigger && document.body.contains(trigger) && typeof trigger.focus === 'function') {
+                        trigger.focus();
+                    }
+                });
+            }
+        },
+    }"
+    @click.outside="close()"
+    @close.stop="close()"
+    @keydown.escape.stop.prevent="close(true)"
+>
+    <div @click="toggle()">
         {{ $trigger }}
     </div>
 
@@ -27,7 +57,7 @@ $width = match ($width) {
             x-transition:leave-end="opacity-0 scale-95"
             class="absolute z-50 mt-2 {{ $width }} rounded-xl shadow-lg {{ $alignmentClasses }}"
             style="display: none;"
-            @click="open = false">
+            @click="close()">
         <div class="rounded-xl ring-1 ring-black ring-opacity-5 dark:ring-white/10 {{ $contentClasses }}">
             {{ $content }}
         </div>

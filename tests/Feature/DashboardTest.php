@@ -63,6 +63,21 @@ class DashboardTest extends TestCase
         ]);
     }
 
+    public function test_application_shell_mobile_navigation_has_dialog_and_keyboard_support(): void
+    {
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('role="dialog" aria-modal="true" aria-label="Navigation"', false)
+            ->assertSee('@keydown.escape.window="if (sidebarOpen) closeSidebar()"', false)
+            ->assertSee('@keydown.tab="trapSidebarTab($event)"', false)
+            ->assertSee('x-ref="sidebarClose"', false)
+            ->assertSee('Close navigation')
+            ->assertSee('aria-haspopup="true"', false)
+            ->assertSee(':aria-expanded="open.toString()"', false)
+            ->assertSee('@keydown.escape.stop.prevent="close(true)"', false);
+    }
+
     public function test_admin_sees_the_company_wide_employee_total(): void
     {
         Employee::factory()->count(3)->create();
