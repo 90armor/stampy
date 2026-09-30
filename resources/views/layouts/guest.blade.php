@@ -31,7 +31,7 @@
         @livewireStyles
     </head>
     <body class="font-sans text-slate-900 antialiased dark:text-slate-100">
-        <div class="min-h-screen min-h-dvh grid grid-cols-1 lg:grid-cols-[46%_54%] bg-slate-50 dark:bg-slate-950 bg-shell">
+        <div class="min-h-screen min-h-dvh grid grid-cols-1 lg:grid-cols-[46%_54%] bg-slate-100 dark:bg-slate-950 bg-shell">
             <!-- Hero panel -->
             <section class="hidden lg:flex flex-col bg-primary-700 text-white px-16 py-12">
                 <x-logo-lockup size="32" variant="dark" />

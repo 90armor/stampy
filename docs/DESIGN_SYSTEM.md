@@ -30,11 +30,11 @@ This document is the source of truth for Stampy's visual interface. It records c
 | Text / Secondary | `text-slate-700` | `dark:text-slate-300` | Supporting body content and controls |
 | Text / Muted | `text-slate-500` | `dark:text-slate-400` | Metadata, hints, and secondary labels |
 | Text / Subtle | `text-slate-400` | `dark:text-slate-500` | Low-emphasis decoration; never critical copy |
-| Surface / Page | `bg-slate-50` | `dark:bg-slate-950` | Application and authentication background |
+| Surface / Page | `bg-slate-100` | `dark:bg-slate-950` | Application and authentication background |
 | Surface / Card | `bg-white` | `dark:bg-slate-900` | Cards, table containers, information panels |
 | Surface / Control | `bg-white` | `dark:bg-slate-800` | Inputs, selects, textareas, compact controls |
 | Surface / Overlay panel | `bg-white` | `dark:bg-slate-900` | Dropdowns, popovers, modal panels |
-| Border / Default | `ring-slate-200/60` or `border-slate-300` | `dark:ring-slate-800/70` or `dark:border-slate-700` | Surface and control boundaries |
+| Border / Default | `ring-slate-200/60` or `border-slate-300` | `dark:ring-slate-800` or `dark:border-slate-700` | Surface and control boundaries |
 | Border / Divider | `bg-slate-200/60` or `border-slate-200/60` | `dark:bg-slate-800/60` or `dark:border-slate-800/60` | Row and section separation |
 | Action / Primary | `bg-primary-600 text-white` | same | Main action on a page or flow |
 | Action / Secondary | `bg-white text-slate-700` | `dark:bg-slate-800 dark:text-slate-200` | Supporting actions |
@@ -71,7 +71,7 @@ Do not add arbitrary pixel spacing until the standard scale demonstrably cannot 
 - `rounded-xl`: cards, dropdown menus, and popovers.
 - `rounded-2xl`: modal and large overlay panels.
 - `rounded-full`: geometry that is intentionally circular, including avatars, dots, progress tracks, and circular icon containers; not status badges or control styling.
-- Cards use `shadow-sm` plus a quiet ring.
+- Cards use `shadow-sm` plus a ring. Separation comes from the surface step first: white cards on a `slate-100` page in light mode. In dark mode a shadow is invisible on near-black, so the card edge is a full-opacity `ring-slate-800` around the `slate-900` card on the `slate-950` page; do not weaken it back to a translucent ring.
 - Dropdowns and modal panels use `shadow-lg` or `shadow-xl` because they float above content.
 - Elevation communicates hierarchy, not decoration. Normal cards do not gain elevation or a colored ring on hover unless the entire card is interactive.
 
@@ -81,7 +81,7 @@ Surface role determines treatment; pages do not choose between glass and solid v
 
 ### Shell surfaces
 
-The sidebar, topbar, and authentication shell may use translucency and `backdrop-blur`. `.bg-shell` supplies the restrained decorative background that makes this treatment legible. Keep the effect subtle and retain clear borders.
+The sidebar, topbar, and authentication shell may use translucency and `backdrop-blur`. `.bg-shell` supplies the restrained decorative background that makes this treatment legible. Keep the effect subtle and retain clear borders. In dark mode the `.bg-shell` glow is confined to the top-left corner behind the sidebar; it must not tint the page behind content cards, where it erodes the already small dark-mode surface step.
 
 ### Content surfaces
 

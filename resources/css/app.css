@@ -70,7 +70,10 @@ input:-webkit-autofill:focus {
 }
 
 /* Soft decorative backdrop behind the application and authentication shells.
-   Only shell surfaces use glass; content surfaces stay opaque. */
+   Only shell surfaces use glass; content surfaces stay opaque. In dark mode
+   the glow is confined to the top-left corner (behind the sidebar): a green
+   haze behind the content area tinted the near-black page between cards and
+   erased what little separation dark cards have. */
 .bg-shell {
     background-image:
         radial-gradient(circle at 12% 8%, rgba(175, 240, 209, 0.35), transparent 32%),
@@ -78,7 +81,5 @@ input:-webkit-autofill:focus {
     background-attachment: fixed;
 }
 .dark .bg-shell {
-    background-image:
-        radial-gradient(circle at 12% 8%, rgba(20, 97, 68, 0.25), transparent 32%),
-        radial-gradient(circle at 88% 18%, rgba(30, 66, 50, 0.35), transparent 28%);
+    background-image: radial-gradient(280px 480px at 0 0, rgba(20, 97, 68, 0.25), transparent);
 }
