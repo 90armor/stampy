@@ -118,7 +118,7 @@ Initial avatars use one neutral tint everywhere — `bg-slate-100 text-slate-600
 
 ### Dashboard
 
-The dashboard is the stat strip followed by two independent column stacks (a wide main column and a narrow side column). Each column flows at its own height, so cards of different heights never leave vertical holes; do not return to a row-based grid where each row takes its tallest card's height. Below `lg` the stacks merge into one reading order with Needs attention first. The attendance trend is a bar chart of the present share per day in `primary-500` — the same green as the department bars, so the page has one data-visualization green; a non-working day (every scoped row Off or Holiday) renders a muted `Off`/`Holiday` marker instead of a 0% bar.
+The dashboard is the stat strip followed by two independent column stacks (a wide main column and a narrow side column). Each column flows at its own height, so cards of different heights never leave vertical holes; do not return to a row-based grid where each row takes its tallest card's height. Below `lg` the stacks merge into one reading order with Needs attention first. The attendance trend is a bar chart of the present share per day in `primary-500` — the same green as the department bars, so the page has one data-visualization green; a non-working day (every scoped row Off or Holiday) renders a muted `Off`/`Holiday` marker instead of a 0% bar. Pending figures (today, while still in progress or not calculated) are never shown as 0% or as an absence: the trend's today bar carries a `Today` marker and at most a lighter provisional bar, departments show a `Checked in N / M` so-far count, and the strip shows no percentage for In progress; see [Attendance UI](ATTENDANCE_UI.md).
 
 ### Entity detail pages
 

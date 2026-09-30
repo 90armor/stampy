@@ -244,13 +244,13 @@ class DashboardTest extends TestCase
         $this->actingAs($this->admin())
             ->get(route('dashboard'))
             ->assertViewHas('attendance', fn ($attendance) => $attendance['trend'] === [
-                ['label' => 'Thu', 'date' => '2026-03-05', 'value' => 100.0, 'marker' => null],
-                ['label' => 'Fri', 'date' => '2026-03-06', 'value' => 0.0, 'marker' => null],
-                ['label' => 'Sat', 'date' => '2026-03-07', 'value' => 0.0, 'marker' => null],
-                ['label' => 'Sun', 'date' => '2026-03-08', 'value' => 0.0, 'marker' => null],
-                ['label' => 'Mon', 'date' => '2026-03-09', 'value' => 0.0, 'marker' => null],
-                ['label' => 'Tue', 'date' => '2026-03-10', 'value' => 66.7, 'marker' => null],
-                ['label' => 'Wed', 'date' => '2026-03-11', 'value' => 33.3, 'marker' => null],
+                ['label' => 'Thu', 'date' => '2026-03-05', 'value' => 100.0, 'marker' => null, 'pending' => false],
+                ['label' => 'Fri', 'date' => '2026-03-06', 'value' => 0.0, 'marker' => null, 'pending' => false],
+                ['label' => 'Sat', 'date' => '2026-03-07', 'value' => 0.0, 'marker' => null, 'pending' => false],
+                ['label' => 'Sun', 'date' => '2026-03-08', 'value' => 0.0, 'marker' => null, 'pending' => false],
+                ['label' => 'Mon', 'date' => '2026-03-09', 'value' => 0.0, 'marker' => null, 'pending' => false],
+                ['label' => 'Tue', 'date' => '2026-03-10', 'value' => 66.7, 'marker' => null, 'pending' => false],
+                ['label' => 'Wed', 'date' => '2026-03-11', 'value' => 33.3, 'marker' => null, 'pending' => false],
             ]);
     }
 
@@ -488,5 +488,52 @@ class DashboardTest extends TestCase
             // No "Late" badge and no amber avatar on the late row.
             ->assertDontSee('bg-amber-50 text-amber-600', false)
             ->assertDontSee('>Late<', false);
+    }
+
+    public function test_a_pending_today_is_marked_never_zero_percent_or_absent(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 11:00:00'));
+        $department = Department::factory()->create(['name' => 'Pending Dept']);
+        $in = Employee::factory()->create(['department_id' => $department->id]);
+        $alsoIn = Employee::factory()->create(['department_id' => $department->id]);
+        $notYet = Employee::factory()->create(['department_id' => $department->id]);
+
+        $this->attendanceRow($in, AttendanceStatus::InProgress, ['first_in' => Carbon::parse('2026-03-11 07:55:00')]);
+        $this->attendanceRow($alsoIn, AttendanceStatus::InProgress, ['first_in' => Carbon::parse('2026-03-11 08:02:00')]);
+        $this->attendanceRow($notYet, AttendanceStatus::InProgress);
+
+        $response = $this->actingAs($this->admin())->get(route('dashboard'));
+
+        $response->assertViewHas('attendance', function ($attendance) {
+            $today = end($attendance['trend']);
+            $dept = collect($attendance['departments'])->firstWhere('name', 'Pending Dept');
+
+            return $today['pending'] === true && $today['marker'] === 'Today' && $today['value'] === null
+                && $dept['pending'] === true && $dept['checkedIn'] === 2;
+        });
+
+        $response->assertSee('Checked in', false)
+            ->assertSee('Today', false)
+            // In progress carries no percentage in the stat strip.
+            ->assertDontSee('>100%<', false)
+            ->assertDontSee('>0%<', false);
+    }
+
+    public function test_partial_present_data_today_is_a_provisional_bar_with_the_today_marker(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 16:30:00'));
+        $early = Employee::factory()->create();
+        $working = Employee::factory()->create();
+
+        $this->attendanceRow($early, AttendanceStatus::Present);
+        $this->attendanceRow($working, AttendanceStatus::InProgress, ['first_in' => Carbon::parse('2026-03-11 07:58:00')]);
+
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertViewHas('attendance', function ($attendance) {
+                $today = end($attendance['trend']);
+
+                return $today['pending'] === true && $today['marker'] === 'Today' && $today['value'] === 50.0;
+            });
     }
 }

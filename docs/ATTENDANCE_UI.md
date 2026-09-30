@@ -46,6 +46,14 @@ Every attendance **duration** — Worked, Late, Early leave, a month's total —
 
 Counts are not durations and keep their own wording: summary timing copy stays concise and omits zero values: `49 late`, `152 early`, or `49 late · 152 early`.
 
+## Pending is never 0% or absent
+
+In-progress or not-yet-calculated attendance is **pending**. It must never render as 0% or as an absence. Today is pending while any row for today is In progress or any active employee in scope has no row yet (`DashboardAttendance::todayIsPending()`).
+
+- **Trend chart:** today's bar carries a muted `Today` marker (like `Off`/`Holiday`) until the day is calculated. If some employees are already present, the share so far is drawn as a lighter, provisional bar (`primary-200`, dark `primary-800`) with the marker above it; with nobody present yet there is no bar, only the marker.
+- **Department attendance:** while today is pending, each department shows a so-far count (`Checked in 28 / 35`) with a lighter provisional bar instead of a percentage.
+- **Dashboard stat strip:** In progress and Not calculated yet carry no percentage.
+
 ## Filters are controls, not status badges
 
 Status and timing filters are separate control groups of filter chips. Chips are controls, not actions: selected is `bg-primary-50 text-primary-700` with a `ring-primary-600` border and a visible check (dark: `bg-primary-900/30 text-primary-200 ring-primary-500`); unselected is a neutral outline. Chips never use a solid fill — a solid primary fill is reserved for the page's primary action. Every chip carries `aria-pressed` and a focus-visible ring. Semantic attendance colors are reserved for attendance data and must not indicate filter selection.

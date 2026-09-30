@@ -55,7 +55,9 @@
                         $attendance['today']['late']['count'] > 0 ? $attendance['today']['late']['count'].' late' : null,
                         $attendance['today']['earlyLeave']['count'] > 0 ? $attendance['today']['earlyLeave']['count'].' early' : null,
                     ]))
-                    : $segment['percent'].'%',
+                    // Pending counts (in progress, not calculated yet) are not a
+                    // share of the day yet — no percentage (docs/ATTENDANCE_UI.md).
+                    : (in_array($segment['key'], ['in_progress', 'not_calculated'], true) ? null : $segment['percent'].'%'),
             ])->push([
                 'icon' => 'users',
                 'label' => 'Employees',
@@ -82,7 +84,9 @@
                             'sm:border-l-0' => $loop->index === 0,
                         ])
                     >
-                        <x-slot:subtext>{{ $cell['subtext'] }}</x-slot:subtext>
+                        @if ($cell['subtext'] !== null)
+                            <x-slot:subtext>{{ $cell['subtext'] }}</x-slot:subtext>
+                        @endif
                     </x-stat-card>
                 @endforeach
             </dl>
@@ -126,6 +130,7 @@
                                 data-labels="{{ json_encode($trend->pluck('label')) }}"
                                 data-values="{{ json_encode($trend->pluck('value')) }}"
                                 data-markers="{{ json_encode($trend->pluck('marker')) }}"
+                                data-pending="{{ json_encode($trend->pluck('pending')) }}"
                                 aria-hidden="true"
                             ></canvas>
                         </div>
@@ -143,9 +148,24 @@
                         <div class="mt-5 space-y-4">
                             @foreach ($attendance['departments'] as $department)
                                 <div>
-                                    <div class="flex items-baseline justify-between gap-2"><p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $department['name'] }}</p><p class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ $department['attendance'] }}%</p></div>
+                                    {{-- While today is pending, a percentage would read people
+                                    still in progress as absent: show the so-far count instead,
+                                    with a lighter provisional bar. --}}
+                                    @php
+                                        $departmentShare = $department['pending']
+                                            ? ($department['employees'] > 0 ? round($department['checkedIn'] / $department['employees'] * 100, 1) : 0)
+                                            : $department['attendance'];
+                                    @endphp
+                                    <div class="flex items-baseline justify-between gap-2">
+                                        <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $department['name'] }}</p>
+                                        @if ($department['pending'])
+                                            <p class="text-sm tabular-nums text-slate-600 dark:text-slate-300">Checked in <span class="font-semibold text-slate-900 dark:text-slate-100">{{ $department['checkedIn'] }}</span> / {{ $department['employees'] }}</p>
+                                        @else
+                                            <p class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ $department['attendance'] }}%</p>
+                                        @endif
+                                    </div>
                                     <p class="text-xs text-slate-500 dark:text-slate-400">{{ $department['employees'] }} {{ $department['employees'] === 1 ? 'employee' : 'employees' }}</p>
-                                    <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"><div class="h-full rounded-full bg-primary-500" style="width: {{ $department['attendance'] }}%"></div></div>
+                                    <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"><div @class(['h-full rounded-full', 'bg-primary-200 dark:bg-primary-800' => $department['pending'], 'bg-primary-500' => ! $department['pending']]) style="width: {{ $departmentShare }}%"></div></div>
                                 </div>
                             @endforeach
                         </div>

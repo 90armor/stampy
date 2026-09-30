@@ -176,8 +176,15 @@ class DashboardAttendance
      * chart to render instead of a misleading 0% bar. A day with no rows at
      * all (not calculated yet) stays a plain 0.
      *
+     * Today is pending until it is fully calculated (todayIsPending()):
+     * in-progress or not-yet-calculated attendance must never read as 0% or
+     * as an absence. A pending today carries the 'Today' marker, and its
+     * value is the present share so far only when someone is already
+     * present (null otherwise), flagged 'pending' so the chart draws it as
+     * provisional.
+     *
      * @param  int[]|null  $employeeIds
-     * @return list<array{label: string, date: string, value: ?float, marker: ?string}>
+     * @return list<array{label: string, date: string, value: ?float, marker: ?string, pending: bool}>
      */
     public static function weeklyTrend(?array $employeeIds, int $days = 7): array
     {
@@ -198,6 +205,8 @@ class DashboardAttendance
             ->map(fn (Collection $rows) => $rows->mapWithKeys(fn (DailyAttendance $row) => [$row->status->value => (int) $row->total]));
 
         $nonWorking = [AttendanceStatus::Off->value, AttendanceStatus::Holiday->value];
+        $todayKey = today()->format('Y-m-d');
+        $todayPending = self::todayIsPending($employeeIds);
 
         $trend = [];
         $cursor = $start->copy();
@@ -206,16 +215,24 @@ class DashboardAttendance
             $key = $cursor->format('Y-m-d');
             $counts = $countsByDate->get($key, collect());
             $isNonWorkingDay = $counts->isNotEmpty() && $counts->keys()->every(fn (string $status) => in_array($status, $nonWorking, true));
+            $isPending = $key === $todayKey && $todayPending && ! $isNonWorkingDay;
+            $present = (int) $counts->get(AttendanceStatus::Present->value, 0);
 
             $trend[] = [
                 'label' => $cursor->format('D'),
                 'date' => $key,
-                'value' => $isNonWorkingDay ? null : round((int) $counts->get(AttendanceStatus::Present->value, 0) / $total * 100, 1),
+                'value' => match (true) {
+                    $isNonWorkingDay => null,
+                    $isPending && $present === 0 => null,
+                    default => round($present / $total * 100, 1),
+                },
                 'marker' => match (true) {
+                    $isPending => 'Today',
                     ! $isNonWorkingDay => null,
                     $counts->has(AttendanceStatus::Off->value) => 'Off',
                     default => 'Holiday',
                 },
+                'pending' => $isPending,
             ];
 
             $cursor->addDay();
@@ -225,33 +242,61 @@ class DashboardAttendance
     }
 
     /**
+     * Today's attendance per department. While today is pending
+     * (todayIsPending()) a percentage would read in-progress people as
+     * absent, so each department also carries 'checkedIn' — rows today with
+     * a first punch — for a "Checked in N / M" so-far count instead.
+     *
      * @param  Collection<int, Department>  $departments  already scoped by
      *                                                    the caller (see routes/web.php) — this only computes each one's percent
      * @param  int[]|null  $employeeIds
-     * @return list<array{name: string, employees: int, attendance: float}>
+     * @return list<array{name: string, employees: int, attendance: float, checkedIn: int, pending: bool}>
      */
     public static function departmentAttendance(Collection $departments, ?array $employeeIds): array
     {
         $today = today()->format('Y-m-d');
+        $pending = self::todayIsPending($employeeIds);
 
-        $presentByDepartment = self::scopedDailyAttendanceQuery($employeeIds)
+        $byDepartment = self::scopedDailyAttendanceQuery($employeeIds)
             ->join('employees', 'employees.id', '=', 'daily_attendances.employee_id')
             ->whereDate('daily_attendances.work_date', $today)
-            ->where('daily_attendances.status', AttendanceStatus::Present->value)
-            ->selectRaw('employees.department_id, count(*) as total')
+            ->selectRaw('employees.department_id')
+            ->selectRaw('sum(daily_attendances.status = ?) as present', [AttendanceStatus::Present->value])
+            ->selectRaw('sum(daily_attendances.first_in is not null) as checked_in')
             ->groupBy('employees.department_id')
-            ->pluck('total', 'department_id');
+            ->get()
+            ->keyBy('department_id');
 
-        return $departments->map(function (Department $department) use ($presentByDepartment) {
+        return $departments->map(function (Department $department) use ($byDepartment, $pending) {
             $activeCount = $department->employees_count;
-            $present = (int) $presentByDepartment->get($department->id, 0);
+            $row = $byDepartment->get($department->id);
+            $present = (int) ($row->present ?? 0);
 
             return [
                 'name' => $department->name,
                 'employees' => $activeCount,
                 'attendance' => $activeCount > 0 ? round($present / $activeCount * 100, 1) : 0.0,
+                'checkedIn' => (int) ($row->checked_in ?? 0),
+                'pending' => $pending,
             ];
         })->values()->all();
+    }
+
+    /**
+     * Today is pending — not yet a final figure — while any scoped row for
+     * today is still In progress, or some active employee in scope has no
+     * row for today yet (not calculated). Pending attendance must never be
+     * shown as 0% or as an absence (docs/ATTENDANCE_UI.md).
+     *
+     * @param  int[]|null  $employeeIds
+     */
+    public static function todayIsPending(?array $employeeIds): bool
+    {
+        $today = today()->format('Y-m-d');
+        $rows = self::scopedDailyAttendanceQuery($employeeIds)->whereDate('work_date', $today);
+
+        return (clone $rows)->where('status', AttendanceStatus::InProgress->value)->exists()
+            || $rows->count() < self::scopedActiveEmployeeQuery($employeeIds)->count();
     }
 
     /**

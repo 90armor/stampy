@@ -7,6 +7,10 @@
 // drawn as a muted "Off"/"Holiday" label on the baseline — never a 0% bar,
 // which would read as "nobody came in". Bars use primary-500, the same green
 // as the department attendance bars, so the page has one data-viz green.
+//
+// Today is pending until it is calculated: it carries a muted "Today" marker,
+// and any partial value so far is drawn as a lighter, provisional bar with the
+// marker above it — never as a final 0% (docs/ATTENDANCE_UI.md).
 import {
     Chart,
     BarController,
@@ -30,10 +34,19 @@ const markerLabels = {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'bottom';
 
+        const bars = chart.getDatasetMeta(0).data;
+
         markers.forEach((marker, index) => {
-            if (marker) {
-                ctx.fillText(marker, scales.x.getPixelForValue(index), chartArea.bottom - 6);
+            if (!marker) {
+                return;
             }
+
+            const value = chart.data.datasets[0].data[index];
+            const y = value === null || value === undefined
+                ? chartArea.bottom - 6
+                : Math.min(chartArea.bottom - 6, bars[index].y - 4);
+
+            ctx.fillText(marker, scales.x.getPixelForValue(index), y);
         });
 
         ctx.restore();
@@ -51,6 +64,8 @@ function initAttendanceTrendChart() {
     const dark = document.documentElement.classList.contains('dark');
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const markers = JSON.parse(canvas.dataset.markers || '[]');
+    const pending = JSON.parse(canvas.dataset.pending || '[]');
+    const barColor = (index) => (pending[index] ? (dark ? '#1e4232' : '#b9d9c8') : '#3f8266');
     const muted = dark ? '#a8a29e' : '#78716c';
 
     new Chart(canvas, {
@@ -59,8 +74,8 @@ function initAttendanceTrendChart() {
             labels: JSON.parse(canvas.dataset.labels),
             datasets: [{
                 data: JSON.parse(canvas.dataset.values),
-                backgroundColor: '#3f8266',
-                hoverBackgroundColor: '#2f6850',
+                backgroundColor: (ctx) => barColor(ctx.dataIndex),
+                hoverBackgroundColor: (ctx) => (pending[ctx.dataIndex] ? barColor(ctx.dataIndex) : '#2f6850'),
                 borderRadius: 4,
                 maxBarThickness: 40,
             }],
@@ -81,7 +96,7 @@ function initAttendanceTrendChart() {
                     displayColors: false,
                     filter: (item) => item.raw !== null,
                     callbacks: {
-                        label: (ctx) => `${ctx.parsed.y}% present`,
+                        label: (ctx) => (pending[ctx.dataIndex] ? `${ctx.parsed.y}% present so far` : `${ctx.parsed.y}% present`),
                     },
                 },
             },
