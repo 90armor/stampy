@@ -154,7 +154,7 @@ class DashboardAttendance
             [$label, $badge, $detail] = match (true) {
                 $row->status === AttendanceStatus::Absent => ['Absent', 'red', null],
                 $row->status === AttendanceStatus::Incomplete => ['Incomplete', 'violet', null],
-                default => ['Late', 'amber', $row->late_minutes.'m late'],
+                default => ['Late', 'amber', Duration::format($row->late_minutes).' late'],
             };
 
             return [
@@ -284,7 +284,7 @@ class DashboardAttendance
             };
 
             $action = match (true) {
-                $isIn && $day && $day->isLate() => 'Checked in '.$day->late_minutes.'m late',
+                $isIn && $day && $day->isLate() => 'Checked in '.Duration::format($day->late_minutes).' late',
                 $isIn => 'Checked in',
                 default => 'Checked out',
             };

@@ -151,7 +151,7 @@
 
             @if ($summary['total_worked_minutes'] > 0)
                 <p class="mt-3 border-t border-slate-200/60 pt-3 text-xs text-slate-400 dark:border-slate-800/60 dark:text-slate-500">
-                    Total worked this month: {{ sprintf('%dh %02dm', intdiv($summary['total_worked_minutes'], 60), $summary['total_worked_minutes'] % 60) }}
+                    Total worked this month: {{ \App\Support\Duration::format($summary['total_worked_minutes']) }}
                 </p>
             @endif
 
@@ -475,8 +475,8 @@
                                         @endif
                                     </td>
                                     <td class="px-6 py-4 text-right text-sm text-slate-700 dark:text-slate-300">{{ $record->formattedWorkedMinutes() ?? '—' }}</td>
-                                    <td @class(['px-6 py-4 text-right text-sm', 'font-medium text-amber-700 dark:text-amber-300' => $markedLate, 'text-slate-700 dark:text-slate-300' => ! $markedLate])>{{ $markedLate ? $record->late_minutes.'m' : '—' }}</td>
-                                    <td @class(['px-6 py-4 text-right text-sm', 'font-medium text-amber-700 dark:text-amber-300' => $markedEarly, 'text-slate-700 dark:text-slate-300' => ! $markedEarly])>{{ $markedEarly ? $record->early_leave_minutes.'m' : '—' }}</td>
+                                    <td @class(['px-6 py-4 text-right text-sm', 'font-medium text-amber-700 dark:text-amber-300' => $markedLate, 'text-slate-700 dark:text-slate-300' => ! $markedLate])>{{ $record->formattedLateMinutes() ?? '—' }}</td>
+                                    <td @class(['px-6 py-4 text-right text-sm', 'font-medium text-amber-700 dark:text-amber-300' => $markedEarly, 'text-slate-700 dark:text-slate-300' => ! $markedEarly])>{{ $record->formattedEarlyLeaveMinutes() ?? '—' }}</td>
                                     <td class="px-6 py-4">
                                         {{-- Status only — the adjacent Late/Early columns already
                                         show the timing (amber); a "Late 21m" chip here repeated the
@@ -636,11 +636,11 @@
                         </div>
                         <div>
                             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Late</dt>
-                            <dd @class(['mt-0.5 text-sm', 'font-medium text-amber-700 dark:text-amber-300' => $modalMarkedLate, 'text-slate-900 dark:text-slate-100' => ! $modalMarkedLate])>{{ $modalMarkedLate ? $modalRecord->late_minutes.'m' : '—' }}</dd>
+                            <dd @class(['mt-0.5 text-sm', 'font-medium text-amber-700 dark:text-amber-300' => $modalMarkedLate, 'text-slate-900 dark:text-slate-100' => ! $modalMarkedLate])>{{ $modalRecord?->formattedLateMinutes() ?? '—' }}</dd>
                         </div>
                         <div>
                             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Early leave</dt>
-                            <dd @class(['mt-0.5 text-sm', 'font-medium text-amber-700 dark:text-amber-300' => $modalMarkedEarly, 'text-slate-900 dark:text-slate-100' => ! $modalMarkedEarly])>{{ $modalMarkedEarly ? $modalRecord->early_leave_minutes.'m' : '—' }}</dd>
+                            <dd @class(['mt-0.5 text-sm', 'font-medium text-amber-700 dark:text-amber-300' => $modalMarkedEarly, 'text-slate-900 dark:text-slate-100' => ! $modalMarkedEarly])>{{ $modalRecord?->formattedEarlyLeaveMinutes() ?? '—' }}</dd>
                         </div>
                         <div>
                             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Note</dt>

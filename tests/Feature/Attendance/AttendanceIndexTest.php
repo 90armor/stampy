@@ -469,6 +469,33 @@ class AttendanceIndexTest extends TestCase
         $this->assertStringNotContainsString('bg-amber-50 text-amber-700', $html);
     }
 
+    public function test_late_and_early_durations_use_the_same_compact_format_as_worked(): void
+    {
+        $admin = $this->admin();
+        $employee = Employee::factory()->create();
+
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => today()->format('Y-m-d'),
+            'status' => AttendanceStatus::Present,
+            'first_in' => today()->setTime(9, 20),
+            'last_out' => today()->setTime(16, 39),
+            'worked_minutes' => 379,
+            'late_minutes' => 80,
+            'early_leave_minutes' => 21,
+        ]);
+
+        $html = Livewire::actingAs($admin)->test(Index::class)->html();
+
+        $this->assertStringContainsString('>1h 20m<', $html);
+        $this->assertStringContainsString('>21m<', $html);
+        $this->assertStringContainsString('>6h 19m<', $html);
+        $this->assertStringNotContainsString('>80m<', $html);
+        // The Present tile's subtext is a COUNT of timing days, not a
+        // duration, and keeps its "N late · N early" wording.
+        $this->assertStringContainsString('1 late · 1 early', $html);
+    }
+
     public function test_a_present_row_with_an_early_leave_marks_the_early_value(): void
     {
         $admin = $this->admin();

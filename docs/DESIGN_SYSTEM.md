@@ -51,7 +51,7 @@ Attendance color is model-driven. `DailyAttendance::displayVariant()` is the sou
 - DM Serif Display is limited to the auth hero's editorial accent through `font-serif`.
 - Default body and control copy is `text-sm`; supporting metadata is `text-xs` or `text-sm`.
 - Page titles use `text-2xl font-semibold tracking-tight`. Section headings use sentence case unless a compact eyebrow label is appropriate.
-- Numeric attendance values use `tabular-nums` when alignment helps comparison.
+- Numeric attendance values use `tabular-nums` when alignment helps comparison. Durations use the single compact format from `App\Support\Duration` (`21m`, `1h 20m`); see [Attendance UI](ATTENDANCE_UI.md).
 - Avoid introducing arbitrary font families, tiny critical copy, or long uppercase labels.
 
 ## Spacing and layout

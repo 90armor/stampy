@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AttendanceStatus;
+use App\Support\Duration;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -45,16 +46,29 @@ class DailyAttendance extends Model
     }
 
     /**
-     * "7h 30m", or null when there's nothing worked to show — callers decide
-     * how to render that (e.g. an em dash).
+     * "7h 30m" / "45m" (App\Support\Duration), or null when there's nothing
+     * worked to show — callers decide how to render that (e.g. an em dash).
      */
     public function formattedWorkedMinutes(): ?string
     {
-        if ($this->worked_minutes === 0) {
-            return null;
-        }
+        return $this->worked_minutes === 0 ? null : Duration::format($this->worked_minutes);
+    }
 
-        return sprintf('%dh %02dm', intdiv($this->worked_minutes, 60), $this->worked_minutes % 60);
+    /**
+     * "21m" / "1h 20m", or null when the arrival wasn't late — the same
+     * Duration format as worked time.
+     */
+    public function formattedLateMinutes(): ?string
+    {
+        return $this->isLate() ? Duration::format($this->late_minutes) : null;
+    }
+
+    /**
+     * "21m" / "1h 20m", or null when there was no early leave.
+     */
+    public function formattedEarlyLeaveMinutes(): ?string
+    {
+        return $this->leftEarly() ? Duration::format($this->early_leave_minutes) : null;
     }
 
     /**

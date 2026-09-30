@@ -34,7 +34,11 @@ Underline is reserved for links everywhere; a timing value is never underlined. 
 
 Contrast of the amber annotation, measured against its actual backgrounds: `amber-700` is 5.02:1 on white, 4.80:1 on a `green-50` Present cell, 4.81:1 on the `slate-50` row hover; `amber-300` is 12.13:1 on the dark card, 11.00:1 on a dark `green-900/20` cell, 11.19:1 on the dark row hover.
 
-Summary timing copy stays concise and omits zero values: `49 late`, `152 early`, or `49 late · 152 early`.
+### Durations and counts
+
+Every attendance **duration** — Worked, Late, Early leave, a month's total — uses one compact format from `App\Support\Duration::format()`: under 60 minutes is minutes only (`21m`); 60 minutes and above is hours plus zero-padded minutes (`1h 20m`, `8h 03m`). This applies in the Daily Attendance table, the employee's calendar day-detail modal and table view, and the dashboard's Needs attention list. `DailyAttendance::formattedWorkedMinutes()`, `formattedLateMinutes()`, and `formattedEarlyLeaveMinutes()` return this format, or null for zero so the caller renders an em dash. Do not format a duration inline or write a second formatter. Stored values (`late_minutes`, `early_leave_minutes`, `worked_minutes`) are always minutes.
+
+Counts are not durations and keep their own wording: summary timing copy stays concise and omits zero values: `49 late`, `152 early`, or `49 late · 152 early`.
 
 ## Filters are controls, not status badges
 

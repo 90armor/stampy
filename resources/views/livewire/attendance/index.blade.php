@@ -348,8 +348,8 @@
                                 <td class="whitespace-nowrap px-6 py-3 text-right text-sm tabular-nums text-slate-700 dark:text-slate-300">{{ $attendance->formattedWorkedMinutes() ?? '—' }}</td>
                                 {{-- In/Out stay neutral; the timing fact is marked here, on
                                 the duration itself, in amber (docs/ATTENDANCE_UI.md). --}}
-                                <td @class(['whitespace-nowrap px-6 py-3 text-right text-sm tabular-nums', 'font-medium text-amber-700 dark:text-amber-300' => $attendance->isLate(), 'text-slate-700 dark:text-slate-300' => ! $attendance->isLate()])>{{ $attendance->isLate() ? $attendance->late_minutes.'m' : '—' }}</td>
-                                <td @class(['whitespace-nowrap px-6 py-3 text-right text-sm tabular-nums', 'font-medium text-amber-700 dark:text-amber-300' => $attendance->leftEarly(), 'text-slate-700 dark:text-slate-300' => ! $attendance->leftEarly()])>{{ $attendance->leftEarly() ? $attendance->early_leave_minutes.'m' : '—' }}</td>
+                                <td @class(['whitespace-nowrap px-6 py-3 text-right text-sm tabular-nums', 'font-medium text-amber-700 dark:text-amber-300' => $attendance->isLate(), 'text-slate-700 dark:text-slate-300' => ! $attendance->isLate()])>{{ $attendance->formattedLateMinutes() ?? '—' }}</td>
+                                <td @class(['whitespace-nowrap px-6 py-3 text-right text-sm tabular-nums', 'font-medium text-amber-700 dark:text-amber-300' => $attendance->leftEarly(), 'text-slate-700 dark:text-slate-300' => ! $attendance->leftEarly()])>{{ $attendance->formattedEarlyLeaveMinutes() ?? '—' }}</td>
                                 <td class="px-6 py-3">
                                     {{-- Status only — the adjacent Late/Early columns already
                                     show the timing (aligned, scannable, amber); a "Late 21m"

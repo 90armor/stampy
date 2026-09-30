@@ -198,7 +198,7 @@ class DashboardTest extends TestCase
         $this->attendanceRow($incomplete, AttendanceStatus::Incomplete);
 
         $late = Employee::factory()->create(['full_name' => 'Late Larry']);
-        $this->attendanceRow($late, AttendanceStatus::Present, ['late_minutes' => 12]);
+        $this->attendanceRow($late, AttendanceStatus::Present, ['late_minutes' => 80]);
 
         $onTime = Employee::factory()->create(['full_name' => 'On Time Otto']);
         $this->attendanceRow($onTime, AttendanceStatus::Present);
@@ -211,6 +211,7 @@ class DashboardTest extends TestCase
             return $byName->has('Absent Ann') && $byName['Absent Ann']['badge'] === 'red'
                 && $byName->has('Incomplete Ian') && $byName['Incomplete Ian']['badge'] === 'violet'
                 && $byName->has('Late Larry') && $byName['Late Larry']['badge'] === 'amber'
+                && $byName['Late Larry']['detail'] === '1h 20m late'
                 && ! $byName->has('On Time Otto');
         });
     }
