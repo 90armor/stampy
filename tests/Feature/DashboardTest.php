@@ -210,7 +210,8 @@ class DashboardTest extends TestCase
 
             return $byName->has('Absent Ann') && $byName['Absent Ann']['badge'] === 'red'
                 && $byName->has('Incomplete Ian') && $byName['Incomplete Ian']['badge'] === 'violet'
-                && $byName->has('Late Larry') && $byName['Late Larry']['badge'] === 'amber'
+                // Late is timing, not a status: no badge, just the duration.
+                && $byName->has('Late Larry') && $byName['Late Larry']['badge'] === null
                 && $byName['Late Larry']['detail'] === '1h 20m late'
                 && ! $byName->has('On Time Otto');
         });
@@ -243,13 +244,13 @@ class DashboardTest extends TestCase
         $this->actingAs($this->admin())
             ->get(route('dashboard'))
             ->assertViewHas('attendance', fn ($attendance) => $attendance['trend'] === [
-                ['label' => 'Thu', 'value' => 100.0],
-                ['label' => 'Fri', 'value' => 0.0],
-                ['label' => 'Sat', 'value' => 0.0],
-                ['label' => 'Sun', 'value' => 0.0],
-                ['label' => 'Mon', 'value' => 0.0],
-                ['label' => 'Tue', 'value' => 66.7],
-                ['label' => 'Wed', 'value' => 33.3],
+                ['label' => 'Thu', 'date' => '2026-03-05', 'value' => 100.0, 'marker' => null],
+                ['label' => 'Fri', 'date' => '2026-03-06', 'value' => 0.0, 'marker' => null],
+                ['label' => 'Sat', 'date' => '2026-03-07', 'value' => 0.0, 'marker' => null],
+                ['label' => 'Sun', 'date' => '2026-03-08', 'value' => 0.0, 'marker' => null],
+                ['label' => 'Mon', 'date' => '2026-03-09', 'value' => 0.0, 'marker' => null],
+                ['label' => 'Tue', 'date' => '2026-03-10', 'value' => 66.7, 'marker' => null],
+                ['label' => 'Wed', 'date' => '2026-03-11', 'value' => 33.3, 'marker' => null],
             ]);
     }
 
@@ -390,7 +391,7 @@ class DashboardTest extends TestCase
         $this->actingAs($this->admin())
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertSee('Quick Actions')
+            ->assertSee('Quick actions')
             ->assertSee('Add employee')
             ->assertSee('Add department')
             ->assertSee('View employees')
@@ -410,7 +411,7 @@ class DashboardTest extends TestCase
         $this->actingAs($manager)
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertDontSee('Quick Actions')
+            ->assertDontSee('Quick actions')
             ->assertDontSee('Add employee')
             ->assertDontSee('Add department')
             ->assertDontSee('Organization settings');
@@ -423,7 +424,7 @@ class DashboardTest extends TestCase
         $this->actingAs($employee)
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertDontSee('Quick Actions');
+            ->assertDontSee('Quick actions');
     }
 
     public function test_the_dashboard_uses_the_shared_stat_strip_with_headcount(): void
@@ -440,5 +441,52 @@ class DashboardTest extends TestCase
             // The nested tinted tiles and the separate Employee summary card are gone.
             ->assertDontSee('rounded-xl bg-slate-50 p-4', false)
             ->assertDontSee('Employee summary');
+    }
+
+    public function test_an_off_day_in_the_trend_is_a_marker_not_a_zero_percent_bar(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 12:00:00'));
+        $a = Employee::factory()->create();
+        $b = Employee::factory()->create();
+
+        foreach ([$a, $b] as $employee) {
+            $this->attendanceRow($employee, AttendanceStatus::Off, ['work_date' => '2026-03-07']);
+            $this->attendanceRow($employee, AttendanceStatus::Holiday, ['work_date' => '2026-03-09']);
+        }
+        $this->attendanceRow($a, AttendanceStatus::Present, ['work_date' => '2026-03-10']);
+        $this->attendanceRow($b, AttendanceStatus::Absent, ['work_date' => '2026-03-10']);
+
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertViewHas('attendance', function ($attendance) {
+                $byDate = collect($attendance['trend'])->keyBy('date');
+
+                return $byDate['2026-03-07']['value'] === null && $byDate['2026-03-07']['marker'] === 'Off'
+                    && $byDate['2026-03-09']['value'] === null && $byDate['2026-03-09']['marker'] === 'Holiday'
+                    && $byDate['2026-03-10']['value'] === 50.0 && $byDate['2026-03-10']['marker'] === null;
+            })
+            // Time scope lives in the card header's meta slot as real dates.
+            ->assertSee('5–11 Mar')
+            ->assertSee('Sat Off', false);
+    }
+
+    public function test_dashboard_cards_use_title_and_meta_headers_without_eyebrows(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 12:00:00'));
+        $late = Employee::factory()->create(['full_name' => 'Late Larry']);
+        $this->attendanceRow($late, AttendanceStatus::Present, ['late_minutes' => 80]);
+
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertSee('Needs attention')
+            ->assertSee('1 today')
+            ->assertSee('Wed, 11 Mar')
+            ->assertSee('1h 20m late')
+            ->assertDontSee('tracking-widest', false)
+            ->assertDontSee('Action required')
+            ->assertDontSee('Last seven days')
+            // No "Late" badge and no amber avatar on the late row.
+            ->assertDontSee('bg-amber-50 text-amber-600', false)
+            ->assertDontSee('>Late<', false);
     }
 }

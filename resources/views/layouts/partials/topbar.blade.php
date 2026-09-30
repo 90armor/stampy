@@ -51,7 +51,7 @@
                         aria-haspopup="true"
                         :aria-expanded="open.toString()"
                     >
-                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-700 font-medium dark:bg-primary-800 dark:text-primary-100">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                             {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
                         </span>
                         <span class="hidden sm:flex sm:flex-col sm:items-start sm:leading-tight">

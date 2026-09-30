@@ -28,7 +28,7 @@ Amber marks the timing fact where it is displayed:
 
 - **Attendance tables** (Daily Attendance and the employee's own table view): the Late and Early values are amber (`font-medium text-amber-700 dark:text-amber-300`). In/Out times are neutral — no color, no underline.
 - **Calendar cells and the day-detail modal:** the late In / early Out time is amber medium-weight text via `<x-time marked>`, with an accessible label such as "Arrived 16 minutes late". No underline, and no extra "+80m" label in calendar cells. The cell fill still follows status, so a late Present day is a green cell with an amber time. The calendar legend's timing entry is a sample amber marked time, not a color swatch.
-- **Dashboard timing copy** ("7 arrived late and 10 left early") may stay amber — it is the timing fact itself.
+- **Dashboard:** timing copy may stay amber, since it is the timing fact itself. A late row in Needs attention is the name plus the amber duration (`1h 20m late`) — no `Late` badge and no amber avatar; Absent and Incomplete rows keep their status badge. Recent activity's "Checked in 21m late" line is amber for the same reason.
 
 Underline is reserved for links everywhere; a timing value is never underlined. Color always accompanies readable text or another non-color signal: the Late/Early column position and value, the marked time's medium weight, and its accessible label. Do not add separate timing chips that duplicate those fields.
 

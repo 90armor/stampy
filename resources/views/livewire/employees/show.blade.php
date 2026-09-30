@@ -8,7 +8,7 @@
 
     <header class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div class="flex min-w-0 items-center gap-x-4">
-            <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary-100 text-base font-semibold text-primary-700 dark:bg-primary-800 dark:text-primary-100">
+            <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-base font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                 {{ strtoupper(substr($employee->full_name, 0, 1)) }}
             </span>
             <div class="min-w-0">

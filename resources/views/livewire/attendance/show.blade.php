@@ -94,7 +94,7 @@
 
         <div class="flex flex-wrap items-center justify-between gap-4">
             <div class="flex items-center gap-x-4">
-                <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary-100 text-lg font-semibold text-primary-700 dark:bg-primary-800 dark:text-primary-100">
+                <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-lg font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                     {{ strtoupper(substr($employee->full_name, 0, 1)) }}
                 </span>
                 <div>

@@ -121,20 +121,11 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @php
-                        $avatarColors = [
-                            'bg-primary-100 text-primary-700 dark:bg-primary-800 dark:text-primary-100',
-                            'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-                            'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-                            'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
-                            'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300',
-                        ];
-                    @endphp
                     @foreach ($employees as $employee)
                         <tr wire:key="employee-{{ $employee->id }}" class="group relative transition hover:bg-slate-50 dark:hover:bg-slate-800/60">
                             <td class="px-6 py-4">
                                 <div class="flex items-center gap-x-3">
-                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold {{ $avatarColors[$loop->index % count($avatarColors)] }}">
+                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                                         {{ strtoupper(substr($employee->full_name, 0, 1)) }}
                                     </span>
                                     <div class="min-w-0">

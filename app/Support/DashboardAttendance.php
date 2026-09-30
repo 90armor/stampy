@@ -122,7 +122,7 @@ class DashboardAttendance
      * need a nudge", not "who is missing from the attendance count".
      *
      * @param  int[]|null  $employeeIds
-     * @return list<array{name: string, label: string, badge: string, detail: ?string}>
+     * @return list<array{name: string, label: string, badge: ?string, detail: ?string}>
      */
     public static function needsAttention(?array $employeeIds, int $limit = 8): array
     {
@@ -151,10 +151,13 @@ class DashboardAttendance
             ->take($limit);
 
         return $rows->map(function (DailyAttendance $row) {
+            // A late arrival is a timing fact, not a status: no badge, just
+            // the amber duration (docs/ATTENDANCE_UI.md). Absent/Incomplete
+            // keep their status badge.
             [$label, $badge, $detail] = match (true) {
                 $row->status === AttendanceStatus::Absent => ['Absent', 'red', null],
                 $row->status === AttendanceStatus::Incomplete => ['Incomplete', 'violet', null],
-                default => ['Late', 'amber', Duration::format($row->late_minutes).' late'],
+                default => ['Late', null, Duration::format($row->late_minutes).' late'],
             };
 
             return [
@@ -167,8 +170,14 @@ class DashboardAttendance
     }
 
     /**
+     * The present share of active employees for each of the last $days days.
+     * A day whose scoped rows are all Off or Holiday is not a working day, so
+     * its value is null and it carries a marker ('Off' / 'Holiday') for the
+     * chart to render instead of a misleading 0% bar. A day with no rows at
+     * all (not calculated yet) stays a plain 0.
+     *
      * @param  int[]|null  $employeeIds
-     * @return list<array{label: string, value: float}>
+     * @return list<array{label: string, date: string, value: ?float, marker: ?string}>
      */
     public static function weeklyTrend(?array $employeeIds, int $days = 7): array
     {
@@ -180,24 +189,33 @@ class DashboardAttendance
 
         $start = today()->copy()->subDays($days - 1);
 
-        $presentByDate = self::scopedDailyAttendanceQuery($employeeIds)
+        $countsByDate = self::scopedDailyAttendanceQuery($employeeIds)
             ->whereBetween('work_date', [$start->format('Y-m-d'), today()->format('Y-m-d')])
-            ->where('status', AttendanceStatus::Present->value)
-            ->selectRaw('work_date, count(*) as total')
-            ->groupBy('work_date')
+            ->selectRaw('work_date, status, count(*) as total')
+            ->groupBy('work_date', 'status')
             ->get()
-            ->keyBy(fn (DailyAttendance $row) => $row->work_date->format('Y-m-d'));
+            ->groupBy(fn (DailyAttendance $row) => $row->work_date->format('Y-m-d'))
+            ->map(fn (Collection $rows) => $rows->mapWithKeys(fn (DailyAttendance $row) => [$row->status->value => (int) $row->total]));
+
+        $nonWorking = [AttendanceStatus::Off->value, AttendanceStatus::Holiday->value];
 
         $trend = [];
         $cursor = $start->copy();
 
         while ($cursor->lte(today())) {
             $key = $cursor->format('Y-m-d');
-            $present = (int) ($presentByDate->get($key)->total ?? 0);
+            $counts = $countsByDate->get($key, collect());
+            $isNonWorkingDay = $counts->isNotEmpty() && $counts->keys()->every(fn (string $status) => in_array($status, $nonWorking, true));
 
             $trend[] = [
                 'label' => $cursor->format('D'),
-                'value' => round($present / $total * 100, 1),
+                'date' => $key,
+                'value' => $isNonWorkingDay ? null : round((int) $counts->get(AttendanceStatus::Present->value, 0) / $total * 100, 1),
+                'marker' => match (true) {
+                    ! $isNonWorkingDay => null,
+                    $counts->has(AttendanceStatus::Off->value) => 'Off',
+                    default => 'Holiday',
+                },
             ];
 
             $cursor->addDay();

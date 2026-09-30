@@ -50,7 +50,7 @@ Attendance color is model-driven. `DailyAttendance::displayVariant()` is the sou
 - Inter is the primary UI font through `font-sans`, with system sans-serif fallbacks.
 - DM Serif Display is limited to the auth hero's editorial accent through `font-serif`.
 - Default body and control copy is `text-sm`; supporting metadata is `text-xs` or `text-sm`.
-- Page titles use `text-2xl font-semibold tracking-tight`. Section headings use sentence case unless a compact eyebrow label is appropriate.
+- Page titles use `text-2xl font-semibold tracking-tight` on every page, the dashboard included. Section and card headings use sentence case ("Quick actions", not "Quick Actions").
 - Numeric attendance values use `tabular-nums` when alignment helps comparison. Durations use the single compact format from `App\Support\Duration` (`21m`, `1h 20m`); see [Attendance UI](ATTENDANCE_UI.md).
 - Avoid introducing arbitrary font families, tiny critical copy, or long uppercase labels.
 
@@ -107,6 +107,18 @@ The modal backdrop may use transparency and `backdrop-blur-sm`. This is an overl
 - `<x-icon>` is the only Heroicons entry point. Add icons there rather than embedding a second icon system.
 
 Prefer composition over adding props that expose implementation choices. Props should express genuine behavior or content, not optional design-system rules.
+
+### Card header pattern
+
+A card that needs a header uses one pattern: the title (`text-lg font-semibold`) on the left and optional right-aligned muted meta (`text-xs text-slate-500 dark:text-slate-400`, `tabular-nums`) on the right, baseline-aligned. Cards carry no eyebrow labels. When a card's content has a time scope, put it in the meta slot as real dates (`Tue, 29 Sep`, `23–29 Sep`), not a relative eyebrow such as "Today" or "Last seven days". A count that summarizes the card (Needs attention's `7 today`) also goes in the meta slot, as muted text rather than a colored badge.
+
+### Avatars
+
+Initial avatars use one neutral tint everywhere — `bg-slate-100 text-slate-600`, dark `bg-slate-800 text-slate-300` — in tables, lists, headers and the topbar. Avatars never carry status or rotating decorative hues: amber, violet, red and similar colors are reserved for attendance meaning, and an avatar that borrows them competes with the status column.
+
+### Dashboard
+
+The dashboard is the stat strip followed by two independent column stacks (a wide main column and a narrow side column). Each column flows at its own height, so cards of different heights never leave vertical holes; do not return to a row-based grid where each row takes its tallest card's height. Below `lg` the stacks merge into one reading order with Needs attention first. The attendance trend is a bar chart of the present share per day in `primary-500` — the same green as the department bars, so the page has one data-visualization green; a non-working day (every scoped row Off or Holiday) renders a muted `Off`/`Holiday` marker instead of a 0% bar.
 
 ### Entity detail pages
 
