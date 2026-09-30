@@ -25,6 +25,6 @@ $colors = [
 ];
 @endphp
 
-<span {{ $attributes->merge(['class' => 'inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset '.$colors[$color]]) }}>
+<span {{ $attributes->merge(['class' => 'inline-flex items-center whitespace-nowrap rounded-md px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset '.$colors[$color]]) }}>
     {{ $slot }}
 </span>

@@ -29,6 +29,36 @@ class DepartmentManagementTest extends TestCase
         }
     }
 
+    public function test_a_single_page_list_renders_no_empty_pagination_footer(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        Department::factory()->count(3)->create();
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->assertDontSeeHtml('Pagination Navigation')
+            ->assertDontSeeHtml('border-t border-slate-200/60 px-5 py-4');
+    }
+
+    public function test_a_multi_page_list_uses_the_themed_pagination_with_no_stock_gray_or_blue(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        Department::factory()->count(12)->create();
+
+        $html = Livewire::actingAs($admin)->test(Index::class)->html();
+
+        $this->assertStringContainsString('Pagination Navigation', $html);
+        $this->assertStringContainsString('dark:border-slate-700 dark:bg-slate-800', $html);
+        $this->assertDoesNotMatchRegularExpression('/\b(?:dark:)?(?:[a-z:]+-)?(?:gray|blue)-\d{2,3}\b/', $html);
+    }
+
+    public function test_badges_never_wrap(): void
+    {
+        $html = (string) $this->blade('<x-badge color="blue">In progress</x-badge>');
+
+        $this->assertStringContainsString('whitespace-nowrap', $html);
+    }
+
     public function test_admin_can_create_a_department(): void
     {
         $admin = User::factory()->create()->assignRole('admin');

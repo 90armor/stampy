@@ -242,9 +242,12 @@
             </div>
         </div>
 
-        <div class="mx-6 border-t border-slate-200/60 py-4 dark:border-slate-800/60">
-            {{ $employees->links() }}
-        </div>
+        {{-- No footer (and no empty divider band) when everything fits on one page. --}}
+        @if ($employees->hasPages())
+            <div class="mx-6 border-t border-slate-200/60 py-4 dark:border-slate-800/60">
+                {{ $employees->links() }}
+            </div>
+        @endif
     @endif
     </x-card>
     @endif

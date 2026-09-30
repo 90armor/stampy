@@ -97,7 +97,8 @@ The modal backdrop may use transparency and `backdrop-blur-sm`. This is an overl
 
 - `<x-card>` is the standard solid `rounded-xl` content container. Use `:padding="false"` when a table or custom edge-to-edge layout owns its inner spacing.
 - `<x-button>` owns primary, secondary, and danger action styling. Breeze primary and secondary button wrappers delegate to it.
-- `<x-badge>` owns compact `rounded-md` status labels. Add variants only when a stable semantic state requires a distinct meaning.
+- `<x-badge>` owns compact `rounded-md` status labels. Badges never wrap (`whitespace-nowrap`): a multi-word status such as "In progress" stays on one line. Add variants only when a stable semantic state requires a distinct meaning.
+- Pagination uses the themed Livewire override at `resources/views/vendor/livewire/tailwind.blade.php`: warm slate borders and surfaces, the primary focus ring, `rounded-lg`, 36px items, and the control selected state for the current page. Do not fall back to Livewire's stock view, whose Tailwind `gray`/`blue` classes are off-palette and read as stray blue borders in dark mode.
 - `<x-text-input>`, `<x-select>`, and `<x-textarea>` own form-control visuals and are always solid.
 - `<x-dropdown>` owns menu positioning, transitions, and its solid `rounded-xl` menu surface.
 - `<x-modal>` owns the backdrop, focus trap, focus restoration, transitions, and solid `rounded-2xl` panel. It remains teleported to `<body>`. The panel deliberately does not use `overflow-hidden`: modal bodies that need scrolling own it locally, and panel-level clipping can cut focus rings or overlay content.
@@ -141,7 +142,7 @@ Keep touch targets at least 44px high for primary auth controls and small-screen
 - Row hover is `hover:bg-slate-50 dark:hover:bg-slate-800/60`.
 - Preserve selectable data when choosing between a cell link and a whole-row target.
 - Wrap wide tables in `overflow-x-auto`; do not compress data until it becomes unreadable.
-- Place pagination within the same solid data surface, separated by a standard divider.
+- Place pagination within the same solid data surface, separated by a standard divider. Render the footer (and its divider) only when `hasPages()` is true; a one-page list ends at its last row, with no empty band.
 
 ## Navigation
 

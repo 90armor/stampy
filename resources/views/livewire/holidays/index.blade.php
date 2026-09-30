@@ -95,9 +95,12 @@
                 @endforeach
             </div>
 
-            <div class="border-t border-slate-200/60 px-5 py-4 dark:border-slate-800/60 sm:px-6">
-                {{ $holidays->links() }}
-            </div>
+            {{-- No footer (and no empty divider band) when everything fits on one page. --}}
+            @if ($holidays->hasPages())
+                <div class="border-t border-slate-200/60 px-5 py-4 dark:border-slate-800/60 sm:px-6">
+                    {{ $holidays->links() }}
+                </div>
+            @endif
         @endif
     </x-card>
 
