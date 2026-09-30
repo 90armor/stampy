@@ -68,7 +68,11 @@
         $summaryScope = $summaryRange.' · '.($employeeFilter !== '' || $departmentFilter !== '' ? 'all employees, all statuses' : 'all statuses');
     @endphp
     <x-card :padding="false">
-        <p class="px-3 pt-3 text-xs text-slate-500 dark:text-slate-400 sm:px-4">{{ $summaryScope }}</p>
+        {{-- Card header pattern: the scope is right-aligned muted meta on a
+        header row, inset to the cells' own padding. --}}
+        <div class="flex items-baseline justify-end gap-4 px-3 pt-3 sm:px-4">
+            <p class="text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ $summaryScope }}</p>
+        </div>
         <dl class="grid grid-cols-3 divide-x divide-slate-200/60 dark:divide-slate-800/60">
             <x-stat-card icon="check" label="Present" :value="$summary['present']">
                 @if ($timingParts)

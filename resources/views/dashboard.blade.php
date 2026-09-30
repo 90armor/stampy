@@ -67,9 +67,11 @@
             $stripColumns = [1 => 'sm:grid-cols-1', 2 => 'sm:grid-cols-2', 3 => 'sm:grid-cols-3', 4 => 'sm:grid-cols-4', 5 => 'sm:grid-cols-5'][$stripCells->count()];
         @endphp
         <x-card :padding="false" class="mb-6">
-            <p class="px-3 pt-3 text-xs text-slate-500 dark:text-slate-400 sm:px-4">
-                Today, {{ today()->format('D, j M') }} · {{ $attendance['today']['total'] }} active {{ $attendance['today']['total'] === 1 ? 'employee' : 'employees' }}
-            </p>
+            <div class="flex items-baseline justify-end gap-4 px-3 pt-3 sm:px-4">
+                <p class="text-xs tabular-nums text-slate-500 dark:text-slate-400">
+                    Today, {{ today()->format('D, j M') }} · {{ $attendance['today']['total'] }} active {{ $attendance['today']['total'] === 1 ? 'employee' : 'employees' }}
+                </p>
+            </div>
             <dl class="grid grid-cols-2 {{ $stripColumns }}">
                 @foreach ($stripCells as $cell)
                     <x-stat-card
