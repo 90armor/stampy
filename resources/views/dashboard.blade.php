@@ -191,7 +191,7 @@
                                         <x-badge :color="$person['badge']">{{ $person['label'] }}</x-badge>
                                     @else
                                         {{-- Late is timing, not a status: the amber duration alone. --}}
-                                        <span class="shrink-0 text-sm font-medium tabular-nums text-yellow-700 dark:text-amber-300">{{ $person['detail'] }}</span>
+                                        <span class="shrink-0 text-sm font-medium tabular-nums text-amber-700 dark:text-amber-300">{{ $person['detail'] }}</span>
                                     @endif
                                 </li>
                             @endforeach
@@ -212,7 +212,7 @@
                                     <span class="{{ $avatar }}" aria-hidden="true">{{ strtoupper(substr($activity['name'], 0, 1)) }}</span>
                                     <div class="min-w-0 flex-1">
                                         <p class="truncate text-sm font-medium text-slate-700 dark:text-slate-200">{{ $activity['name'] }}</p>
-                                        <p @class(['mt-0.5 text-xs', 'font-medium text-yellow-700 dark:text-amber-300' => $activity['tone'] === 'late', 'text-slate-500 dark:text-slate-400' => $activity['tone'] !== 'late'])>{{ $activity['action'] }}</p>
+                                        <p @class(['mt-0.5 text-xs', 'font-medium text-amber-700 dark:text-amber-300' => $activity['tone'] === 'late', 'text-slate-500 dark:text-slate-400' => $activity['tone'] !== 'late'])>{{ $activity['action'] }}</p>
                                     </div>
                                     <span class="shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ $activity['time'] }}</span>
                                 </div>

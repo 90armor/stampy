@@ -587,7 +587,7 @@ class AttendanceIndexTest extends TestCase
         $html = Livewire::actingAs($admin)->test(Index::class)->html();
 
         // In/Out stay neutral; the timing fact is the amber Late value.
-        $this->assertMatchesRegularExpression('/class="whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums font-medium text-yellow-700 dark:text-amber-300">12m</', $html);
+        $this->assertMatchesRegularExpression('/class="whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums font-medium text-amber-700 dark:text-amber-300">12m</', $html);
         $this->assertStringNotContainsString('aria-label="Arrived', $html);
         $this->assertStringNotContainsString('underline decoration-red', $html);
         // Status-only colour: a late Present row is a green badge.
@@ -639,7 +639,7 @@ class AttendanceIndexTest extends TestCase
 
         $html = Livewire::actingAs($admin)->test(Index::class)->html();
 
-        $this->assertMatchesRegularExpression('/class="whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums font-medium text-yellow-700 dark:text-amber-300">4m</', $html);
+        $this->assertMatchesRegularExpression('/class="whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums font-medium text-amber-700 dark:text-amber-300">4m</', $html);
         // The Status badge stays "Present" — status doesn't change, only the
         // Early value is marked (docs/ATTENDANCE_UI.md).
         $this->assertStringContainsString('Present', $html);
