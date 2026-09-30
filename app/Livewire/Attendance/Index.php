@@ -112,13 +112,45 @@ class Index extends Component
         $this->resetPage();
     }
 
+    /**
+     * The status chips narrow; they don't enumerate. The stored $statuses set
+     * (and the query and URL built from it) is unchanged — the default is
+     * still every status except Off — but the chips present it so that the
+     * default reads as "no filter applied":
+     *
+     * - The working-status chips (everything but Off) show as unselected
+     *   while ALL of them are in the set. Clicking one from there narrows the
+     *   set to just that status; clicking further chips adds or removes
+     *   them; removing the last one returns to "all working statuses".
+     * - Off is a separate "Show off days" toggle that adds or removes 'off'
+     *   independently of the working-status selection.
+     */
     public function toggleStatus(string $status): void
     {
-        if (in_array($status, $this->statuses, true)) {
-            $this->statuses = array_values(array_diff($this->statuses, [$status]));
+        $off = AttendanceStatus::Off->value;
+        $includesOff = in_array($off, $this->statuses, true);
+
+        if ($status === $off) {
+            $includesOff = ! $includesOff;
+            $working = array_values(array_diff($this->statuses, [$off]));
         } else {
-            $this->statuses[] = $status;
+            $allWorking = $this->defaultStatuses();
+            $working = array_values(array_intersect($this->statuses, $allWorking));
+
+            if (count($working) === count($allWorking)) {
+                $working = [$status];
+            } elseif (in_array($status, $working, true)) {
+                $working = array_values(array_diff($working, [$status]));
+            } else {
+                $working[] = $status;
+            }
+
+            if ($working === []) {
+                $working = $allWorking;
+            }
         }
+
+        $this->statuses = $includesOff ? [...$working, $off] : $working;
 
         $this->resetPage();
     }

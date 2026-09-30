@@ -42,7 +42,9 @@ Counts are not durations and keep their own wording: summary timing copy stays c
 
 ## Filters are controls, not status badges
 
-Status and timing filters are separate control groups. Their selected treatment uses the primary interaction palette, with a visible check, `aria-pressed`, and a focus-visible ring. Semantic attendance colors are reserved for attendance data and must not indicate filter selection.
+Status and timing filters are separate control groups of filter chips. Chips are controls, not actions: selected is `bg-primary-50 text-primary-700` with a `ring-primary-600` border and a visible check (dark: `bg-primary-900/30 text-primary-200 ring-primary-500`); unselected is a neutral outline. Chips never use a solid fill — a solid primary fill is reserved for the page's primary action. Every chip carries `aria-pressed` and a focus-visible ring. Semantic attendance colors are reserved for attendance data and must not indicate filter selection.
+
+The default filter state reads as "no filter applied". Status chips **narrow** rather than enumerate: while every working status (all but Off) is in the filter — the default — none of them renders as selected. Clicking one narrows to that status; further clicks add or remove statuses; removing the last one returns to all working statuses. Off days are a separate **Show off days** toggle, unselected by default. The stored filter, its URL form, and the default query are unchanged (every status except Off); only the presentation and toggle mapping are defined this way (`Attendance\Index::toggleStatus()`). Timing chips are unselected by default.
 
 Filtering must preserve URL-bound state, employee scope, permissions, and the existing distinction between status and timing. Loading feedback should stay local to the records area and must not cause a large layout shift.
 

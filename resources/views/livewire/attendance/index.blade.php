@@ -209,36 +209,55 @@
         {{-- Two independent filters, not one long chip list — a label per
         row is the whole point, since Status and Timing combine with AND
         between them (and OR within each), and nothing about the chips
-        themselves signals that grouping. --}}
+        themselves signals that grouping.
+
+        Chips are controls, not actions (docs/ATTENDANCE_UI.md): selected is
+        a primary-50 tint with primary text, a primary border and a check;
+        unselected is a neutral outline; never a solid fill. The status chips
+        narrow rather than enumerate — while every working status is in the
+        set (the default), none of them reads as selected, so the default
+        state looks like what it is: no filter. Off is its own "Show off
+        days" toggle. See Index::toggleStatus() for the mapping. --}}
+        @php
+            $chipBase = 'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-slate-900';
+            $chipSelected = 'bg-primary-50 text-primary-700 ring-primary-600 hover:bg-primary-100 dark:bg-primary-900/30 dark:text-primary-200 dark:ring-primary-500 dark:hover:bg-primary-900/50';
+            $chipUnselected = 'bg-white text-slate-600 ring-slate-300 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-700 dark:hover:text-white dark:active:bg-slate-600';
+            $workingStatuses = collect($allStatuses)->reject(fn ($status) => $status === \App\Enums\AttendanceStatus::Off);
+            $allWorkingSelected = $workingStatuses->every(fn ($status) => in_array($status->value, $statuses, true));
+            $showsOffDays = in_array(\App\Enums\AttendanceStatus::Off->value, $statuses, true);
+        @endphp
         <div class="grid gap-4 border-t border-slate-200/60 px-5 py-4 dark:border-slate-800/60 sm:px-6 xl:grid-cols-[minmax(0,1fr)_auto]">
         <fieldset>
         <legend class="text-xs font-medium text-slate-700 dark:text-slate-300">Status</legend>
         <div class="mt-2 flex flex-wrap gap-2">
-            @foreach ($allStatuses as $status)
-                @php $selected = in_array($status->value, $statuses, true); @endphp
+            @foreach ($workingStatuses as $status)
+                @php $selected = ! $allWorkingSelected && in_array($status->value, $statuses, true); @endphp
                 <button
                     type="button"
                     wire:click="toggleStatus('{{ $status->value }}')"
                     aria-pressed="{{ $selected ? 'true' : 'false' }}"
-                    @class([
-                        'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-slate-900',
-                        'bg-primary-700 text-white shadow-sm hover:bg-primary-800 active:bg-primary-900 dark:bg-primary-600 dark:hover:bg-primary-500 dark:active:bg-primary-700' => $selected,
-                        'bg-white text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-700 dark:hover:text-white dark:active:bg-slate-600' => ! $selected,
-                    ])
+                    @class([$chipBase, $chipSelected => $selected, $chipUnselected => ! $selected])
                 >
                     @if ($selected)<x-icon name="check" class="h-3.5 w-3.5" />@endif
                     {{ $status->label() }}
                 </button>
             @endforeach
+            <button
+                type="button"
+                wire:click="toggleStatus('{{ \App\Enums\AttendanceStatus::Off->value }}')"
+                aria-pressed="{{ $showsOffDays ? 'true' : 'false' }}"
+                @class([$chipBase, $chipSelected => $showsOffDays, $chipUnselected => ! $showsOffDays])
+            >
+                @if ($showsOffDays)<x-icon name="check" class="h-3.5 w-3.5" />@endif
+                Show off days
+            </button>
         </div>
         </fieldset>
 
         {{-- Timing (late arrival / early departure) is independent of status
-        (see AttendanceStatus's doc comment) — filtering for it used to be
-        impossible since "late" wasn't a filterable status any more than
-        "early leave" ever was. Same chip styling and OR-across-selected
-        semantics as the status chips above, just a separate #[Url]-bound
-        property so the two filters combine independently. --}}
+        (see AttendanceStatus's doc comment) — a separate #[Url]-bound
+        property so the two filters combine independently. Same chip
+        treatment; unselected by default. --}}
         <fieldset>
         <legend class="text-xs font-medium text-slate-700 dark:text-slate-300">Timing</legend>
         <div class="mt-2 flex flex-wrap gap-2">
@@ -248,11 +267,7 @@
                     type="button"
                     wire:click="toggleTimingFilter('{{ $value }}')"
                     aria-pressed="{{ $selected ? 'true' : 'false' }}"
-                    @class([
-                        'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-slate-900',
-                        'bg-primary-700 text-white shadow-sm hover:bg-primary-800 active:bg-primary-900 dark:bg-primary-600 dark:hover:bg-primary-500 dark:active:bg-primary-700' => $selected,
-                        'bg-white text-slate-600 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-700 dark:hover:text-white dark:active:bg-slate-600' => ! $selected,
-                    ])
+                    @class([$chipBase, $chipSelected => $selected, $chipUnselected => ! $selected])
                 >
                     @if ($selected)<x-icon name="check" class="h-3.5 w-3.5" />@endif
                     {{ $label }}

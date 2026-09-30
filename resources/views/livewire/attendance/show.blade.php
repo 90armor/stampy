@@ -206,7 +206,7 @@
                     <button
                         type="button"
                         wire:click="$set('view', 'calendar')"
-                        class="rounded-md px-3 py-1.5 text-sm font-medium transition {{ $view === 'calendar' ? 'bg-primary-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}"
+                        class="rounded-md px-3 py-1.5 text-sm font-medium ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 {{ $view === 'calendar' ? 'bg-primary-50 text-primary-700 ring-primary-600 dark:bg-primary-900/30 dark:text-primary-200 dark:ring-primary-500' : 'ring-transparent text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}"
                         aria-pressed="{{ $view === 'calendar' ? 'true' : 'false' }}"
                     >
                         Calendar
@@ -214,7 +214,7 @@
                     <button
                         type="button"
                         wire:click="$set('view', 'table')"
-                        class="rounded-md px-3 py-1.5 text-sm font-medium transition {{ $view === 'table' ? 'bg-primary-600 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}"
+                        class="rounded-md px-3 py-1.5 text-sm font-medium ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 {{ $view === 'table' ? 'bg-primary-50 text-primary-700 ring-primary-600 dark:bg-primary-900/30 dark:text-primary-200 dark:ring-primary-500' : 'ring-transparent text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}"
                         aria-pressed="{{ $view === 'table' ? 'true' : 'false' }}"
                     >
                         Table

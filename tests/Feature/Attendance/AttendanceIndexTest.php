@@ -368,6 +368,62 @@ class AttendanceIndexTest extends TestCase
             ->assertSee('(+1)');
     }
 
+    public function test_the_default_status_filter_reads_as_no_filter_applied(): void
+    {
+        $component = Livewire::actingAs($this->admin())->test(Index::class);
+
+        // The query default is unchanged: every status except Off.
+        $this->assertEqualsCanonicalizing(
+            ['present', 'incomplete', 'absent', 'holiday', 'leave', 'in_progress'],
+            $component->get('statuses'),
+        );
+
+        // ...but no chip renders as selected, and none uses a solid fill.
+        $html = $component->html();
+        $this->assertStringNotContainsString('aria-pressed="true"', $html);
+        $this->assertStringContainsString('Show off days', $html);
+        $this->assertStringNotContainsString('bg-primary-700 text-white', $html);
+    }
+
+    public function test_status_chips_narrow_from_the_default_and_return_to_it(): void
+    {
+        $component = Livewire::actingAs($this->admin())->test(Index::class);
+
+        $component->call('toggleStatus', 'absent');
+        $this->assertSame(['absent'], $component->get('statuses'));
+        $this->assertSame(1, substr_count($component->html(), 'aria-pressed="true"'));
+        $this->assertStringContainsString('bg-primary-50 text-primary-700 ring-primary-600', $component->html());
+
+        $component->call('toggleStatus', 'incomplete');
+        $this->assertEqualsCanonicalizing(['absent', 'incomplete'], $component->get('statuses'));
+
+        $component->call('toggleStatus', 'absent');
+        $component->call('toggleStatus', 'incomplete');
+        // Removing the last selected chip returns to "all working statuses".
+        $this->assertEqualsCanonicalizing(
+            ['present', 'incomplete', 'absent', 'holiday', 'leave', 'in_progress'],
+            $component->get('statuses'),
+        );
+    }
+
+    public function test_show_off_days_adds_off_independently_of_the_status_selection(): void
+    {
+        $component = Livewire::actingAs($this->admin())->test(Index::class);
+
+        $component->call('toggleStatus', 'off');
+        $this->assertContains('off', $component->get('statuses'));
+        $this->assertCount(7, $component->get('statuses'));
+        // Every working status is still in the set, so only the off-days
+        // toggle reads as selected.
+        $this->assertSame(1, substr_count($component->html(), 'aria-pressed="true"'));
+
+        $component->call('toggleStatus', 'absent');
+        $this->assertEqualsCanonicalizing(['absent', 'off'], $component->get('statuses'));
+
+        $component->call('toggleStatus', 'off');
+        $this->assertSame(['absent'], $component->get('statuses'));
+    }
+
     public function test_incomplete_badge_and_stat_card_use_violet_not_amber(): void
     {
         $admin = $this->admin();
