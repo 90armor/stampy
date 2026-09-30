@@ -36,4 +36,15 @@ class DatabaseSeederTest extends TestCase
             'Employees with no schedule assignment: '.$withoutAssignment->pluck('employee_code')->implode(', '),
         );
     }
+
+    public function test_seeded_attendance_never_includes_a_punch_later_than_now(): void
+    {
+        // Mid-shift, so today's generated day has punches on both sides of now.
+        $this->travelTo(now()->setTime(10, 30));
+
+        $this->seed();
+
+        $this->assertGreaterThan(0, \App\Models\AttendanceLog::count());
+        $this->assertSame(0, \App\Models\AttendanceLog::where('punched_at', '>', now())->count());
+    }
 }

@@ -68,6 +68,18 @@ class AttendanceLogSeeder extends Seeder
             $date = $date->copy()->addDay();
         }
 
+        // Never write a punch that hasn't happened yet. Every day is still
+        // generated in full first, so the mt_rand() sequence (and therefore
+        // every past punch) is identical whenever this runs; only punches
+        // later than now are dropped. Seeding during working hours therefore
+        // gives a real "today so far": some employees punched in, some not
+        // yet, nobody punched out in the future.
+        $now = Carbon::now();
+        $records = array_values(array_filter(
+            $records,
+            fn (PunchRecord $record) => $record->punchedAt->lte($now),
+        ));
+
         $source = new SampleAttendanceSource($records);
 
         // +1 day on the range end to catch overnight punches from the last day.
