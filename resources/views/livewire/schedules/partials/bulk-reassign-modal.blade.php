@@ -42,7 +42,7 @@
 
             <div class="space-y-4">
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">From</p>
+                    <p class="text-xs font-medium text-slate-500 dark:text-slate-400">From</p>
                     <x-input-label for="bulk_from" value="Current schedule" class="mt-2" />
                 {{-- .live: without it wire:model only syncs on submit
                 (Livewire 3's default), so the preview below couldn't react
@@ -65,7 +65,7 @@
                 </div>
 
                 <div>
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">To</p>
+                    <p class="text-xs font-medium text-slate-500 dark:text-slate-400">To</p>
                     <x-input-label for="bulk_to" value="New schedule" class="mt-2" />
                     <x-select id="bulk_to" wire:model="bulk_to_id" wire:loading.attr="disabled" wire:target="bulkReassign" class="mt-1 block w-full">
                         <option value="">Select a schedule&hellip;</option>

@@ -61,7 +61,7 @@
                     <form id="employee-form" wire:submit="save" class="space-y-8">
                         {{-- Identity --}}
                         <div>
-                            <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Identity</p>
+                            <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">Identity</p>
 
                             <div class="mt-3 divide-y divide-slate-200/60 dark:divide-slate-800/60">
                                 <div class="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
@@ -95,7 +95,7 @@
 
                         {{-- Work --}}
                         <div>
-                            <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Work</p>
+                            <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">Work</p>
 
                             <div class="mt-3 divide-y divide-slate-200/60 dark:divide-slate-800/60">
                                 <div class="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
@@ -158,7 +158,7 @@
 
                         {{-- System --}}
                         <div>
-                            <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">System</p>
+                            <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">System</p>
 
                             <div class="mt-3 divide-y divide-slate-200/60 dark:divide-slate-800/60">
                                 <div class="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">

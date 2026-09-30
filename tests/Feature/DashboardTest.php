@@ -543,4 +543,23 @@ class DashboardTest extends TestCase
                 return $today['pending'] === true && $today['marker'] === 'Today' && $today['value'] === 66.7;
             });
     }
+
+    public function test_recent_activity_dates_only_entries_that_are_not_from_today(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 12:00:00'));
+        $employee = Employee::factory()->create(['full_name' => 'Yesterday Yan']);
+        $other = Employee::factory()->create(['full_name' => 'Today Tess']);
+
+        AttendanceLog::factory()->create(['employee_id' => $employee->id, 'punch_type' => PunchType::Out, 'punched_at' => Carbon::parse('2026-03-10 17:05:00')]);
+        AttendanceLog::factory()->create(['employee_id' => $other->id, 'punch_type' => PunchType::In, 'punched_at' => Carbon::parse('2026-03-11 07:55:00')]);
+
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertViewHas('attendance', function ($attendance) {
+                $byName = collect($attendance['recent'])->keyBy('name');
+
+                return $byName['Yesterday Yan']['date'] === 'Tue 10 Mar' && $byName['Today Tess']['date'] === null;
+            })
+            ->assertSee('Tue 10 Mar');
+    }
 }

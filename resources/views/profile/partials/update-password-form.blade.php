@@ -1,7 +1,6 @@
 <section>
     <header>
-        <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Account</p>
-        <h2 class="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">
+        <h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">
             {{ __('Password') }}
         </h2>
 

@@ -1,8 +1,7 @@
 <div class="space-y-6">
     <div class="flex flex-wrap items-end justify-between gap-4">
         <div>
-            <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">People directory</p>
-            <h1 class="mt-1 text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Employees</h1>
+            <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Employees</h1>
         </div>
 
         @can('create', \App\Models\Employee::class)

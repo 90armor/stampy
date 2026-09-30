@@ -359,7 +359,7 @@ class DashboardAttendance
      * row (batched, not per-punch) so a late arrival reads as late here too.
      *
      * @param  int[]|null  $employeeIds
-     * @return list<array{name: string, action: string, time: string, tone: string}>
+     * @return list<array{name: string, action: string, time: string, date: ?string, tone: string}>
      */
     public static function recentActivity(?array $employeeIds, int $limit = 6): array
     {
@@ -410,6 +410,9 @@ class DashboardAttendance
                 'name' => $log->employee->full_name,
                 'action' => $action,
                 'time' => AttendanceTime::format($log->punched_at),
+                // Only for an entry that isn't from today, so an older punch
+                // can't read as this morning's.
+                'date' => $log->punched_at->isToday() ? null : DisplayDate::compact($log->punched_at),
                 'tone' => $tone,
             ];
         })->values()->all();

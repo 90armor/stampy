@@ -485,4 +485,18 @@ class EmployeeManagementTest extends TestCase
 
         $this->assertSame(0, Employee::whereIn('employee_code', ['EMP-9500', 'EMP-9501'])->count());
     }
+
+    public function test_employee_pages_carry_no_eyebrow_labels(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        $employee = Employee::factory()->create();
+
+        $this->actingAs($admin)->get(route('employees.index'))
+            ->assertDontSee('People directory')
+            ->assertDontSee('tracking-widest', false);
+
+        $this->actingAs($admin)->get(route('employees.show', $employee))
+            ->assertDontSee('tracking-widest', false)
+            ->assertSee('<h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Details</h2>', false);
+    }
 }

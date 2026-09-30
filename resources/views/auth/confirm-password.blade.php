@@ -1,5 +1,4 @@
 <x-guest-layout>
-    <p class="mb-1.5 text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Security check</p>
     <h2 class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Confirm your password</h2>
     <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
         {{ __('This is a secure area. Please confirm your password before continuing.') }}

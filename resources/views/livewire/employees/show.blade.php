@@ -34,7 +34,7 @@
         <x-employee-details-card :employee="$employee" class="order-1 lg:col-span-8 lg:row-start-1" />
 
         <x-card class="order-2 lg:col-span-4 lg:row-start-1">
-            <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Login</p>
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Login</h2>
 
             <dl class="mt-4 space-y-4">
                 <div class="sm:grid sm:grid-cols-[max-content_minmax(0,1fr)] sm:items-baseline sm:gap-x-4">
@@ -68,7 +68,7 @@
 
         @can('view', $employee)
             <x-card class="order-3 lg:col-span-4 lg:col-start-9 lg:row-start-2">
-                <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Attendance</p>
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Attendance</h2>
                 <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">Review this employee’s monthly attendance record.</p>
                 <a href="{{ route('attendance.show', $employee) }}" wire:navigate class="mt-4 inline-flex items-center gap-1 rounded text-sm font-medium text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-2 transition hover:decoration-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:decoration-primary-700 dark:hover:decoration-primary-400">
                     View monthly attendance

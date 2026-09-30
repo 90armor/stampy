@@ -1,6 +1,5 @@
 <x-guest-layout>
     <x-slot:pageTitle>Sign in</x-slot:pageTitle>
-    <p class="mb-1.5 text-xs font-bold uppercase tracking-widest text-slate-600 dark:text-slate-400">Welcome back</p>
     <h2 class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Sign in to your workspace</h2>
     <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">Enter your credentials to continue.</p>
 

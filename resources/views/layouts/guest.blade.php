@@ -38,7 +38,6 @@
 
                 <div class="flex flex-1 items-center">
                     <div class="max-w-md">
-                        <p class="mb-2 text-xs font-bold uppercase tracking-widest text-accent-300">People operations, clarified</p>
                         <h1 class="text-5xl font-semibold leading-[1.05] tracking-tight">
                             Make every workday<br>
                             <em class="font-serif font-normal not-italic text-accent-300">count.</em>

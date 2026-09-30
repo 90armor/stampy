@@ -32,7 +32,7 @@
 
             <div class="divide-y divide-slate-200/60 dark:divide-slate-800/60">
                 <section class="py-4">
-                    <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Identity</h4>
+                    <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Identity</h4>
                     <div class="mt-3">
                         <x-input-label for="schedule_name" value="Name" />
                         <x-text-input id="schedule_name" type="text" wire:model="name" autofocus />
@@ -41,7 +41,7 @@
                 </section>
 
                 <section class="py-4" @if ($editingIsLocked) aria-describedby="schedule-lock-help" @endif>
-                    <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Working hours</h4>
+                    <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Working hours</h4>
                     <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
                             <x-input-label for="schedule_start_time" value="Start time" />
@@ -57,7 +57,7 @@
                 </section>
 
                 <section class="py-4" @if ($editingIsLocked) aria-describedby="schedule-lock-help" @endif>
-                    <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Attendance rules</h4>
+                    <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Attendance rules</h4>
                     <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
                             <x-input-label for="schedule_grace" value="Grace period" />
@@ -79,7 +79,7 @@
                 </section>
 
                 <fieldset class="py-4" @disabled($editingIsLocked) @if ($editingIsLocked) aria-describedby="schedule-lock-help" @endif>
-                    <legend class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Workdays</legend>
+                    <legend class="text-sm font-semibold text-slate-900 dark:text-slate-100">Workdays</legend>
                     <div class="mt-3 flex flex-wrap gap-x-4 gap-y-3">
                         @foreach ([1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => 'Sat', 7 => 'Sun'] as $iso => $label)
                             <label class="inline-flex min-h-9 items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
@@ -96,7 +96,7 @@
                 </fieldset>
 
                 <section class="py-4">
-                    <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Default behavior</h4>
+                    <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Default behavior</h4>
                     <label class="mt-3 flex items-start gap-2.5">
                         <input type="checkbox" wire:model="is_default" @disabled($editing?->is_default) class="mt-0.5">
                         <span>

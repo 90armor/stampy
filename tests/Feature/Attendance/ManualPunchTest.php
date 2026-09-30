@@ -72,6 +72,24 @@ class ManualPunchTest extends TestCase
         return [$component, $employee];
     }
 
+    public function test_raw_punch_badges_are_neutral_for_both_directions(): void
+    {
+        $employee = Employee::factory()->create();
+        \App\Models\AttendanceLog::factory()->create(['employee_id' => $employee->id, 'punch_type' => \App\Enums\PunchType::In, 'punched_at' => Carbon::parse('2026-03-02 08:00:00')]);
+        \App\Models\AttendanceLog::factory()->create(['employee_id' => $employee->id, 'punch_type' => \App\Enums\PunchType::Out, 'punched_at' => Carbon::parse('2026-03-02 17:00:00')]);
+
+        $html = Livewire::actingAs($this->admin())
+            ->test(\App\Livewire\Attendance\Show::class, ['employee' => $employee])
+            ->set('month', '2026-03')
+            ->call('openDay', '2026-03-02')
+            ->html();
+
+        // Green means Present; an in-punch is not a status.
+        $this->assertMatchesRegularExpression('/bg-slate-100 text-slate-600[^>]*>\s*In\s*</', $html);
+        $this->assertMatchesRegularExpression('/bg-slate-100 text-slate-600[^>]*>\s*Out\s*</', $html);
+        $this->assertDoesNotMatchRegularExpression('/bg-green-50 text-green-700[^>]*>\s*In\s*</', $html);
+    }
+
     public function test_punch_validation_messages_are_human_readable_not_raw_property_names(): void
     {
         // Laravel's default attribute-name fallback would otherwise read

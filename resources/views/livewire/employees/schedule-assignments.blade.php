@@ -1,6 +1,6 @@
 <div>
     <div>
-        <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Schedule</p>
+        <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Schedule</h2>
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Effective-dated work schedule assignments.</p>
     </div>
 

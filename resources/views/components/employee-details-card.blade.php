@@ -9,7 +9,7 @@
     is the one place that markup lives.
 --}}
 <x-card {{ $attributes }}>
-    <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Details</p>
+    <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Details</h2>
 
     <dl class="mt-4 grid grid-cols-1 gap-[1.3125rem] sm:grid-cols-[max-content_minmax(0,1fr)_max-content_minmax(0,1fr)] sm:gap-x-6 sm:gap-y-4">
         <div class="sm:col-span-2 sm:grid sm:grid-cols-subgrid sm:items-baseline">

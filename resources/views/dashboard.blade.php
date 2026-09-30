@@ -192,7 +192,10 @@
                                         <p class="truncate text-sm font-medium text-slate-700 dark:text-slate-200">{{ $activity['name'] }}</p>
                                         <p @class(['mt-0.5 text-xs', 'font-medium text-amber-700 dark:text-amber-300' => $activity['tone'] === 'late', 'text-slate-500 dark:text-slate-400' => $activity['tone'] !== 'late'])>{{ $activity['action'] }}</p>
                                     </div>
-                                    <span class="shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ $activity['time'] }}</span>
+                                    <span class="shrink-0 text-right text-xs tabular-nums text-slate-500 dark:text-slate-400">
+                                        @if ($activity['date'])<span class="block">{{ $activity['date'] }}</span>@endif
+                                        {{ $activity['time'] }}
+                                    </span>
                                 </div>
                             @endforeach
                         </div>

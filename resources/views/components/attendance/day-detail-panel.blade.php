@@ -18,7 +18,7 @@ divergence here would be a real correctness bug, not just a style one. --}}
 @php $dayKey = $date->format('Y-m-d'); @endphp
 
 <div>
-    <p class="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Raw punches</p>
+    <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">Raw punches</p>
 
     @if ($punches->isEmpty())
         <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">No punches recorded on this date.</p>
@@ -28,7 +28,8 @@ divergence here would be a real correctness bug, not just a style one. --}}
                 <li class="flex flex-wrap items-center justify-between gap-3 text-sm">
                     <span class="flex flex-wrap items-center gap-2 {{ $punch->voided_at ? 'text-slate-400 line-through dark:text-slate-600' : 'text-slate-700 dark:text-slate-300' }}">
                         <x-time :time="$punch->punched_at" />
-                        <x-badge :color="$punch->punch_type->value === 'in' ? 'green' : 'slate'">{{ $punch->punch_type->label() }}</x-badge>
+                        {{-- Both directions neutral: green means Present, and an in-punch is not a status. --}}
+                        <x-badge color="slate">{{ $punch->punch_type->label() }}</x-badge>
                         <span class="text-xs text-slate-400 dark:text-slate-500">{{ $punch->source->label() }}</span>
                         @if ($punch->source->value === 'manual' && $punch->createdBy)
                             <span class="text-xs text-slate-400 dark:text-slate-500">by {{ $punch->createdBy->name }}</span>

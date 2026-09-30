@@ -115,6 +115,8 @@ Prefer composition over adding props that expose implementation choices. Props s
 
 ### Card header pattern
 
+**No eyebrows, anywhere.** A small uppercase, letter-spaced kicker above a title ("People directory", "Account", "Welcome back") is not used on pages, cards, auth screens or the auth hero. A card whose only heading was such a label gets a real sentence-case title instead (`Details`, `Login`, `Schedule`). Section labels inside forms, modals and popovers stay but use sentence case: `text-sm font-semibold` for a form section (`Identity`, `Working hours`), `text-xs font-medium` muted for a small group label (`Quick ranges`, `From`). Uppercase remains only for table column headers, calendar weekday headers and the compact `Soon` chip.
+
 A card that needs a header uses one pattern: the title (`text-lg font-semibold`) on the left and optional right-aligned muted meta (`text-xs text-slate-500 dark:text-slate-400`, `tabular-nums`) on the right, baseline-aligned. Cards carry no eyebrow labels. When a card's content has a time scope, put it in the meta slot as real dates (`Tue 29 Sep`, `23–29 Sep`), not a relative eyebrow such as "Today" or "Last seven days". A count that summarizes the card (Needs attention's `7 today`) also goes in the meta slot, as muted text rather than a colored badge.
 
 ### Avatars
