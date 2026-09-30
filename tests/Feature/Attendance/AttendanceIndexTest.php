@@ -464,6 +464,14 @@ class AttendanceIndexTest extends TestCase
         $html = Livewire::actingAs($admin)->test(Index::class)->html();
 
         $this->assertStringContainsString('<abbr title="Early leave" class="no-underline">Early</abbr>', $html);
+
+        // Employee is the leftmost column; identity and status come first.
+        $headers = [];
+        preg_match_all('/<th[^>]*>\s*(.*?)\s*<\/th>/s', $html, $matches);
+        foreach ($matches[1] as $cell) {
+            $headers[] = trim(strip_tags(preg_replace('/<span class="sr-only">.*?<\/span>/s', '', $cell)));
+        }
+        $this->assertSame(['Employee', 'Status', 'Date', 'In', 'Out', 'Worked', 'Late', 'Early', 'Department', ''], $headers);
         $this->assertStringContainsString('<tr class="relative whitespace-nowrap', $html);
         // Empty values are a muted em dash.
         $this->assertStringContainsString('<span class="text-slate-300 dark:text-slate-600">—</span>', $html);

@@ -301,17 +301,17 @@
                 </div>
 
                 <div class="overflow-x-auto transition-opacity" wire:loading.class="opacity-60">
-                    {{-- Column order puts identity and status first (Date, Employee,
-                    Status), then the times, then Department, so the columns that
-                    answer "who, and did they attend" are the ones visible without
-                    scrolling at narrow widths. No column is ever hidden
+                    {{-- Column order puts identity and status first (Employee, Status,
+                    then Date), then the times, then Department, so the columns that
+                    answer "who, and did they attend" are the leftmost and visible
+                    without scrolling at narrow widths. No column is ever hidden
                     (docs/ATTENDANCE_UI.md). --}}
                     <table class="min-w-[64rem] w-full">
                     <thead>
                         <tr class="relative whitespace-nowrap text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                            <th class="px-6 py-3">Date</th>
                             <th class="min-w-[11rem] px-6 py-3">Employee</th>
                             <th class="px-6 py-3">Status</th>
+                            <th class="px-6 py-3">Date</th>
                             <th class="px-6 py-3">In</th>
                             <th class="px-6 py-3">Out</th>
                             <th class="px-6 py-3 text-right">Worked</th>
@@ -337,7 +337,6 @@
                                 $workDateLabel = $attendance->work_date->format('D j M');
                             @endphp
                             <tr wire:key="daily-attendance-{{ $attendance->id }}" class="group relative hover:bg-slate-50 dark:hover:bg-slate-800/60">
-                                <td class="whitespace-nowrap px-6 py-2 text-sm tabular-nums {{ $dateCellClass }}">{{ $workDateLabel }}</td>
                                 {{-- Plain text, not a link: the row's one navigation target is
                                 the chevron at the end, so the identity column reads as data
                                 and every cell stays selectable. --}}
@@ -353,6 +352,7 @@
                                     day is a green "Present". --}}
                                     <x-badge :color="$style['badge']">{{ $attendance->status->label() }}</x-badge>
                                 </td>
+                                <td class="whitespace-nowrap px-6 py-2 text-sm tabular-nums {{ $dateCellClass }}">{{ $workDateLabel }}</td>
                                 <td class="whitespace-nowrap px-6 py-2 text-sm tabular-nums text-slate-700 dark:text-slate-300">
                                     @if ($attendance->first_in)
                                         <x-time :time="$attendance->first_in" />
