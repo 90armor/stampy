@@ -63,9 +63,8 @@ class CalendarReadabilityTest extends TestCase
         // Each legend entry's icon path, not just its label text — proves
         // the legend actually pairs icon-to-label, not just prints text
         // near unrelated icons elsewhere on the page. No icon path for
-        // "Late / Early leave": that entry is a colour swatch + underlined
-        // sample time, not an icon at all — merging it out of the icon list
-        // is exactly what stopped it duplicating present's check icon.
+        // "Late / Early leave": timing isn't a status, so that entry is an
+        // amber sample marked time, not an icon.
         foreach ([
             'M4.5 12.75l6 6 9-13.5',       // present (check)
             'M12 9v3.75m-9.303',            // incomplete (triangle)
@@ -174,7 +173,7 @@ class CalendarReadabilityTest extends TestCase
         $component->assertDontSee('March 3, 2026, Present, left');
     }
 
-    public function test_a_late_arrival_marks_the_in_time_with_red_underline_and_a_label(): void
+    public function test_a_late_arrival_marks_the_in_time_in_amber_without_underline_and_with_a_label(): void
     {
         $employee = Employee::factory()->create();
         DailyAttendance::factory()->create([
@@ -192,12 +191,15 @@ class CalendarReadabilityTest extends TestCase
             ->set('month', self::MONTH)
             ->html();
 
-        $this->assertStringContainsString('aria-label="Arrived 12 minutes late"', $html);
-        $this->assertStringContainsString('decoration-red-600', $html);
+        $this->assertMatchesRegularExpression('/<span class="font-medium text-amber-700 dark:text-amber-300" aria-label="Arrived 12 minutes late">/', $html);
+        $this->assertStringNotContainsString('decoration-red', $html);
         $this->assertStringNotContainsString('aria-label="Left', $html);
+        // The cell itself stays status-coloured (green Present), not amber.
+        $this->assertStringContainsString('bg-green-50 dark:bg-green-900/20', $html);
+        $this->assertStringNotContainsString('bg-amber-50 dark:bg-amber-900/20', $html);
     }
 
-    public function test_an_early_departure_marks_the_out_time_with_red_underline_and_a_label(): void
+    public function test_an_early_departure_marks_the_out_time_in_amber_and_with_a_label(): void
     {
         $employee = Employee::factory()->create();
         DailyAttendance::factory()->create([
@@ -215,11 +217,11 @@ class CalendarReadabilityTest extends TestCase
             ->set('month', self::MONTH)
             ->html();
 
-        $this->assertStringContainsString('aria-label="Left 4 minutes early"', $html);
+        $this->assertMatchesRegularExpression('/<span class="font-medium text-amber-700 dark:text-amber-300" aria-label="Left 4 minutes early">/', $html);
         $this->assertStringNotContainsString('aria-label="Arrived', $html);
     }
 
-    public function test_the_table_view_also_marks_late_arrival_and_early_leave_times(): void
+    public function test_the_table_view_marks_timing_on_the_late_and_early_values_not_the_times(): void
     {
         $employee = Employee::factory()->create();
         DailyAttendance::factory()->create([
@@ -238,12 +240,14 @@ class CalendarReadabilityTest extends TestCase
             ->set('view', 'table')
             ->html();
 
-        $this->assertStringContainsString('aria-label="Arrived 12 minutes late"', $html);
-        $this->assertStringContainsString('aria-label="Left 4 minutes early"', $html);
-        // The marked times and the numeric Late/Early leave columns already
-        // show this — a third "Late 12m"/"Early 4m" chip beside the Status
-        // badge repeated the same fact and bloated the row height, so it
-        // was removed.
+        // Same rule as the Daily Attendance table: In/Out stay neutral and
+        // the amber Late/Early values carry the timing fact.
+        $this->assertMatchesRegularExpression('/class="px-6 py-4 text-right text-sm font-medium text-amber-700 dark:text-amber-300">12m</', $html);
+        $this->assertMatchesRegularExpression('/class="px-6 py-4 text-right text-sm font-medium text-amber-700 dark:text-amber-300">4m</', $html);
+        $this->assertStringNotContainsString('aria-label="Arrived', $html);
+        $this->assertStringNotContainsString('aria-label="Left', $html);
+        // A third "Late 12m"/"Early 4m" chip beside the Status badge
+        // repeated the same fact and bloated the row height.
         $this->assertStringNotContainsString('>Late 12m<', $html);
         $this->assertStringNotContainsString('>Early 4m<', $html);
     }
@@ -369,7 +373,7 @@ class CalendarReadabilityTest extends TestCase
         $this->assertStringNotContainsString('bg-amber-50 text-amber-700', $html);
     }
 
-    public function test_a_present_day_with_an_early_leave_borrows_lates_amber_cell_colour(): void
+    public function test_a_present_day_with_an_early_leave_keeps_the_green_present_cell(): void
     {
         $employee = Employee::factory()->create();
         DailyAttendance::factory()->create([
@@ -397,8 +401,11 @@ class CalendarReadabilityTest extends TestCase
             ->set('month', self::MONTH)
             ->html();
 
-        $this->assertStringContainsString('bg-amber-50 dark:bg-amber-900/20', $html);
-        $this->assertStringContainsString('bg-green-50 dark:bg-green-900/20', $html);
+        // Colour is status-only: both days are green Present cells; the
+        // early day is distinguished only by its amber marked Out time.
+        $this->assertStringNotContainsString('bg-amber-50 dark:bg-amber-900/20', $html);
+        $this->assertSame(2, substr_count($html, 'bg-green-50 dark:bg-green-900/20'));
+        $this->assertStringContainsString('aria-label="Left 4 minutes early"', $html);
     }
 
     public function test_the_legend_shows_a_marked_time_sample_instead_of_a_dot(): void
@@ -411,7 +418,10 @@ class CalendarReadabilityTest extends TestCase
             ->html();
 
         $this->assertStringContainsString('Late / Early leave', $html);
-        $this->assertStringContainsString('decoration-red-600', $html);
+        // The sample is an amber marked time with no underline and no
+        // colour swatch — timing never colours a cell.
+        $this->assertStringContainsString('font-medium text-amber-700 dark:text-amber-300', $html);
+        $this->assertStringNotContainsString('decoration-red', $html);
         $this->assertStringNotContainsString('bg-slate-700 dark:bg-slate-200', $html);
     }
 

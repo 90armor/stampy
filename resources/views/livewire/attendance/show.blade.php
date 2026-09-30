@@ -1,28 +1,19 @@
 @php
     // Colour comes from DailyAttendance::displayVariant() everywhere on this
-    // page — "did they attend" (status) and "was the timing off" (late/early
-    // minutes) are independent facts (see AttendanceStatus's doc comment),
-    // so no view here keys colour off late_minutes/early_leave_minutes/
-    // status directly; every lookup below is by variant key. badge: table
-    // view/day-modal pill (x-badge's palette). icon/bg/text: the calendar
-    // view's cells — status is never colour-only there (see the icon
-    // choices below, each verified to keep a distinct silhouette in
-    // greyscale, not just a different colour) EXCEPT 'timing', which
-    // deliberately reuses 'present's check icon: the icon reflects
-    // attendance (they showed up), not timing, so a late-arrival/early-leave
-    // day still gets a check — the amber colour and the marked time (see
-    // the "Marked times" note) are what carry the timing exception, not the
-    // icon shape. bg/text stay within the app's existing green/amber/red/
-    // slate/primary/accent palette rather than introducing new one-off
-    // colours for holiday/leave.
+    // page, and that variant is the attendance STATUS only — one value per
+    // day. Timing (late arrival / early leave) can co-occur with Present, so
+    // it is an annotation inside the cell (an amber marked time via
+    // <x-time marked>), never the cell or badge colour: a late Present day is
+    // a green cell with an amber time. See docs/ATTENDANCE_UI.md. badge:
+    // table view/day-modal pill (x-badge's palette). icon/bg/text: the
+    // calendar view's cells — status is never colour-only there (each icon
+    // keeps a distinct silhouette in greyscale, not just a different colour).
     $variantStyles = [
         'present' => ['badge' => 'green', 'icon' => 'check', 'bg' => 'bg-green-50 dark:bg-green-900/20', 'text' => 'text-green-700 dark:text-green-400', 'ring' => 'ring-green-600/20 dark:ring-green-500/30'],
-        'timing' => ['badge' => 'amber', 'icon' => 'check', 'bg' => 'bg-amber-50 dark:bg-amber-900/20', 'text' => 'text-amber-700 dark:text-amber-400', 'ring' => 'ring-amber-600/20 dark:ring-amber-500/30'],
         // A deliberate one-time addition to the palette — see CLAUDE.md's
-        // displayVariant() colour table. A timing exception (employee behavior,
-        // correct data) and Incomplete (a device defect — the person
-        // worked, nothing recorded it) used to share amber and read as the
-        // same thing in light mode. text-violet-700/violet-300 measured
+        // displayVariant() colour table. Incomplete (a device defect — the
+        // person worked, nothing recorded it) must never read as amber, which
+        // is reserved for the timing annotation. text-violet-700/violet-300 measured
         // 6.48:1 (light, on violet-50) and 9.43:1 (dark, on violet-900/20
         // over the card background) — -300, not -400, for the same reason
         // 'absent' uses red-300: picked against the actual measured ratio,
@@ -42,8 +33,7 @@
         // stock-green already tells), which would repeat the exact
         // amber/violet confusability problem this app has already fixed
         // twice. Must not read as red or amber either — it means "not yet",
-        // not a failure. 'clock' is free to reuse here since 'timing' (see
-        // above) moved off it onto 'present's check. text-blue-700/blue-300
+        // not a failure. text-blue-700/blue-300
         // measured 6.16:1 (light, on blue-50) and 9.51:1 (dark, on
         // blue-900/20 over the card background).
         'in_progress' => ['badge' => 'blue', 'icon' => 'clock', 'bg' => 'bg-blue-50 dark:bg-blue-900/20', 'text' => 'text-blue-700 dark:text-blue-300', 'ring' => 'ring-blue-600/20 dark:ring-blue-500/30'],
@@ -68,16 +58,10 @@
 
     // The variants that actually appear in the grid (holiday/leave are
     // defined but never rendered yet, so they're left out of the legend —
-    // nothing to explain), MINUS 'timing': it deliberately reuses 'present's
-    // check icon in the calendar (see the 'timing' variant style's comment
-    // above), so an icon-based legend row for it would be a second entry
-    // with the same icon shape as 'present', differing only in colour —
-    // indistinguishable in greyscale, defeating the reason icons exist at
-    // all. It gets its own non-icon entry below instead, combining the
-    // amber colour with the underlined marked-time sample — the one visual
-    // that actually IS distinct. Labels come from AttendanceStatus::label()
-    // where a real status exists, so the legend can never drift from what a
-    // cell actually says.
+    // nothing to explain). Labels come from AttendanceStatus::label() where a
+    // real status exists, so the legend can never drift from what a cell
+    // actually says. Timing isn't a variant, so it has no icon row; its one
+    // legend entry below is a sample amber marked time.
     $legendItems = [
         ['icon' => $variantStyles['present']['icon'], 'text' => $variantStyles['present']['text'], 'label' => \App\Enums\AttendanceStatus::Present->label()],
         ['icon' => $variantStyles['incomplete']['icon'], 'text' => $variantStyles['incomplete']['text'], 'label' => \App\Enums\AttendanceStatus::Incomplete->label()],
@@ -264,10 +248,9 @@
                             $lateArrival = $record && $record->isLate();
                             $earlyDeparture = $record && $record->leftEarly();
 
-                            // Colour comes from displayVariant() — the one place that
-                            // decides whether a Present day with a timing exception reads
-                            // as 'present' (green) or 'timing' (amber). No re-deriving that
-                            // here from late/early minutes directly.
+                            // Colour comes from displayVariant(), which is status-only:
+                            // a Present day with a timing exception is still a green
+                            // 'present' cell; the marked time below carries the timing.
                             if (! $cell['inMonth']) {
                                 $style = null;
                             } elseif ($record) {
@@ -357,13 +340,13 @@
                                 which structurally has none to show anyway. --}}
                                 @if ($record && $record->status->value !== 'off' && $record->status->value !== 'holiday')
                                     {{-- A plain "→" character, not an icon — the status icon is
-                                    the one signal that matters; a marked time (see CLAUDE.md's
-                                    "Marked times" note) points at the specific in/out value
-                                    that's out of range instead of adding a second glyph. --}}
+                                    the one signal that matters; a marked time (amber, see
+                                    <x-time marked>) points at the specific in/out value that's
+                                    out of range instead of adding a second glyph. --}}
                                     <div class="hidden items-center gap-1 whitespace-nowrap text-[10px] leading-tight text-slate-500 dark:text-slate-400 sm:flex">
                                         @if ($record->first_in)
                                             @if ($lateArrival)
-                                                <x-time :time="$record->first_in" class="text-red-700 underline decoration-red-600 decoration-2 underline-offset-2 dark:text-red-300 dark:decoration-red-400" aria-label="Arrived {{ $lateMinutesLabel }} late" />
+                                                <x-time :time="$record->first_in" marked aria-label="Arrived {{ $lateMinutesLabel }} late" />
                                             @else
                                                 <x-time :time="$record->first_in" />
                                             @endif
@@ -373,7 +356,7 @@
                                         <span aria-hidden="true" class="opacity-60">&rarr;</span>
                                         @if ($record->last_out)
                                             @if ($earlyDeparture)
-                                                <x-time :time="$record->last_out" class="text-red-700 underline decoration-red-600 decoration-2 underline-offset-2 dark:text-red-300 dark:decoration-red-400" aria-label="Left {{ $earlyMinutesLabel }} early" />
+                                                <x-time :time="$record->last_out" marked aria-label="Left {{ $earlyMinutesLabel }} early" />
                                             @else
                                                 <x-time :time="$record->last_out" />
                                             @endif
@@ -409,21 +392,15 @@
                             {{ $item['label'] }}
                         </span>
                     @endforeach
-                    {{-- The one entry for a timing exception, combining both of its
-                    visual signals rather than splitting them across two legend rows
-                    (which used to duplicate each other — "Late / Early leave" next
-                    to a separate "Late arrival / early leave" sample). The swatch is
-                    the same amber the cell background uses; the sample time carries
-                    the actual underline — the shape cue that survives greyscale on
-                    its own, independent of whether the colour reads at all. One
-                    label covers both directions the marker appears (late arrival,
-                    early leave). Goes through the real <x-time> component (not a
-                    hardcoded "7:55 AM" string) so the sample honours
-                    config('attendance.time_format') the same as every other time on
-                    the page. --}}
+                    {{-- The one entry for a timing exception: a sample marked time,
+                    the same amber annotation a real late In / early Out carries
+                    inside an otherwise status-coloured cell. No swatch — timing
+                    never colours a cell. Goes through the real <x-time> component
+                    (not a hardcoded "7:55 AM" string) so the sample honours
+                    config('attendance.time_format') like every other time on the
+                    page. --}}
                     <span class="inline-flex items-center gap-1.5">
-                        <span class="h-3 w-3 shrink-0 rounded-sm {{ $variantStyles['timing']['bg'] }} ring-1 ring-inset {{ $variantStyles['timing']['ring'] }}" aria-hidden="true"></span>
-                        <x-time :time="\Illuminate\Support\Carbon::createFromTime(7, 55)" class="text-red-700 underline decoration-red-600 decoration-2 underline-offset-2 dark:text-red-300 dark:decoration-red-400" />
+                        <x-time :time="\Illuminate\Support\Carbon::createFromTime(7, 55)" marked />
                         Late / Early leave
                     </span>
                 </div>
@@ -450,14 +427,10 @@
                             @php
                                 $record = $day['record'];
                                 $dayKey = $day['date']->format('Y-m-d');
-                                // Marked times (see CLAUDE.md's "Marked times" note) — the
-                                // Status badge shows the real attendance status ("Present"),
-                                // so the In/Out cells are where the specific late-arrival/
-                                // early-leave discrepancy is pointed out, matching the
-                                // calendar's convention.
+                                // Same rule as the Daily Attendance table: In/Out stay
+                                // neutral, and the timing fact is the amber Late/Early value.
                                 $markedLate = $record && $record->isLate();
                                 $markedEarly = $record && $record->leftEarly();
-                                $markedTimeClass = 'text-red-700 underline decoration-red-600 decoration-2 underline-offset-2 dark:text-red-300 dark:decoration-red-400';
                             @endphp
                             {{-- A per-day <tbody> (valid HTML — a <table> may contain several),
                             not a single <tbody> for the month: the expand toggle and its detail
@@ -486,22 +459,14 @@
                                 @if ($record)
                                     <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">
                                         @if ($record->first_in)
-                                            @if ($markedLate)
-                                                <x-time :time="$record->first_in" class="{{ $markedTimeClass }}" aria-label="Arrived {{ $record->late_minutes }} minute{{ $record->late_minutes === 1 ? '' : 's' }} late" />
-                                            @else
-                                                <x-time :time="$record->first_in" />
-                                            @endif
+                                            <x-time :time="$record->first_in" />
                                         @else
                                             —
                                         @endif
                                     </td>
                                     <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">
                                         @if ($record->last_out)
-                                            @if ($markedEarly)
-                                                <x-time :time="$record->last_out" class="{{ $markedTimeClass }}" aria-label="Left {{ $record->early_leave_minutes }} minute{{ $record->early_leave_minutes === 1 ? '' : 's' }} early" />
-                                            @else
-                                                <x-time :time="$record->last_out" />
-                                            @endif
+                                            <x-time :time="$record->last_out" />
                                             @if ($record->isOvernightOut())
                                                 <span class="text-slate-400 dark:text-slate-500">(+1)</span>
                                             @endif
@@ -510,15 +475,12 @@
                                         @endif
                                     </td>
                                     <td class="px-6 py-4 text-right text-sm text-slate-700 dark:text-slate-300">{{ $record->formattedWorkedMinutes() ?? '—' }}</td>
-                                    <td class="px-6 py-4 text-right text-sm text-slate-700 dark:text-slate-300">{{ $record->isLate() ? $record->late_minutes.'m' : '—' }}</td>
-                                    <td class="px-6 py-4 text-right text-sm text-slate-700 dark:text-slate-300">{{ $record->leftEarly() ? $record->early_leave_minutes.'m' : '—' }}</td>
+                                    <td @class(['px-6 py-4 text-right text-sm', 'font-medium text-amber-700 dark:text-amber-300' => $markedLate, 'text-slate-700 dark:text-slate-300' => ! $markedLate])>{{ $markedLate ? $record->late_minutes.'m' : '—' }}</td>
+                                    <td @class(['px-6 py-4 text-right text-sm', 'font-medium text-amber-700 dark:text-amber-300' => $markedEarly, 'text-slate-700 dark:text-slate-300' => ! $markedEarly])>{{ $markedEarly ? $record->early_leave_minutes.'m' : '—' }}</td>
                                     <td class="px-6 py-4">
-                                        {{-- Status only — the adjacent Late/Early leave columns
-                                        already show the minutes (aligned, scannable), and the
-                                        marked In/Out times already point at which one; a third
-                                        "Late 21m" chip here repeated the same fact and bloated
-                                        row height. Colour still comes from displayVariant(), so
-                                        a timing exception still reads amber, not green. --}}
+                                        {{-- Status only — the adjacent Late/Early columns already
+                                        show the timing (amber); a "Late 21m" chip here repeated the
+                                        same fact. Colour comes from the status-only displayVariant(). --}}
                                         <x-badge :color="$variantStyles[$record->displayVariant()]['badge']">{{ $record->status->label() }}</x-badge>
                                     </td>
                                     <td class="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
@@ -596,7 +558,6 @@
                     $modalSchedule = $modalRecord?->workSchedule ?? $employee->scheduleOn($modalDate);
                     $modalMarkedLate = $modalRecord && $modalRecord->isLate();
                     $modalMarkedEarly = $modalRecord && $modalRecord->leftEarly();
-                    $markedTimeClass = 'text-red-700 underline decoration-red-600 decoration-2 underline-offset-2 dark:text-red-300 dark:decoration-red-400';
                     // Same holiday-name source as the calendar cell (read
                     // straight from `holidays`, not $modalRecord) — the
                     // modal is opened from a cell, so it should never say
@@ -616,10 +577,9 @@
                             @endif
                         </div>
                         {{-- Status pill shows the real attendance status ("Present"), coloured by
-                        displayVariant() — a timing exception reads as an amber "Present", not a
-                        separate chip. The grid's own Late / Early leave fields below (and their
-                        marked In/Out times) already carry the timing; a chip here would just
-                        repeat them, the same reasoning the table/list Status columns document. --}}
+                        the status-only displayVariant() — a late day is a green "Present". The
+                        Late / Early leave fields below (and the amber marked In/Out times)
+                        carry the timing; a chip here would just repeat them. --}}
                         <div class="flex flex-wrap items-center justify-end gap-1.5">
                             <span class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ring-1 ring-inset {{ $modalStyle['bg'] }} {{ $modalStyle['text'] }} {{ $modalStyle['ring'] }}">
                                 <x-icon :name="$modalStyle['icon']" class="h-3.5 w-3.5" />
@@ -644,7 +604,7 @@
                             <dd class="mt-0.5 text-sm text-slate-900 dark:text-slate-100">
                                 @if ($modalRecord?->first_in)
                                     @if ($modalMarkedLate)
-                                        <x-time :time="$modalRecord->first_in" class="{{ $markedTimeClass }}" aria-label="Arrived {{ $modalRecord->late_minutes }} minute{{ $modalRecord->late_minutes === 1 ? '' : 's' }} late" />
+                                        <x-time :time="$modalRecord->first_in" marked aria-label="Arrived {{ $modalRecord->late_minutes }} minute{{ $modalRecord->late_minutes === 1 ? '' : 's' }} late" />
                                     @else
                                         <x-time :time="$modalRecord->first_in" />
                                     @endif
@@ -658,7 +618,7 @@
                             <dd class="mt-0.5 text-sm text-slate-900 dark:text-slate-100">
                                 @if ($modalRecord?->last_out)
                                     @if ($modalMarkedEarly)
-                                        <x-time :time="$modalRecord->last_out" class="{{ $markedTimeClass }}" aria-label="Left {{ $modalRecord->early_leave_minutes }} minute{{ $modalRecord->early_leave_minutes === 1 ? '' : 's' }} early" />
+                                        <x-time :time="$modalRecord->last_out" marked aria-label="Left {{ $modalRecord->early_leave_minutes }} minute{{ $modalRecord->early_leave_minutes === 1 ? '' : 's' }} early" />
                                     @else
                                         <x-time :time="$modalRecord->last_out" />
                                     @endif
@@ -676,11 +636,11 @@
                         </div>
                         <div>
                             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Late</dt>
-                            <dd class="mt-0.5 text-sm text-slate-900 dark:text-slate-100">{{ $modalMarkedLate ? $modalRecord->late_minutes.'m' : '—' }}</dd>
+                            <dd @class(['mt-0.5 text-sm', 'font-medium text-amber-700 dark:text-amber-300' => $modalMarkedLate, 'text-slate-900 dark:text-slate-100' => ! $modalMarkedLate])>{{ $modalMarkedLate ? $modalRecord->late_minutes.'m' : '—' }}</dd>
                         </div>
                         <div>
                             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Early leave</dt>
-                            <dd class="mt-0.5 text-sm text-slate-900 dark:text-slate-100">{{ $modalMarkedEarly ? $modalRecord->early_leave_minutes.'m' : '—' }}</dd>
+                            <dd @class(['mt-0.5 text-sm', 'font-medium text-amber-700 dark:text-amber-300' => $modalMarkedEarly, 'text-slate-900 dark:text-slate-100' => ! $modalMarkedEarly])>{{ $modalMarkedEarly ? $modalRecord->early_leave_minutes.'m' : '—' }}</dd>
                         </div>
                         <div>
                             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Note</dt>

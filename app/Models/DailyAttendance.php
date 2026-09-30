@@ -84,17 +84,19 @@ class DailyAttendance extends Model
     }
 
     /**
-     * The single resolver every view colours a cell/badge from — "did they
-     * attend" (status) and "was the timing off" (isLate()/leftEarly()) are
-     * independent facts, so no view may re-derive a colour bucket by
-     * checking late_minutes/early_leave_minutes/status itself; they all
-     * call this instead. A timing exception can only ever coincide with
-     * Present: every other status structurally carries zero late/early
-     * minutes (DailySummaryBuilder only computes either when both punches
-     * exist on a workday that isn't a holiday — InProgress/Incomplete/
-     * Absent never have both, and a worked Holiday has them forced to 0),
-     * so 'timing' and every other variant are mutually exclusive by
-     * construction, not by a check here.
+     * The single resolver every view colours a cell/badge from. It encodes
+     * the attendance STATUS only — one value per day. Attributes that can
+     * co-occur on the same day (timing exceptions now, partial leave later)
+     * are annotations inside the cell, exposed through isLate()/leftEarly()/
+     * hasTimingException(), never a colour bucket: a Present day is 'present'
+     * whether or not it was late. No view may re-derive a colour bucket from
+     * late_minutes/early_leave_minutes/status itself; they all call this.
+     *
+     * A 'timing' variant used to exist (Present + a timing exception, amber)
+     * and was removed in Design System v1.1: it made one cell colour carry
+     * two independent facts, and would have needed yet another combined
+     * bucket the first time a second co-occurring attribute (partial leave)
+     * arrived.
      */
     public function displayVariant(): string
     {
@@ -105,7 +107,7 @@ class DailyAttendance extends Model
             AttendanceStatus::Absent => 'absent',
             AttendanceStatus::Incomplete => 'incomplete',
             AttendanceStatus::InProgress => 'in_progress',
-            AttendanceStatus::Present => $this->hasTimingException() ? 'timing' : 'present',
+            AttendanceStatus::Present => 'present',
         };
     }
 }

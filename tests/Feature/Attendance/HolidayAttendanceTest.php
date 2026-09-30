@@ -80,9 +80,8 @@ class HolidayAttendanceTest extends TestCase
         $this->assertSame(0, $row->late_minutes);
         $this->assertSame(0, $row->early_leave_minutes);
         $this->assertFalse($row->hasTimingException());
-        // Falls out of the existing code with no special case: Present with
-        // both timing fields at 0 already resolves to 'present', not
-        // 'timing', via hasTimingException().
+        // displayVariant() is status-only, so a worked holiday is 'present';
+        // the zeroed timing fields also mean it carries no amber annotation.
         $this->assertSame('present', $row->displayVariant());
     }
 

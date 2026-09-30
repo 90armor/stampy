@@ -1,17 +1,11 @@
 @php
     // Colour comes from DailyAttendance::displayVariant() everywhere on this
-    // page — "did they attend" (status) and "was the timing off" (late/early
-    // minutes) are independent facts (see AttendanceStatus's doc comment),
-    // so no lookup here keys off late_minutes/early_leave_minutes/status
-    // directly. 'timing' is the variant for a Present day with a late
-    // arrival and/or early leave — needed here for the per-row Status badge
-    // (a row can resolve to it), but NOT for the Present stat card below:
-    // that tile aggregates every present row, on-time or not, so it stays
-    // green/check like Present itself — only its subtext breaks out how
-    // many of those were late/early, it doesn't recolour the whole tile.
+    // page, and that variant is the attendance STATUS only — a late or early
+    // Present day is still 'present' (green). Timing is an annotation: the
+    // amber Late/Early values in their own columns, never the badge colour.
+    // See docs/ATTENDANCE_UI.md.
     $variantStyles = [
         'present' => ['icon' => 'check', 'badge' => 'green', 'iconClass' => 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400'],
-        'timing' => ['icon' => 'clock', 'badge' => 'amber', 'iconClass' => 'bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'],
         // violet, not amber — matches Attendance\Show's calendar/day-modal/
         // table (see CLAUDE.md's displayVariant() colour table): Incomplete is a
         // device defect (a punch never recorded), a late/early timing
@@ -316,16 +310,6 @@
                         @foreach ($attendances as $attendance)
                             @php
                                 $style = $variantStyles[$attendance->displayVariant()];
-
-                                // Marked times (see CLAUDE.md's "Marked times" note) — the
-                                // Status badge shows the real attendance status ("Present"),
-                                // so the In/Out cells are where the specific late-arrival/
-                                // early-leave discrepancy is pointed out, matching the
-                                // calendar's convention, instead of it only living in the
-                                // Late/Early leave columns.
-                                $markedLate = $attendance->isLate();
-                                $markedEarly = $attendance->leftEarly();
-                                $markedTimeClass = 'text-red-700 underline decoration-red-600 decoration-2 underline-offset-2 dark:text-red-300 dark:decoration-red-400';
                             @endphp
                             <tr wire:key="daily-attendance-{{ $attendance->id }}" class="group relative hover:bg-slate-50 dark:hover:bg-slate-800/60">
                                 <td class="whitespace-nowrap px-6 py-3 text-sm tabular-nums text-slate-700 dark:text-slate-300">{{ $attendance->work_date->format('D j M') }}</td>
@@ -346,22 +330,14 @@
                                 <td class="px-6 py-3 text-sm text-slate-700 dark:text-slate-300">{{ $attendance->employee->department->name }}</td>
                                 <td class="whitespace-nowrap px-6 py-3 text-sm tabular-nums text-slate-700 dark:text-slate-300">
                                     @if ($attendance->first_in)
-                                        @if ($markedLate)
-                                            <x-time :time="$attendance->first_in" class="{{ $markedTimeClass }}" aria-label="Arrived {{ $attendance->late_minutes }} minute{{ $attendance->late_minutes === 1 ? '' : 's' }} late" />
-                                        @else
-                                            <x-time :time="$attendance->first_in" />
-                                        @endif
+                                        <x-time :time="$attendance->first_in" />
                                     @else
                                         —
                                     @endif
                                 </td>
                                 <td class="whitespace-nowrap px-6 py-3 text-sm tabular-nums text-slate-700 dark:text-slate-300">
                                     @if ($attendance->last_out)
-                                        @if ($markedEarly)
-                                            <x-time :time="$attendance->last_out" class="{{ $markedTimeClass }}" aria-label="Left {{ $attendance->early_leave_minutes }} minute{{ $attendance->early_leave_minutes === 1 ? '' : 's' }} early" />
-                                        @else
-                                            <x-time :time="$attendance->last_out" />
-                                        @endif
+                                        <x-time :time="$attendance->last_out" />
                                         @if ($attendance->isOvernightOut())
                                             <span class="text-slate-400 dark:text-slate-500">(+1)</span>
                                         @endif
@@ -370,15 +346,16 @@
                                     @endif
                                 </td>
                                 <td class="whitespace-nowrap px-6 py-3 text-right text-sm tabular-nums text-slate-700 dark:text-slate-300">{{ $attendance->formattedWorkedMinutes() ?? '—' }}</td>
-                                <td class="whitespace-nowrap px-6 py-3 text-right text-sm tabular-nums text-slate-700 dark:text-slate-300">{{ $attendance->isLate() ? $attendance->late_minutes.'m' : '—' }}</td>
-                                <td class="whitespace-nowrap px-6 py-3 text-right text-sm tabular-nums text-slate-700 dark:text-slate-300">{{ $attendance->leftEarly() ? $attendance->early_leave_minutes.'m' : '—' }}</td>
+                                {{-- In/Out stay neutral; the timing fact is marked here, on
+                                the duration itself, in amber (docs/ATTENDANCE_UI.md). --}}
+                                <td @class(['whitespace-nowrap px-6 py-3 text-right text-sm tabular-nums', 'font-medium text-amber-700 dark:text-amber-300' => $attendance->isLate(), 'text-slate-700 dark:text-slate-300' => ! $attendance->isLate()])>{{ $attendance->isLate() ? $attendance->late_minutes.'m' : '—' }}</td>
+                                <td @class(['whitespace-nowrap px-6 py-3 text-right text-sm tabular-nums', 'font-medium text-amber-700 dark:text-amber-300' => $attendance->leftEarly(), 'text-slate-700 dark:text-slate-300' => ! $attendance->leftEarly()])>{{ $attendance->leftEarly() ? $attendance->early_leave_minutes.'m' : '—' }}</td>
                                 <td class="px-6 py-3">
-                                    {{-- Status only — the adjacent Late/Early leave columns
-                                    already show the minutes (aligned, scannable), and the
-                                    marked In/Out times already point at which one; a third
-                                    "Late 21m" chip here repeated the same fact and bloated
-                                    row height. Colour still comes from displayVariant(), so
-                                    a timing exception still reads amber, not green. --}}
+                                    {{-- Status only — the adjacent Late/Early columns already
+                                    show the timing (aligned, scannable, amber); a "Late 21m"
+                                    chip here repeated the same fact and bloated row height.
+                                    Colour comes from displayVariant(), which is status-only:
+                                    a late Present day is a green "Present". --}}
                                     <x-badge :color="$style['badge']">{{ $attendance->status->label() }}</x-badge>
                                 </td>
                                 <td class="py-3 pl-2 pr-6 text-right">

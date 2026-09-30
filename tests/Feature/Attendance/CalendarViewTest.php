@@ -241,9 +241,9 @@ class CalendarViewTest extends TestCase
     public function test_a_timing_exception_day_shares_the_present_check_icon(): void
     {
         // The icon reflects attendance (they showed up), not timing — see
-        // AttendanceStatus's doc comment and the calendar's 'timing' variant
-        // style. The amber colour and the marked time are what distinguish
-        // a late/early day from a clean one, not the icon shape.
+        // AttendanceStatus's doc comment. displayVariant() is status-only, so
+        // a late day is an ordinary Present cell; only the amber marked time
+        // distinguishes it from a clean one.
         $employee = Employee::factory()->create();
         DailyAttendance::factory()->create([
             'employee_id' => $employee->id,

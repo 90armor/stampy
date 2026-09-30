@@ -383,9 +383,7 @@ class AttendanceIndexTest extends TestCase
 
         $html = Livewire::actingAs($admin)->test(Index::class)->html();
 
-        // bg-amber-50 text-amber-600 legitimately appears elsewhere on this
-        // page (Late's own stat card/badge, even at a zero count), so this
-        // checks the Incomplete badge's own violet classes directly rather
+        // Checks the Incomplete badge's own violet classes directly rather
         // than a broad "no amber anywhere" assertion.
         $this->assertStringContainsString('bg-violet-50 text-violet-700', $html);
     }
@@ -445,7 +443,7 @@ class AttendanceIndexTest extends TestCase
         $this->assertStringNotContainsString(' early', $html);
     }
 
-    public function test_a_late_arrival_marks_the_in_time_with_a_red_underline_and_a_label(): void
+    public function test_a_late_arrival_is_marked_by_an_amber_late_value_and_a_neutral_in_time(): void
     {
         $admin = $this->admin();
         $employee = Employee::factory()->create();
@@ -462,11 +460,16 @@ class AttendanceIndexTest extends TestCase
 
         $html = Livewire::actingAs($admin)->test(Index::class)->html();
 
-        $this->assertStringContainsString('aria-label="Arrived 12 minutes late"', $html);
-        $this->assertStringNotContainsString('aria-label="Left', $html);
+        // In/Out stay neutral; the timing fact is the amber Late value.
+        $this->assertMatchesRegularExpression('/class="whitespace-nowrap px-6 py-3 text-right text-sm tabular-nums font-medium text-amber-700 dark:text-amber-300">12m</', $html);
+        $this->assertStringNotContainsString('aria-label="Arrived', $html);
+        $this->assertStringNotContainsString('underline decoration-red', $html);
+        // Status-only colour: a late Present row is a green badge.
+        $this->assertStringContainsString('bg-green-50 text-green-700', $html);
+        $this->assertStringNotContainsString('bg-amber-50 text-amber-700', $html);
     }
 
-    public function test_a_present_row_with_an_early_leave_marks_the_out_time(): void
+    public function test_a_present_row_with_an_early_leave_marks_the_early_value(): void
     {
         $admin = $this->admin();
         $employee = Employee::factory()->create();
@@ -483,9 +486,9 @@ class AttendanceIndexTest extends TestCase
 
         $html = Livewire::actingAs($admin)->test(Index::class)->html();
 
-        $this->assertStringContainsString('aria-label="Left 4 minutes early"', $html);
+        $this->assertMatchesRegularExpression('/class="whitespace-nowrap px-6 py-3 text-right text-sm tabular-nums font-medium text-amber-700 dark:text-amber-300">4m</', $html);
         // The Status badge stays "Present" — status doesn't change, only the
-        // specific Out time is marked (see CLAUDE.md's "Marked times" note).
+        // Early value is marked (docs/ATTENDANCE_UI.md).
         $this->assertStringContainsString('Present', $html);
         // No separate "Early 4m" chip beside the badge — the marked time and
         // the numeric Early leave column already show this.

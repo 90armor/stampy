@@ -8,14 +8,15 @@ Attendance status answers whether an employee attended: `present`, `incomplete`,
 
 There is no `Late` attendance status. A person who arrived late or left early still has the underlying `present` status. A day may have either timing exception or both without requiring a combined status.
 
-`DailyAttendance::displayVariant()` is the only source of truth for the semantic display variant. Views must not independently infer a color from status or timing fields.
+### Color = status only; timing is an annotation
 
-The semantic mapping is:
+A cell or badge color encodes the attendance **status** only — one value per day. Attributes that can co-occur on the same day (timing exceptions now, partial leave later) are **annotations inside the cell**, never the cell or badge color. A late or early Present day is a green "Present".
+
+`DailyAttendance::displayVariant()` is the only source of truth for the display variant, and it is status-only. Views must not independently infer a color from status or timing fields. Timing stays exposed through `isLate()`, `leftEarly()`, and `hasTimingException()`.
 
 | Display variant | Meaning |
 | --- | --- |
-| `green` | Present without a timing exception |
-| `amber` | Present with late and/or early timing |
+| `green` | Present (with or without a timing exception) |
 | `violet` | Incomplete |
 | `red` | Absent |
 | `slate` | Off |
@@ -23,7 +24,15 @@ The semantic mapping is:
 | `blue` | In progress |
 | `fuchsia` | Holiday |
 
-Color always accompanies readable text or another non-color signal. Status badges show the attendance status, while timing values live in the Late and Early leave columns or fields. Marked In/Out times identify which punch caused a timing exception. Do not add separate timing chips that duplicate those fields.
+Amber marks the timing fact where it is displayed:
+
+- **Attendance tables** (Daily Attendance and the employee's own table view): the Late and Early values are amber (`font-medium text-amber-700 dark:text-amber-300`). In/Out times are neutral — no color, no underline.
+- **Calendar cells and the day-detail modal:** the late In / early Out time is amber medium-weight text via `<x-time marked>`, with an accessible label such as "Arrived 16 minutes late". No underline, and no extra "+80m" label in calendar cells. The cell fill still follows status, so a late Present day is a green cell with an amber time. The calendar legend's timing entry is a sample amber marked time, not a color swatch.
+- **Dashboard timing copy** ("7 arrived late and 10 left early") may stay amber — it is the timing fact itself.
+
+Underline is reserved for links everywhere; a timing value is never underlined. Color always accompanies readable text or another non-color signal: the Late/Early column position and value, the marked time's medium weight, and its accessible label. Do not add separate timing chips that duplicate those fields.
+
+Contrast of the amber annotation, measured against its actual backgrounds: `amber-700` is 5.02:1 on white, 4.80:1 on a `green-50` Present cell, 4.81:1 on the `slate-50` row hover; `amber-300` is 12.13:1 on the dark card, 11.00:1 on a dark `green-900/20` cell, 11.19:1 on the dark row hover.
 
 Summary timing copy stays concise and omits zero values: `49 late`, `152 early`, or `49 late · 152 early`.
 

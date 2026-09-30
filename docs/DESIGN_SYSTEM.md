@@ -41,7 +41,9 @@ This document is the source of truth for Stampy's visual interface. It records c
 | Action / Danger | `text-red-600` with red boundary/tint | `dark:text-red-400` | Destructive actions |
 | Focus / Interactive | `ring-primary-500` | `dark:ring-primary-500` | Keyboard focus and focused controls |
 
-Attendance color is model-driven. `DailyAttendance::displayVariant()` is the source of truth: present is green, timing exception amber, incomplete violet, absent red, off slate, leave accent, in progress blue, and holiday fuchsia. Views must not independently derive these buckets. Status is reinforced with text or shape, never color alone.
+Attendance color is model-driven. `DailyAttendance::displayVariant()` is the source of truth and is status-only: present green, incomplete violet, absent red, off slate, leave accent, in progress blue, and holiday fuchsia. Views must not independently derive these buckets. Status is reinforced with text or shape, never color alone.
+
+**Color = status only; co-occurring attributes are annotations.** A cell or badge color encodes one value per record — its status. Attributes that can co-occur with that status on the same record (attendance timing exceptions now, partial leave later) are annotations inside the cell, never the cell or badge color. For attendance timing the annotation is amber text on the specific value; see [Attendance UI](ATTENDANCE_UI.md).
 
 ## Typography
 
@@ -117,6 +119,7 @@ Entity detail pages are operational records, not dashboards or profile heroes. L
 - Text-entry and selection controls may retain a visible `focus` border/ring while being edited; action controls and links prefer `focus-visible` so keyboard focus is prominent without adding unnecessary pointer-click persistence.
 - Destructive actions use red semantics and require confirmation when the effect is material.
 - Row navigation must be keyboard reachable. A cell link uses visible primary-colored underlined text; a fully clickable row uses cursor, hover, and `focus-visible` treatment.
+- Underline is reserved for links. Never underline a value to mark it (a timing exception, an error, an emphasis); use color plus weight or an explicit label instead.
 - Preserve user-entered state during Livewire updates and restore focus after modal dismissal.
 
 ## Forms

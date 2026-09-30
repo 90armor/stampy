@@ -282,7 +282,7 @@ class DailySummaryBuilderTest extends TestCase
         $this->assertTrue($row->hasTimingException());
     }
 
-    public function test_display_variant_is_timing_for_late_early_or_both_and_present_for_a_clean_day(): void
+    public function test_display_variant_is_status_only_present_whether_or_not_the_day_had_a_timing_exception(): void
     {
         $employee = $this->employeeOn($this->schedule());
         $monday = Carbon::parse(self::MONDAY);
@@ -296,19 +296,22 @@ class DailySummaryBuilderTest extends TestCase
         $this->punch($employee, $tuesday->format('Y-m-d').' 08:25:00', 'in');
         $this->punch($employee, $tuesday->format('Y-m-d').' 17:00:00', 'out');
         $lateOnly = app(DailySummaryBuilder::class)->build($employee, $tuesday);
-        $this->assertSame('timing', $lateOnly->displayVariant());
+        $this->assertTrue($lateOnly->isLate());
+        $this->assertSame('present', $lateOnly->displayVariant());
 
         $wednesday = $tuesday->copy()->addDay();
         $this->punch($employee, $wednesday->format('Y-m-d').' 07:55:00', 'in');
         $this->punch($employee, $wednesday->format('Y-m-d').' 16:00:00', 'out');
         $earlyOnly = app(DailySummaryBuilder::class)->build($employee, $wednesday);
-        $this->assertSame('timing', $earlyOnly->displayVariant());
+        $this->assertTrue($earlyOnly->leftEarly());
+        $this->assertSame('present', $earlyOnly->displayVariant());
 
         $thursday = $wednesday->copy()->addDay();
         $this->punch($employee, $thursday->format('Y-m-d').' 08:25:00', 'in');
         $this->punch($employee, $thursday->format('Y-m-d').' 16:00:00', 'out');
         $both = app(DailySummaryBuilder::class)->build($employee, $thursday);
-        $this->assertSame('timing', $both->displayVariant());
+        $this->assertTrue($both->isLate() && $both->leftEarly());
+        $this->assertSame('present', $both->displayVariant());
     }
 
     public function test_in_only_is_incomplete_with_zero_minutes(): void
