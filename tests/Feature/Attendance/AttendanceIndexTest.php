@@ -494,6 +494,27 @@ class AttendanceIndexTest extends TestCase
         $this->assertSame(3, substr_count($component->html(), 'text-xl font-semibold leading-7 tabular-nums'));
     }
 
+    public function test_a_range_of_exactly_today_shows_the_live_strip(): void
+    {
+        $admin = $this->admin();
+        [$arrived, $left, $notYet] = Employee::factory()->count(3)->create()->all();
+
+        DailyAttendance::factory()->create(['employee_id' => $arrived->id, 'work_date' => today()->format('Y-m-d'), 'status' => AttendanceStatus::InProgress, 'first_in' => today()->setTime(7, 55)]);
+        DailyAttendance::factory()->create(['employee_id' => $left->id, 'work_date' => today()->format('Y-m-d'), 'status' => AttendanceStatus::Present, 'first_in' => today()->setTime(7, 50), 'last_out' => today()->setTime(15, 0), 'early_leave_minutes' => 120]);
+        DailyAttendance::factory()->create(['employee_id' => $notYet->id, 'work_date' => today()->format('Y-m-d'), 'status' => AttendanceStatus::InProgress]);
+
+        $component = Livewire::actingAs($admin)->test(Index::class);
+
+        $component->assertSeeInOrder(['Checked in', '2 / 3', 'Not in yet', '1', 'Left', '1', '1 early'])
+            ->assertSee('Today, '.today()->format('D j M').' · so far')
+            ->assertDontSee('Incomplete</dt>', false);
+
+        // Any other range keeps the end-of-day status counts.
+        $component->set('fromDate', today()->subDay()->format('Y-m-d'))
+            ->assertSee('Absent')
+            ->assertDontSee('Not in yet');
+    }
+
     public function test_incomplete_badge_and_stat_card_use_violet_not_amber(): void
     {
         $admin = $this->admin();
@@ -538,7 +559,10 @@ class AttendanceIndexTest extends TestCase
             'early_leave_minutes' => 5,
         ]);
 
-        $html = Livewire::actingAs($admin)->test(Index::class)->html();
+        $html = Livewire::actingAs($admin)->test(Index::class)
+            // A range that isn't exactly today shows end-of-day status counts.
+            ->set('fromDate', today()->subDay()->format('Y-m-d'))
+            ->html();
 
         // A late/early day is already counted in Present, not a peer tile
         // (see CLAUDE.md's "Status vs. timing" note) — the containment is
@@ -611,7 +635,10 @@ class AttendanceIndexTest extends TestCase
             'early_leave_minutes' => 21,
         ]);
 
-        $html = Livewire::actingAs($admin)->test(Index::class)->html();
+        $html = Livewire::actingAs($admin)->test(Index::class)
+            // A range that isn't exactly today shows end-of-day status counts.
+            ->set('fromDate', today()->subDay()->format('Y-m-d'))
+            ->html();
 
         $this->assertStringContainsString('>1h 20m<', $html);
         $this->assertStringContainsString('>21m<', $html);

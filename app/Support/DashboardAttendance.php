@@ -283,6 +283,55 @@ class DashboardAttendance
     }
 
     /**
+     * The live "who is here now" view of today, derived from today's
+     * existing rows (no builder involvement): Checked in = rows with an
+     * in-punch; Not in yet = In progress rows with no punch at all; Left =
+     * Present rows (both punches), of which some left early. Status counts
+     * answer "did they attend" at end of day; this answers "who is here
+     * now" and is only ever shown for today (docs/ATTENDANCE_UI.md).
+     *
+     * @param  int[]|null  $employeeIds
+     * @return array{checkedIn: int, total: int, notInYet: int, left: int, leftEarly: int}
+     */
+    public static function liveToday(?array $employeeIds): array
+    {
+        $today = today()->format('Y-m-d');
+        $row = self::scopedDailyAttendanceQuery($employeeIds)
+            ->whereDate('work_date', $today)
+            ->selectRaw('sum(first_in is not null) as checked_in')
+            ->selectRaw('sum(status = ? and first_in is null and last_out is null) as not_in_yet', [AttendanceStatus::InProgress->value])
+            ->selectRaw('sum(status = ?) as left_count', [AttendanceStatus::Present->value])
+            ->selectRaw('sum(status = ? and early_leave_minutes > 0) as left_early', [AttendanceStatus::Present->value])
+            ->toBase()
+            ->first();
+
+        return [
+            'checkedIn' => (int) ($row->checked_in ?? 0),
+            'total' => self::scopedActiveEmployeeQuery($employeeIds)->count(),
+            'notInYet' => (int) ($row->not_in_yet ?? 0),
+            'left' => (int) ($row->left_count ?? 0),
+            'leftEarly' => (int) ($row->left_early ?? 0),
+        ];
+    }
+
+    /**
+     * The live strip's three cells, shared by the Dashboard and the
+     * Attendance page so both say exactly the same thing:
+     * "Checked in 27 / 35 · Not in yet 5 · Left 3 (3 early)".
+     *
+     * @param  array{checkedIn: int, total: int, notInYet: int, left: int, leftEarly: int}  $live
+     * @return list<array{icon: string, label: string, value: string, subtext: ?string}>
+     */
+    public static function liveTodayCells(array $live): array
+    {
+        return [
+            ['icon' => 'check', 'label' => 'Checked in', 'value' => $live['checkedIn'].' / '.$live['total'], 'subtext' => null],
+            ['icon' => 'clock', 'label' => 'Not in yet', 'value' => (string) $live['notInYet'], 'subtext' => null],
+            ['icon' => 'logout', 'label' => 'Left', 'value' => (string) $live['left'], 'subtext' => $live['leftEarly'] > 0 ? $live['leftEarly'].' early' : null],
+        ];
+    }
+
+    /**
      * Today is pending — not yet a final figure — while any scoped row for
      * today is still In progress, or some active employee in scope has no
      * row for today yet (not calculated). Pending attendance must never be

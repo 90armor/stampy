@@ -56,7 +56,14 @@ In-progress or not-yet-calculated attendance is **pending**. It must never rende
 
 - **Trend chart:** today's bar carries a muted `Today` marker (like `Off`/`Holiday`) until the day is calculated. If some employees are already present, the share so far is drawn as a lighter, provisional bar (`primary-200`, dark `primary-800`) with the marker above it; with nobody present yet there is no bar, only the marker.
 - **Department attendance:** while today is pending, each department shows a so-far count (`Checked in 28 / 35`) with a lighter provisional bar instead of a percentage.
-- **Dashboard stat strip:** In progress and Not calculated yet carry no percentage.
+- **Dashboard stat strip:** today uses the live strip (below), which has no percentages at all.
+
+## Status counts vs. the live strip
+
+Two different questions, two strip forms:
+
+- **Status counts** (Present, Absent, Incomplete) answer *"did they attend"* — an end-of-day view. The Attendance strip uses them for any range that is not exactly today.
+- **The live strip** answers *"who is here now"* — today only. It reads `Checked in 27 / 35 · Not in yet 5 · Left 3 (3 early)`: **Checked in** is today's rows with an in-punch over active employees in scope, **Not in yet** is In progress rows with no punch at all, **Left** is Present rows (both punches), with those that left early as its subtext. It is derived from today's existing rows (`DashboardAttendance::liveToday()` / `liveTodayCells()`), with no builder involvement. The Dashboard strip always uses it (followed by the Employees headcount); the Attendance strip uses it whenever the range is exactly today, with the scope meta `Today, Wed 30 Sep · so far`.
 
 ## Filters are controls, not status badges
 

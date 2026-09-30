@@ -431,11 +431,12 @@ class DashboardTest extends TestCase
     {
         $admin = User::factory()->create()->assignRole('admin');
         $employee = Employee::factory()->create();
-        $this->attendanceRow($employee, AttendanceStatus::Present, ['late_minutes' => 5]);
+        $this->attendanceRow($employee, AttendanceStatus::Present, ['first_in' => today()->setTime(7, 50), 'last_out' => today()->setTime(16, 0), 'early_leave_minutes' => 60]);
 
         $this->actingAs($admin)->get(route('dashboard'))
             ->assertSee('Today, '.today()->format('D j M'))
-            ->assertSee('1 late')
+            // Live "who is here now" language, not end-of-day status counts.
+            ->assertSeeInOrder(['Checked in', '1 / 1', 'Not in yet', '0', 'Left', '1', '1 early'])
             ->assertSee('added this month')
             ->assertSee('text-xl font-semibold leading-7 tabular-nums', false)
             // The nested tinted tiles and the separate Employee summary card are gone.

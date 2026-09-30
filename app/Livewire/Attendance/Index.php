@@ -6,6 +6,7 @@ use App\Enums\AttendanceStatus;
 use App\Models\DailyAttendance;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Support\DashboardAttendance;
 use App\Support\EmployeeScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -370,6 +371,11 @@ class Index extends Component
             'attendances' => $attendances,
             'departments' => $departments,
             'summary' => $summary,
+            // A range of exactly today shows the live "who is here now"
+            // strip instead of end-of-day status counts.
+            'live' => $this->fromDate === $this->toDate && $this->fromDate === today()->format('Y-m-d')
+                ? DashboardAttendance::liveToday($this->scopedEmployeeIds())
+                : null,
             'maxBuiltDate' => DailyAttendance::max('work_date'),
             'allStatuses' => AttendanceStatus::cases(),
             'scopeHasNoEmployeeRecord' => $this->scope()->hasNoEmployeeRecord,

@@ -58,7 +58,9 @@
         // states its own scope rather than read as contradicting a filtered
         // table below it.
         $summaryRange = \App\Support\DisplayDate::range(\Illuminate\Support\Carbon::parse($fromDate), \Illuminate\Support\Carbon::parse($toDate));
-        $summaryScope = $summaryRange.' · '.($employeeFilter !== '' || $departmentFilter !== '' ? 'all employees, all statuses' : 'all statuses');
+        $summaryScope = $live
+            ? 'Today, '.$summaryRange.' · so far'
+            : $summaryRange.' · '.($employeeFilter !== '' || $departmentFilter !== '' ? 'all employees, all statuses' : 'all statuses');
     @endphp
     <x-card :padding="false">
         {{-- Card header pattern: the scope is right-aligned muted meta on a
@@ -67,13 +69,25 @@
             <p class="text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ $summaryScope }}</p>
         </div>
         <dl class="grid grid-cols-3 divide-x divide-slate-200/60 dark:divide-slate-800/60">
-            <x-stat-card icon="check" label="Present" :value="$summary['present']">
-                @if ($timingParts)
-                    <x-slot:subtext>{{ implode(' · ', $timingParts) }}</x-slot:subtext>
-                @endif
-            </x-stat-card>
-            <x-stat-card icon="user-x" label="Absent" :value="$summary['absent']" />
-            <x-stat-card icon="exclamation-triangle" label="Incomplete" :value="$summary['incomplete']" />
+            @if ($live)
+                {{-- Exactly today: the live "who is here now" strip. Any other
+                range: end-of-day status counts ("did they attend"). --}}
+                @foreach (\App\Support\DashboardAttendance::liveTodayCells($live) as $cell)
+                    <x-stat-card :icon="$cell['icon']" :label="$cell['label']" :value="$cell['value']">
+                        @if ($cell['subtext'] !== null)
+                            <x-slot:subtext>{{ $cell['subtext'] }}</x-slot:subtext>
+                        @endif
+                    </x-stat-card>
+                @endforeach
+            @else
+                <x-stat-card icon="check" label="Present" :value="$summary['present']">
+                    @if ($timingParts)
+                        <x-slot:subtext>{{ implode(' · ', $timingParts) }}</x-slot:subtext>
+                    @endif
+                </x-stat-card>
+                <x-stat-card icon="user-x" label="Absent" :value="$summary['absent']" />
+                <x-stat-card icon="exclamation-triangle" label="Incomplete" :value="$summary['incomplete']" />
+            @endif
         </dl>
     </x-card>
 

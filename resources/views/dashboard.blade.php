@@ -34,31 +34,11 @@
         @endphp
 
         @php
-            // The shared stat strip (x-stat-card cells in one card, as on
-            // Attendance and Employees): today's non-zero status counts, then
-            // headcount. Up to five cells; two per row on phones.
-            $stripCells = $segments->take(4)->map(fn ($segment) => [
-                'icon' => match ($segment['key']) {
-                    'present' => 'check',
-                    'absent' => 'user-x',
-                    'incomplete' => 'exclamation-triangle',
-                    'in_progress' => 'clock',
-                    'holiday' => 'flag',
-                    'off' => 'calendar-days',
-                    'leave' => 'briefcase',
-                    default => 'minus',
-                },
-                'label' => $segment['label'],
-                'value' => $segment['count'],
-                'subtext' => $segment['key'] === 'present' && ($attendance['today']['late']['count'] > 0 || $attendance['today']['earlyLeave']['count'] > 0)
-                    ? implode(' · ', array_filter([
-                        $attendance['today']['late']['count'] > 0 ? $attendance['today']['late']['count'].' late' : null,
-                        $attendance['today']['earlyLeave']['count'] > 0 ? $attendance['today']['earlyLeave']['count'].' early' : null,
-                    ]))
-                    // Pending counts (in progress, not calculated yet) are not a
-                    // share of the day yet — no percentage (docs/ATTENDANCE_UI.md).
-                    : (in_array($segment['key'], ['in_progress', 'not_calculated'], true) ? null : $segment['percent'].'%'),
-            ])->push([
+            // The shared stat strip in its live "who is here now" form for
+            // today (docs/ATTENDANCE_UI.md), then headcount. Two per row on
+            // phones.
+            $live = $attendance['live'];
+            $stripCells = collect(\App\Support\DashboardAttendance::liveTodayCells($live))->push([
                 'icon' => 'users',
                 'label' => 'Employees',
                 'value' => $stats['total_employees'],
