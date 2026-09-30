@@ -24,10 +24,16 @@ A cell or badge color encodes the attendance **status** only — one value per d
 | `blue` | In progress |
 | `fuchsia` | Holiday |
 
+**Fill emphasizes exceptions.** In the calendar, a Present cell uses the neutral card surface (`bg-white dark:bg-slate-900` with a `slate-200`/`slate-800` ring); its status stays visible through the green day number and green check icon. Fills are reserved for the non-present statuses — absent, incomplete, leave, holiday and in progress — so the exceptions are what the eye finds first. Off stays a neutral grey fill; not-calculated days stay the lightest neutral. This is a presentation rule for the calendar grid only: it does not change `displayVariant()`, and the day modal's status pill and all table badges stay green for Present.
+
+**Today** is marked by a filled circle behind the day number — `bg-primary-600 text-white` (6.53:1), dark `bg-primary-400 text-slate-900` (5.68:1 for the digits and 5.68:1 for the circle against the dark card; `primary-500` with white text measured only 4.57:1 / 3.83:1) — with `aria-current="date"` on the cell. There is no cell border highlight, which read as one more status ring. The status icon stays in its corner.
+
+**In-cell times** are at least 12px (`text-xs`), and the AM/PM suffix at least 10px (`<x-time>` uses `max(10px, 0.8em)`). Cells have a minimum height rather than a fixed one, so in narrow cells the Out time wraps onto a second line instead of clipping.
+
 Amber marks the timing fact where it is displayed:
 
 - **Attendance tables** (Daily Attendance and the employee's own table view): the Late and Early values are amber (`font-medium text-amber-700 dark:text-amber-300`). In/Out times are neutral — no color, no underline.
-- **Calendar cells and the day-detail modal:** the late In / early Out time is amber medium-weight text via `<x-time marked>`, with an accessible label such as "Arrived 16 minutes late". No underline, and no extra "+80m" label in calendar cells. The cell fill still follows status, so a late Present day is a green cell with an amber time. The calendar legend's timing entry is a sample amber marked time, not a color swatch.
+- **Calendar cells and the day-detail modal:** the late In / early Out time is amber medium-weight text via `<x-time marked>`, with an accessible label such as "Arrived 16 minutes late". No underline, and no extra "+80m" label in calendar cells. The cell still follows status, so a late Present day is an ordinary Present cell with an amber time. The calendar legend's timing entry is a sample amber marked time, not a color swatch.
 - **Dashboard:** timing copy may stay amber, since it is the timing fact itself. A late row in Needs attention is the name plus the amber duration (`1h 20m late`) — no `Late` badge and no amber avatar; Absent and Incomplete rows keep their status badge. Recent activity's "Checked in 21m late" line is amber for the same reason.
 
 Underline is reserved for links everywhere; a timing value is never underlined. Color always accompanies readable text or another non-color signal: the Late/Early column position and value, the marked time's medium weight, and its accessible label. Do not add separate timing chips that duplicate those fields.

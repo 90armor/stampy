@@ -260,25 +260,40 @@ class CalendarViewTest extends TestCase
             ->assertSeeHtml('M4.5 12.75l6 6 9-13.5');
     }
 
-    public function test_todays_cell_ring_has_a_dark_mode_variant(): void
+    public function test_today_is_a_filled_circle_on_the_day_number_not_a_cell_border(): void
     {
-        // ring-primary-500 (the isToday() ring) with no dark: variant loses
-        // the cascade in dark mode to the cell's own status ring, which DOES
-        // have one (dark:ring-{color}-500/30, by design — that's what dark:
-        // is for) — "today" then reads as an ordinary status-coloured cell,
-        // 1px wider and otherwise indistinguishable. Confirmed in a real
-        // browser: computed box-shadow was rgb(63,130,102) — primary-500 —
-        // in light mode, but the cell's own amber dark ring once .dark was
-        // added, before dark:ring-primary-400 was added here. This only
-        // pins the class is present; the cascade behaviour itself isn't
-        // something a server-rendered-HTML assertion can check.
         $this->travelTo(Carbon::parse('2026-03-15 12:00:00'));
         $employee = Employee::factory()->create();
 
-        Livewire::actingAs($this->admin())
+        $html = Livewire::actingAs($this->admin())
             ->test(Show::class, ['employee' => $employee])
             ->set('month', self::SUNDAY_START_MONTH)
-            ->assertSeeHtml('ring-2 ring-primary-500 dark:ring-primary-400');
+            ->html();
+
+        $this->assertSame(1, substr_count($html, 'aria-current="date"'));
+        $this->assertMatchesRegularExpression('/rounded-full bg-primary-600 px-1 text-sm font-bold text-white[^"]*dark:bg-primary-400 dark:text-slate-900">15</', $html);
+        $this->assertStringNotContainsString('ring-2 ring-primary-500 dark:ring-primary-400', $html);
+    }
+
+    public function test_in_cell_times_are_at_least_12px_with_a_10px_meridiem(): void
+    {
+        $employee = Employee::factory()->create();
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => '2026-03-03',
+            'status' => AttendanceStatus::Present,
+            'first_in' => Carbon::parse('2026-03-03 08:00:00'),
+            'last_out' => Carbon::parse('2026-03-03 17:00:00'),
+        ]);
+
+        $html = Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', self::SUNDAY_START_MONTH)
+            ->html();
+
+        $this->assertStringContainsString('hidden flex-wrap items-center gap-x-1 text-xs leading-4', $html);
+        $this->assertStringNotContainsString('text-[10px] leading-tight text-slate-500', $html);
+        $this->assertStringContainsString('text-[max(10px,0.8em)]', $html);
     }
 
     public function test_a_long_holiday_name_wraps_instead_of_truncating_to_one_line(): void

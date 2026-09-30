@@ -9,7 +9,10 @@
     // calendar view's cells — status is never colour-only there (each icon
     // keeps a distinct silhouette in greyscale, not just a different colour).
     $variantStyles = [
-        'present' => ['badge' => 'green', 'icon' => 'check', 'bg' => 'bg-green-50 dark:bg-green-900/20', 'text' => 'text-green-700 dark:text-green-400', 'ring' => 'ring-green-600/20 dark:ring-green-500/30'],
+        // Fill emphasizes exceptions: a Present cell is the neutral card
+        // surface; the green day number and check carry the status. 'pill' is
+        // the day modal's status pill, which stays a green badge.
+        'present' => ['badge' => 'green', 'icon' => 'check', 'bg' => 'bg-white dark:bg-slate-900', 'text' => 'text-green-700 dark:text-green-400', 'ring' => 'ring-slate-200 dark:ring-slate-800', 'pill' => 'bg-green-50 ring-green-600/20 dark:bg-green-900/20 dark:ring-green-500/30'],
         // A deliberate one-time addition to the palette — see CLAUDE.md's
         // displayVariant() colour table. Incomplete (a device defect — the
         // person worked, nothing recorded it) must never read as amber, which
@@ -273,38 +276,33 @@
                                 type="button"
                                 wire:click="openDay('{{ $cellDateKey }}')"
                                 aria-label="{{ $cellAriaLabel }}"
-                                {{-- hover/focus ring: unlike the app's other focus rings (inputs,
-                                buttons), this one is ring-inset against the cell's OWN tinted
-                                background, which is a flat pastel in light mode but a dark
-                                translucent composite in dark mode — two very different
-                                luminances. A single ring-primary-500 measured 4.2-4.4:1 against
-                                the light cells but only 3.3-3.8:1 against the dark ones (checked
-                                against every status cell's actual composited color, not assumed):
-                                same hex, visibly weaker in dark mode. dark:*-primary-400 restores
-                                4.9-5.7:1, back in the light mode's range — the same "one shade
-                                lighter for dark" pattern already used for every status ring/text
-                                pair in this file, not a one-off.
+                                @if ($cell['date']->isToday()) aria-current="date" @endif
+                                {{-- hover/focus ring: ring-inset against the cell's own
+                                background, which is a flat surface in light mode but a dark
+                                translucent composite in dark mode. ring-primary-500 measured
+                                4.2-4.4:1 against the light cells but only 3.3-3.8:1 against the
+                                dark ones, so dark mode uses primary-400 (4.9-5.7:1).
 
-                                The isToday() ring below used to be ring-primary-500 with no dark:
-                                variant at all — not just weaker in dark mode, invisible: with no
-                                dark: override, Tailwind's dark: rule for the cell's OWN status ring
-                                ($style['ring']'s dark:ring-{color}-500/30) wins the cascade whenever
-                                dark mode is active (that's what dark: is for), so "today" silently
-                                collapsed into an ordinary status-coloured ring, 1px wider and
-                                otherwise indistinguishable from any other day of the same status.
-                                Confirmed via computed getComputedStyle().boxShadow before this fix:
-                                rgb(63, 130, 102) — primary-500 — in light mode, but rgba(245, 158,
-                                11, 0.3) — the cell's own amber dark ring — once .dark was added,
-                                for the exact same cell. Needs the same dark:ring-primary-400 this
-                                comment already describes for hover/focus, not a new pattern. --}}
-                                class="group relative flex h-16 flex-col items-start gap-1 rounded-lg p-1.5 text-left ring-1 ring-inset transition hover:ring-2 hover:ring-primary-500 dark:hover:ring-primary-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:focus-visible:ring-primary-400 sm:h-24 sm:p-2 {{ $style['bg'] }} {{ $style['ring'] }} {{ $cell['date']->isToday() ? 'ring-2 ring-primary-500 dark:ring-primary-400' : '' }}"
+                                Today is marked by the filled circle behind the day number, not
+                                a cell border: a border read as another status ring. The cell
+                                height is a minimum, not fixed, so 12px times can wrap onto a
+                                second line in narrow cells instead of clipping. --}}
+                                class="group relative flex min-h-16 flex-col items-start gap-1 rounded-lg p-1.5 text-left ring-1 ring-inset transition hover:ring-2 hover:ring-primary-500 dark:hover:ring-primary-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:focus-visible:ring-primary-400 sm:min-h-24 sm:p-2 {{ $style['bg'] }} {{ $style['ring'] }}"
                             >
                                 <div class="flex w-full items-center justify-between">
                                     {{-- Day number is the largest, boldest thing in the
                                     cell; times below (when shown) are deliberately
                                     smaller and muted so the status icon — not the
                                     times — stays the primary signal. --}}
-                                    <span class="text-sm font-bold sm:text-base {{ $style['text'] }}">{{ $cell['date']->day }}</span>
+                                    @if ($cell['date']->isToday())
+                                        {{-- primary-600 + white (6.53:1) in light mode; dark mode
+                                        inverts to primary-400 + slate-900, 5.68:1 for the digits
+                                        and 5.68:1 for the circle against the dark card (primary-500
+                                        + white measured 4.57:1 / 3.83:1). --}}
+                                        <span class="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-primary-600 px-1 text-sm font-bold text-white sm:h-7 sm:min-w-7 sm:text-base dark:bg-primary-400 dark:text-slate-900">{{ $cell['date']->day }}</span>
+                                    @else
+                                        <span class="text-sm font-bold sm:text-base {{ $style['text'] }}">{{ $cell['date']->day }}</span>
+                                    @endif
                                     <x-icon :name="$style['icon']" class="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4 {{ $style['text'] }}" />
                                 </div>
                                 {{-- A holiday cell shows its name whatever the attendance
@@ -343,7 +341,7 @@
                                     the one signal that matters; a marked time (amber, see
                                     <x-time marked>) points at the specific in/out value that's
                                     out of range instead of adding a second glyph. --}}
-                                    <div class="hidden items-center gap-1 whitespace-nowrap text-[10px] leading-tight text-slate-500 dark:text-slate-400 sm:flex">
+                                    <div class="hidden flex-wrap items-center gap-x-1 text-xs leading-4 text-slate-500 dark:text-slate-400 sm:flex">
                                         @if ($record->first_in)
                                             @if ($lateArrival)
                                                 <x-time :time="$record->first_in" marked aria-label="Arrived {{ $lateMinutesLabel }} late" />
@@ -372,7 +370,7 @@
                             not clickable, excluded from the month summary. They
                             exist only to keep the grid rectangular. --}}
                             <div
-                                class="flex h-16 flex-col items-start gap-1 rounded-lg p-1.5 text-slate-300 dark:text-slate-700 sm:h-24 sm:p-2"
+                                class="flex min-h-16 flex-col items-start gap-1 rounded-lg p-1.5 text-slate-300 dark:text-slate-700 sm:min-h-24 sm:p-2"
                                 aria-hidden="true"
                             >
                                 <span class="text-xs sm:text-sm">{{ $cell['date']->day }}</span>
@@ -600,7 +598,7 @@
                         Late / Early leave fields below (and the amber marked In/Out times)
                         carry the timing; a chip here would just repeat them. --}}
                         <div class="flex flex-wrap items-center justify-end gap-1.5">
-                            <span class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ring-1 ring-inset {{ $modalStyle['bg'] }} {{ $modalStyle['text'] }} {{ $modalStyle['ring'] }}">
+                            <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium ring-1 ring-inset {{ $modalStyle['pill'] ?? $modalStyle['bg'].' '.$modalStyle['ring'] }} {{ $modalStyle['text'] }}">
                                 <x-icon :name="$modalStyle['icon']" class="h-3.5 w-3.5" />
                                 {{ $modalRecord ? $modalRecord->status->label() : 'Not calculated' }}
                             </span>

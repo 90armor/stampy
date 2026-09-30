@@ -117,7 +117,10 @@ class HolidayCalendarDisplayTest extends TestCase
             ->html();
 
         $this->assertStringContainsString('Test Holiday', $html);
-        $this->assertStringContainsString('bg-green-50 dark:bg-green-900/20', $html);
+        // A worked holiday is Present: the neutral cell surface with the green
+        // day number and check (fill is reserved for exceptions).
+        $this->assertStringContainsString('bg-white dark:bg-slate-900 ring-slate-200 dark:ring-slate-800', $html);
+        $this->assertStringContainsString('text-green-700 dark:text-green-400', $html);
     }
 
     public function test_holidays_are_not_shown_on_out_of_month_padding_cells(): void

@@ -194,8 +194,8 @@ class CalendarReadabilityTest extends TestCase
         $this->assertMatchesRegularExpression('/<span class="font-medium text-amber-700 dark:text-amber-300" aria-label="Arrived 12 minutes late">/', $html);
         $this->assertStringNotContainsString('decoration-red', $html);
         $this->assertStringNotContainsString('aria-label="Left', $html);
-        // The cell itself stays status-coloured (green Present), not amber.
-        $this->assertStringContainsString('bg-green-50 dark:bg-green-900/20', $html);
+        // The cell itself is an ordinary Present cell (neutral surface), not amber.
+        $this->assertStringContainsString('bg-white dark:bg-slate-900 ring-slate-200 dark:ring-slate-800', $html);
         $this->assertStringNotContainsString('bg-amber-50 dark:bg-amber-900/20', $html);
     }
 
@@ -405,10 +405,12 @@ class CalendarReadabilityTest extends TestCase
             ->set('month', self::MONTH)
             ->html();
 
-        // Colour is status-only: both days are green Present cells; the
-        // early day is distinguished only by its amber marked Out time.
+        // Colour is status-only and fill emphasizes exceptions: both days are
+        // neutral Present cells; the early day is distinguished only by its
+        // amber marked Out time.
         $this->assertStringNotContainsString('bg-amber-50 dark:bg-amber-900/20', $html);
-        $this->assertSame(2, substr_count($html, 'bg-green-50 dark:bg-green-900/20'));
+        $this->assertStringNotContainsString('bg-green-50 dark:bg-green-900/20', $html);
+        $this->assertSame(2, substr_count($html, 'bg-white dark:bg-slate-900 ring-slate-200 dark:ring-slate-800'));
         $this->assertStringContainsString('aria-label="Left 4 minutes early"', $html);
     }
 
