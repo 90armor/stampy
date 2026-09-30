@@ -141,7 +141,7 @@
                                     {{ ucfirst($employee->status) }}
                                 </x-badge>
                             </td>
-                            <td class="whitespace-nowrap px-6 py-4 text-sm tabular-nums text-slate-500 dark:text-slate-400">{{ $employee->join_date->format('M j, Y') }}</td>
+                            <td class="whitespace-nowrap px-6 py-4 text-sm tabular-nums text-slate-500 dark:text-slate-400">{{ \App\Support\DisplayDate::compact($employee->join_date) }}</td>
                             <td class="px-6 py-4 text-right">
                                 @unless ($loop->last)
                                     <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60"></span>

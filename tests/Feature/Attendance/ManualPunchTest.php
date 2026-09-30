@@ -98,7 +98,7 @@ class ManualPunchTest extends TestCase
 
         $component->call('addPunch')->assertHasErrors(['newPunchDate']);
 
-        $this->assertStringContainsString("before this employee's start date (Feb 2, 2026)", $component->errors()->first('newPunchDate'));
+        $this->assertStringContainsString("before this employee's start date (Mon 2 Feb)", $component->errors()->first('newPunchDate'));
         $this->assertSame(0, AttendanceLog::where('employee_id', $employee->id)->count());
         $this->assertSame(0, DailyAttendance::where('employee_id', $employee->id)->count());
     }

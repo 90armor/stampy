@@ -42,7 +42,7 @@
         </div>
         <div class="sm:col-span-2 sm:grid sm:grid-cols-subgrid sm:items-baseline">
             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Start date</dt>
-            <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">{{ $employee->join_date->format('M j, Y') }}</dd>
+            <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">{{ \App\Support\DisplayDate::compact($employee->join_date) }}</dd>
         </div>
         <div class="sm:col-span-2 sm:grid sm:grid-cols-subgrid sm:items-baseline">
             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Device user ID</dt>

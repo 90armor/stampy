@@ -18,7 +18,7 @@
                     <span class="ml-1 text-xs font-normal text-primary-600 dark:text-primary-400">(current)</span>
                 </p>
                 <p class="text-xs text-slate-500 dark:text-slate-400">
-                    Effective from {{ $currentAssignment->effective_from->format('M j, Y') }}
+                    Effective from {{ \App\Support\DisplayDate::compact($currentAssignment->effective_from) }}
                 </p>
             </div>
 
@@ -28,14 +28,14 @@
                         type="button"
                         @click="$dispatch('confirm-dialog-schedule-assignments', {
                             title: 'Delete assignment',
-                            message: @js('Delete the '.$currentAssignment->workSchedule->name.' assignment effective '.$currentAssignment->effective_from->format('M j, Y').'? This rebuilds this employee\'s attendance from that date.'),
+                            message: @js('Delete the '.$currentAssignment->workSchedule->name.' assignment effective '.\App\Support\DisplayDate::compact($currentAssignment->effective_from).'? This rebuilds this employee\'s attendance from that date.'),
                             confirmText: 'Delete',
                             method: 'deleteAssignment',
                             args: [{{ $currentAssignment->id }}],
                         })"
                         class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-500 dark:hover:bg-red-900/30 dark:hover:text-red-400"
                         title="Delete assignment"
-                        aria-label="Delete {{ $currentAssignment->workSchedule->name }} schedule assignment effective {{ $currentAssignment->effective_from->format('M j, Y') }}"
+                        aria-label="Delete {{ $currentAssignment->workSchedule->name }} schedule assignment effective {{ \App\Support\DisplayDate::compact($currentAssignment->effective_from) }}"
                     >
                         <x-icon name="trash" class="h-3.5 w-3.5" />
                     </button>
@@ -99,7 +99,7 @@
                                 {{ $assignment->workSchedule->name }}
                             </p>
                             <p class="text-xs text-slate-500 dark:text-slate-400">
-                                Effective from {{ $assignment->effective_from->format('M j, Y') }}
+                                Effective from {{ \App\Support\DisplayDate::compact($assignment->effective_from) }}
                             </p>
                         </div>
 
@@ -108,14 +108,14 @@
                                 type="button"
                                 @click="$dispatch('confirm-dialog-schedule-assignments', {
                                     title: 'Delete assignment',
-                                    message: @js('Delete the '.$assignment->workSchedule->name.' assignment effective '.$assignment->effective_from->format('M j, Y').'? This rebuilds this employee\'s attendance from that date.'),
+                                    message: @js('Delete the '.$assignment->workSchedule->name.' assignment effective '.\App\Support\DisplayDate::compact($assignment->effective_from).'? This rebuilds this employee\'s attendance from that date.'),
                                     confirmText: 'Delete',
                                     method: 'deleteAssignment',
                                     args: [{{ $assignment->id }}],
                                 })"
                                 class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-500 dark:hover:bg-red-900/30 dark:hover:text-red-400"
                                 title="Delete assignment"
-                                aria-label="Delete {{ $assignment->workSchedule->name }} schedule assignment effective {{ $assignment->effective_from->format('M j, Y') }}"
+                                aria-label="Delete {{ $assignment->workSchedule->name }} schedule assignment effective {{ \App\Support\DisplayDate::compact($assignment->effective_from) }}"
                             >
                                 <x-icon name="trash" class="h-3.5 w-3.5" />
                             </button>

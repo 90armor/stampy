@@ -110,7 +110,7 @@ class CalendarReadabilityTest extends TestCase
             ->test(Show::class, ['employee' => $employee])
             ->set('month', self::MONTH)
             ->assertSee('only been calculated up to')
-            ->assertSee('Mar 5, 2026');
+            ->assertSee('Thu 5 Mar');
     }
 
     public function test_a_month_with_nothing_built_shows_a_generic_notice_not_a_date(): void
@@ -168,9 +168,9 @@ class CalendarReadabilityTest extends TestCase
             ->test(Show::class, ['employee' => $employee])
             ->set('month', self::MONTH);
 
-        $component->assertSee('March 2, 2026, Present, left 45 minutes early');
-        $component->assertSee('March 3, 2026, Present');
-        $component->assertDontSee('March 3, 2026, Present, left');
+        $component->assertSee('Monday, 2 March 2026, Present, left 45 minutes early');
+        $component->assertSee('Tuesday, 3 March 2026, Present');
+        $component->assertDontSee('Tuesday, 3 March 2026, Present, left');
     }
 
     public function test_a_late_arrival_marks_the_in_time_in_amber_without_underline_and_with_a_label(): void

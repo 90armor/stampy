@@ -74,8 +74,8 @@ class HolidayManagementTest extends TestCase
             ->assertSee('Configure company-wide dates that affect attendance.')
             ->assertSee('aria-label="Holidays for 2026"', false)
             ->assertSee('datetime="2026-02-02"', false)
-            ->assertSee('aria-label="Edit Constitution Day holiday on February 2, 2026"', false)
-            ->assertSee('aria-label="Delete Constitution Day holiday on February 2, 2026"', false)
+            ->assertSee('aria-label="Edit Constitution Day holiday on Monday, 2 February 2026"', false)
+            ->assertSee('aria-label="Delete Constitution Day holiday on Monday, 2 February 2026"', false)
             ->assertSee('role="tooltip"', false);
 
         $component->call('create')

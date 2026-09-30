@@ -5,7 +5,7 @@
         <div>
             <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Dashboard</h1>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Welcome back, {{ auth()->user()->name }}. <span class="whitespace-nowrap">{{ now()->format('l, F j, Y') }}</span>
+                Welcome back, {{ auth()->user()->name }}. <span class="whitespace-nowrap">{{ \App\Support\DisplayDate::long(now()) }}</span>
             </p>
         </div>
         <x-button :href="$stats ? route('attendance.index') : route('attendance.mine')" variant="secondary" wire:navigate class="self-start sm:self-auto">
@@ -69,7 +69,7 @@
         <x-card :padding="false" class="mb-6">
             <div class="flex items-baseline justify-end gap-4 px-3 pt-3 sm:px-4">
                 <p class="text-xs tabular-nums text-slate-500 dark:text-slate-400">
-                    Today, {{ today()->format('D, j M') }} · {{ $attendance['today']['total'] }} active {{ $attendance['today']['total'] === 1 ? 'employee' : 'employees' }}
+                    Today, {{ \App\Support\DisplayDate::compact(today()) }} · {{ $attendance['today']['total'] }} active {{ $attendance['today']['total'] === 1 ? 'employee' : 'employees' }}
                 </p>
             </div>
             <dl class="grid grid-cols-2 {{ $stripColumns }}">
@@ -105,13 +105,9 @@
         @php
             $trend = collect($attendance['trend']);
             $trendMeta = $trend->isNotEmpty()
-                ? (function ($from, $to) {
-                    return $from->isSameMonth($to)
-                        ? $from->format('j').'–'.$to->format('j M')
-                        : $from->format('j M').' – '.$to->format('j M');
-                })(\Illuminate\Support\Carbon::parse($trend->first()['date']), \Illuminate\Support\Carbon::parse($trend->last()['date']))
+                ? \App\Support\DisplayDate::range(\Illuminate\Support\Carbon::parse($trend->first()['date']), \Illuminate\Support\Carbon::parse($trend->last()['date']))
                 : null;
-            $todayMeta = today()->format('D, j M');
+            $todayMeta = \App\Support\DisplayDate::compact(today());
             $cardHeader = 'flex items-baseline justify-between gap-4';
             $cardTitle = 'text-lg font-semibold text-slate-900 dark:text-slate-100';
             $cardMeta = 'shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400';

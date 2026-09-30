@@ -43,7 +43,7 @@ divergence here would be a real correctness bug, not just a style one. --}}
                                 type="button"
                                 @click="$dispatch('confirm-dialog-attendance-show', {
                                     title: 'Void punch',
-                                    message: @js('Void the '.$punch->punch_type->label().' punch at '.\App\Support\AttendanceTime::format($punch->punched_at).' on '.$punch->punched_at->format('M j, Y').'? This cannot be undone.'),
+                                    message: @js('Void the '.$punch->punch_type->label().' punch at '.\App\Support\AttendanceTime::format($punch->punched_at).' on '.\App\Support\DisplayDate::compact($punch->punched_at).'? This cannot be undone.'),
                                     confirmText: 'Void',
                                     method: 'voidPunch',
                                     args: [{{ $punch->id }}],

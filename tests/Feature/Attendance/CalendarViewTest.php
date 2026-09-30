@@ -203,7 +203,7 @@ class CalendarViewTest extends TestCase
         $day = $grid->first(fn (array $cell) => $cell['inMonth'] && $cell['date']->format('Y-m-d') === '2026-03-05');
 
         $this->assertNull($day['record']);
-        $component->assertSee('March 5, 2026, Not calculated');
+        $component->assertSee('Thursday, 5 March 2026, Not calculated');
         // The dash icon's distinguishing path, not the clock/x-mark/etc used
         // by real statuses — "not calculated" must not borrow another
         // status's icon.
@@ -331,8 +331,8 @@ class CalendarViewTest extends TestCase
         Livewire::actingAs($this->admin())
             ->test(Show::class, ['employee' => $employee])
             ->set('month', self::SUNDAY_START_MONTH)
-            ->assertSee('March 10, 2026, Present')
-            ->assertSee('March 5, 2026, Not calculated');
+            ->assertSee('Tuesday, 10 March 2026, Present')
+            ->assertSee('Thursday, 5 March 2026, Not calculated');
     }
 
     public function test_clicking_a_day_opens_the_modal_with_that_days_punches(): void

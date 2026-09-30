@@ -169,7 +169,7 @@
                     <x-icon name="exclamation-triangle" class="mt-0.5 h-4 w-4 shrink-0" />
                     @if ($lastBuiltInMonth)
                         <span>
-                            Attendance has only been calculated up to <strong>{{ \Illuminate\Support\Carbon::parse($lastBuiltInMonth)->format('M j, Y') }}</strong>.
+                            Attendance has only been calculated up to <strong>{{ \App\Support\DisplayDate::compact(\Illuminate\Support\Carbon::parse($lastBuiltInMonth)) }}</strong>.
                             The empty cells after that aren't missing punches — they simply haven't been processed yet.
                         </span>
                     @else
@@ -271,7 +271,7 @@
                             $statusLabel = $record ? $record->status->label() : 'Not calculated';
                             $lateMinutesLabel = $lateArrival ? $record->late_minutes.' minute'.($record->late_minutes === 1 ? '' : 's') : null;
                             $earlyMinutesLabel = $earlyDeparture ? $record->early_leave_minutes.' minute'.($record->early_leave_minutes === 1 ? '' : 's') : null;
-                            $cellAriaLabel = $cell['date']->format('F j, Y').', '.$statusLabel
+                            $cellAriaLabel = \App\Support\DisplayDate::long($cell['date']).', '.$statusLabel
                                 .($lateArrival ? ', arrived '.$lateMinutesLabel.' late' : '')
                                 .($earlyDeparture ? ', left '.$earlyMinutesLabel.' early' : '')
                                 .($holiday ? ', Holiday: '.$holiday->name : '');
@@ -448,7 +448,7 @@
                             @php
                                 $record = $day['record'];
                                 $dayKey = $day['date']->format('Y-m-d');
-                                $dayLabel = $day['date']->format('D j M');
+                                $dayLabel = \App\Support\DisplayDate::compact($day['date']);
                                 // Same rule as the Daily Attendance table: In/Out stay
                                 // neutral, and the timing fact is the amber Late/Early value.
                                 $markedLate = $record && $record->isLate();
@@ -590,8 +590,7 @@
                 <div class="p-6">
                     <div class="flex items-start justify-between gap-4">
                         <div>
-                            <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">{{ $modalDate->format('l') }}</p>
-                            <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100">{{ $modalDate->format('F j, Y') }}</h3>
+                            <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100">{{ \App\Support\DisplayDate::long($modalDate) }}</h3>
                             @if ($modalHoliday)
                                 <p class="mt-0.5 flex items-center gap-1 text-sm font-medium text-fuchsia-700 dark:text-fuchsia-300">
                                     <x-icon name="flag" class="h-3.5 w-3.5 shrink-0" />

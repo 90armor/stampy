@@ -51,6 +51,11 @@ Attendance color is model-driven. `DailyAttendance::displayVariant()` is the sou
 - DM Serif Display is limited to the auth hero's editorial accent through `font-serif`.
 - Default body and control copy is `text-sm`; supporting metadata is `text-xs` or `text-sm`.
 - Page titles use `text-2xl font-semibold tracking-tight` on every page, the dashboard included. Section and card headings use sentence case ("Quick actions", not "Quick Actions").
+- Dates go through `App\Support\DisplayDate`, in day-month order, in exactly three forms:
+  - **compact** `Tue 29 Sep` — tables, stat strip and card meta, lists, detail fields, and inline dates in notices and messages;
+  - **range** `23–29 Sep`, `28 Sep – 3 Oct` — the date picker trigger, strip scope and card meta for a span (a one-day range is compact);
+  - **long** `Tuesday, 29 September 2026` — page subtitles, modal titles, and accessible labels.
+  Compact and range show the year only when it isn't the current year (`Mon 20 May 2024`, `28 Dec 2025 – 3 Jan 2026`); long always includes it. Do not call `->format()` for display elsewhere, and do not pair a weekday eyebrow with a date — compact already carries the weekday. A month heading such as `September 2026` names a month, not a date, and stays as is.
 - Numeric attendance values use `tabular-nums` when alignment helps comparison. Durations use the single compact format from `App\Support\Duration` (`21m`, `1h 20m`); see [Attendance UI](ATTENDANCE_UI.md).
 - Avoid introducing arbitrary font families, tiny critical copy, or long uppercase labels.
 
@@ -102,7 +107,7 @@ The modal backdrop may use transparency and `backdrop-blur-sm`. This is an overl
 - `<x-text-input>`, `<x-select>`, and `<x-textarea>` own form-control visuals and are always solid.
 - `<x-dropdown>` owns menu positioning, transitions, and its solid `rounded-xl` menu surface.
 - `<x-modal>` owns the backdrop, focus trap, focus restoration, transitions, and solid `rounded-2xl` panel. It remains teleported to `<body>`. The panel deliberately does not use `overflow-hidden`: modal bodies that need scrolling own it locally, and panel-level clipping can cut focus rings or overlay content.
-- `<x-stat-card>` is one cell of the **stat strip**, the only pattern for a row of headline figures (Dashboard, Attendance, Employees). A strip is one `<x-card :padding="false">` holding a `<dl>` grid of `<x-stat-card>` cells separated by dividers — never a card per figure and never tinted tiles nested in a card. Every cell has the same treatment: a neutral 32px `rounded-lg` icon tile (`bg-slate-100 text-slate-500`, dark `bg-slate-800 text-slate-400`; hidden below `sm`), a `text-xs font-medium` muted label, a `text-xl font-semibold tabular-nums` value, and an optional `text-xs` muted subtext. Icons are neutral signifiers, not status colors. A strip states its scope using the card header pattern: a header row above the cells, inset to the cells' padding, with the scope as right-aligned muted meta (for example `Sep 1–29 · all statuses`) — never a small label pinned in the top-left corner. This matters most when the figures don't follow the page's filters.
+- `<x-stat-card>` is one cell of the **stat strip**, the only pattern for a row of headline figures (Dashboard, Attendance, Employees). A strip is one `<x-card :padding="false">` holding a `<dl>` grid of `<x-stat-card>` cells separated by dividers — never a card per figure and never tinted tiles nested in a card. Every cell has the same treatment: a neutral 32px `rounded-lg` icon tile (`bg-slate-100 text-slate-500`, dark `bg-slate-800 text-slate-400`; hidden below `sm`), a `text-xs font-medium` muted label, a `text-xl font-semibold tabular-nums` value, and an optional `text-xs` muted subtext. Icons are neutral signifiers, not status colors. A strip states its scope using the card header pattern: a header row above the cells, inset to the cells' padding, with the scope as right-aligned muted meta (for example `1–29 Sep · all statuses`) — never a small label pinned in the top-left corner. This matters most when the figures don't follow the page's filters.
 - `<x-empty-state>` provides an icon, title, optional description, and optional action.
 - `<x-icon>` is the only Heroicons entry point. Add icons there rather than embedding a second icon system.
 
@@ -110,7 +115,7 @@ Prefer composition over adding props that expose implementation choices. Props s
 
 ### Card header pattern
 
-A card that needs a header uses one pattern: the title (`text-lg font-semibold`) on the left and optional right-aligned muted meta (`text-xs text-slate-500 dark:text-slate-400`, `tabular-nums`) on the right, baseline-aligned. Cards carry no eyebrow labels. When a card's content has a time scope, put it in the meta slot as real dates (`Tue, 29 Sep`, `23–29 Sep`), not a relative eyebrow such as "Today" or "Last seven days". A count that summarizes the card (Needs attention's `7 today`) also goes in the meta slot, as muted text rather than a colored badge.
+A card that needs a header uses one pattern: the title (`text-lg font-semibold`) on the left and optional right-aligned muted meta (`text-xs text-slate-500 dark:text-slate-400`, `tabular-nums`) on the right, baseline-aligned. Cards carry no eyebrow labels. When a card's content has a time scope, put it in the meta slot as real dates (`Tue 29 Sep`, `23–29 Sep`), not a relative eyebrow such as "Today" or "Last seven days". A count that summarizes the card (Needs attention's `7 today`) also goes in the meta slot, as muted text rather than a colored badge.
 
 ### Avatars
 

@@ -40,6 +40,10 @@ Underline is reserved for links everywhere; a timing value is never underlined. 
 
 Why `amber-700` in light mode: an earlier perception that amber timing text read as reddish came from simultaneous contrast with the old `green-50` Present fill, not from the hue itself. With Present cells now on the plain card surface, `amber-700` (#b45309) reads as orange and stays clearly distinct from `red-700`. `yellow-700` was tried and rejected: it read muddy and lost warning salience. Measured contrast of the timing text against its actual backgrounds: `amber-700` is 5.02:1 on white (cards and Present calendar cells) and 4.81:1 on the `slate-50` row hover; `amber-300` in dark mode is 12.13:1 on the dark card (and dark Present cells) and 11.19:1 on the dark row hover.
 
+### Dates
+
+Attendance dates use the three `App\Support\DisplayDate` forms (see [Design System](DESIGN_SYSTEM.md#typography)): compact `Tue 29 Sep` in table Date columns, the employee table view, card meta and notices; range `23–29 Sep` for the date picker trigger and the summary strip scope; long `Monday, 21 September 2026` for the day-modal title (no weekday eyebrow) and every calendar cell's accessible label.
+
 ### Durations and counts
 
 Every attendance **duration** — Worked, Late, Early leave, a month's total — uses one compact format from `App\Support\Duration::format()`: under 60 minutes is minutes only (`21m`); 60 minutes and above is hours plus zero-padded minutes (`1h 20m`, `8h 03m`). This applies in the Daily Attendance table, the employee's calendar day-detail modal and table view, and the dashboard's Needs attention list. `DailyAttendance::formattedWorkedMinutes()`, `formattedLateMinutes()`, and `formattedEarlyLeaveMinutes()` return this format, or null for zero so the caller renders an em dash. Do not format a duration inline or write a second formatter. Stored values (`late_minutes`, `early_leave_minutes`, `worked_minutes`) are always minutes.
@@ -83,7 +87,7 @@ On narrow screens, preserve the full table and native horizontal scrolling inste
 
 A short, non-interactive “Scroll to view all columns” cue appears above the table on narrow screens. It is hidden at the desktop breakpoint and requires no JavaScript. The cue is supplementary; native scrolling remains the interaction.
 
-The Daily Attendance summary is the shared stat strip (Present, Absent, Incomplete). It is range-wide on purpose: it follows the date range only, not the status or timing chips, search, or department. So that it cannot be read as contradicting a filtered table, it shows its scope as right-aligned muted meta on the strip's header row (card header pattern), such as `Sep 1–29 · all statuses`, which becomes `… · all employees, all statuses` while a search or department filter narrows the table. Present's subtext is the timing count (`7 late · 10 early`), not a duration.
+The Daily Attendance summary is the shared stat strip (Present, Absent, Incomplete). It is range-wide on purpose: it follows the date range only, not the status or timing chips, search, or department. So that it cannot be read as contradicting a filtered table, it shows its scope as right-aligned muted meta on the strip's header row (card header pattern), such as `1–29 Sep · all statuses`, which becomes `… · all employees, all statuses` while a search or department filter narrows the table. Present's subtext is the timing count (`7 late · 10 early`), not a duration.
 
 Summary metrics may stack or use compact responsive columns, but labels, counts, percentages, and timing context must remain readable without truncating meaningful information.
 

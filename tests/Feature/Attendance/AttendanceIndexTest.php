@@ -484,11 +484,11 @@ class AttendanceIndexTest extends TestCase
             ->set('fromDate', '2026-09-01')
             ->set('toDate', '2026-09-29');
 
-        $component->assertSee('Sep 1–29 · all statuses');
+        $component->assertSee('1–29 Sep · all statuses');
 
         // Narrowing the table doesn't narrow the strip, and the label says so.
         $component->set('employeeFilter', 'someone')
-            ->assertSee('Sep 1–29 · all employees, all statuses');
+            ->assertSee('1–29 Sep · all employees, all statuses');
 
         // One strip treatment: x-stat-card cells, neutral icon tiles.
         $this->assertSame(3, substr_count($component->html(), 'text-xl font-semibold leading-7 tabular-nums'));

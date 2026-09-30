@@ -434,7 +434,7 @@ class DashboardTest extends TestCase
         $this->attendanceRow($employee, AttendanceStatus::Present, ['late_minutes' => 5]);
 
         $this->actingAs($admin)->get(route('dashboard'))
-            ->assertSee('Today, '.today()->format('D, j M'))
+            ->assertSee('Today, '.today()->format('D j M'))
             ->assertSee('1 late')
             ->assertSee('added this month')
             ->assertSee('text-xl font-semibold leading-7 tabular-nums', false)
@@ -480,7 +480,7 @@ class DashboardTest extends TestCase
             ->get(route('dashboard'))
             ->assertSee('Needs attention')
             ->assertSee('1 today')
-            ->assertSee('Wed, 11 Mar')
+            ->assertSee('Wed 11 Mar')
             ->assertSee('1h 20m late')
             ->assertDontSee('tracking-widest', false)
             ->assertDontSee('Action required')

@@ -156,7 +156,7 @@ class Show extends Component
             'newPunchTime' => ['required', 'date_format:H:i'],
             'newPunchType' => ['required', 'in:in,out'],
         ], [
-            'newPunchDate.after_or_equal' => "A punch can't be dated before this employee's start date ({$joinDate->format('M j, Y')}).",
+            'newPunchDate.after_or_equal' => "A punch can't be dated before this employee's start date (".\App\Support\DisplayDate::compact($joinDate).").",
             'newPunchDate.before_or_equal' => "A punch can't be dated in the future.",
         ], [
             'newPunchDate' => 'punch date',

@@ -96,7 +96,7 @@ class HolidayCalendarDisplayTest extends TestCase
             ->set('month', self::MONTH);
 
         $component->assertSee('Company Anniversary');
-        $component->assertSee('March 1, 2026, Off, Holiday: Company Anniversary');
+        $component->assertSee('Sunday, 1 March 2026, Off, Holiday: Company Anniversary');
     }
 
     public function test_a_worked_holiday_shows_the_name_with_the_present_colour(): void

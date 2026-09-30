@@ -48,8 +48,7 @@
                         @endunless
 
                         <time datetime="{{ $holiday->date->format('Y-m-d') }}" class="col-start-1 text-sm font-medium tabular-nums text-slate-700 dark:text-slate-300">
-                            <span class="block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ $holiday->date->format('l') }}</span>
-                            <span class="mt-0.5 block">{{ $holiday->date->format('M j, Y') }}</span>
+                            {{ \App\Support\DisplayDate::compact($holiday->date) }}
                         </time>
 
                         <div class="col-span-2 col-start-1 mt-1.5 min-w-0 sm:col-span-1 sm:col-start-2 sm:mt-0">
@@ -67,7 +66,7 @@
                                     wire:loading.attr="disabled"
                                     wire:target="edit({{ $holiday->id }})"
                                     class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-600 active:bg-primary-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:hover:bg-primary-900/30 dark:hover:text-primary-400 dark:active:bg-primary-900/50"
-                                    aria-label="Edit {{ $holiday->name }} holiday on {{ $holiday->date->format('F j, Y') }}"
+                                    aria-label="Edit {{ $holiday->name }} holiday on {{ \App\Support\DisplayDate::long($holiday->date) }}"
                                 >
                                     <x-icon name="pencil" class="w-4 h-4" />
                                 </button>
@@ -78,13 +77,13 @@
                                     type="button"
                                     @click="$dispatch('confirm-dialog-holidays', {
                                         title: 'Delete holiday',
-                                        message: @js('Delete '.$holiday->name.' ('.$holiday->date->format('M j, Y').')? Attendance for active employees on this date will be recalculated. This action cannot be undone.'),
+                                        message: @js('Delete '.$holiday->name.' ('.\App\Support\DisplayDate::compact($holiday->date).')? Attendance for active employees on this date will be recalculated. This action cannot be undone.'),
                                         confirmText: 'Delete',
                                         method: 'delete',
                                         args: [{{ $holiday->id }}],
                                     })"
                                     class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-600 active:bg-red-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-red-900/30 dark:hover:text-red-400 dark:active:bg-red-900/50"
-                                    aria-label="Delete {{ $holiday->name }} holiday on {{ $holiday->date->format('F j, Y') }}"
+                                    aria-label="Delete {{ $holiday->name }} holiday on {{ \App\Support\DisplayDate::long($holiday->date) }}"
                                 >
                                     <x-icon name="trash" class="w-4 h-4" />
                                 </button>

@@ -22,8 +22,8 @@
     $isToday = $fromDate === $toDate && $fromDate === today()->format('Y-m-d');
     $rangeLabel = match (true) {
         $isToday => 'Today',
-        $fromDate === $toDate => \Illuminate\Support\Carbon::parse($fromDate)->format('M j, Y'),
-        default => \Illuminate\Support\Carbon::parse($fromDate)->format('M j').' – '.\Illuminate\Support\Carbon::parse($toDate)->format('M j, Y'),
+        $fromDate === $toDate => \App\Support\DisplayDate::compact(\Illuminate\Support\Carbon::parse($fromDate)),
+        default => \App\Support\DisplayDate::range(\Illuminate\Support\Carbon::parse($fromDate), \Illuminate\Support\Carbon::parse($toDate)),
     };
     $defaultStatuses = collect($allStatuses)
         ->reject(fn ($status) => $status === \App\Enums\AttendanceStatus::Off)
@@ -57,14 +57,7 @@
         // ignores the status/timing chips, search and department, so it
         // states its own scope rather than read as contradicting a filtered
         // table below it.
-        $from = \Illuminate\Support\Carbon::parse($fromDate);
-        $to = \Illuminate\Support\Carbon::parse($toDate);
-        $summaryRange = match (true) {
-            $from->isSameDay($to) => $from->format('D, M j'),
-            $from->isSameMonth($to) => $from->format('M j').'–'.$to->format('j'),
-            $from->isSameYear($to) => $from->format('M j').' – '.$to->format('M j'),
-            default => $from->format('M j, Y').' – '.$to->format('M j, Y'),
-        };
+        $summaryRange = \App\Support\DisplayDate::range(\Illuminate\Support\Carbon::parse($fromDate), \Illuminate\Support\Carbon::parse($toDate));
         $summaryScope = $summaryRange.' · '.($employeeFilter !== '' || $departmentFilter !== '' ? 'all employees, all statuses' : 'all statuses');
     @endphp
     <x-card :padding="false">
@@ -283,7 +276,7 @@
             <div class="mx-6 mb-6 flex items-start gap-2 rounded-lg bg-amber-50 p-4 text-sm text-amber-800 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-500/30">
                 <x-icon name="exclamation-triangle" class="mt-0.5 h-4 w-4 shrink-0" />
                 <span>
-                    Attendance has only been calculated up to <strong>{{ \Illuminate\Support\Carbon::parse($maxBuiltDate)->format('M j, Y') }}</strong>.
+                    Attendance has only been calculated up to <strong>{{ \App\Support\DisplayDate::compact(\Illuminate\Support\Carbon::parse($maxBuiltDate)) }}</strong>.
                     Dates after that aren't missing punches — they simply haven't been processed yet.
                 </span>
             </div>
@@ -338,7 +331,7 @@
                         @foreach ($attendances as $attendance)
                             @php
                                 $style = $variantStyles[$attendance->displayVariant()];
-                                $workDateLabel = $attendance->work_date->format('D j M');
+                                $workDateLabel = \App\Support\DisplayDate::compact($attendance->work_date);
                             @endphp
                             <tr wire:key="daily-attendance-{{ $attendance->id }}" class="group relative hover:bg-slate-50 dark:hover:bg-slate-800/60">
                                 {{-- Plain text, not a link: the row's one navigation target is
