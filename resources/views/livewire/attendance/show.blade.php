@@ -295,7 +295,9 @@
                                 second line in narrow cells instead of clipping. --}}
                                 class="group relative flex min-h-16 flex-col items-start gap-1 rounded-lg p-1.5 text-left ring-1 ring-inset transition hover:ring-2 hover:ring-primary-500 dark:hover:ring-primary-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:focus-visible:ring-primary-400 sm:min-h-24 sm:p-2 {{ $style['bg'] }} {{ $style['ring'] }}"
                             >
-                                <div class="flex w-full items-center justify-between">
+                                {{-- Below sm a cell is ~44px wide: the day number and the
+                                status icon stack instead of colliding side by side. --}}
+                                <div class="flex w-full flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:justify-between">
                                     {{-- Day number is the largest, boldest thing in the
                                     cell; times below (when shown) are deliberately
                                     smaller and muted so the status icon — not the
@@ -331,9 +333,16 @@
                                     equivalent the way an interactive control would (1.2's rule),
                                     since it's supplementary here, not the only way to read the
                                     name — line-clamp already shows as much as fits. --}}
-                                    <span class="w-full line-clamp-2 text-[10px] font-medium leading-tight text-fuchsia-700 dark:text-fuchsia-300" title="{{ $holiday->name }}">
+                                    {{-- Below sm there is no room for the name without clipping it,
+                                    so the cell shows a small flag instead (the name stays in the
+                                    cell's accessible label and in the day modal). A cell whose
+                                    status icon is already the holiday flag needs no second one. --}}
+                                    <span class="hidden w-full line-clamp-2 text-[10px] font-medium leading-tight text-fuchsia-700 dark:text-fuchsia-300 sm:block" title="{{ $holiday->name }}">
                                         {{ $holiday->name }}
                                     </span>
+                                    @unless ($style['icon'] === 'flag')
+                                        <x-icon name="flag" class="h-3 w-3 shrink-0 text-fuchsia-700 dark:text-fuchsia-300 sm:hidden" />
+                                    @endunless
                                 @endif
                                 {{-- Off and an unworked Holiday both show nothing below the
                                 day number — no punches on a non-working day is expected, not

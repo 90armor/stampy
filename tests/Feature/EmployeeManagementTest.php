@@ -499,4 +499,20 @@ class EmployeeManagementTest extends TestCase
             ->assertDontSee('tracking-widest', false)
             ->assertSee('<h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Details</h2>', false);
     }
+
+    public function test_the_directory_puts_identity_and_status_first(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        Employee::factory()->create();
+
+        $html = Livewire::actingAs($admin)->test(Index::class)->html();
+
+        preg_match_all('/<th[^>]*>\s*(.*?)\s*<\/th>/s', $html, $matches);
+        $headers = array_map(fn ($cell) => trim(strip_tags($cell)), $matches[1]);
+        $this->assertSame(['Employee', 'Status', 'Department', 'Position', 'Start date', 'Actions'], $headers);
+        // The three-column filter grid only starts at xl, so it can't overflow
+        // the card at 1024px.
+        $this->assertStringContainsString('xl:grid-cols-[minmax(18rem,1fr)_14rem_11rem]', $html);
+        $this->assertStringNotContainsString('lg:grid-cols-[minmax(18rem,1fr)_14rem_11rem]', $html);
+    }
 }

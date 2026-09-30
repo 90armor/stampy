@@ -43,8 +43,11 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 sm:p-6 lg:grid-cols-[minmax(18rem,1fr)_14rem_11rem]">
-        <div class="relative min-w-0 sm:col-span-2 lg:col-span-1">
+    {{-- Three columns only from xl: at lg (1024px, a 718px card) the
+    18rem + 14rem + 11rem minimums overflowed the card. Below xl the search
+    spans the row and the two selects share the next. --}}
+    <div class="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 sm:p-6 xl:grid-cols-[minmax(18rem,1fr)_14rem_11rem]">
+        <div class="relative min-w-0 sm:col-span-2 xl:col-span-1">
             <label for="employee-search" class="sr-only">Search employees by name or code</label>
             <x-icon name="search" class="pointer-events-none absolute left-3 top-2.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
             <input
@@ -100,18 +103,22 @@
         @endif
     @else
         <div class="border-t border-slate-200/60 dark:border-slate-800/60">
-            <div class="flex items-center justify-end gap-1.5 px-5 py-2 text-xs text-slate-500 dark:text-slate-400 lg:hidden" aria-hidden="true">
+            {{-- The table's natural width is ~959px (min-w-[60rem]); it fits the
+            card from xl (974px) up, so the cue shows exactly while it scrolls. --}}
+            <div class="flex items-center justify-end gap-1.5 px-5 py-2 text-xs text-slate-500 dark:text-slate-400 xl:hidden" aria-hidden="true">
                 <span>Scroll to view all columns</span>
                 <x-icon name="chevron-right" class="h-3.5 w-3.5" />
             </div>
             <div class="overflow-x-auto transition-opacity" wire:loading.class="opacity-60">
-            <table class="w-full min-w-[64rem]">
+            {{-- Identity and status first (Employee, Status), so both stay
+            visible without scrolling at narrow widths. --}}
+            <table class="w-full min-w-[60rem]">
                 <thead>
                     <tr class="relative text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
                         <th class="px-6 py-3">Employee</th>
+                        <th class="px-6 py-3">Status</th>
                         <th class="px-6 py-3">Department</th>
                         <th class="px-6 py-3">Position</th>
-                        <th class="px-6 py-3">Status</th>
                         <th class="px-6 py-3">Start date</th>
                         <th class="px-6 py-3 text-right">
                             Actions
@@ -133,13 +140,13 @@
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{{ $employee->department->name }}</td>
-                            <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{{ $employee->position->name }}</td>
                             <td class="px-6 py-4">
                                 <x-badge :color="$employee->status === 'active' ? 'green' : 'slate'">
                                     {{ ucfirst($employee->status) }}
                                 </x-badge>
                             </td>
+                            <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{{ $employee->department->name }}</td>
+                            <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{{ $employee->position->name }}</td>
                             <td class="whitespace-nowrap px-6 py-4 text-sm tabular-nums text-slate-500 dark:text-slate-400">{{ \App\Support\DisplayDate::compact($employee->join_date) }}</td>
                             <td class="px-6 py-4 text-right">
                                 @unless ($loop->last)

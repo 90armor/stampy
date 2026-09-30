@@ -198,7 +198,7 @@ Use `<x-empty-state>` inside the owning solid content surface. State what is mis
 
 ## Responsive behavior
 
-Design from the smallest supported width outward. The app switches from the sidebar to a drawer below `lg`; auth switches from split-screen to form-only below `lg`. Stack form and toolbar controls before they become cramped. Use wrapping and horizontal table scrolling intentionally. Test at narrow mobile, tablet, desktop, and zoomed desktop widths in both themes.
+Design from the smallest supported width outward. The app switches from the sidebar to a drawer below `lg`; auth switches from split-screen to form-only below `lg`. Stack form and toolbar controls before they become cramped: a multi-column filter row switches on only at the breakpoint where its column minimums actually fit the card (the Employees filters use `xl`, since at `lg` the sidebar leaves a 718px card). Tables lead with identity and status columns so those stay visible while the rest scrolls, and a scroll cue's breakpoint follows the table's measured width. Use wrapping and horizontal table scrolling intentionally. Test at narrow mobile, tablet, desktop, and zoomed desktop widths in both themes.
 
 ## Dark mode
 

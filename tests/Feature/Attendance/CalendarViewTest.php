@@ -314,9 +314,13 @@ class CalendarViewTest extends TestCase
             ->test(Show::class, ['employee' => $employee])
             ->set('month', self::SUNDAY_START_MONTH)
             ->assertDontSeeHtml('class="w-full truncate')
-            ->assertSeeHtml('class="w-full line-clamp-2')
+            ->assertSeeHtml('class="hidden w-full line-clamp-2')
             ->assertSeeHtml('title="Company Anniversary (demo)"')
-            ->assertSee('Company Anniversary (demo)');
+            ->assertSee('Company Anniversary (demo)')
+            // Below sm the name would clip, so a small flag marks the holiday
+            // instead, and the day number and icon stack rather than collide.
+            ->assertSeeHtml('h-3 w-3 shrink-0 text-fuchsia-700 dark:text-fuchsia-300 sm:hidden')
+            ->assertSeeHtml('flex w-full flex-col items-start gap-0.5 sm:flex-row');
     }
 
     public function test_every_cell_carries_an_accessible_label(): void

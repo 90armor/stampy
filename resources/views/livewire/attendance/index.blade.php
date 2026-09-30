@@ -306,7 +306,11 @@
             </div>
         @else
             <div class="border-t border-slate-200/60 dark:border-slate-800/60">
-                <div class="flex items-center justify-end gap-1.5 px-5 py-2 text-xs text-slate-500 dark:text-slate-400 lg:hidden" aria-hidden="true">
+                {{-- The table's natural width is ~1119px; it first fits the card
+                at a 1440px viewport (1134px card), so the cue shows below that —
+                including 1024–1439, where it used to be hidden while the table
+                still scrolled. --}}
+                <div class="flex items-center justify-end gap-1.5 px-5 py-2 text-xs text-slate-500 dark:text-slate-400 min-[1440px]:hidden" aria-hidden="true">
                     <span>Scroll to view all columns</span>
                     <x-icon name="chevron-right" class="h-3.5 w-3.5" />
                 </div>
