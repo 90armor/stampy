@@ -69,6 +69,8 @@ On narrow screens, preserve the full table and native horizontal scrolling inste
 
 A short, non-interactive “Scroll to view all columns” cue appears above the table on narrow screens. It is hidden at the desktop breakpoint and requires no JavaScript. The cue is supplementary; native scrolling remains the interaction.
 
+The Daily Attendance summary is the shared stat strip (Present, Absent, Incomplete). It is range-wide on purpose: it follows the date range only, not the status or timing chips, search, or department. So that it cannot be read as contradicting a filtered table, it shows a visible scope line such as `Sep 1–29 · all statuses`, which becomes `… · all employees, all statuses` while a search or department filter narrows the table. Present's subtext is the timing count (`7 late · 10 early`), not a duration.
+
 Summary metrics may stack or use compact responsive columns, but labels, counts, percentages, and timing context must remain readable without truncating meaningful information.
 
 ## Dark mode and accessibility

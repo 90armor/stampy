@@ -469,6 +469,23 @@ class AttendanceIndexTest extends TestCase
         $this->assertStringContainsString('<span class="text-slate-300 dark:text-slate-600">—</span>', $html);
     }
 
+    public function test_the_summary_strip_states_its_range_wide_scope(): void
+    {
+        $component = Livewire::actingAs($this->admin())
+            ->test(Index::class)
+            ->set('fromDate', '2026-09-01')
+            ->set('toDate', '2026-09-29');
+
+        $component->assertSee('Sep 1–29 · all statuses');
+
+        // Narrowing the table doesn't narrow the strip, and the label says so.
+        $component->set('employeeFilter', 'someone')
+            ->assertSee('Sep 1–29 · all employees, all statuses');
+
+        // One strip treatment: x-stat-card cells, neutral icon tiles.
+        $this->assertSame(3, substr_count($component->html(), 'text-xl font-semibold leading-7 tabular-nums'));
+    }
+
     public function test_incomplete_badge_and_stat_card_use_violet_not_amber(): void
     {
         $admin = $this->admin();

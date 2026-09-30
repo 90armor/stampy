@@ -4,24 +4,19 @@
     // Present day is still 'present' (green). Timing is an annotation: the
     // amber Late/Early values in their own columns, never the badge colour.
     // See docs/ATTENDANCE_UI.md.
+    // Badge colour per status variant (x-badge palette). violet for
+    // Incomplete (a device defect) so it never reads as the amber timing
+    // annotation; blue for In progress ("not yet", not a failure); fuchsia
+    // for Holiday, outside the green family; accent for Leave, which must
+    // not look like a weekend (Off). See CLAUDE.md's displayVariant() table.
     $variantStyles = [
-        'present' => ['icon' => 'check', 'badge' => 'green', 'iconClass' => 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400'],
-        // violet, not amber — matches Attendance\Show's calendar/day-modal/
-        // table (see CLAUDE.md's displayVariant() colour table): Incomplete is a
-        // device defect (a punch never recorded), a late/early timing
-        // exception is normal employee behavior, and the two used to be
-        // visually indistinguishable here.
-        'incomplete' => ['icon' => 'exclamation-triangle', 'badge' => 'violet', 'iconClass' => 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300'],
-        'absent' => ['icon' => 'user-x', 'badge' => 'red', 'iconClass' => 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400'],
-        'off' => ['icon' => 'calendar-days', 'badge' => 'slate', 'iconClass' => 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'],
-        // blue/fuchsia — see Attendance\Show's calendar (same reasoning as
-        // CLAUDE.md's displayVariant() table: in_progress must not read as red/amber ("not yet", not
-        // a failure), and holiday must not reuse primary/accent's own green
-        // family, which would repeat present's hue.
-        'in_progress' => ['icon' => 'clock', 'badge' => 'blue', 'iconClass' => 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'],
-        'holiday' => ['icon' => 'flag', 'badge' => 'fuchsia', 'iconClass' => 'bg-fuchsia-50 text-fuchsia-700 dark:bg-fuchsia-900/30 dark:text-fuchsia-300'],
-        // Accent + briefcase, matching Attendance\Show's calendar — a day off that used leave balance must not look like a weekend (off).
-        'leave' => ['icon' => 'briefcase', 'badge' => 'accent', 'iconClass' => 'bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300'],
+        'present' => ['badge' => 'green'],
+        'incomplete' => ['badge' => 'violet'],
+        'absent' => ['badge' => 'red'],
+        'off' => ['badge' => 'slate'],
+        'in_progress' => ['badge' => 'blue'],
+        'holiday' => ['badge' => 'fuchsia'],
+        'leave' => ['badge' => 'accent'],
     ];
 
     $isToday = $fromDate === $toDate && $fromDate === today()->format('Y-m-d');
@@ -58,28 +53,31 @@
             $summary['late'] > 0 ? $summary['late'].' late' : null,
             $summary['early'] > 0 ? $summary['early'].' early' : null,
         ]);
+        // The strip is range-wide on purpose (Index::summaryQuery()): it
+        // ignores the status/timing chips, search and department, so it
+        // states its own scope rather than read as contradicting a filtered
+        // table below it.
+        $from = \Illuminate\Support\Carbon::parse($fromDate);
+        $to = \Illuminate\Support\Carbon::parse($toDate);
+        $summaryRange = match (true) {
+            $from->isSameDay($to) => $from->format('D, M j'),
+            $from->isSameMonth($to) => $from->format('M j').'–'.$to->format('j'),
+            $from->isSameYear($to) => $from->format('M j').' – '.$to->format('M j'),
+            default => $from->format('M j, Y').' – '.$to->format('M j, Y'),
+        };
+        $summaryScope = $summaryRange.' · '.($employeeFilter !== '' || $departmentFilter !== '' ? 'all employees, all statuses' : 'all statuses');
     @endphp
     <x-card :padding="false">
-        <div class="grid grid-cols-3 divide-x divide-slate-200/60 dark:divide-slate-800/60">
-            @foreach ([
-                ['key' => 'present', 'label' => 'Present'],
-                ['key' => 'absent', 'label' => 'Absent'],
-                ['key' => 'incomplete', 'label' => 'Incomplete'],
-            ] as $metric)
-                <div class="min-w-0 p-4 sm:flex sm:items-center sm:gap-3">
-                    <span class="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:flex {{ $variantStyles[$metric['key']]['iconClass'] }}">
-                        <x-icon :name="$variantStyles[$metric['key']]['icon']" class="h-4 w-4" />
-                    </span>
-                    <div class="min-w-0">
-                        <p class="text-xs font-medium text-slate-500 dark:text-slate-400">{{ $metric['label'] }}</p>
-                        <p class="mt-0.5 text-xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ $summary[$metric['key']] }}</p>
-                        @if ($metric['key'] === 'present' && $timingParts)
-                            <p class="mt-0.5 text-[11px] leading-4 text-slate-500 dark:text-slate-400 sm:text-xs">{{ implode(' · ', $timingParts) }}</p>
-                        @endif
-                    </div>
-                </div>
-            @endforeach
-        </div>
+        <p class="px-3 pt-3 text-xs text-slate-500 dark:text-slate-400 sm:px-4">{{ $summaryScope }}</p>
+        <dl class="grid grid-cols-3 divide-x divide-slate-200/60 dark:divide-slate-800/60">
+            <x-stat-card icon="check" label="Present" :value="$summary['present']">
+                @if ($timingParts)
+                    <x-slot:subtext>{{ implode(' · ', $timingParts) }}</x-slot:subtext>
+                @endif
+            </x-stat-card>
+            <x-stat-card icon="user-x" label="Absent" :value="$summary['absent']" />
+            <x-stat-card icon="exclamation-triangle" label="Incomplete" :value="$summary['incomplete']" />
+        </dl>
     </x-card>
 
     <x-card :padding="false">

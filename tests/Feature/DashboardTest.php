@@ -425,4 +425,20 @@ class DashboardTest extends TestCase
             ->assertOk()
             ->assertDontSee('Quick Actions');
     }
+
+    public function test_the_dashboard_uses_the_shared_stat_strip_with_headcount(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        $employee = Employee::factory()->create();
+        $this->attendanceRow($employee, AttendanceStatus::Present, ['late_minutes' => 5]);
+
+        $this->actingAs($admin)->get(route('dashboard'))
+            ->assertSee('Today, '.today()->format('D, j M'))
+            ->assertSee('1 late')
+            ->assertSee('added this month')
+            ->assertSee('text-xl font-semibold leading-7 tabular-nums', false)
+            // The nested tinted tiles and the separate Employee summary card are gone.
+            ->assertDontSee('rounded-xl bg-slate-50 p-4', false)
+            ->assertDontSee('Employee summary');
+    }
 }

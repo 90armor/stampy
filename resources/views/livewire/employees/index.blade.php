@@ -18,33 +18,9 @@
     @else
     <x-card :padding="false">
         <dl class="grid grid-cols-3 divide-x divide-slate-200/60 dark:divide-slate-800/60">
-            <div class="min-w-0 px-3 py-3 sm:flex sm:items-center sm:gap-3 sm:px-4">
-                <span class="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-50 text-primary-700 sm:flex dark:bg-primary-900/40 dark:text-primary-300">
-                    <x-icon name="users" class="h-4 w-4" />
-                </span>
-                <div class="min-w-0">
-                    <dt class="text-[11px] font-medium leading-4 text-slate-500 sm:text-xs dark:text-slate-400">Total employees</dt>
-                    <dd class="mt-0.5 text-xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ $stats['total_employees'] }}</dd>
-                </div>
-            </div>
-            <div class="min-w-0 px-3 py-3 sm:flex sm:items-center sm:gap-3 sm:px-4">
-                <span class="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent-50 text-accent-700 sm:flex dark:bg-accent-900/40 dark:text-accent-300">
-                    <x-icon name="user-circle" class="h-4 w-4" />
-                </span>
-                <div class="min-w-0">
-                    <dt class="text-[11px] font-medium leading-4 text-slate-500 sm:text-xs dark:text-slate-400">Active employees</dt>
-                    <dd class="mt-0.5 text-lg font-semibold tabular-nums text-slate-800 dark:text-slate-200">{{ $stats['active_employees'] }}</dd>
-                </div>
-            </div>
-            <div class="min-w-0 px-3 py-3 sm:flex sm:items-center sm:gap-3 sm:px-4">
-                <span class="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 sm:flex dark:bg-slate-800 dark:text-slate-400">
-                    <x-icon name="user-x" class="h-4 w-4" />
-                </span>
-                <div class="min-w-0">
-                    <dt class="text-[11px] font-medium leading-4 text-slate-500 sm:text-xs dark:text-slate-400">Inactive employees</dt>
-                    <dd class="mt-0.5 text-lg font-semibold tabular-nums text-slate-800 dark:text-slate-200">{{ $stats['inactive_employees'] }}</dd>
-                </div>
-            </div>
+            <x-stat-card icon="users" label="Total employees" :value="$stats['total_employees']" />
+            <x-stat-card icon="user-circle" label="Active employees" :value="$stats['active_employees']" />
+            <x-stat-card icon="user-x" label="Inactive employees" :value="$stats['inactive_employees']" />
         </dl>
     </x-card>
 

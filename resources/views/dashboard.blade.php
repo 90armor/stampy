@@ -17,7 +17,6 @@
     @if ($stats)
         @php
             $segments = collect($attendance['today']['segments']);
-            $primarySegments = $segments->take(4);
             $attentionAvatarClass = [
                 'red' => 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400',
                 'violet' => 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
@@ -39,60 +38,63 @@
                 && ! ($quickActions->count() === 1 && $quickActions->first()['route'] === 'employees.index');
         @endphp
 
+        @php
+            // The shared stat strip (x-stat-card cells in one card, as on
+            // Attendance and Employees): today's non-zero status counts, then
+            // headcount. Up to five cells; two per row on phones.
+            $stripCells = $segments->take(4)->map(fn ($segment) => [
+                'icon' => match ($segment['key']) {
+                    'present' => 'check',
+                    'absent' => 'user-x',
+                    'incomplete' => 'exclamation-triangle',
+                    'in_progress' => 'clock',
+                    'holiday' => 'flag',
+                    'off' => 'calendar-days',
+                    'leave' => 'briefcase',
+                    default => 'minus',
+                },
+                'label' => $segment['label'],
+                'value' => $segment['count'],
+                'subtext' => $segment['key'] === 'present' && ($attendance['today']['late']['count'] > 0 || $attendance['today']['earlyLeave']['count'] > 0)
+                    ? implode(' · ', array_filter([
+                        $attendance['today']['late']['count'] > 0 ? $attendance['today']['late']['count'].' late' : null,
+                        $attendance['today']['earlyLeave']['count'] > 0 ? $attendance['today']['earlyLeave']['count'].' early' : null,
+                    ]))
+                    : $segment['percent'].'%',
+            ])->push([
+                'icon' => 'users',
+                'label' => 'Employees',
+                'value' => $stats['total_employees'],
+                'subtext' => $stats['new_this_month'].' added this month',
+            ])->values();
+            $stripColumns = [1 => 'sm:grid-cols-1', 2 => 'sm:grid-cols-2', 3 => 'sm:grid-cols-3', 4 => 'sm:grid-cols-4', 5 => 'sm:grid-cols-5'][$stripCells->count()];
+        @endphp
+        <x-card :padding="false" class="mb-6">
+            <p class="px-3 pt-3 text-xs text-slate-500 dark:text-slate-400 sm:px-4">
+                Today, {{ today()->format('D, j M') }} · {{ $attendance['today']['total'] }} active {{ $attendance['today']['total'] === 1 ? 'employee' : 'employees' }}
+            </p>
+            <dl class="grid grid-cols-2 {{ $stripColumns }}">
+                @foreach ($stripCells as $cell)
+                    <x-stat-card
+                        :icon="$cell['icon']"
+                        :label="$cell['label']"
+                        :value="$cell['value']"
+                        @class([
+                            'border-slate-200/60 dark:border-slate-800/60',
+                            'border-t sm:border-t-0' => $loop->index >= 2,
+                            'border-l' => $loop->index % 2 === 1,
+                            'sm:border-l' => $loop->index > 0,
+                            'sm:border-l-0' => $loop->index === 0,
+                        ])
+                    >
+                        <x-slot:subtext>{{ $cell['subtext'] }}</x-slot:subtext>
+                    </x-stat-card>
+                @endforeach
+            </dl>
+        </x-card>
+
         <div class="grid gap-6 lg:grid-cols-12 lg:items-start">
             <section class="contents" aria-label="Today's attendance overview">
-                <x-card class="order-1 lg:col-span-8">
-                    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Today</p>
-                            <h2 class="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">Attendance status</h2>
-                            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                                {{ $attendance['today']['total'] }} active {{ $attendance['today']['total'] === 1 ? 'employee' : 'employees' }} in scope
-                            </p>
-                        </div>
-                        @unless ($attendance['today']['builtToday'])
-                            <x-badge color="amber">Not calculated yet</x-badge>
-                        @endunless
-                    </div>
-
-                    <dl @class([
-                        'mt-6 grid w-full grid-cols-1 gap-3',
-                        'max-w-sm' => $primarySegments->count() === 1,
-                        'sm:grid-cols-2' => $primarySegments->count() === 2,
-                        'sm:grid-cols-3' => $primarySegments->count() === 3,
-                        'sm:grid-cols-4' => $primarySegments->count() >= 4,
-                    ])>
-                        @foreach ($primarySegments as $segment)
-                            <div class="rounded-xl bg-slate-50 p-4 dark:bg-slate-800/60">
-                                <dt class="flex items-center gap-x-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-                                    <span class="h-2 w-2 rounded-full {{ $segment['dot'] }}"></span>{{ $segment['label'] }}
-                                </dt>
-                                <dd class="mt-2 text-2xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ $segment['count'] }}</dd>
-                                <dd class="text-xs tabular-nums text-slate-400 dark:text-slate-500">{{ $segment['percent'] }}%</dd>
-                            </div>
-                        @endforeach
-                    </dl>
-
-                    @if ($segments->count() > 4)
-                        <div class="mt-4 flex flex-wrap gap-x-5 gap-y-2">
-                            @foreach ($segments->slice(4) as $segment)
-                                <p class="flex items-center gap-x-2 text-xs text-slate-500 dark:text-slate-400">
-                                    <span class="h-2 w-2 rounded-full {{ $segment['dot'] }}"></span>{{ $segment['label'] }}
-                                    <span class="font-semibold tabular-nums text-slate-700 dark:text-slate-200">{{ $segment['count'] }}</span>
-                                </p>
-                            @endforeach
-                        </div>
-                    @endif
-                    @if ($attendance['today']['late']['count'] > 0 || $attendance['today']['earlyLeave']['count'] > 0)
-                        <p class="mt-5 border-t border-slate-100 pt-4 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
-                            Of those present,
-                            @if ($attendance['today']['late']['count'] > 0)<span class="font-medium text-amber-700 dark:text-amber-400">{{ $attendance['today']['late']['count'] }} arrived late</span>@endif
-                            @if ($attendance['today']['late']['count'] > 0 && $attendance['today']['earlyLeave']['count'] > 0) and @endif
-                            @if ($attendance['today']['earlyLeave']['count'] > 0)<span class="font-medium text-amber-700 dark:text-amber-400">{{ $attendance['today']['earlyLeave']['count'] }} left early</span>@endif.
-                        </p>
-                    @endif
-                </x-card>
-
                 <x-card class="order-2 lg:col-span-4">
                     <div class="flex items-start justify-between gap-4">
                         <div>
@@ -138,15 +140,6 @@
                     @endif
                 </x-card>
                 <div class="contents lg:order-4 lg:col-span-4 lg:flex lg:flex-col lg:gap-6">
-                    <x-card class="order-4 min-w-0 w-full">
-                        <p class="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Workforce</p>
-                        <h2 class="mt-1 text-lg font-semibold text-slate-900 dark:text-slate-100">Employee summary</h2>
-                        <dl class="mt-5 divide-y divide-slate-200/70 dark:divide-slate-800">
-                            <div class="flex items-end justify-between gap-4 pb-4"><dt class="text-sm font-medium text-slate-700 dark:text-slate-300">Total employees</dt><dd class="text-3xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ $stats['total_employees'] }}</dd></div>
-                            <div class="flex items-end justify-between gap-4 pt-4"><dt class="text-xs text-slate-500 dark:text-slate-400">Added this month</dt><dd class="text-sm font-medium tabular-nums text-slate-600 dark:text-slate-300">{{ $stats['new_this_month'] }}</dd></div>
-                        </dl>
-                    </x-card>
-
                     @if ($showQuickActions)
                         <x-card class="order-7">
                             <p class="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">Shortcuts</p>
