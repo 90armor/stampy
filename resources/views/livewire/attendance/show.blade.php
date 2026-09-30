@@ -30,7 +30,13 @@
         // harder to see. red-300 measures 9.07:1 in the same computation,
         // back in line with its siblings.
         'absent' => ['badge' => 'red', 'icon' => 'x-mark', 'bg' => 'bg-red-50 dark:bg-red-900/20', 'text' => 'text-red-700 dark:text-red-300', 'ring' => 'ring-red-600/20 dark:ring-red-500/40'],
-        'off' => ['badge' => 'slate', 'icon' => 'calendar-days', 'bg' => 'bg-slate-100 dark:bg-slate-800', 'text' => 'text-slate-500 dark:text-slate-400', 'ring' => 'ring-slate-500/10 dark:ring-slate-500/20'],
+        // Off is the quietest cell in the grid, quieter than Present: no fill
+        // (a grey fill was the heaviest surface in dark mode), a muted number
+        // and a fainter icon, and a dashed boundary so the grid still reads.
+        // The number stays slate-500 (4.8:1, AA) and drops to medium weight
+        // rather than going paler.
+        // 'pill' keeps the day modal's Off pill a normal slate badge.
+        'off' => ['badge' => 'slate', 'icon' => 'calendar-days', 'bg' => 'bg-transparent', 'text' => 'text-slate-500 dark:text-slate-400', 'iconText' => 'text-slate-400 dark:text-slate-500', 'weight' => 'font-medium', 'ring' => 'ring-transparent border border-dashed border-slate-300 dark:border-slate-700', 'pill' => 'bg-slate-100 ring-slate-500/10 dark:bg-slate-800 dark:ring-slate-500/20'],
         // blue, not primary/evergreen: primary is still a green-family hue
         // (a different shade of the same "present" story present's own
         // stock-green already tells), which would repeat the exact
@@ -301,9 +307,9 @@
                                         + white measured 4.57:1 / 3.83:1). --}}
                                         <span class="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-primary-600 px-1 text-sm font-bold text-white sm:h-7 sm:min-w-7 sm:text-base dark:bg-primary-400 dark:text-slate-900">{{ $cell['date']->day }}</span>
                                     @else
-                                        <span class="text-sm font-bold sm:text-base {{ $style['text'] }}">{{ $cell['date']->day }}</span>
+                                        <span class="text-sm sm:text-base {{ $style['weight'] ?? 'font-bold' }} {{ $style['text'] }}">{{ $cell['date']->day }}</span>
                                     @endif
-                                    <x-icon :name="$style['icon']" class="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4 {{ $style['text'] }}" />
+                                    <x-icon :name="$style['icon']" class="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4 {{ $style['iconText'] ?? $style['text'] }}" />
                                 </div>
                                 {{-- A holiday cell shows its name whatever the attendance
                                 status is (or isn't, yet) — read from $holiday, not from

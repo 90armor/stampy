@@ -432,6 +432,27 @@ class CalendarReadabilityTest extends TestCase
         $this->assertStringNotContainsString('bg-slate-700 dark:bg-slate-200', $html);
     }
 
+    public function test_off_cells_have_no_fill_and_a_dashed_boundary(): void
+    {
+        $employee = Employee::factory()->create();
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => '2026-03-01',
+            'status' => AttendanceStatus::Off,
+        ]);
+
+        $html = Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', self::MONTH)
+            ->html();
+
+        // Quieter than a Present cell: no grey fill, a dashed boundary, and a
+        // fainter icon than the day number.
+        $this->assertStringContainsString('bg-transparent ring-transparent border border-dashed border-slate-300 dark:border-slate-700', $html);
+        $this->assertStringNotContainsString('bg-slate-100 dark:bg-slate-800 ring-slate-500/10', $html);
+        $this->assertStringContainsString('text-slate-400 dark:text-slate-500', $html);
+    }
+
     public function test_off_cells_show_no_time_placeholder(): void
     {
         $employee = Employee::factory()->create();
