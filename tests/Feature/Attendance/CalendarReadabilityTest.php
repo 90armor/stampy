@@ -242,10 +242,14 @@ class CalendarReadabilityTest extends TestCase
 
         // Same rule as the Daily Attendance table: In/Out stay neutral and
         // the amber Late/Early values carry the timing fact.
-        $this->assertMatchesRegularExpression('/class="px-6 py-4 text-right text-sm font-medium text-amber-700 dark:text-amber-300">12m</', $html);
-        $this->assertMatchesRegularExpression('/class="px-6 py-4 text-right text-sm font-medium text-amber-700 dark:text-amber-300">4m</', $html);
+        $this->assertMatchesRegularExpression('/class="whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums font-medium text-amber-700 dark:text-amber-300">12m</', $html);
+        $this->assertMatchesRegularExpression('/class="whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums font-medium text-amber-700 dark:text-amber-300">4m</', $html);
         $this->assertStringNotContainsString('aria-label="Arrived', $html);
         $this->assertStringNotContainsString('aria-label="Left', $html);
+        // The row's one affordance is the trailing 40px raw-punches toggle,
+        // named for its date (an admin is acting here).
+        $this->assertStringContainsString('aria-label="Show raw punches for Mon 2 Mar"', $html);
+        $this->assertStringContainsString('<abbr title="Early leave" class="no-underline">Early</abbr>', $html);
         // A third "Late 12m"/"Early 4m" chip beside the Status badge
         // repeated the same fact and bloated the row height.
         $this->assertStringNotContainsString('>Late 12m<', $html);

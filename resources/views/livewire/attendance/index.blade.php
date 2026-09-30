@@ -303,18 +303,23 @@
                 </div>
 
                 <div class="overflow-x-auto transition-opacity" wire:loading.class="opacity-60">
-                    <table class="min-w-[72rem] w-full">
+                    {{-- Column order puts identity and status first (Date, Employee,
+                    Status), then the times, then Department, so the columns that
+                    answer "who, and did they attend" are the ones visible without
+                    scrolling at narrow widths. No column is ever hidden
+                    (docs/ATTENDANCE_UI.md). --}}
+                    <table class="min-w-[64rem] w-full">
                     <thead>
-                        <tr class="relative text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                            <th class="whitespace-nowrap px-6 py-3">Date</th>
+                        <tr class="relative whitespace-nowrap text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                            <th class="px-6 py-3">Date</th>
                             <th class="min-w-[11rem] px-6 py-3">Employee</th>
-                            <th class="px-6 py-3">Department</th>
+                            <th class="px-6 py-3">Status</th>
                             <th class="px-6 py-3">In</th>
                             <th class="px-6 py-3">Out</th>
                             <th class="px-6 py-3 text-right">Worked</th>
                             <th class="px-6 py-3 text-right">Late</th>
-                            <th class="px-6 py-3 text-right">Early leave</th>
-                            <th class="px-6 py-3">Status</th>
+                            <th class="px-6 py-3 text-right"><abbr title="Early leave" class="no-underline">Early</abbr></th>
+                            <th class="px-6 py-3">Department</th>
                             <th class="py-3 pl-2 pr-6">
                                 <span class="sr-only">Open detail</span>
                                 <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
@@ -322,59 +327,67 @@
                         </tr>
                     </thead>
                     <tbody>
+                        @php
+                            // A single-day range already says the date in the range
+                            // control, so the repeated Date column recedes to muted.
+                            $dateCellClass = $fromDate === $toDate ? 'text-slate-500 dark:text-slate-400' : 'text-slate-700 dark:text-slate-300';
+                            $emDash = '<span class="text-slate-300 dark:text-slate-600">—</span>';
+                        @endphp
                         @foreach ($attendances as $attendance)
                             @php
                                 $style = $variantStyles[$attendance->displayVariant()];
+                                $workDateLabel = $attendance->work_date->format('D j M');
                             @endphp
                             <tr wire:key="daily-attendance-{{ $attendance->id }}" class="group relative hover:bg-slate-50 dark:hover:bg-slate-800/60">
-                                <td class="whitespace-nowrap px-6 py-3 text-sm tabular-nums text-slate-700 dark:text-slate-300">{{ $attendance->work_date->format('D j M') }}</td>
-                                <td class="px-6 py-3">
-                                    {{-- Resting-state accent color (not just on hover) + underline-on-hover
-                                    + a visible focus ring is the app's new "this is a link" convention —
-                                    see CLAUDE.md's Design system → Links. Hover alone isn't enough on
-                                    touch devices, which never trigger it. --}}
-                                    <a
-                                        href="{{ route('attendance.show', $attendance->employee) }}"
-                                        wire:navigate
-                                        class="inline-block rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                                    >
-                                        <div class="whitespace-nowrap font-medium text-primary-700 underline decoration-1 underline-offset-2 decoration-primary-300 transition hover:decoration-primary-600 dark:text-primary-400 dark:decoration-primary-700 dark:hover:decoration-primary-400">{{ $attendance->employee->full_name }}</div>
-                                        <div class="text-sm text-slate-500 dark:text-slate-400">{{ $attendance->employee->employee_code }}</div>
-                                    </a>
+                                <td class="whitespace-nowrap px-6 py-2 text-sm tabular-nums {{ $dateCellClass }}">{{ $workDateLabel }}</td>
+                                {{-- Plain text, not a link: the row's one navigation target is
+                                the chevron at the end, so the identity column reads as data
+                                and every cell stays selectable. --}}
+                                <td class="px-6 py-2">
+                                    <div class="whitespace-nowrap text-sm font-medium text-slate-900 dark:text-slate-100">{{ $attendance->employee->full_name }}</div>
+                                    <div class="text-xs text-slate-500 dark:text-slate-400">{{ $attendance->employee->employee_code }}</div>
                                 </td>
-                                <td class="px-6 py-3 text-sm text-slate-700 dark:text-slate-300">{{ $attendance->employee->department->name }}</td>
-                                <td class="whitespace-nowrap px-6 py-3 text-sm tabular-nums text-slate-700 dark:text-slate-300">
+                                <td class="px-6 py-2">
+                                    {{-- Status only — the Late/Early columns already show the
+                                    timing (aligned, scannable, amber); a "Late 21m" chip here
+                                    repeated the same fact and bloated row height. Colour comes
+                                    from displayVariant(), which is status-only: a late Present
+                                    day is a green "Present". --}}
+                                    <x-badge :color="$style['badge']">{{ $attendance->status->label() }}</x-badge>
+                                </td>
+                                <td class="whitespace-nowrap px-6 py-2 text-sm tabular-nums text-slate-700 dark:text-slate-300">
                                     @if ($attendance->first_in)
                                         <x-time :time="$attendance->first_in" />
                                     @else
-                                        —
+                                        {!! $emDash !!}
                                     @endif
                                 </td>
-                                <td class="whitespace-nowrap px-6 py-3 text-sm tabular-nums text-slate-700 dark:text-slate-300">
+                                <td class="whitespace-nowrap px-6 py-2 text-sm tabular-nums text-slate-700 dark:text-slate-300">
                                     @if ($attendance->last_out)
                                         <x-time :time="$attendance->last_out" />
                                         @if ($attendance->isOvernightOut())
                                             <span class="text-slate-400 dark:text-slate-500">(+1)</span>
                                         @endif
                                     @else
-                                        —
+                                        {!! $emDash !!}
                                     @endif
                                 </td>
-                                <td class="whitespace-nowrap px-6 py-3 text-right text-sm tabular-nums text-slate-700 dark:text-slate-300">{{ $attendance->formattedWorkedMinutes() ?? '—' }}</td>
+                                <td class="whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums text-slate-700 dark:text-slate-300">{!! e($attendance->formattedWorkedMinutes()) ?: $emDash !!}</td>
                                 {{-- In/Out stay neutral; the timing fact is marked here, on
                                 the duration itself, in amber (docs/ATTENDANCE_UI.md). --}}
-                                <td @class(['whitespace-nowrap px-6 py-3 text-right text-sm tabular-nums', 'font-medium text-amber-700 dark:text-amber-300' => $attendance->isLate(), 'text-slate-700 dark:text-slate-300' => ! $attendance->isLate()])>{{ $attendance->formattedLateMinutes() ?? '—' }}</td>
-                                <td @class(['whitespace-nowrap px-6 py-3 text-right text-sm tabular-nums', 'font-medium text-amber-700 dark:text-amber-300' => $attendance->leftEarly(), 'text-slate-700 dark:text-slate-300' => ! $attendance->leftEarly()])>{{ $attendance->formattedEarlyLeaveMinutes() ?? '—' }}</td>
-                                <td class="px-6 py-3">
-                                    {{-- Status only — the adjacent Late/Early columns already
-                                    show the timing (aligned, scannable, amber); a "Late 21m"
-                                    chip here repeated the same fact and bloated row height.
-                                    Colour comes from displayVariant(), which is status-only:
-                                    a late Present day is a green "Present". --}}
-                                    <x-badge :color="$style['badge']">{{ $attendance->status->label() }}</x-badge>
-                                </td>
-                                <td class="py-3 pl-2 pr-6 text-right">
-                                    <a href="{{ route('attendance.show', $attendance->employee) }}" wire:navigate aria-label="View attendance details for {{ $attendance->employee->full_name }}" class="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-primary-50 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover:text-primary-600 dark:text-slate-500 dark:hover:bg-primary-900/30 dark:hover:text-primary-300 dark:group-hover:text-primary-400">
+                                <td @class(['whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums', 'font-medium text-amber-700 dark:text-amber-300' => $attendance->isLate()])>{!! e($attendance->formattedLateMinutes()) ?: $emDash !!}</td>
+                                <td @class(['whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums', 'font-medium text-amber-700 dark:text-amber-300' => $attendance->leftEarly()])>{!! e($attendance->formattedEarlyLeaveMinutes()) ?: $emDash !!}</td>
+                                <td class="whitespace-nowrap px-6 py-2 text-sm text-slate-700 dark:text-slate-300">{{ $attendance->employee->department->name }}</td>
+                                <td class="py-2 pl-2 pr-6 text-right">
+                                    {{-- The row's only link: visible at rest, a 40px target
+                                    (negative margin keeps it from growing the row), no
+                                    whole-row click handler. --}}
+                                    <a
+                                        href="{{ route('attendance.show', $attendance->employee) }}?month={{ $attendance->work_date->format('Y-m') }}"
+                                        wire:navigate
+                                        aria-label="View attendance for {{ $attendance->employee->full_name }}, {{ $workDateLabel }}"
+                                        class="-my-1 ml-auto inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover:text-primary-600 dark:text-slate-400 dark:hover:bg-primary-900/30 dark:hover:text-primary-300 dark:group-hover:text-primary-400"
+                                    >
                                         <x-icon name="chevron-right" class="h-4 w-4" />
                                     </a>
                                     @unless ($loop->last)

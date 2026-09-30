@@ -119,7 +119,7 @@ Entity detail pages are operational records, not dashboards or profile heroes. L
 - Disabled controls use reduced contrast and `cursor-not-allowed` where appropriate, while remaining readable. Loading actions remain disabled against repeat submission and retain meaningful copy or an accessible loading indicator.
 - Text-entry and selection controls may retain a visible `focus` border/ring while being edited; action controls and links prefer `focus-visible` so keyboard focus is prominent without adding unnecessary pointer-click persistence.
 - Destructive actions use red semantics and require confirmation when the effect is material.
-- Row navigation must be keyboard reachable. A cell link uses visible primary-colored underlined text; a fully clickable row uses cursor, hover, and `focus-visible` treatment.
+- Row navigation must be keyboard reachable. A row whose record has a detail destination may use a trailing chevron link as its only navigation target — visible at rest, at least 40px, with an `aria-label` naming the record — leaving identity text plain and every cell selectable (the Attendance tables do this). Otherwise a cell link uses visible primary-colored underlined text; a fully clickable row uses cursor, hover, and `focus-visible` treatment.
 - Underline is reserved for links. Never underline a value to mark it (a timing exception, an error, an emphasis); use color plus weight or an explicit label instead.
 - Preserve user-entered state during Livewire updates and restore focus after modal dismissal.
 
@@ -135,7 +135,8 @@ Keep touch targets at least 44px high for primary auth controls and small-screen
 
 ## Tables and data lists
 
-- Use uppercase `text-xs` headers, `px-6 py-3` headings, and `px-6 py-4` body cells.
+- Use uppercase `text-xs` headers that never wrap, and `px-6 py-3` headings. Body cells default to `px-6 py-4`; dense operational tables (Attendance) use `px-6 py-2` for about 52px rows. Abbreviate a long header rather than let it wrap, exposing the full name with `<abbr title>` or `sr-only` text.
+- Empty cell values are a muted em dash (`text-slate-300 dark:text-slate-600`), so data reads before placeholders.
 - Use the established inset `slate-200/60` divider (dark: `slate-800/60`), omitting a trailing divider after the last row.
 - Row hover is `hover:bg-slate-50 dark:hover:bg-slate-800/60`.
 - Preserve selectable data when choosing between a cell link and a whole-row target.

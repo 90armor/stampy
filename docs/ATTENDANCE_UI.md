@@ -52,9 +52,14 @@ Filtering must preserve URL-bound state, employee scope, permissions, and the ex
 
 The Attendance table prioritizes scanability:
 
-- Keep employee identity, status, scheduled and marked times, worked duration, late minutes, and early-leave minutes visible as distinct columns.
-- Use tabular numerals and prevent time values from wrapping.
-- Preserve clear headers, restrained row height, visible row separators, and accessible employee/detail links.
+- Never hide or conditionally remove columns. Keep date, employee identity, status, In/Out times, worked duration, late, early leave, and department visible as distinct columns.
+- Column order puts identity and status first: Date, Employee, Status, then In, Out, Worked, Late, Early, and Department, followed by the row's navigation chevron.
+- Header labels never wrap (`whitespace-nowrap` on the header row). The early-leave column header is `Early`, with its full name exposed as `<abbr title="Early leave">`.
+- Body rows target about 52px at desktop width: `py-2` cells, the employee name on one `text-sm` line and the employee code on a `text-xs` line.
+- Use tabular numerals and prevent time and duration values from wrapping.
+- Empty values are a muted em dash (`text-slate-300 dark:text-slate-600`). When the range is a single day the Date column is muted (`text-slate-500 dark:text-slate-400`), since the range control already states the date.
+- The employee name is plain text (`text-slate-900 font-medium`, dark `text-slate-100`), not a link. The trailing chevron is the row's only link to attendance detail: visible at rest, at least a 40px target (a negative vertical margin keeps it from growing the row), and labelled `View attendance for {name}, {date}`. It opens that employee's month containing the date. Row hover stays; there is no whole-row click handler, so every cell remains selectable.
+- The employee's own attendance table view follows the same rules: Date and Status first, `Early` abbreviated, muted em dashes, and one trailing per-row affordance. There, that affordance is the admin-only raw-punches disclosure toggle (40px, labelled `Show raw punches for {date}`), since the page already is the employee's attendance detail.
 - Keep status badges driven by `displayVariant()`; never recreate semantic logic in Blade.
 - Use a compact in-card empty state that explains the result and offers filter reset when applicable.
 

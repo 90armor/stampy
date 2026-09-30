@@ -406,27 +406,45 @@
                 </div>
             </div>
         @else
+            @php
+                // Same table rules as Daily Attendance (docs/ATTENDANCE_UI.md):
+                // identity/status first, nowrap headers, muted em dashes, and one
+                // per-row affordance at the end of the row. Here that affordance
+                // is the admin-only raw-punches toggle (a disclosure button, not a
+                // link — this page already is the employee's attendance detail).
+                $canManagePunches = auth()->user()->can('update', $employee);
+                $emDash = '<span class="text-slate-300 dark:text-slate-600">—</span>';
+            @endphp
             <div class="overflow-x-auto">
                 <table class="min-w-full">
                     <thead>
-                        <tr class="relative text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        <tr class="relative whitespace-nowrap text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
                             <th class="px-6 py-3">Date</th>
+                            <th class="px-6 py-3">Status</th>
                             <th class="px-6 py-3">In</th>
                             <th class="px-6 py-3">Out</th>
                             <th class="px-6 py-3 text-right">Worked</th>
                             <th class="px-6 py-3 text-right">Late</th>
-                            <th class="px-6 py-3 text-right">Early leave</th>
-                            <th class="px-6 py-3">Status</th>
-                            <th class="px-6 py-3">
+                            <th class="px-6 py-3 text-right"><abbr title="Early leave" class="no-underline">Early</abbr></th>
+                            <th @class(['py-3', 'px-6' => ! $canManagePunches, 'pl-6 pr-2' => $canManagePunches])>
                                 Note
-                                <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
+                                @unless ($canManagePunches)
+                                    <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
+                                @endunless
                             </th>
+                            @if ($canManagePunches)
+                                <th class="py-3 pl-2 pr-6">
+                                    <span class="sr-only">Raw punches</span>
+                                    <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
+                                </th>
+                            @endif
                         </tr>
                     </thead>
                         @foreach ($days as $day)
                             @php
                                 $record = $day['record'];
                                 $dayKey = $day['date']->format('Y-m-d');
+                                $dayLabel = $day['date']->format('D j M');
                                 // Same rule as the Daily Attendance table: In/Out stay
                                 // neutral, and the timing fact is the amber Late/Early value.
                                 $markedLate = $record && $record->isLate();
@@ -438,56 +456,41 @@
                             don't share scope unless a common ancestor carries it. --}}
                             <tbody wire:key="attendance-day-tbody-{{ $dayKey }}" x-data="{ open: false }">
                             <tr
-                                class="relative {{ $day['date']->isToday() ? 'bg-primary-50/40 dark:bg-primary-900/10' : '' }}"
+                                class="relative hover:bg-slate-50 dark:hover:bg-slate-800/60 {{ $day['date']->isToday() ? 'bg-primary-50/40 dark:bg-primary-900/10' : '' }}"
                             >
-                                <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">
-                                    <div class="flex items-center gap-2">
-                                        @can('update', $employee)
-                                            <button
-                                                type="button"
-                                                @click="open = !open"
-                                                :aria-expanded="open.toString()"
-                                                aria-label="Show raw punches"
-                                                class="shrink-0 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
-                                            >
-                                                <x-icon name="chevron-right" class="h-3.5 w-3.5 transition" x-bind:class="open ? 'rotate-90' : ''" />
-                                            </button>
-                                        @endcan
-                                        <span>{{ $day['date']->format('D j M') }}</span>
-                                    </div>
-                                </td>
+                                <td class="whitespace-nowrap px-6 py-2 text-sm tabular-nums text-slate-700 dark:text-slate-300">{{ $dayLabel }}</td>
                                 @if ($record)
-                                    <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">
+                                    <td class="px-6 py-2">
+                                        {{-- Status only — the Late/Early columns already show the
+                                        timing (amber); a "Late 21m" chip here repeated the same
+                                        fact. Colour comes from the status-only displayVariant(). --}}
+                                        <x-badge :color="$variantStyles[$record->displayVariant()]['badge']">{{ $record->status->label() }}</x-badge>
+                                    </td>
+                                    <td class="whitespace-nowrap px-6 py-2 text-sm tabular-nums text-slate-700 dark:text-slate-300">
                                         @if ($record->first_in)
                                             <x-time :time="$record->first_in" />
                                         @else
-                                            —
+                                            {!! $emDash !!}
                                         @endif
                                     </td>
-                                    <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">
+                                    <td class="whitespace-nowrap px-6 py-2 text-sm tabular-nums text-slate-700 dark:text-slate-300">
                                         @if ($record->last_out)
                                             <x-time :time="$record->last_out" />
                                             @if ($record->isOvernightOut())
                                                 <span class="text-slate-400 dark:text-slate-500">(+1)</span>
                                             @endif
                                         @else
-                                            —
+                                            {!! $emDash !!}
                                         @endif
                                     </td>
-                                    <td class="px-6 py-4 text-right text-sm text-slate-700 dark:text-slate-300">{{ $record->formattedWorkedMinutes() ?? '—' }}</td>
-                                    <td @class(['px-6 py-4 text-right text-sm', 'font-medium text-amber-700 dark:text-amber-300' => $markedLate, 'text-slate-700 dark:text-slate-300' => ! $markedLate])>{{ $record->formattedLateMinutes() ?? '—' }}</td>
-                                    <td @class(['px-6 py-4 text-right text-sm', 'font-medium text-amber-700 dark:text-amber-300' => $markedEarly, 'text-slate-700 dark:text-slate-300' => ! $markedEarly])>{{ $record->formattedEarlyLeaveMinutes() ?? '—' }}</td>
-                                    <td class="px-6 py-4">
-                                        {{-- Status only — the adjacent Late/Early columns already
-                                        show the timing (amber); a "Late 21m" chip here repeated the
-                                        same fact. Colour comes from the status-only displayVariant(). --}}
-                                        <x-badge :color="$variantStyles[$record->displayVariant()]['badge']">{{ $record->status->label() }}</x-badge>
-                                    </td>
-                                    <td class="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">
-                                        {{ $record->note ?? '—' }}
-                                        @unless ($loop->last)
+                                    <td class="whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums text-slate-700 dark:text-slate-300">{!! e($record->formattedWorkedMinutes()) ?: $emDash !!}</td>
+                                    <td @class(['whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums', 'font-medium text-amber-700 dark:text-amber-300' => $markedLate])>{!! e($record->formattedLateMinutes()) ?: $emDash !!}</td>
+                                    <td @class(['whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums', 'font-medium text-amber-700 dark:text-amber-300' => $markedEarly])>{!! e($record->formattedEarlyLeaveMinutes()) ?: $emDash !!}</td>
+                                    <td @class(['py-2 text-sm text-slate-500 dark:text-slate-400', 'px-6' => ! $canManagePunches, 'pl-6 pr-2' => $canManagePunches])>
+                                        {!! $record->note !== null ? e($record->note) : $emDash !!}
+                                        @if (! $canManagePunches && ! $loop->last)
                                             <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
-                                        @endunless
+                                        @endif
                                     </td>
                                 @else
                                     {{-- No row at all — the builder hasn't reached this date yet.
@@ -495,16 +498,32 @@
                                     ran and found no punches on a scheduled workday; this means
                                     it hasn't run at all, so nothing here should read as a
                                     judgement about attendance. --}}
-                                    <td class="px-6 py-4 text-sm text-slate-400 dark:text-slate-600">—</td>
-                                    <td class="px-6 py-4 text-sm text-slate-400 dark:text-slate-600">—</td>
-                                    <td class="px-6 py-4 text-right text-sm text-slate-400 dark:text-slate-600">—</td>
-                                    <td class="px-6 py-4 text-right text-sm text-slate-400 dark:text-slate-600">—</td>
-                                    <td class="px-6 py-4 text-right text-sm text-slate-400 dark:text-slate-600">—</td>
-                                    <td class="px-6 py-4">
+                                    <td class="px-6 py-2">
                                         <x-badge color="slate">Not calculated</x-badge>
                                     </td>
-                                    <td class="px-6 py-4 text-sm text-slate-400 dark:text-slate-600">
-                                        —
+                                    <td class="px-6 py-2 text-sm">{!! $emDash !!}</td>
+                                    <td class="px-6 py-2 text-sm">{!! $emDash !!}</td>
+                                    <td class="px-6 py-2 text-right text-sm">{!! $emDash !!}</td>
+                                    <td class="px-6 py-2 text-right text-sm">{!! $emDash !!}</td>
+                                    <td class="px-6 py-2 text-right text-sm">{!! $emDash !!}</td>
+                                    <td @class(['py-2 text-sm', 'px-6' => ! $canManagePunches, 'pl-6 pr-2' => $canManagePunches])>
+                                        {!! $emDash !!}
+                                        @if (! $canManagePunches && ! $loop->last)
+                                            <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
+                                        @endif
+                                    </td>
+                                @endif
+                                @if ($canManagePunches)
+                                    <td class="py-2 pl-2 pr-6 text-right">
+                                        <button
+                                            type="button"
+                                            @click="open = !open"
+                                            :aria-expanded="open.toString()"
+                                            aria-label="Show raw punches for {{ $dayLabel }}"
+                                            class="-my-1 ml-auto inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-primary-900/30 dark:hover:text-primary-300"
+                                        >
+                                            <x-icon name="chevron-right" class="h-4 w-4 transition" x-bind:class="open ? 'rotate-90' : ''" />
+                                        </button>
                                         @unless ($loop->last)
                                             <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
                                         @endunless
@@ -517,7 +536,7 @@
                             explicit: keep it exactly as it was in Phase 2.4c. --}}
                             @can('update', $employee)
                                 <tr x-show="open" x-cloak>
-                                    <td colspan="8" class="bg-slate-50/60 px-6 py-4 dark:bg-slate-800/30">
+                                    <td colspan="9" class="bg-slate-50/60 px-6 py-4 dark:bg-slate-800/30">
                                         <x-attendance.day-detail-panel
                                             :employee="$employee"
                                             :date="$day['date']"

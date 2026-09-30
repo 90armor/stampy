@@ -424,6 +424,51 @@ class AttendanceIndexTest extends TestCase
         $this->assertSame(['absent'], $component->get('statuses'));
     }
 
+    public function test_the_chevron_is_the_rows_only_link_and_names_the_employee_and_date(): void
+    {
+        $admin = $this->admin();
+        $employee = Employee::factory()->create(['full_name' => 'Chevron Chan']);
+
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => '2026-03-02',
+            'status' => AttendanceStatus::Absent,
+        ]);
+
+        $html = Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->set('fromDate', '2026-03-02')
+            ->set('toDate', '2026-03-02')
+            ->html();
+
+        $href = route('attendance.show', $employee).'?month=2026-03';
+        $this->assertSame(1, substr_count($html, 'href="'.$href.'"'));
+        $this->assertStringContainsString('aria-label="View attendance for Chevron Chan, Mon 2 Mar"', $html);
+        // The name is plain text, not a link.
+        $this->assertMatchesRegularExpression('/<div class="whitespace-nowrap text-sm font-medium text-slate-900 dark:text-slate-100">Chevron Chan<\/div>/', $html);
+        $this->assertStringNotContainsString('text-primary-700 underline', $html);
+        // 40px target.
+        $this->assertStringContainsString('inline-flex h-10 w-10', $html);
+    }
+
+    public function test_the_early_header_is_abbreviated_with_an_accessible_full_name(): void
+    {
+        $admin = $this->admin();
+        $employee = Employee::factory()->create();
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => today()->format('Y-m-d'),
+            'status' => AttendanceStatus::Absent,
+        ]);
+
+        $html = Livewire::actingAs($admin)->test(Index::class)->html();
+
+        $this->assertStringContainsString('<abbr title="Early leave" class="no-underline">Early</abbr>', $html);
+        $this->assertStringContainsString('<tr class="relative whitespace-nowrap', $html);
+        // Empty values are a muted em dash.
+        $this->assertStringContainsString('<span class="text-slate-300 dark:text-slate-600">—</span>', $html);
+    }
+
     public function test_incomplete_badge_and_stat_card_use_violet_not_amber(): void
     {
         $admin = $this->admin();
@@ -517,7 +562,7 @@ class AttendanceIndexTest extends TestCase
         $html = Livewire::actingAs($admin)->test(Index::class)->html();
 
         // In/Out stay neutral; the timing fact is the amber Late value.
-        $this->assertMatchesRegularExpression('/class="whitespace-nowrap px-6 py-3 text-right text-sm tabular-nums font-medium text-amber-700 dark:text-amber-300">12m</', $html);
+        $this->assertMatchesRegularExpression('/class="whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums font-medium text-amber-700 dark:text-amber-300">12m</', $html);
         $this->assertStringNotContainsString('aria-label="Arrived', $html);
         $this->assertStringNotContainsString('underline decoration-red', $html);
         // Status-only colour: a late Present row is a green badge.
@@ -569,7 +614,7 @@ class AttendanceIndexTest extends TestCase
 
         $html = Livewire::actingAs($admin)->test(Index::class)->html();
 
-        $this->assertMatchesRegularExpression('/class="whitespace-nowrap px-6 py-3 text-right text-sm tabular-nums font-medium text-amber-700 dark:text-amber-300">4m</', $html);
+        $this->assertMatchesRegularExpression('/class="whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums font-medium text-amber-700 dark:text-amber-300">4m</', $html);
         // The Status badge stays "Present" — status doesn't change, only the
         // Early value is marked (docs/ATTENDANCE_UI.md).
         $this->assertStringContainsString('Present', $html);
