@@ -191,7 +191,7 @@ class CalendarReadabilityTest extends TestCase
             ->set('month', self::MONTH)
             ->html();
 
-        $this->assertMatchesRegularExpression('/<span class="font-medium text-amber-700 dark:text-amber-300" aria-label="Arrived 12 minutes late">/', $html);
+        $this->assertMatchesRegularExpression('/<span class="font-medium text-yellow-700 dark:text-amber-300" aria-label="Arrived 12 minutes late">/', $html);
         $this->assertStringNotContainsString('decoration-red', $html);
         $this->assertStringNotContainsString('aria-label="Left', $html);
         // The cell itself is an ordinary Present cell (neutral surface), not amber.
@@ -217,7 +217,7 @@ class CalendarReadabilityTest extends TestCase
             ->set('month', self::MONTH)
             ->html();
 
-        $this->assertMatchesRegularExpression('/<span class="font-medium text-amber-700 dark:text-amber-300" aria-label="Left 4 minutes early">/', $html);
+        $this->assertMatchesRegularExpression('/<span class="font-medium text-yellow-700 dark:text-amber-300" aria-label="Left 4 minutes early">/', $html);
         $this->assertStringNotContainsString('aria-label="Arrived', $html);
     }
 
@@ -242,8 +242,8 @@ class CalendarReadabilityTest extends TestCase
 
         // Same rule as the Daily Attendance table: In/Out stay neutral and
         // the amber Late/Early values carry the timing fact.
-        $this->assertMatchesRegularExpression('/class="whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums font-medium text-amber-700 dark:text-amber-300">12m</', $html);
-        $this->assertMatchesRegularExpression('/class="whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums font-medium text-amber-700 dark:text-amber-300">4m</', $html);
+        $this->assertMatchesRegularExpression('/class="whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums font-medium text-yellow-700 dark:text-amber-300">12m</', $html);
+        $this->assertMatchesRegularExpression('/class="whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums font-medium text-yellow-700 dark:text-amber-300">4m</', $html);
         $this->assertStringNotContainsString('aria-label="Arrived', $html);
         $this->assertStringNotContainsString('aria-label="Left', $html);
         // The row's one affordance is the trailing 40px raw-punches toggle,
@@ -353,7 +353,8 @@ class CalendarReadabilityTest extends TestCase
 
         $this->assertStringContainsString('text-violet-700', $html);
         $this->assertStringContainsString('dark:text-violet-300', $html);
-        $this->assertStringContainsString('text-amber-700', $html);
+        // The late day's timing marker is the (yellow-700 light) timing text.
+        $this->assertStringContainsString('text-yellow-700', $html);
     }
 
     public function test_the_tables_incomplete_badge_matches_the_calendars_violet_not_amber(): void
@@ -426,7 +427,7 @@ class CalendarReadabilityTest extends TestCase
         $this->assertStringContainsString('Late / Early leave', $html);
         // The sample is an amber marked time with no underline and no
         // colour swatch — timing never colours a cell.
-        $this->assertStringContainsString('font-medium text-amber-700 dark:text-amber-300', $html);
+        $this->assertStringContainsString('font-medium text-yellow-700 dark:text-amber-300', $html);
         $this->assertStringNotContainsString('decoration-red', $html);
         $this->assertStringNotContainsString('bg-slate-700 dark:bg-slate-200', $html);
     }

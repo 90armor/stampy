@@ -12,7 +12,8 @@ config('attendance.time_format') the same way.
 
 `marked` is the one timing-annotation treatment for a time that caused a
 timing exception (the calendar cell and day-detail modal's late In /
-early Out): amber text plus medium weight, never an underline — underline
+early Out): timing text — yellow-700 in light mode, amber-300 in dark —
+plus medium weight, never an underline — underline
 is reserved for links. Status colour stays on the cell/badge; this only
 annotates the specific value. See docs/ATTENDANCE_UI.md. --}}
 @php
@@ -24,5 +25,5 @@ annotates the specific value. See docs/ATTENDANCE_UI.md. --}}
         $value = $matches[1];
         $meridiem = $matches[2] ?? null;
     @endphp
-    <span {{ $attributes->class(['font-medium text-amber-700 dark:text-amber-300' => $marked]) }}>{{ $value }}@if ($meridiem)<span class="ml-0.5 text-[max(10px,0.8em)] font-normal opacity-70">{{ $meridiem }}</span>@endif</span>
+    <span {{ $attributes->class(['font-medium text-yellow-700 dark:text-amber-300' => $marked]) }}>{{ $value }}@if ($meridiem)<span class="ml-0.5 text-[max(10px,0.8em)] font-normal opacity-70">{{ $meridiem }}</span>@endif</span>
 @endif

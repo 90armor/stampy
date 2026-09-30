@@ -482,8 +482,8 @@
                                         @endif
                                     </td>
                                     <td class="whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums text-slate-700 dark:text-slate-300">{!! e($record->formattedWorkedMinutes()) ?: $emDash !!}</td>
-                                    <td @class(['whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums', 'font-medium text-amber-700 dark:text-amber-300' => $markedLate])>{!! e($record->formattedLateMinutes()) ?: $emDash !!}</td>
-                                    <td @class(['whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums', 'font-medium text-amber-700 dark:text-amber-300' => $markedEarly])>{!! e($record->formattedEarlyLeaveMinutes()) ?: $emDash !!}</td>
+                                    <td @class(['whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums', 'font-medium text-yellow-700 dark:text-amber-300' => $markedLate])>{!! e($record->formattedLateMinutes()) ?: $emDash !!}</td>
+                                    <td @class(['whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums', 'font-medium text-yellow-700 dark:text-amber-300' => $markedEarly])>{!! e($record->formattedEarlyLeaveMinutes()) ?: $emDash !!}</td>
                                     <td @class(['py-2 text-sm text-slate-500 dark:text-slate-400', 'px-6' => ! $canManagePunches, 'pl-6 pr-2' => $canManagePunches])>
                                         {!! $record->note !== null ? e($record->note) : $emDash !!}
                                         @if (! $canManagePunches && ! $loop->last)
@@ -653,11 +653,11 @@
                         </div>
                         <div>
                             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Late</dt>
-                            <dd @class(['mt-0.5 text-sm', 'font-medium text-amber-700 dark:text-amber-300' => $modalMarkedLate, 'text-slate-900 dark:text-slate-100' => ! $modalMarkedLate])>{{ $modalRecord?->formattedLateMinutes() ?? '—' }}</dd>
+                            <dd @class(['mt-0.5 text-sm', 'font-medium text-yellow-700 dark:text-amber-300' => $modalMarkedLate, 'text-slate-900 dark:text-slate-100' => ! $modalMarkedLate])>{{ $modalRecord?->formattedLateMinutes() ?? '—' }}</dd>
                         </div>
                         <div>
                             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Early leave</dt>
-                            <dd @class(['mt-0.5 text-sm', 'font-medium text-amber-700 dark:text-amber-300' => $modalMarkedEarly, 'text-slate-900 dark:text-slate-100' => ! $modalMarkedEarly])>{{ $modalRecord?->formattedEarlyLeaveMinutes() ?? '—' }}</dd>
+                            <dd @class(['mt-0.5 text-sm', 'font-medium text-yellow-700 dark:text-amber-300' => $modalMarkedEarly, 'text-slate-900 dark:text-slate-100' => ! $modalMarkedEarly])>{{ $modalRecord?->formattedEarlyLeaveMinutes() ?? '—' }}</dd>
                         </div>
                         <div>
                             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Note</dt>

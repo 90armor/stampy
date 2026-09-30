@@ -30,15 +30,15 @@ A cell or badge color encodes the attendance **status** only — one value per d
 
 **In-cell times** are at least 12px (`text-xs`), and the AM/PM suffix at least 10px (`<x-time>` uses `max(10px, 0.8em)`). Cells have a minimum height rather than a fixed one, so in narrow cells the Out time wraps onto a second line instead of clipping.
 
-Amber marks the timing fact where it is displayed:
+The **timing text** color marks the timing fact where it is displayed: `font-medium text-yellow-700` in light mode, `dark:text-amber-300` in dark mode ("amber" below means this token pair). Amber badges and amber alerts (such as the not-yet-calculated notice) are a different role and keep `amber-700`.
 
-- **Attendance tables** (Daily Attendance and the employee's own table view): the Late and Early values are amber (`font-medium text-amber-700 dark:text-amber-300`). In/Out times are neutral — no color, no underline.
+- **Attendance tables** (Daily Attendance and the employee's own table view): the Late and Early values use the timing text color (`font-medium text-yellow-700 dark:text-amber-300`). In/Out times are neutral — no color, no underline.
 - **Calendar cells and the day-detail modal:** the late In / early Out time is amber medium-weight text via `<x-time marked>`, with an accessible label such as "Arrived 16 minutes late". No underline, and no extra "+80m" label in calendar cells. The cell still follows status, so a late Present day is an ordinary Present cell with an amber time. The calendar legend's timing entry is a sample amber marked time, not a color swatch.
 - **Dashboard:** timing copy may stay amber, since it is the timing fact itself. A late row in Needs attention is the name plus the amber duration (`1h 20m late`) — no `Late` badge and no amber avatar; Absent and Incomplete rows keep their status badge. Recent activity's "Checked in 21m late" line is amber for the same reason.
 
 Underline is reserved for links everywhere; a timing value is never underlined. Color always accompanies readable text or another non-color signal: the Late/Early column position and value, the marked time's medium weight, and its accessible label. Do not add separate timing chips that duplicate those fields.
 
-Contrast of the amber annotation, measured against its actual backgrounds: `amber-700` is 5.02:1 on white, 4.80:1 on a `green-50` Present cell, 4.81:1 on the `slate-50` row hover; `amber-300` is 12.13:1 on the dark card, 11.00:1 on a dark `green-900/20` cell, 11.19:1 on the dark row hover.
+Why `yellow-700`, not `amber-700`, in light mode: `amber-700` (#b45309) sits at hue 26°, close enough to `red-700`'s 0° that a late value read as an error at a glance; `yellow-700` (#a16207) sits at hue 35° and reads as a caution, not a failure, while keeping the medium weight. Measured contrast of the timing text against its actual backgrounds: `yellow-700` is 4.92:1 on white (cards and Present calendar cells) and 4.71:1 on the `slate-50` row hover; `amber-300` in dark mode is 12.13:1 on the dark card (and dark Present cells) and 11.19:1 on the dark row hover. Dark mode is unchanged.
 
 ### Durations and counts
 
