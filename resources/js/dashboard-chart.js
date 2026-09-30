@@ -9,8 +9,8 @@
 // as the department attendance bars, so the page has one data-viz green.
 //
 // Today is pending until it is calculated: it carries a muted "Today" marker,
-// and any partial value so far is drawn as a lighter, provisional bar with the
-// marker above it — never as a final 0% (docs/ATTENDANCE_UI.md).
+// and the checked-in share so far is drawn as a lighter, provisional bar with
+// the marker above it — never as a final 0% (docs/ATTENDANCE_UI.md).
 import {
     Chart,
     BarController,
@@ -96,7 +96,7 @@ function initAttendanceTrendChart() {
                     displayColors: false,
                     filter: (item) => item.raw !== null,
                     callbacks: {
-                        label: (ctx) => (pending[ctx.dataIndex] ? `${ctx.parsed.y}% present so far` : `${ctx.parsed.y}% present`),
+                        label: (ctx) => (pending[ctx.dataIndex] ? `${ctx.parsed.y}% checked in so far` : `${ctx.parsed.y}% present`),
                     },
                 },
             },

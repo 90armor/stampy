@@ -54,7 +54,7 @@ Counts are not durations and keep their own wording: summary timing copy stays c
 
 In-progress or not-yet-calculated attendance is **pending**. It must never render as 0% or as an absence. Today is pending while any row for today is In progress or any active employee in scope has no row yet (`DashboardAttendance::todayIsPending()`).
 
-- **Trend chart:** today's bar carries a muted `Today` marker (like `Off`/`Holiday`) until the day is calculated. If some employees are already present, the share so far is drawn as a lighter, provisional bar (`primary-200`, dark `primary-800`) with the marker above it; with nobody present yet there is no bar, only the marker.
+- **Trend chart:** today's bar carries a muted `Today` marker (like `Off`/`Holiday`) until the day is calculated. If anyone has checked in, the checked-in share so far (in-punches over active employees — the same figure as the Department card's `Checked in N / M`, not the Present count) is drawn as a lighter, provisional bar (`primary-200`, dark `primary-800`) with the marker above it; with nobody checked in yet there is no bar, only the marker.
 - **Department attendance:** while today is pending, each department shows a so-far count (`Checked in 28 / 35`) with a lighter provisional bar instead of a percentage.
 - **Dashboard stat strip:** today uses the live strip (below), which has no percentages at all.
 

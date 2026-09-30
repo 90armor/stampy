@@ -509,7 +509,9 @@ class DashboardTest extends TestCase
             $today = end($attendance['trend']);
             $dept = collect($attendance['departments'])->firstWhere('name', 'Pending Dept');
 
-            return $today['pending'] === true && $today['marker'] === 'Today' && $today['value'] === null
+            // Two of three checked in: a provisional bar of the checked-in
+            // share, never 0% for the one not in yet.
+            return $today['pending'] === true && $today['marker'] === 'Today' && $today['value'] === 66.7
                 && $dept['pending'] === true && $dept['checkedIn'] === 2;
         });
 
@@ -520,21 +522,25 @@ class DashboardTest extends TestCase
             ->assertDontSee('>0%<', false);
     }
 
-    public function test_partial_present_data_today_is_a_provisional_bar_with_the_today_marker(): void
+    public function test_todays_provisional_bar_is_the_checked_in_share_with_the_today_marker(): void
     {
         $this->travelTo(Carbon::parse('2026-03-11 16:30:00'));
         $early = Employee::factory()->create();
         $working = Employee::factory()->create();
 
-        $this->attendanceRow($early, AttendanceStatus::Present);
-        $this->attendanceRow($working, AttendanceStatus::InProgress, ['first_in' => Carbon::parse('2026-03-11 07:58:00')]);
+        $notYet = Employee::factory()->create();
 
+        $this->attendanceRow($early, AttendanceStatus::Present, ['first_in' => Carbon::parse('2026-03-11 07:52:00'), 'last_out' => Carbon::parse('2026-03-11 15:00:00')]);
+        $this->attendanceRow($working, AttendanceStatus::InProgress, ['first_in' => Carbon::parse('2026-03-11 07:58:00')]);
+        $this->attendanceRow($notYet, AttendanceStatus::InProgress);
+
+        // The provisional bar is checked in so far (2 of 3), not present (1 of 3).
         $this->actingAs($this->admin())
             ->get(route('dashboard'))
             ->assertViewHas('attendance', function ($attendance) {
                 $today = end($attendance['trend']);
 
-                return $today['pending'] === true && $today['marker'] === 'Today' && $today['value'] === 50.0;
+                return $today['pending'] === true && $today['marker'] === 'Today' && $today['value'] === 66.7;
             });
     }
 }

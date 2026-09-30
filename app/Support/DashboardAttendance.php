@@ -179,9 +179,10 @@ class DashboardAttendance
      * Today is pending until it is fully calculated (todayIsPending()):
      * in-progress or not-yet-calculated attendance must never read as 0% or
      * as an absence. A pending today carries the 'Today' marker, and its
-     * value is the present share so far only when someone is already
-     * present (null otherwise), flagged 'pending' so the chart draws it as
-     * provisional.
+     * value is the checked-in share so far (rows with an in-punch over
+     * active employees, the same figure as the Department card's "Checked
+     * in N / M") when anyone has checked in (null otherwise), flagged
+     * 'pending' so the chart draws it as provisional.
      *
      * @param  int[]|null  $employeeIds
      * @return list<array{label: string, date: string, value: ?float, marker: ?string, pending: bool}>
@@ -207,6 +208,9 @@ class DashboardAttendance
         $nonWorking = [AttendanceStatus::Off->value, AttendanceStatus::Holiday->value];
         $todayKey = today()->format('Y-m-d');
         $todayPending = self::todayIsPending($employeeIds);
+        $checkedInToday = $todayPending
+            ? self::scopedDailyAttendanceQuery($employeeIds)->whereDate('work_date', $todayKey)->whereNotNull('first_in')->count()
+            : 0;
 
         $trend = [];
         $cursor = $start->copy();
@@ -223,7 +227,8 @@ class DashboardAttendance
                 'date' => $key,
                 'value' => match (true) {
                     $isNonWorkingDay => null,
-                    $isPending && $present === 0 => null,
+                    $isPending && $checkedInToday === 0 => null,
+                    $isPending => round($checkedInToday / $total * 100, 1),
                     default => round($present / $total * 100, 1),
                 },
                 'marker' => match (true) {
