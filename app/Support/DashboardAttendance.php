@@ -407,68 +407,32 @@ class DashboardAttendance
     }
 
     /**
-     * The most recent real punches, not a fabricated activity feed — each
-     * one's tone is looked up from that day's already-built DailyAttendance
-     * row (batched, not per-punch) so a late arrival reads as late here too.
+     * The most recent real punches, not a fabricated activity feed. This is
+     * a log: "Checked in" / "Checked out" in neutral text, with no timing.
+     * The late fact is shown once, in Needs attention, not repeated here.
      *
      * @param  int[]|null  $employeeIds
-     * @return list<array{name: string, action: string, time: string, date: ?string, tone: string}>
+     * @return list<array{name: string, action: string, time: string, date: ?string}>
      */
     public static function recentActivity(?array $employeeIds, int $limit = 6): array
     {
-        $punches = AttendanceLog::query()
+        return AttendanceLog::query()
             ->notVoided()
             ->when($employeeIds !== null, fn ($query) => $query->whereIn('employee_id', $employeeIds))
             ->with('employee')
             ->orderByDesc('punched_at')
             ->limit($limit)
-            ->get();
-
-        if ($punches->isEmpty()) {
-            return [];
-        }
-
-        // Batched, not one query per punch: every (employee, date) pair this
-        // page of punches could reference, fetched once.
-        $dailyRows = DailyAttendance::query()
-            ->where(function ($query) use ($punches) {
-                foreach ($punches->unique(fn (AttendanceLog $log) => $log->employee_id.'|'.$log->punched_at->format('Y-m-d')) as $log) {
-                    $query->orWhere(function ($q) use ($log) {
-                        $q->where('employee_id', $log->employee_id)
-                            ->whereDate('work_date', $log->punched_at->format('Y-m-d'));
-                    });
-                }
-            })
             ->get()
-            ->keyBy(fn (DailyAttendance $row) => $row->employee_id.'|'.$row->work_date->format('Y-m-d'));
-
-        return $punches->map(function (AttendanceLog $log) use ($dailyRows) {
-            $dayKey = $log->employee_id.'|'.$log->punched_at->format('Y-m-d');
-            $day = $dailyRows->get($dayKey);
-            $isIn = $log->punch_type->value === 'in';
-
-            $tone = match (true) {
-                $isIn && $day && $day->isLate() => 'late',
-                $isIn => 'present',
-                default => 'out',
-            };
-
-            $action = match (true) {
-                $isIn && $day && $day->isLate() => 'Checked in '.Duration::format($day->late_minutes).' late',
-                $isIn => 'Checked in',
-                default => 'Checked out',
-            };
-
-            return [
+            ->map(fn (AttendanceLog $log) => [
                 'name' => $log->employee->full_name,
-                'action' => $action,
+                'action' => $log->punch_type->value === 'in' ? 'Checked in' : 'Checked out',
                 'time' => AttendanceTime::format($log->punched_at),
                 // Only for an entry that isn't from today, so an older punch
                 // can't read as this morning's.
                 'date' => $log->punched_at->isToday() ? null : DisplayDate::compact($log->punched_at),
-                'tone' => $tone,
-            ];
-        })->values()->all();
+            ])
+            ->values()
+            ->all();
     }
 
     /**

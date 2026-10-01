@@ -346,7 +346,7 @@ class DashboardTest extends TestCase
         });
     }
 
-    public function test_recent_activity_shows_a_late_check_in_with_its_minutes(): void
+    public function test_recent_activity_is_a_neutral_log_without_timing(): void
     {
         $admin = $this->admin();
 
@@ -361,11 +361,15 @@ class DashboardTest extends TestCase
 
         $response = $this->actingAs($admin)->get(route('dashboard'));
 
+        // A log: plain "Checked in", no late minutes and no amber — the late
+        // fact is shown once, in Needs attention.
         $response->assertViewHas('attendance', function ($attendance) {
             $activity = collect($attendance['recent'])->firstWhere('name', 'Punchy Person');
 
-            return $activity !== null && $activity['tone'] === 'late' && str_contains($activity['action'], '8m late');
+            return $activity !== null && $activity['action'] === 'Checked in' && ! array_key_exists('tone', $activity);
         });
+        $response->assertDontSee('Checked in 8m late')
+            ->assertSee('<p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Checked in</p>', false);
     }
 
     public function test_employee_role_does_not_see_attendance_stats_on_the_dashboard(): void

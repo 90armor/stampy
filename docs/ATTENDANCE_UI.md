@@ -34,7 +34,7 @@ The **timing text** color marks the timing fact where it is displayed: `font-med
 
 - **Attendance tables** (Daily Attendance and the employee's own table view): the Late and Early values use the timing text color (`font-medium text-amber-700 dark:text-amber-300`). In/Out times are neutral — no color, no underline.
 - **Calendar cells and the day-detail modal:** the late In / early Out time is amber medium-weight text via `<x-time marked>`, with an accessible label such as "Arrived 16 minutes late". No underline, and no extra "+80m" label in calendar cells. The cell still follows status, so a late Present day is an ordinary Present cell with an amber time. The calendar legend's timing entry is a sample amber marked time, not a color swatch.
-- **Dashboard:** timing copy may stay amber, since it is the timing fact itself. A late row in Needs attention is the name plus the amber duration (`1h 20m late`) — no `Late` badge and no amber avatar; Absent and Incomplete rows keep their status badge. Recent activity's "Checked in 21m late" line is amber for the same reason.
+- **Dashboard:** timing copy may stay amber, since it is the timing fact itself. A late row in Needs attention is the name plus the amber duration (`1h 20m late`) — no `Late` badge and no amber avatar; Absent and Incomplete rows keep their status badge. Recent activity is a log and stays neutral — plain "Checked in" / "Checked out", no amber and no late minutes; the timing fact is shown once, in Needs attention.
 
 **Late before the day is complete (Phase 2.6).** Late is recorded as soon as the in-punch exists, so it also appears on `in_progress` and `incomplete` days: the Attendance table's Late column shows it, the calendar cell and day modal mark the in-time, and the **Late arrival** filter returns late rows of every status. Early leave only ever appears on Present days. The status badge and cell colour stay those of the status (an In progress or Incomplete day with a late in-punch is still blue or violet); late is only the annotation. **Late annotates its own status group.** In every summary, late is a sub-line on the status group it belongs to — never folded into another group and never a group of its own — the same way the live strip shows it on At work and Left. The employee month summary reads `Present 19 (of which 2 late · 4 left early) · Absent 1 · Incomplete 1 (1 late)`, and the Attendance range strip shows `64 late · 184 early` under Present and `3 late` under Incomplete. Present's sub-line counts Present days only; a late Incomplete day is counted under Incomplete. Early leave only ever annotates Present.
 
@@ -59,7 +59,7 @@ Today's list, worst-first: **Absent** and **Incomplete** (status badges — thes
 ## Other attendance details
 
 - Raw punch badges in the day modal and table view are neutral (`slate`) for both In and Out. Green means Present; a punch direction is not a status.
-- Dashboard Recent activity shows the date (compact, `Tue 29 Sep`) above the time for any entry that isn't from today, so an older punch can't read as this morning's.
+- Dashboard Recent activity is a neutral log ("Checked in" / "Checked out", no timing) and shows the date (compact, `Tue 29 Sep`) above the time for any entry that isn't from today, so an older punch can't read as this morning's.
 
 ## Pending is never 0% or absent
 
