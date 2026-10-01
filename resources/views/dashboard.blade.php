@@ -153,16 +153,20 @@
                             @foreach ($attendance['needsAttention'] as $person)
                                 <li class="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
                                     <span class="{{ $avatar }}" aria-hidden="true">{{ strtoupper(substr($person['name'], 0, 1)) }}</span>
-                                    <p class="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-slate-200">{{ $person['name'] }}</p>
+                                    <div class="min-w-0 flex-1">
+                                        <p class="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{{ $person['name'] }}</p>
+                                        @if ($person['kind'] === 'not_in_yet')
+                                            {{-- Not in yet is a derived fact, not a status or an
+                                            absence: muted text with the scheduled start, under the
+                                            name so a narrow column doesn't truncate the name. --}}
+                                            <p class="mt-0.5 text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ $person['detail'] }}</p>
+                                        @endif
+                                    </div>
                                     @if ($person['badge'])
                                         <x-badge :color="$person['badge']">{{ $person['label'] }}</x-badge>
                                     @elseif ($person['kind'] === 'late')
                                         {{-- Late is timing, not a status: the amber duration alone. --}}
                                         <span class="shrink-0 text-sm font-medium tabular-nums text-amber-700 dark:text-amber-300">{{ $person['detail'] }}</span>
-                                    @else
-                                        {{-- Not in yet is a derived fact, not a status or an
-                                        absence: muted text with the scheduled start. --}}
-                                        <span class="shrink-0 text-sm tabular-nums text-slate-500 dark:text-slate-400">{{ $person['detail'] }}</span>
                                     @endif
                                 </li>
                             @endforeach
