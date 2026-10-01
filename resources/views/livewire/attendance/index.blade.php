@@ -226,16 +226,17 @@
         themselves signals that grouping.
 
         Chips are controls, not actions (docs/ATTENDANCE_UI.md): selected is
-        a primary-50 tint with primary text, a primary border and a check;
+        the shared selected state — a primary-50 tint with semibold primary
+        text, a primary border — plus a check;
         unselected is a neutral outline; never a solid fill. The status chips
         narrow rather than enumerate — while every working status is in the
         set (the default), none of them reads as selected, so the default
         state looks like what it is: no filter. Off is its own "Show off
         days" toggle. See Index::toggleStatus() for the mapping. --}}
         @php
-            $chipBase = 'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-slate-900';
-            $chipSelected = 'bg-primary-50 text-primary-700 ring-primary-600 hover:bg-primary-100 dark:bg-primary-900/30 dark:text-primary-200 dark:ring-primary-500 dark:hover:bg-primary-900/50';
-            $chipUnselected = 'bg-white text-slate-600 ring-slate-300 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-700 dark:hover:text-white dark:active:bg-slate-600';
+            $chipBase = 'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-slate-900';
+            $chipSelected = 'font-semibold bg-primary-50 text-primary-700 ring-primary-600 hover:bg-primary-100 dark:bg-primary-900/30 dark:text-primary-200 dark:ring-primary-500 dark:hover:bg-primary-900/50';
+            $chipUnselected = 'font-medium bg-white text-slate-600 ring-slate-300 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-700 dark:hover:text-white dark:active:bg-slate-600';
             $workingStatuses = collect($allStatuses)->reject(fn ($status) => $status === \App\Enums\AttendanceStatus::Off);
             $allWorkingSelected = $workingStatuses->every(fn ($status) => in_array($status->value, $statuses, true));
             $showsOffDays = in_array(\App\Enums\AttendanceStatus::Off->value, $statuses, true);

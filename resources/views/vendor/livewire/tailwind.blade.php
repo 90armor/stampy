@@ -4,7 +4,9 @@ Behaviour and markup structure are unchanged; only the classes move from
 Tailwind's stock cool gray/blue scales (which this app doesn't use and which
 read as stray blue borders in dark mode) onto the design system's warm
 slate neutrals, primary focus ring and control radius. The current page uses
-the control selected state (primary tint), not a solid fill. --}}
+the shared selected state (primary tint, primary text and border, semibold
+— the same treatment as the filter chips and the Calendar/Table toggle), not
+a solid fill, and carries aria-current="page" itself. --}}
 @php
 if (! isset($scrollTo)) {
     $scrollTo = 'body';
@@ -16,10 +18,14 @@ $scrollIntoViewJsSnippet = ($scrollTo !== false)
     JS
     : '';
 
-$item = 'relative inline-flex h-9 items-center justify-center text-sm font-medium border border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-800';
-$enabled = 'text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 focus:z-10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 active:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-slate-100 dark:active:bg-slate-600';
-$disabled = 'cursor-default text-slate-300 dark:text-slate-600';
-$current = 'z-10 cursor-default border-primary-600 bg-primary-50 text-primary-700 dark:border-primary-500 dark:bg-primary-900/30 dark:text-primary-200';
+// Surface colours live on each state, not on $item: a shared bg-white /
+// border-slate-300 out-ranked the current page's tint in Tailwind's CSS order,
+// so the current page silently rendered as an ordinary white item.
+$item = 'relative inline-flex h-9 items-center justify-center text-sm border';
+$neutral = 'border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-800';
+$enabled = $neutral.' font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 focus:z-10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 active:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-slate-100 dark:active:bg-slate-600';
+$disabled = $neutral.' cursor-default font-medium text-slate-300 dark:text-slate-600';
+$current = 'z-10 cursor-default font-semibold border-primary-600 bg-primary-50 text-primary-700 dark:border-primary-500 dark:bg-primary-900/30 dark:text-primary-200';
 @endphp
 
 <div>
@@ -86,7 +92,7 @@ $current = 'z-10 cursor-default border-primary-600 bg-primary-50 text-primary-70
                             {{-- "Three Dots" Separator --}}
                             @if (is_string($element))
                                 <span aria-disabled="true">
-                                    <span class="{{ $item }} -ml-px cursor-default px-3 text-slate-500 dark:text-slate-400">{{ $element }}</span>
+                                    <span class="{{ $item }} {{ $neutral }} -ml-px cursor-default px-3 font-medium text-slate-500 dark:text-slate-400">{{ $element }}</span>
                                 </span>
                             @endif
 
@@ -95,9 +101,7 @@ $current = 'z-10 cursor-default border-primary-600 bg-primary-50 text-primary-70
                                 @foreach ($element as $page => $url)
                                     <span wire:key="paginator-{{ $paginator->getPageName() }}-page{{ $page }}">
                                         @if ($page == $paginator->currentPage())
-                                            <span aria-current="page">
-                                                <span class="{{ $item }} {{ $current }} -ml-px min-w-9 px-3 tabular-nums">{{ $page }}</span>
-                                            </span>
+                                            <span aria-current="page" class="{{ $item }} {{ $current }} -ml-px min-w-9 px-3 tabular-nums">{{ $page }}</span>
                                         @else
                                             <button type="button" wire:click="gotoPage({{ $page }}, '{{ $paginator->getPageName() }}')" x-on:click="{{ $scrollIntoViewJsSnippet }}" class="{{ $item }} {{ $enabled }} -ml-px min-w-9 px-3 tabular-nums" aria-label="{{ __('Go to page :page', ['page' => $page]) }}">
                                                 {{ $page }}

@@ -50,6 +50,18 @@ class DepartmentManagementTest extends TestCase
         $this->assertStringContainsString('Pagination Navigation', $html);
         $this->assertStringContainsString('dark:border-slate-700 dark:bg-slate-800', $html);
         $this->assertDoesNotMatchRegularExpression('/\b(?:dark:)?(?:[a-z:]+-)?(?:gray|blue)-\d{2,3}\b/', $html);
+
+        // The current page is the shared selected state, and says so itself.
+        $this->assertMatchesRegularExpression('/<span aria-current="page" class="([^"]*)">1<\/span>/', $html);
+        preg_match('/<span aria-current="page" class="([^"]*)">1<\/span>/', $html, $current);
+        $classes = explode(' ', $current[1]);
+        foreach (['font-semibold', 'border-primary-600', 'bg-primary-50', 'text-primary-700', 'dark:bg-primary-900/30'] as $class) {
+            $this->assertContains($class, $classes);
+        }
+        // No neutral surface alongside the tint: bg-white out-ranks bg-primary-50
+        // in the generated CSS, which is how the tint was once silently lost.
+        $this->assertNotContains('bg-white', $classes);
+        $this->assertNotContains('border-slate-300', $classes);
     }
 
     public function test_badges_never_wrap(): void
