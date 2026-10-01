@@ -109,27 +109,39 @@
                 <span>Scroll to view all columns</span>
                 <x-icon name="chevron-right" class="h-3.5 w-3.5" />
             </div>
-            <div class="overflow-x-auto transition-opacity" wire:loading.class="opacity-60">
-            {{-- Identity and status first (Employee, Status), so both stay
-            visible without scrolling at narrow widths. --}}
+            {{-- Below xl the Status and Actions columns are pinned to the right
+            edge (.table-pin in resources/css/app.css; pinnedColumns in
+            resources/js/app.js keeps the offset and edge shadow in sync), so
+            status and the row's actions stay on screen while the rest scrolls.
+            wire:ignore.self so a re-render doesn't strip what pinnedColumns
+            sets on this element; the rows inside still morph normally. --}}
+            <div class="overflow-x-auto transition-opacity" wire:loading.class="opacity-60" wire:ignore.self x-data="pinnedColumns" @scroll.passive="measure()">
+            {{-- Column order (owner decision, docs/ATTENDANCE_UI.md): Employee,
+            Department, Position, Start date, then Status and Actions. --}}
             <table class="w-full min-w-[60rem]">
                 <thead>
                     <tr class="relative text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                        <th class="px-6 py-3">Employee</th>
-                        <th class="px-6 py-3">Status</th>
+                        <th class="px-6 py-3">
+                            Employee
+                            <span class="pointer-events-none absolute inset-x-6 bottom-0 z-[2] h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
+                        </th>
                         <th class="px-6 py-3">Department</th>
                         <th class="px-6 py-3">Position</th>
                         <th class="px-6 py-3">Start date</th>
-                        <th class="px-6 py-3 text-right">
-                            Actions
-                            <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
-                        </th>
+                        <th class="table-pin table-pin-start px-6 py-3">Status</th>
+                        <th class="table-pin table-pin-end px-6 py-3 text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach ($employees as $employee)
                         <tr wire:key="employee-{{ $employee->id }}" class="group relative transition hover:bg-slate-50 dark:hover:bg-slate-800/60">
                             <td class="px-6 py-4">
+                                {{-- The row divider lives in the first cell (positioned
+                                against the row) and sits above the pinned cells, so it
+                                runs unbroken beneath them. --}}
+                                @unless ($loop->last)
+                                    <span class="pointer-events-none absolute inset-x-6 bottom-0 z-[2] h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
+                                @endunless
                                 <div class="flex items-center gap-x-3">
                                     <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                                         {{ strtoupper(substr($employee->full_name, 0, 1)) }}
@@ -140,19 +152,15 @@
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-4">
+                            <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{{ $employee->department->name }}</td>
+                            <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{{ $employee->position->name }}</td>
+                            <td class="whitespace-nowrap px-6 py-4 text-sm tabular-nums text-slate-500 dark:text-slate-400">{{ \App\Support\DisplayDate::compact($employee->join_date) }}</td>
+                            <td class="table-pin table-pin-start px-6 py-4">
                                 <x-badge :color="$employee->status === 'active' ? 'green' : 'slate'">
                                     {{ ucfirst($employee->status) }}
                                 </x-badge>
                             </td>
-                            <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{{ $employee->department->name }}</td>
-                            <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{{ $employee->position->name }}</td>
-                            <td class="whitespace-nowrap px-6 py-4 text-sm tabular-nums text-slate-500 dark:text-slate-400">{{ \App\Support\DisplayDate::compact($employee->join_date) }}</td>
-                            <td class="px-6 py-4 text-right">
-                                @unless ($loop->last)
-                                    <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
-                                @endunless
-
+                            <td class="table-pin table-pin-end px-6 py-4 text-right">
                                 <div class="flex items-center justify-end gap-1">
                                     @can('update', $employee)
                                         <span class="group/action relative inline-flex">

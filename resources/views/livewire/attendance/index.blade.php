@@ -321,27 +321,34 @@
                     <x-icon name="chevron-right" class="h-3.5 w-3.5" />
                 </div>
 
-                <div class="overflow-x-auto transition-opacity" wire:loading.class="opacity-60">
-                    {{-- Column order puts identity and status first (Employee, Status,
-                    then Date), then the times, then Department, so the columns that
-                    answer "who, and did they attend" are the leftmost and visible
-                    without scrolling at narrow widths. No column is ever hidden
-                    (docs/ATTENDANCE_UI.md). --}}
+                {{-- Below xl the Status and chevron columns are pinned to the
+                right edge (.table-pin in resources/css/app.css), so "did they
+                attend" and the way into the record stay on screen while the
+                times scroll beneath them. pinnedColumns (resources/js/app.js)
+                keeps the pin offset and the edge shadow in sync with scrolling;
+                wire:ignore.self so a re-render doesn't strip what it sets on
+                this element (the rows inside still morph normally). --}}
+                <div class="overflow-x-auto transition-opacity" wire:loading.class="opacity-60" wire:ignore.self x-data="pinnedColumns" @scroll.passive="measure()">
+                    {{-- Column order (owner decision, docs/ATTENDANCE_UI.md): Date,
+                    Employee, Department, the times, then Status and the chevron.
+                    No column is ever hidden. --}}
                     <table class="min-w-[64rem] w-full">
                     <thead>
                         <tr class="relative whitespace-nowrap text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                            <th class="px-6 py-3">
+                                Date
+                                <span class="pointer-events-none absolute inset-x-6 bottom-0 z-[2] h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
+                            </th>
                             <th class="min-w-[11rem] px-6 py-3">Employee</th>
-                            <th class="px-6 py-3">Status</th>
-                            <th class="px-6 py-3">Date</th>
+                            <th class="px-6 py-3">Department</th>
                             <th class="px-6 py-3">In</th>
                             <th class="px-6 py-3">Out</th>
                             <th class="px-6 py-3 text-right">Worked</th>
                             <th class="px-6 py-3 text-right">Late</th>
                             <th class="px-6 py-3 text-right"><abbr title="Early leave" class="no-underline">Early</abbr></th>
-                            <th class="px-6 py-3">Department</th>
-                            <th class="py-3 pl-2 pr-6">
+                            <th class="table-pin table-pin-start px-6 py-3">Status</th>
+                            <th class="table-pin table-pin-end py-3 pl-2 pr-6">
                                 <span class="sr-only">Open detail</span>
-                                <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
                             </th>
                         </tr>
                     </thead>
@@ -358,6 +365,15 @@
                                 $workDateLabel = \App\Support\DisplayDate::compact($attendance->work_date);
                             @endphp
                             <tr wire:key="daily-attendance-{{ $attendance->id }}" class="group relative hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                                <td class="whitespace-nowrap px-6 py-2 text-sm tabular-nums {{ $dateCellClass }}">
+                                    {{ $workDateLabel }}
+                                    {{-- The row divider lives in the first cell (positioned
+                                    against the row) and sits above the pinned cells, so it
+                                    runs unbroken beneath them. --}}
+                                    @unless ($loop->last)
+                                        <span class="pointer-events-none absolute inset-x-6 bottom-0 z-[2] h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
+                                    @endunless
+                                </td>
                                 {{-- Plain text, not a link: the row's one navigation target is
                                 the chevron at the end, so the identity column reads as data
                                 and every cell stays selectable. --}}
@@ -365,15 +381,7 @@
                                     <div class="whitespace-nowrap text-sm font-medium text-slate-900 dark:text-slate-100">{{ $attendance->employee->full_name }}</div>
                                     <div class="text-xs text-slate-500 dark:text-slate-400">{{ $attendance->employee->employee_code }}</div>
                                 </td>
-                                <td class="px-6 py-2">
-                                    {{-- Status only — the Late/Early columns already show the
-                                    timing (aligned, scannable, amber); a "Late 21m" chip here
-                                    repeated the same fact and bloated row height. Colour comes
-                                    from displayVariant(), which is status-only: a late Present
-                                    day is a green "Present". --}}
-                                    <x-badge :color="$style['badge']">{{ $attendance->status->label() }}</x-badge>
-                                </td>
-                                <td class="whitespace-nowrap px-6 py-2 text-sm tabular-nums {{ $dateCellClass }}">{{ $workDateLabel }}</td>
+                                <td class="whitespace-nowrap px-6 py-2 text-sm text-slate-700 dark:text-slate-300">{{ $attendance->employee->department->name }}</td>
                                 <td class="whitespace-nowrap px-6 py-2 text-sm tabular-nums text-slate-700 dark:text-slate-300">
                                     @if ($attendance->first_in)
                                         <x-time :time="$attendance->first_in" />
@@ -396,8 +404,15 @@
                                 the duration itself, in amber (docs/ATTENDANCE_UI.md). --}}
                                 <td @class(['whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums', 'font-medium text-amber-700 dark:text-amber-300' => $attendance->isLate()])>{!! e($attendance->formattedLateMinutes()) ?: $emDash !!}</td>
                                 <td @class(['whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums', 'font-medium text-amber-700 dark:text-amber-300' => $attendance->leftEarly()])>{!! e($attendance->formattedEarlyLeaveMinutes()) ?: $emDash !!}</td>
-                                <td class="whitespace-nowrap px-6 py-2 text-sm text-slate-700 dark:text-slate-300">{{ $attendance->employee->department->name }}</td>
-                                <td class="py-2 pl-2 pr-6 text-right">
+                                <td class="table-pin table-pin-start px-6 py-2">
+                                    {{-- Status only — the Late/Early columns already show the
+                                    timing (aligned, scannable, amber); a "Late 21m" chip here
+                                    repeated the same fact and bloated row height. Colour comes
+                                    from displayVariant(), which is status-only: a late Present
+                                    day is a green "Present". --}}
+                                    <x-badge :color="$style['badge']">{{ $attendance->status->label() }}</x-badge>
+                                </td>
+                                <td class="table-pin table-pin-end py-2 pl-2 pr-6 text-right">
                                     {{-- The row's only link: visible at rest, a 40px target
                                     (negative margin keeps it from growing the row), no
                                     whole-row click handler. --}}
@@ -409,9 +424,6 @@
                                     >
                                         <x-icon name="chevron-right" class="h-4 w-4" />
                                     </a>
-                                    @unless ($loop->last)
-                                        <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
-                                    @endunless
                                 </td>
                             </tr>
                         @endforeach

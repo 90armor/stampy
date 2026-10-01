@@ -500,7 +500,7 @@ class EmployeeManagementTest extends TestCase
             ->assertSee('<h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Details</h2>', false);
     }
 
-    public function test_the_directory_puts_identity_and_status_first(): void
+    public function test_the_directory_column_order_ends_with_pinned_status_and_actions(): void
     {
         $admin = User::factory()->create()->assignRole('admin');
         Employee::factory()->create();
@@ -509,7 +509,12 @@ class EmployeeManagementTest extends TestCase
 
         preg_match_all('/<th[^>]*>\s*(.*?)\s*<\/th>/s', $html, $matches);
         $headers = array_map(fn ($cell) => trim(strip_tags($cell)), $matches[1]);
-        $this->assertSame(['Employee', 'Status', 'Department', 'Position', 'Start date', 'Actions'], $headers);
+        // Owner decision (docs/ATTENDANCE_UI.md): Status and Actions are the
+        // trailing columns, pinned to the right edge below xl.
+        $this->assertSame(['Employee', 'Department', 'Position', 'Start date', 'Status', 'Actions'], $headers);
+        $this->assertStringContainsString('<th class="table-pin table-pin-start px-6 py-3">Status</th>', $html);
+        $this->assertStringContainsString('<th class="table-pin table-pin-end px-6 py-3 text-right">Actions</th>', $html);
+        $this->assertStringContainsString('x-data="pinnedColumns"', $html);
         // The three-column filter grid only starts at xl, so it can't overflow
         // the card at 1024px.
         $this->assertStringContainsString('xl:grid-cols-[minmax(18rem,1fr)_14rem_11rem]', $html);

@@ -427,8 +427,9 @@
             </div>
         @else
             @php
-                // Same table rules as Daily Attendance (docs/ATTENDANCE_UI.md):
-                // identity/status first, nowrap headers, muted em dashes, and one
+                // Same table rules as Daily Attendance (docs/ATTENDANCE_UI.md),
+                // with its own column order (Date and Status first — there is no
+                // Employee column and no pinning): nowrap headers, muted em dashes, and one
                 // per-row affordance at the end of the row. Here that affordance
                 // is the admin-only raw-punches toggle (a disclosure button, not a
                 // link — this page already is the employee's attendance detail).
