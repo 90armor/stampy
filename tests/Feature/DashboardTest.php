@@ -436,7 +436,7 @@ class DashboardTest extends TestCase
         $this->actingAs($admin)->get(route('dashboard'))
             ->assertSee('Today, '.today()->format('D j M'))
             // Live "who is here now" language, not end-of-day status counts.
-            ->assertSeeInOrder(['Checked in', '1 / 1', 'Not in yet', '0', 'Left', '1', '1 early'])
+            ->assertSeeInOrder(['At work', '0', 'Left', '1', '1 early', 'Not in yet', '0'])
             ->assertSee('added this month')
             ->assertSee('text-xl font-semibold leading-7 tabular-nums', false)
             // The nested tinted tiles and the separate Employee summary card are gone.
@@ -561,5 +561,43 @@ class DashboardTest extends TestCase
                 return $byName['Yesterday Yan']['date'] === 'Tue 10 Mar' && $byName['Today Tess']['date'] === null;
             })
             ->assertSee('Tue 10 Mar');
+    }
+
+    public function test_the_live_strip_is_a_partition_that_sums_to_active_employees(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 12:00:00'));
+        $at = fn () => Carbon::parse('2026-03-11 07:55:00');
+
+        $working = Employee::factory()->create();
+        $workingIncomplete = Employee::factory()->create();
+        $leftOnTime = Employee::factory()->create();
+        $leftEarly = Employee::factory()->create();
+        $noPunch = Employee::factory()->create();
+        $outOnly = Employee::factory()->create();
+        $absent = Employee::factory()->create();
+        Employee::factory()->create(); // not calculated yet: no row at all
+        $inactive = Employee::factory()->create(['status' => 'inactive']);
+
+        $this->attendanceRow($working, AttendanceStatus::InProgress, ['first_in' => $at()]);
+        $this->attendanceRow($workingIncomplete, AttendanceStatus::Incomplete, ['first_in' => $at()]);
+        $this->attendanceRow($leftOnTime, AttendanceStatus::Present, ['first_in' => $at(), 'last_out' => Carbon::parse('2026-03-11 11:00:00')]);
+        $this->attendanceRow($leftEarly, AttendanceStatus::Present, ['first_in' => $at(), 'last_out' => Carbon::parse('2026-03-11 11:30:00'), 'early_leave_minutes' => 330]);
+        $this->attendanceRow($noPunch, AttendanceStatus::InProgress);
+        $this->attendanceRow($outOnly, AttendanceStatus::InProgress, ['last_out' => Carbon::parse('2026-03-11 11:45:00')]);
+        $this->attendanceRow($absent, AttendanceStatus::Absent);
+        // An inactive employee's row is outside the active partition.
+        $this->attendanceRow($inactive, AttendanceStatus::Present, ['first_in' => $at(), 'last_out' => Carbon::parse('2026-03-11 11:00:00')]);
+
+        $live = \App\Support\DashboardAttendance::liveToday(null);
+
+        $this->assertSame(8, $live['total']);
+        $this->assertSame(2, $live['atWork']);
+        $this->assertSame(2, $live['left']);
+        $this->assertSame(1, $live['leftEarly']);
+        $this->assertSame(4, $live['notInYet']);
+        $this->assertSame($live['total'], $live['atWork'] + $live['left'] + $live['notInYet']);
+        // "Checked in" overlaps the partition: everyone with an in-punch,
+        // whether still at work or already left.
+        $this->assertSame(4, $live['checkedIn']);
     }
 }

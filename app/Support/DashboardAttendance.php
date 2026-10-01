@@ -289,50 +289,70 @@ class DashboardAttendance
 
     /**
      * The live "who is here now" view of today, derived from today's
-     * existing rows (no builder involvement): Checked in = rows with an
-     * in-punch; Not in yet = In progress rows with no punch at all; Left =
-     * Present rows (both punches), of which some left early. Status counts
-     * answer "did they attend" at end of day; this answers "who is here
-     * now" and is only ever shown for today (docs/ATTENDANCE_UI.md).
+     * existing rows (no builder involvement), as a partition of the active
+     * employees in scope — the three groups never overlap and always sum to
+     * 'total':
+     *
+     * - atWork: has an in-punch today and hasn't finished (any non-Present
+     *   row with a first_in);
+     * - left: Present today (both punches), of which 'leftEarly' left early;
+     * - notInYet: everyone else — no in-punch yet (punchless In progress,
+     *   not calculated, or an out-only row).
+     *
+     * 'checkedIn' is a different, overlapping figure — everyone with an
+     * in-punch today, at work or already left — used by the Department card
+     * and the trend's pending bar, never by the strip. Status counts answer
+     * "did they attend" at end of day; this answers "who is here now" and is
+     * only ever shown for today (docs/ATTENDANCE_UI.md).
      *
      * @param  int[]|null  $employeeIds
-     * @return array{checkedIn: int, total: int, notInYet: int, left: int, leftEarly: int}
+     * @return array{atWork: int, left: int, leftEarly: int, notInYet: int, checkedIn: int, total: int}
      */
     public static function liveToday(?array $employeeIds): array
     {
         $today = today()->format('Y-m-d');
+        $present = AttendanceStatus::Present->value;
+
         $row = self::scopedDailyAttendanceQuery($employeeIds)
-            ->whereDate('work_date', $today)
-            ->selectRaw('sum(first_in is not null) as checked_in')
-            ->selectRaw('sum(status = ? and first_in is null and last_out is null) as not_in_yet', [AttendanceStatus::InProgress->value])
-            ->selectRaw('sum(status = ?) as left_count', [AttendanceStatus::Present->value])
-            ->selectRaw('sum(status = ? and early_leave_minutes > 0) as left_early', [AttendanceStatus::Present->value])
+            ->join('employees', 'employees.id', '=', 'daily_attendances.employee_id')
+            ->where('employees.status', 'active')
+            ->whereDate('daily_attendances.work_date', $today)
+            ->selectRaw('sum(daily_attendances.status <> ? and daily_attendances.first_in is not null) as at_work', [$present])
+            ->selectRaw('sum(daily_attendances.status = ?) as left_count', [$present])
+            ->selectRaw('sum(daily_attendances.status = ? and daily_attendances.early_leave_minutes > 0) as left_early', [$present])
+            ->selectRaw('sum(daily_attendances.first_in is not null) as checked_in')
             ->toBase()
             ->first();
 
+        $total = self::scopedActiveEmployeeQuery($employeeIds)->count();
+        $atWork = (int) ($row->at_work ?? 0);
+        $left = (int) ($row->left_count ?? 0);
+
         return [
-            'checkedIn' => (int) ($row->checked_in ?? 0),
-            'total' => self::scopedActiveEmployeeQuery($employeeIds)->count(),
-            'notInYet' => (int) ($row->not_in_yet ?? 0),
-            'left' => (int) ($row->left_count ?? 0),
+            'atWork' => $atWork,
+            'left' => $left,
             'leftEarly' => (int) ($row->left_early ?? 0),
+            'notInYet' => max(0, $total - $atWork - $left),
+            'checkedIn' => (int) ($row->checked_in ?? 0),
+            'total' => $total,
         ];
     }
 
     /**
      * The live strip's three cells, shared by the Dashboard and the
      * Attendance page so both say exactly the same thing:
-     * "Checked in 27 / 35 · Not in yet 5 · Left 3 (3 early)".
+     * "At work 27 · Left 3 (3 early) · Not in yet 5" — a partition that sums
+     * to active employees.
      *
-     * @param  array{checkedIn: int, total: int, notInYet: int, left: int, leftEarly: int}  $live
+     * @param  array{atWork: int, left: int, leftEarly: int, notInYet: int, checkedIn: int, total: int}  $live
      * @return list<array{icon: string, label: string, value: string, subtext: ?string}>
      */
     public static function liveTodayCells(array $live): array
     {
         return [
-            ['icon' => 'check', 'label' => 'Checked in', 'value' => $live['checkedIn'].' / '.$live['total'], 'subtext' => null],
-            ['icon' => 'clock', 'label' => 'Not in yet', 'value' => (string) $live['notInYet'], 'subtext' => null],
+            ['icon' => 'check', 'label' => 'At work', 'value' => (string) $live['atWork'], 'subtext' => null],
             ['icon' => 'logout', 'label' => 'Left', 'value' => (string) $live['left'], 'subtext' => $live['leftEarly'] > 0 ? $live['leftEarly'].' early' : null],
+            ['icon' => 'clock', 'label' => 'Not in yet', 'value' => (string) $live['notInYet'], 'subtext' => null],
         ];
     }
 

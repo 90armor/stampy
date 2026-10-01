@@ -505,7 +505,7 @@ class AttendanceIndexTest extends TestCase
 
         $component = Livewire::actingAs($admin)->test(Index::class);
 
-        $component->assertSeeInOrder(['Checked in', '2 / 3', 'Not in yet', '1', 'Left', '1', '1 early'])
+        $component->assertSeeInOrder(['At work', '1', 'Left', '1', '1 early', 'Not in yet', '1'])
             ->assertSee('Today, '.today()->format('D j M').' · so far')
             ->assertDontSee('Incomplete</dt>', false);
 
