@@ -7,6 +7,7 @@ use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
 use App\Models\Department;
 use App\Models\Employee;
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
 /**
@@ -115,14 +116,18 @@ class DashboardAttendance
     }
 
     /**
-     * Absent, incomplete, or a late arrival today — the three things
-     * actually worth a manager's attention, ordered worst-first. A late
-     * arrival is included even though the day is still 'present' (see
-     * AttendanceStatus's doc comment): the point of this list is "who might
-     * need a nudge", not "who is missing from the attendance count".
+     * Who needs a look today, worst-first: Absent, then Incomplete, then a
+     * late arrival, then "Not in yet". A late arrival is included whatever
+     * its status — since Phase 2.6 that includes a day still In progress —
+     * because the point of this list is "who might need a nudge", not "who
+     * is missing from the attendance count". "Not in yet" is the narrow,
+     * actionable scope of that label: an In progress row with no punch whose
+     * start_time + grace_minutes has passed (DailyAttendance::isNotInYet()),
+     * always a subset of the live strip's wider "Not in yet" count. Neither
+     * late nor "not in yet" is a status, so neither carries a badge.
      *
      * @param  int[]|null  $employeeIds
-     * @return list<array{name: string, label: string, badge: ?string, detail: ?string}>
+     * @return list<array{name: string, kind: string, label: string, badge: ?string, detail: ?string}>
      */
     public static function needsAttention(?array $employeeIds, int $limit = 8): array
     {
@@ -135,33 +140,50 @@ class DashboardAttendance
             ->whereDate('work_date', today()->format('Y-m-d'))
             ->where(function ($query) {
                 $query->whereIn('status', [AttendanceStatus::Absent->value, AttendanceStatus::Incomplete->value])
-                    ->orWhere('late_minutes', '>', 0);
+                    ->orWhere('late_minutes', '>', 0)
+                    ->orWhere(fn ($q) => $q->where('status', AttendanceStatus::InProgress->value)
+                        ->whereNull('first_in')
+                        ->whereNull('last_out'));
             })
-            ->with('employee')
+            ->with(['employee', 'workSchedule'])
             ->get()
-            // Absent first, then Incomplete, then a late-but-present day —
-            // sorted in PHP rather than a SQL ORDER BY FIELD(), since the
-            // set is small (bounded by today's employee count) and this
-            // reads more plainly than a raw expression would.
-            ->sortBy(fn (DailyAttendance $row) => match (true) {
-                $row->status === AttendanceStatus::Absent => 0,
-                $row->status === AttendanceStatus::Incomplete => 1,
-                default => 2,
-            })
+            ->map(fn (DailyAttendance $row) => [
+                'row' => $row,
+                'kind' => match (true) {
+                    $row->status === AttendanceStatus::Absent => 'absent',
+                    $row->status === AttendanceStatus::Incomplete => 'incomplete',
+                    $row->isLate() => 'late',
+                    $row->isNotInYet() => 'not_in_yet',
+                    default => null,
+                },
+            ])
+            // A punchless In progress row before start + grace is simply in
+            // progress, not "not in yet" — it drops out here.
+            ->filter(fn (array $item) => $item['kind'] !== null)
+            // Sorted in PHP rather than a SQL ORDER BY FIELD(): the set is
+            // small (bounded by today's employee count).
+            ->sortBy(fn (array $item) => [
+                ['absent' => 0, 'incomplete' => 1, 'late' => 2, 'not_in_yet' => 3][$item['kind']],
+                $item['kind'] === 'late' ? -$item['row']->late_minutes : 0,
+                $item['row']->employee->full_name,
+            ])
             ->take($limit);
 
-        return $rows->map(function (DailyAttendance $row) {
-            // A late arrival is a timing fact, not a status: no badge, just
-            // the amber duration (docs/ATTENDANCE_UI.md). Absent/Incomplete
-            // keep their status badge.
-            [$label, $badge, $detail] = match (true) {
-                $row->status === AttendanceStatus::Absent => ['Absent', 'red', null],
-                $row->status === AttendanceStatus::Incomplete => ['Incomplete', 'violet', null],
-                default => ['Late', null, Duration::format($row->late_minutes).' late'],
+        return $rows->map(function (array $item) {
+            $row = $item['row'];
+
+            [$label, $badge, $detail] = match ($item['kind']) {
+                'absent' => ['Absent', 'red', null],
+                'incomplete' => ['Incomplete', 'violet', null],
+                'late' => ['Late', null, Duration::format($row->late_minutes).' late'],
+                'not_in_yet' => ['Not in yet', null, 'Not in yet · due '.AttendanceTime::format(
+                    Carbon::parse($row->work_date->format('Y-m-d').' '.$row->workSchedule->start_time)
+                )],
             };
 
             return [
                 'name' => $row->employee->full_name,
+                'kind' => $item['kind'],
                 'label' => $label,
                 'badge' => $badge,
                 'detail' => $detail,
@@ -299,6 +321,10 @@ class DashboardAttendance
      * - notInYet: everyone else — no in-punch yet (punchless In progress,
      *   not calculated, or an out-only row).
      *
+     * 'atWorkLate' and 'leftLate' annotate two of those groups with how
+     * many arrived late (Phase 2.6: late is known from the in-punch) — late
+     * is never a fourth group.
+     *
      * 'checkedIn' is a different, overlapping figure — everyone with an
      * in-punch today, at work or already left — used by the Department card
      * and the trend's pending bar, never by the strip. Status counts answer
@@ -306,7 +332,7 @@ class DashboardAttendance
      * only ever shown for today (docs/ATTENDANCE_UI.md).
      *
      * @param  int[]|null  $employeeIds
-     * @return array{atWork: int, left: int, leftEarly: int, notInYet: int, checkedIn: int, total: int}
+     * @return array{atWork: int, atWorkLate: int, left: int, leftLate: int, leftEarly: int, notInYet: int, checkedIn: int, total: int}
      */
     public static function liveToday(?array $employeeIds): array
     {
@@ -318,7 +344,9 @@ class DashboardAttendance
             ->where('employees.status', 'active')
             ->whereDate('daily_attendances.work_date', $today)
             ->selectRaw('sum(daily_attendances.status <> ? and daily_attendances.first_in is not null) as at_work', [$present])
+            ->selectRaw('sum(daily_attendances.status <> ? and daily_attendances.first_in is not null and daily_attendances.late_minutes > 0) as at_work_late', [$present])
             ->selectRaw('sum(daily_attendances.status = ?) as left_count', [$present])
+            ->selectRaw('sum(daily_attendances.status = ? and daily_attendances.late_minutes > 0) as left_late', [$present])
             ->selectRaw('sum(daily_attendances.status = ? and daily_attendances.early_leave_minutes > 0) as left_early', [$present])
             ->selectRaw('sum(daily_attendances.first_in is not null) as checked_in')
             ->toBase()
@@ -330,7 +358,9 @@ class DashboardAttendance
 
         return [
             'atWork' => $atWork,
+            'atWorkLate' => (int) ($row->at_work_late ?? 0),
             'left' => $left,
+            'leftLate' => (int) ($row->left_late ?? 0),
             'leftEarly' => (int) ($row->left_early ?? 0),
             'notInYet' => max(0, $total - $atWork - $left),
             'checkedIn' => (int) ($row->checked_in ?? 0),
@@ -341,17 +371,20 @@ class DashboardAttendance
     /**
      * The live strip's three cells, shared by the Dashboard and the
      * Attendance page so both say exactly the same thing:
-     * "At work 27 · Left 3 (3 early) · Not in yet 5" — a partition that sums
-     * to active employees.
+     * "At work 27 (4 late) · Left 3 (1 late · 3 early) · Not in yet 5" — a
+     * partition that sums to active employees, with late as a sub-line.
      *
-     * @param  array{atWork: int, left: int, leftEarly: int, notInYet: int, checkedIn: int, total: int}  $live
+     * @param  array{atWork: int, atWorkLate: int, left: int, leftLate: int, leftEarly: int, notInYet: int, checkedIn: int, total: int}  $live
      * @return list<array{icon: string, label: string, value: string, subtext: ?string}>
      */
     public static function liveTodayCells(array $live): array
     {
         return [
-            ['icon' => 'check', 'label' => 'At work', 'value' => (string) $live['atWork'], 'subtext' => null],
-            ['icon' => 'logout', 'label' => 'Left', 'value' => (string) $live['left'], 'subtext' => $live['leftEarly'] > 0 ? $live['leftEarly'].' early' : null],
+            ['icon' => 'check', 'label' => 'At work', 'value' => (string) $live['atWork'], 'subtext' => $live['atWorkLate'] > 0 ? $live['atWorkLate'].' late' : null],
+            ['icon' => 'logout', 'label' => 'Left', 'value' => (string) $live['left'], 'subtext' => implode(' · ', array_filter([
+                $live['leftLate'] > 0 ? $live['leftLate'].' late' : null,
+                $live['leftEarly'] > 0 ? $live['leftEarly'].' early' : null,
+            ])) ?: null],
             ['icon' => 'clock', 'label' => 'Not in yet', 'value' => (string) $live['notInYet'], 'subtext' => null],
         ];
     }

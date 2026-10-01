@@ -2,10 +2,9 @@
 
 {{-- One cell of the shared stat strip (docs/DESIGN_SYSTEM.md → Stat strip):
 one solid <x-card :padding="false"> holding a <dl> grid of these cells,
-separated by dividers — never a card per figure. The grid is one full-width
-column with horizontal dividers below sm (`grid-cols-1 divide-y`) and one row
-with vertical dividers from sm, so no width leaves an orphaned cell or a
-partial divider. Cells use px-6, the standard card padding, so a strip's
+separated by dividers — never a card per figure. A strip has exactly three
+cells and stays one row (`grid-cols-3 divide-x`) at every width, including a
+390px phone, so no width can leave an orphaned cell or a partial divider. Cells use px-6, the standard card padding, so a strip's
 figures line up with other cards' titles. Every strip uses the same
 treatment: a neutral 32px icon tile (from lg, where every cell has room for
 it), a text-xs label and a text-xl value. The icon is a neutral signifier,

@@ -68,7 +68,7 @@
         <div class="flex items-baseline justify-end gap-4 px-6 pt-4">
             <p class="text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ $summaryScope }}</p>
         </div>
-        <dl class="grid grid-cols-1 divide-y divide-slate-200/60 dark:divide-slate-800/60 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        <dl class="grid grid-cols-3 divide-x divide-slate-200/60 dark:divide-slate-800/60">
             @if ($live)
                 {{-- Exactly today: the live "who is here now" strip. Any other
                 range: end-of-day status counts ("did they attend"). --}}

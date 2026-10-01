@@ -38,13 +38,9 @@
             // today (docs/ATTENDANCE_UI.md), then headcount. Below sm the cells
             // stack full-width with horizontal dividers (see x-stat-card).
             $live = $attendance['live'];
-            $stripCells = collect(\App\Support\DashboardAttendance::liveTodayCells($live))->push([
-                'icon' => 'users',
-                'label' => 'Employees',
-                'value' => $stats['total_employees'],
-                'subtext' => $stats['new_this_month'].' added this month',
-            ])->values();
-            $stripColumns = [1 => 'sm:grid-cols-1', 2 => 'sm:grid-cols-2', 3 => 'sm:grid-cols-3', 4 => 'sm:grid-cols-4', 5 => 'sm:grid-cols-5'][$stripCells->count()];
+            // No separate headcount cell: the total is already the strip's meta
+            // ("35 active employees"), and the three cells sum to it.
+            $stripCells = collect(\App\Support\DashboardAttendance::liveTodayCells($live));
         @endphp
         <x-card :padding="false" class="mb-6">
             <div class="flex items-baseline justify-end gap-4 px-6 pt-4">
@@ -52,7 +48,7 @@
                     Today, {{ \App\Support\DisplayDate::compact(today()) }} · {{ $attendance['today']['total'] }} active {{ $attendance['today']['total'] === 1 ? 'employee' : 'employees' }}
                 </p>
             </div>
-            <dl class="grid grid-cols-1 divide-y divide-slate-200/60 dark:divide-slate-800/60 sm:divide-x sm:divide-y-0 {{ $stripColumns }}">
+            <dl class="grid grid-cols-3 divide-x divide-slate-200/60 dark:divide-slate-800/60">
                 @foreach ($stripCells as $cell)
                     <x-stat-card
                         :icon="$cell['icon']"
@@ -160,9 +156,13 @@
                                     <p class="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-slate-200">{{ $person['name'] }}</p>
                                     @if ($person['badge'])
                                         <x-badge :color="$person['badge']">{{ $person['label'] }}</x-badge>
-                                    @else
+                                    @elseif ($person['kind'] === 'late')
                                         {{-- Late is timing, not a status: the amber duration alone. --}}
                                         <span class="shrink-0 text-sm font-medium tabular-nums text-amber-700 dark:text-amber-300">{{ $person['detail'] }}</span>
+                                    @else
+                                        {{-- Not in yet is a derived fact, not a status or an
+                                        absence: muted text with the scheduled start. --}}
+                                        <span class="shrink-0 text-sm tabular-nums text-slate-500 dark:text-slate-400">{{ $person['detail'] }}</span>
                                     @endif
                                 </li>
                             @endforeach

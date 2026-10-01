@@ -427,7 +427,7 @@ class DashboardTest extends TestCase
             ->assertDontSee('Quick actions');
     }
 
-    public function test_the_dashboard_uses_the_shared_stat_strip_with_headcount(): void
+    public function test_the_dashboard_uses_the_shared_three_cell_stat_strip(): void
     {
         $admin = User::factory()->create()->assignRole('admin');
         $employee = Employee::factory()->create();
@@ -437,7 +437,11 @@ class DashboardTest extends TestCase
             ->assertSee('Today, '.today()->format('D j M'))
             // Live "who is here now" language, not end-of-day status counts.
             ->assertSeeInOrder(['At work', '0', 'Left', '1', '1 early', 'Not in yet', '0'])
-            ->assertSee('added this month')
+            // No separate headcount cell (Phase 2.6): the total lives in the
+            // strip's meta, and the three cells stay one row at every width.
+            ->assertSee('1 active employee')
+            ->assertDontSee('added this month')
+            ->assertSee('grid grid-cols-3 divide-x', false)
             ->assertSee('text-xl font-semibold leading-7 tabular-nums', false)
             // The nested tinted tiles and the separate Employee summary card are gone.
             ->assertDontSee('rounded-xl bg-slate-50 p-4', false)
@@ -599,5 +603,115 @@ class DashboardTest extends TestCase
         // "Checked in" overlaps the partition: everyone with an in-punch,
         // whether still at work or already left.
         $this->assertSame(4, $live['checkedIn']);
+    }
+
+    private function onSchedule(Employee $employee, array $overrides = []): WorkSchedule
+    {
+        $schedule = WorkSchedule::factory()->create(array_merge([
+            'start_time' => '08:00:00', 'end_time' => '17:00:00', 'grace_minutes' => 10,
+            'break_minutes' => 60, 'workdays' => [1, 2, 3, 4, 5],
+        ], $overrides));
+        $employee->scheduleAssignments()->update(['work_schedule_id' => $schedule->id]);
+
+        return $schedule;
+    }
+
+    public function test_not_in_yet_starts_only_after_start_time_plus_grace(): void
+    {
+        $employee = Employee::factory()->create();
+        $schedule = $this->onSchedule($employee);
+        $row = $this->attendanceRow($employee, AttendanceStatus::InProgress, [
+            'work_date' => '2026-03-11', 'work_schedule_id' => $schedule->id,
+        ]);
+        $row->load('workSchedule');
+
+        $this->assertFalse($row->isNotInYet(Carbon::parse('2026-03-11 07:30:00')));
+        // 08:10 is the end of grace: still simply in progress.
+        $this->assertFalse($row->isNotInYet(Carbon::parse('2026-03-11 08:10:00')));
+        $this->assertTrue($row->isNotInYet(Carbon::parse('2026-03-11 08:10:01')));
+        // Only for today's row.
+        $this->assertFalse($row->isNotInYet(Carbon::parse('2026-03-12 09:00:00')));
+
+        // A punch of either kind means they're not "not in yet".
+        $row->first_in = Carbon::parse('2026-03-11 08:30:00');
+        $this->assertFalse($row->isNotInYet(Carbon::parse('2026-03-11 09:00:00')));
+    }
+
+    public function test_not_in_yet_is_never_off_holiday_leave_or_absent(): void
+    {
+        $now = Carbon::parse('2026-03-11 10:00:00');
+
+        foreach ([AttendanceStatus::Off, AttendanceStatus::Holiday, AttendanceStatus::Leave, AttendanceStatus::Absent] as $status) {
+            $employee = Employee::factory()->create();
+            $schedule = $this->onSchedule($employee);
+            $row = $this->attendanceRow($employee, $status, ['work_date' => '2026-03-11', 'work_schedule_id' => $schedule->id]);
+
+            $this->assertFalse($row->load('workSchedule')->isNotInYet($now), $status->value);
+        }
+    }
+
+    public function test_needs_attention_lists_late_arrivals_then_not_in_yet_mid_day(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 09:30:00'));
+        $make = function (string $name, AttendanceStatus $status, array $overrides = []) {
+            $employee = Employee::factory()->create(['full_name' => $name]);
+            $schedule = $this->onSchedule($employee);
+
+            return $this->attendanceRow($employee, $status, ['work_schedule_id' => $schedule->id, ...$overrides]);
+        };
+
+        $make('Not Yet Nina', AttendanceStatus::InProgress);
+        $make('Late Lou', AttendanceStatus::InProgress, ['first_in' => Carbon::parse('2026-03-11 08:45:00'), 'late_minutes' => 45]);
+        $make('On Time Oscar', AttendanceStatus::InProgress, ['first_in' => Carbon::parse('2026-03-11 07:55:00')]);
+        $make('Later Lena', AttendanceStatus::InProgress, ['first_in' => Carbon::parse('2026-03-11 09:20:00'), 'late_minutes' => 80]);
+
+        $response = $this->actingAs($this->admin())->get(route('dashboard'));
+
+        $response->assertViewHas('attendance', function ($attendance) {
+            $list = collect($attendance['needsAttention']);
+
+            return $list->pluck('name')->all() === ['Later Lena', 'Late Lou', 'Not Yet Nina']
+                && $list->pluck('kind')->all() === ['late', 'late', 'not_in_yet']
+                && $list[0]['detail'] === '1h 20m late'
+                && $list[2]['detail'] === 'Not in yet · due 8:00 AM'
+                && $list->every(fn ($item) => $item['badge'] === null);
+        });
+        $response->assertSeeInOrder(['Later Lena', '1h 20m late', 'Late Lou', '45m late', 'Not Yet Nina', 'Not in yet · due 8:00 AM']);
+    }
+
+    public function test_before_start_plus_grace_a_punchless_employee_is_not_listed_as_not_in_yet(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 08:05:00'));
+        $employee = Employee::factory()->create(['full_name' => 'Early Bird Ed']);
+        $schedule = $this->onSchedule($employee);
+        $this->attendanceRow($employee, AttendanceStatus::InProgress, ['work_schedule_id' => $schedule->id]);
+
+        $this->actingAs($this->admin())->get(route('dashboard'))
+            ->assertViewHas('attendance', fn ($attendance) => $attendance['needsAttention'] === []
+                // ...but the strip still counts them as not in yet (wider scope).
+                && $attendance['live']['notInYet'] === 1)
+            ->assertSee('Nothing needs attention today.');
+    }
+
+    public function test_the_live_strip_carries_late_as_a_sub_line_on_at_work_and_left(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 15:00:00'));
+        $in = fn (string $time) => Carbon::parse('2026-03-11 '.$time);
+
+        foreach ([['08:40', 40], ['08:30', 30], ['07:55', 0]] as [$time, $late]) {
+            $this->attendanceRow(Employee::factory()->create(), AttendanceStatus::InProgress, ['first_in' => $in($time), 'late_minutes' => $late]);
+        }
+        $this->attendanceRow(Employee::factory()->create(), AttendanceStatus::Present, ['first_in' => $in('08:20'), 'last_out' => $in('14:00'), 'late_minutes' => 20, 'early_leave_minutes' => 180]);
+        $this->attendanceRow(Employee::factory()->create(), AttendanceStatus::InProgress);
+
+        $live = \App\Support\DashboardAttendance::liveToday(null);
+
+        $this->assertSame(['atWork' => 3, 'atWorkLate' => 2, 'left' => 1, 'leftLate' => 1, 'leftEarly' => 1, 'notInYet' => 1], array_intersect_key($live, array_flip(['atWork', 'atWorkLate', 'left', 'leftLate', 'leftEarly', 'notInYet'])));
+        // Late is an annotation on a group, never a fourth group: the
+        // partition still sums to active employees.
+        $this->assertSame($live['total'], $live['atWork'] + $live['left'] + $live['notInYet']);
+
+        $this->actingAs($this->admin())->get(route('dashboard'))
+            ->assertSeeInOrder(['At work', '3', '2 late', 'Left', '1', '1 late · 1 early', 'Not in yet', '1']);
     }
 }

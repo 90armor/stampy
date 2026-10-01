@@ -52,6 +52,10 @@ Every attendance **duration** — Worked, Late, Early leave, a month's total —
 
 Counts are not durations and keep their own wording: summary timing copy stays concise and omits zero values: `49 late`, `152 early`, or `49 late · 152 early`.
 
+## Needs attention (dashboard)
+
+Today's list, worst-first: **Absent** and **Incomplete** (status badges — these only exist once the day's end time has passed), then **late arrivals** (name plus the amber duration, `1h 20m late`, longest first — including people still at work, since Phase 2.6 records late from the in-punch), then **Not in yet** (name plus muted `Not in yet · due 8:00 AM`, narrow scope above). Late and Not in yet carry no badge; neither is a status. The empty state is unchanged.
+
 ## Other attendance details
 
 - Raw punch badges in the day modal and table view are neutral (`slate`) for both In and Out. Green means Present; a punch direction is not a status.
@@ -70,7 +74,12 @@ In-progress or not-yet-calculated attendance is **pending**. It must never rende
 Two different questions, two strip forms:
 
 - **Status counts** (Present, Absent, Incomplete) answer *"did they attend"* — an end-of-day view. The Attendance strip uses them for any range that is not exactly today.
-- **The live strip** answers *"who is here now"* — today only. It reads `At work 27 · Left 3 (3 early) · Not in yet 5` and is a **partition of the active employees in scope: the three numbers never overlap and must always sum to active employees.** **At work** is everyone with an in-punch today who hasn't finished (any non-Present row with a first punch); **Left** is everyone Present today (both punches), with those who left early as its subtext; **Not in yet** is everyone else — no in-punch yet (a punchless In progress row, no row calculated yet, or an out-only row). It is derived from today's existing rows (`DashboardAttendance::liveToday()` / `liveTodayCells()`), with no builder involvement. The Dashboard strip always uses it (followed by the Employees headcount); the Attendance strip uses it whenever the range is exactly today, with the scope meta `Today, Wed 30 Sep · so far`.
+- **The live strip** answers *"who is here now"* — today only. It reads `At work 32 (4 late) · Left 3 (1 late · 3 early) · Not in yet 3` and is a **partition of the active employees in scope: the three numbers never overlap and must always sum to active employees.** **At work** is everyone with an in-punch today who hasn't finished (any non-Present row with a first punch); **Left** is everyone Present today (both punches); **Not in yet** is everyone else — no in-punch yet. Late (Phase 2.6) is a **sub-line** on At work and Left, never a fourth group; early leave is a sub-line on Left. It is derived from today's existing rows (`DashboardAttendance::liveToday()` / `liveTodayCells()`), with no builder involvement. The Dashboard strip always uses it — three cells, with no separate headcount cell, since the total is already the strip's meta (`Today, Thu 1 Oct · 35 active employees`); the Attendance strip uses it whenever the range is exactly today, with the scope meta `Today, Wed 30 Sep · so far`.
+- **"Not in yet" has two scopes, and the narrower is always a subset of the wider** — never a different definition under the same label:
+  - **Strip:** every active employee with no in-punch yet today, at any time of day (before or after the shift starts).
+  - **Needs attention:** only those who are actionable — an In progress row with no punch at all whose schedule `start_time + grace_minutes` has passed (`DailyAttendance::isNotInYet()`), shown as `Not in yet · due 8:00 AM` (the scheduled start). Before start + grace the person is simply in progress and isn't listed.
+
+  "Not in yet" is a derived display fact, never an attendance status and never "absent": Off, Holiday, Leave and Absent rows never qualify. It uses muted text, not a status colour.
 - **"Checked in" is a different, overlapping figure** and is reserved for *has an in-punch today*, whether still at work or already left. It is used only by the Department card (`Checked in 30 / 35`) and the trend's pending bar (checked in ÷ active employees), never by the strip — so the strip's At work (27) and the Department card's Checked in (30) can differ by exactly the people who have left.
 
 ## Filters are controls, not status badges

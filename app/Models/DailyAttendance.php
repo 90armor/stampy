@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Enums\AttendanceStatus;
 use App\Support\Duration;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -95,6 +97,44 @@ class DailyAttendance extends Model
     public function hasTimingException(): bool
     {
         return $this->isLate() || $this->leftEarly();
+    }
+
+    /**
+     * When a punchless person counts as "not in yet": the schedule this row
+     * was built with, start_time plus grace_minutes on work_date, in the app
+     * timezone. Null when the row carries no schedule.
+     */
+    public function notInYetAfter(): ?CarbonInterface
+    {
+        if ($this->workSchedule === null) {
+            return null;
+        }
+
+        return Carbon::parse($this->work_date->format('Y-m-d').' '.$this->workSchedule->start_time)
+            ->addMinutes($this->workSchedule->grace_minutes);
+    }
+
+    /**
+     * "Not in yet" (Phase 2.6) is a derived display fact, never a status and
+     * never "absent": an In progress row (so today, a workday, not a holiday
+     * or leave) with no punch at all, once the schedule's start_time +
+     * grace_minutes has passed. Before that point the person is simply in
+     * progress. Off/holiday/leave rows are never In progress, so they never
+     * qualify. The live strip's own "Not in yet" count is wider (anyone
+     * without an in-punch at any time of day); this is the narrower,
+     * actionable subset Needs attention lists (docs/ATTENDANCE_UI.md).
+     */
+    public function isNotInYet(?CarbonInterface $now = null): bool
+    {
+        $now ??= now();
+        $due = $this->notInYetAfter();
+
+        return $this->status === AttendanceStatus::InProgress
+            && $this->first_in === null
+            && $this->last_out === null
+            && $this->work_date->isSameDay($now)
+            && $due !== null
+            && $now->gt($due);
     }
 
     /**

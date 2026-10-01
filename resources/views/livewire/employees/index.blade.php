@@ -16,7 +16,7 @@
         <x-no-employee-record subject="The employee directory" />
     @else
     <x-card :padding="false">
-        <dl class="grid grid-cols-1 divide-y divide-slate-200/60 dark:divide-slate-800/60 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        <dl class="grid grid-cols-3 divide-x divide-slate-200/60 dark:divide-slate-800/60">
             <x-stat-card icon="users" label="Total employees" :value="$stats['total_employees']" />
             <x-stat-card icon="user-circle" label="Active employees" :value="$stats['active_employees']" />
             <x-stat-card icon="user-x" label="Inactive employees" :value="$stats['inactive_employees']" />
