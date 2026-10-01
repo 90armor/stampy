@@ -47,4 +47,21 @@ class DatabaseSeederTest extends TestCase
         $this->assertGreaterThan(0, \App\Models\AttendanceLog::count());
         $this->assertSame(0, \App\Models\AttendanceLog::where('punched_at', '>', now())->count());
     }
+
+    public function test_seeded_attendance_includes_late_incomplete_days(): void
+    {
+        $this->travelTo(now()->setTime(10, 30));
+
+        $this->seed();
+
+        // Some in-only days punch in late, so dev data exercises late on
+        // incomplete days (Phase 2.6) as well as on-time ones.
+        $inOnly = \App\Models\DailyAttendance::query()
+            ->where('status', 'incomplete')
+            ->whereNotNull('first_in')
+            ->whereDate('work_date', '<', today());
+
+        $this->assertGreaterThan(0, (clone $inOnly)->where('late_minutes', '>', 0)->count());
+        $this->assertGreaterThan(0, (clone $inOnly)->where('late_minutes', 0)->count());
+    }
 }
