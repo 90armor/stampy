@@ -35,8 +35,8 @@
 
         @php
             // The shared stat strip in its live "who is here now" form for
-            // today (docs/ATTENDANCE_UI.md), then headcount. Two per row on
-            // phones.
+            // today (docs/ATTENDANCE_UI.md), then headcount. Below sm the cells
+            // stack full-width with horizontal dividers (see x-stat-card).
             $live = $attendance['live'];
             $stripCells = collect(\App\Support\DashboardAttendance::liveTodayCells($live))->push([
                 'icon' => 'users',
@@ -47,24 +47,17 @@
             $stripColumns = [1 => 'sm:grid-cols-1', 2 => 'sm:grid-cols-2', 3 => 'sm:grid-cols-3', 4 => 'sm:grid-cols-4', 5 => 'sm:grid-cols-5'][$stripCells->count()];
         @endphp
         <x-card :padding="false" class="mb-6">
-            <div class="flex items-baseline justify-end gap-4 px-3 pt-3 sm:px-4">
+            <div class="flex items-baseline justify-end gap-4 px-6 pt-4">
                 <p class="text-xs tabular-nums text-slate-500 dark:text-slate-400">
                     Today, {{ \App\Support\DisplayDate::compact(today()) }} · {{ $attendance['today']['total'] }} active {{ $attendance['today']['total'] === 1 ? 'employee' : 'employees' }}
                 </p>
             </div>
-            <dl class="grid grid-cols-2 {{ $stripColumns }}">
+            <dl class="grid grid-cols-1 divide-y divide-slate-200/60 dark:divide-slate-800/60 sm:divide-x sm:divide-y-0 {{ $stripColumns }}">
                 @foreach ($stripCells as $cell)
                     <x-stat-card
                         :icon="$cell['icon']"
                         :label="$cell['label']"
                         :value="$cell['value']"
-                        @class([
-                            'border-slate-200/60 dark:border-slate-800/60',
-                            'border-t sm:border-t-0' => $loop->index >= 2,
-                            'border-l' => $loop->index % 2 === 1,
-                            'sm:border-l' => $loop->index > 0,
-                            'sm:border-l-0' => $loop->index === 0,
-                        ])
                     >
                         @if ($cell['subtext'] !== null)
                             <x-slot:subtext>{{ $cell['subtext'] }}</x-slot:subtext>

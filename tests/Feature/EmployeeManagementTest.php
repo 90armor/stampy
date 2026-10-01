@@ -515,4 +515,16 @@ class EmployeeManagementTest extends TestCase
         $this->assertStringContainsString('xl:grid-cols-[minmax(18rem,1fr)_14rem_11rem]', $html);
         $this->assertStringNotContainsString('lg:grid-cols-[minmax(18rem,1fr)_14rem_11rem]', $html);
     }
+
+    public function test_the_stat_strip_stacks_full_width_below_sm_with_card_padding(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+
+        $html = Livewire::actingAs($admin)->test(Index::class)->html();
+
+        // One column with horizontal dividers below sm, one row from sm — no
+        // wrapped multi-row grid that could orphan a cell.
+        $this->assertStringContainsString('grid grid-cols-1 divide-y divide-slate-200/60 dark:divide-slate-800/60 sm:grid-cols-3 sm:divide-x sm:divide-y-0', $html);
+        $this->assertSame(3, substr_count($html, 'min-w-0 px-6 py-4 lg:flex'));
+    }
 }
