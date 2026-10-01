@@ -338,6 +338,9 @@ class Index extends Component
         // For Present rows the two agree — covered by a test.
         $lateCount = (clone $query)->where('status', AttendanceStatus::Present->value)->where('late_minutes', '>', 0)->count();
         $earlyCount = (clone $query)->where('early_leave_minutes', '>', 0)->count();
+        // Late annotates its own status group: incomplete days with a late
+        // in-punch are counted under Incomplete, not folded into Present.
+        $incompleteLateCount = (clone $query)->where('status', AttendanceStatus::Incomplete->value)->where('late_minutes', '>', 0)->count();
 
         return collect([
             'present' => $counts->get(AttendanceStatus::Present->value, 0),
@@ -345,6 +348,7 @@ class Index extends Component
             'early' => $earlyCount,
             'absent' => $counts->get(AttendanceStatus::Absent->value, 0),
             'incomplete' => $counts->get(AttendanceStatus::Incomplete->value, 0),
+            'incomplete_late' => $incompleteLateCount,
         ]);
     }
 

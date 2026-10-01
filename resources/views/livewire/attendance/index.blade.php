@@ -86,7 +86,12 @@
                     @endif
                 </x-stat-card>
                 <x-stat-card icon="user-x" label="Absent" :value="$summary['absent']" />
-                <x-stat-card icon="exclamation-triangle" label="Incomplete" :value="$summary['incomplete']" />
+                <x-stat-card icon="exclamation-triangle" label="Incomplete" :value="$summary['incomplete']">
+                    {{-- Late annotates its own status group (docs/ATTENDANCE_UI.md). --}}
+                    @if ($summary['incomplete_late'] > 0)
+                        <x-slot:subtext>{{ $summary['incomplete_late'] }} late</x-slot:subtext>
+                    @endif
+                </x-stat-card>
             @endif
         </dl>
     </x-card>

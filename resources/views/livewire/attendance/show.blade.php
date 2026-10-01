@@ -155,7 +155,14 @@
                     @endif
                 </span>
                 <span class="text-slate-500 dark:text-slate-400">Absent <strong class="font-semibold text-slate-900 dark:text-slate-100">{{ $summary['absent'] }}</strong></span>
-                <span class="text-slate-500 dark:text-slate-400">Incomplete <strong class="font-semibold text-slate-900 dark:text-slate-100">{{ $summary['incomplete'] }}</strong></span>
+                <span class="text-slate-500 dark:text-slate-400">
+                    Incomplete <strong class="font-semibold text-slate-900 dark:text-slate-100">{{ $summary['incomplete'] }}</strong>
+                    {{-- Late annotates its own status group, the same way as
+                    Present's "(of which …)" (docs/ATTENDANCE_UI.md). --}}
+                    @if ($summary['incomplete_late'] > 0)
+                        <span class="text-xs text-slate-400 dark:text-slate-500">({{ $summary['incomplete_late'] }} late)</span>
+                    @endif
+                </span>
             </div>
 
             @if ($summary['total_worked_minutes'] > 0)

@@ -688,4 +688,24 @@ class CalendarReadabilityTest extends TestCase
         $this->assertSame(2, substr_count($html, 'aria-label="Arrived 35 minutes late"'));
         $this->assertStringContainsString('Monday, 2 March 2026, Incomplete, arrived 35 minutes late', $html);
     }
+
+    public function test_the_month_summary_annotates_late_on_each_status_group(): void
+    {
+        $employee = Employee::factory()->create();
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id, 'work_date' => '2026-03-02', 'status' => AttendanceStatus::Present,
+            'first_in' => Carbon::parse('2026-03-02 08:20:00'), 'last_out' => Carbon::parse('2026-03-02 17:00:00'), 'late_minutes' => 20,
+        ]);
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id, 'work_date' => '2026-03-03', 'status' => AttendanceStatus::Incomplete,
+            'first_in' => Carbon::parse('2026-03-03 08:30:00'), 'late_minutes' => 30,
+        ]);
+
+        Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', self::MONTH)
+            // Present's breakdown still counts present days only; the late
+            // incomplete day is annotated under Incomplete.
+            ->assertSeeInOrder(['Present', '1', '(of which 1 late)', 'Incomplete', '1', '(1 late)']);
+    }
 }

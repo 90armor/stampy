@@ -433,6 +433,9 @@ class Show extends Component
             'late' => $records->filter(fn (DailyAttendance $row) => $row->status === AttendanceStatus::Present && $row->isLate())->count(),
             'absent' => $counts->get(AttendanceStatus::Absent->value, 0),
             'incomplete' => $counts->get(AttendanceStatus::Incomplete->value, 0),
+            // Late annotates its own status group: an incomplete day with a
+            // late in-punch is counted here, under Incomplete.
+            'incomplete_late' => $records->filter(fn (DailyAttendance $row) => $row->status === AttendanceStatus::Incomplete && $row->isLate())->count(),
             'early_leave_days' => $records->filter(fn (DailyAttendance $row) => $row->leftEarly())->count(),
             'total_worked_minutes' => (int) $records->sum('worked_minutes'),
         ];

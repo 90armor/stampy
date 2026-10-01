@@ -229,12 +229,13 @@ class AttendanceIndexTest extends TestCase
             ->render()
             ->getData()['summary'];
 
-        $this->assertSame(['present', 'late', 'early', 'absent', 'incomplete'], $summary->keys()->all());
+        $this->assertSame(['present', 'late', 'early', 'absent', 'incomplete', 'incomplete_late'], $summary->keys()->all());
         $this->assertSame(1, $summary->get('present'));
         $this->assertSame(0, $summary->get('late'));
         $this->assertSame(0, $summary->get('early'));
         $this->assertSame(0, $summary->get('absent'));
         $this->assertSame(0, $summary->get('incomplete'));
+        $this->assertSame(0, $summary->get('incomplete_late'));
     }
 
     public function test_changing_a_filter_resets_pagination_to_page_one(): void
@@ -829,6 +830,9 @@ class AttendanceIndexTest extends TestCase
 
         // The Present sub-line is a breakdown of Present: only the present late day.
         $this->assertSame(1, $component->instance()->render()->getData()['summary']['late']);
+        // ...and the late incomplete day annotates its own group, Incomplete.
+        $this->assertSame(1, $component->instance()->render()->getData()['summary']['incomplete_late']);
+        $this->assertMatchesRegularExpression('/>Incomplete<\/dt>.*?>1<\/dd>.*?>\s*1 late\s*<\/dd>/s', $component->html());
 
         // The filter returns late rows of every status, and the Late column
         // shows the incomplete day's minutes in amber.
