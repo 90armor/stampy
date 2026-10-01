@@ -427,7 +427,10 @@ class Show extends Component
                 $workdayStatuses
             ))->count(),
             'present' => $counts->get(AttendanceStatus::Present->value, 0),
-            'late' => $records->filter(fn (DailyAttendance $row) => $row->isLate())->count(),
+            // "of which N late" is a breakdown of Present, so only Present
+            // days count here, even though since Phase 2.6 an incomplete day
+            // can carry late minutes too (it is still shown in its own row).
+            'late' => $records->filter(fn (DailyAttendance $row) => $row->status === AttendanceStatus::Present && $row->isLate())->count(),
             'absent' => $counts->get(AttendanceStatus::Absent->value, 0),
             'incomplete' => $counts->get(AttendanceStatus::Incomplete->value, 0),
             'early_leave_days' => $records->filter(fn (DailyAttendance $row) => $row->leftEarly())->count(),

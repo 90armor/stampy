@@ -664,4 +664,28 @@ class CalendarReadabilityTest extends TestCase
 
         $this->assertSame($tableCount, $calendarCount);
     }
+
+    public function test_an_incomplete_day_with_a_late_in_punch_marks_the_in_time(): void
+    {
+        $employee = Employee::factory()->create();
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => '2026-03-02',
+            'status' => AttendanceStatus::Incomplete,
+            'first_in' => Carbon::parse('2026-03-02 08:35:00'),
+            'last_out' => null,
+            'late_minutes' => 35,
+        ]);
+
+        $html = Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', self::MONTH)
+            ->call('openDay', '2026-03-02')
+            ->html();
+
+        // Calendar cell and day modal both mark the late in-time; the cell
+        // stays violet (Incomplete) — late is an annotation, not a colour.
+        $this->assertSame(2, substr_count($html, 'aria-label="Arrived 35 minutes late"'));
+        $this->assertStringContainsString('Monday, 2 March 2026, Incomplete, arrived 35 minutes late', $html);
+    }
 }

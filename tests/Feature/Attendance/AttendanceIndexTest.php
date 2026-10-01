@@ -808,4 +808,32 @@ class AttendanceIndexTest extends TestCase
         $this->assertSame(2, $summary['early']);
         $this->assertSame(2, $earlyFiltered->total());
     }
+
+    public function test_the_late_filter_includes_in_progress_and_incomplete_late_rows_but_the_present_breakdown_does_not(): void
+    {
+        $admin = $this->admin();
+        $date = today()->subDay()->format('Y-m-d');
+        $make = fn (AttendanceStatus $status, int $late) => DailyAttendance::factory()->create([
+            'employee_id' => Employee::factory()->create()->id,
+            'work_date' => $date,
+            'status' => $status,
+            'first_in' => today()->subDay()->setTime(8, 0)->addMinutes($late),
+            'late_minutes' => $late,
+        ]);
+        $make(AttendanceStatus::Present, 20);
+        $make(AttendanceStatus::Incomplete, 35);
+        $make(AttendanceStatus::Present, 0);
+
+        $component = Livewire::actingAs($admin)->test(Index::class)
+            ->set('fromDate', $date)->set('toDate', $date);
+
+        // The Present sub-line is a breakdown of Present: only the present late day.
+        $this->assertSame(1, $component->instance()->render()->getData()['summary']['late']);
+
+        // The filter returns late rows of every status, and the Late column
+        // shows the incomplete day's minutes in amber.
+        $filtered = $component->set('timingFilters', ['late']);
+        $this->assertSame(2, $filtered->instance()->render()->getData()['attendances']->total());
+        $this->assertStringContainsString('font-medium text-amber-700 dark:text-amber-300">35m<', $filtered->html());
+    }
 }

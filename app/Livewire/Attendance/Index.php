@@ -331,10 +331,12 @@ class Index extends Component
         // counted in 'present' above — these two are a breakdown of it, not
         // additional rows — which is why the view renders them as a
         // sub-line under the Present tile rather than as peer tiles (see
-        // CLAUDE.md's "Status vs. timing" note). This must stay in sync
-        // with what the list's timing filter itself returns — covered by a
-        // test asserting the two agree.
-        $lateCount = (clone $query)->where('late_minutes', '>', 0)->count();
+        // CLAUDE.md's "Status vs. timing" note). Since Phase 2.6 late can
+        // also sit on in_progress and incomplete rows, so the late count is
+        // restricted to Present rows to stay a breakdown OF Present; the
+        // "Late arrival" filter itself returns late rows of every status.
+        // For Present rows the two agree — covered by a test.
+        $lateCount = (clone $query)->where('status', AttendanceStatus::Present->value)->where('late_minutes', '>', 0)->count();
         $earlyCount = (clone $query)->where('early_leave_minutes', '>', 0)->count();
 
         return collect([
