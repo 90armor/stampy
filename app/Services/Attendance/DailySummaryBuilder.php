@@ -237,28 +237,41 @@ class DailySummaryBuilder
         if ($hasBoth) {
             $workedSeconds = $lastOut->punched_at->getTimestamp() - $firstIn->punched_at->getTimestamp();
             $workedMinutes = max(0, intdiv($workedSeconds, 60) - $schedule->break_minutes);
+        }
 
-            // Working a holiday is never late or early-leaving, regardless of
-            // when they clocked in/out — matters for OT later, where a
-            // holiday's worked hours must not also register as a timing
-            // exception. isWorkday is deliberately still checked alongside
-            // isHoliday: a holiday landing on a weekend is caught by the
-            // status match() below (-> Off) before this is ever reached with
-            // hasBoth true, but the guard here is the one that actually
-            // stops late/early from being computed either way.
-            if ($isWorkday && ! $isHoliday) {
-                $scheduledStart = Carbon::parse($workDate->format('Y-m-d').' '.$schedule->start_time);
+        // Timing (Phase 2.6). Late is a fact about the in-punch alone, so it
+        // is computed whenever the day HAS an in-punch — the same $firstIn the
+        // pairing above already chose, never a second pairing rule — whatever
+        // the status turns out to be: in_progress (late while the day is
+        // still open), incomplete (the out-punch never came) or present. A
+        // late fact therefore never disappears when an in_progress day later
+        // becomes incomplete: both builds read the same in-punch. An out-only
+        // day has no in-punch, so no late. Early leave is a fact about the
+        // out-punch measured against a shift that was actually worked, so it
+        // still needs both punches — before the out-punch it isn't knowable.
+        //
+        // Working a holiday is never late or early-leaving, regardless of
+        // when they clocked in/out — matters for OT later, where a holiday's
+        // worked hours must not also register as a timing exception. That
+        // now covers in_progress and incomplete holiday days too. isWorkday is
+        // checked alongside isHoliday: an ordinary weekend someone came in on
+        // isn't measured against a schedule they weren't on. The zeroing
+        // after the status match() below enforces both for every status.
+        if ($hasIn && $isWorkday && ! $isHoliday) {
+            $scheduledStart = Carbon::parse($workDate->format('Y-m-d').' '.$schedule->start_time);
+
+            // Grace only decides WHETHER first_in counts as late, not how
+            // much: once outside grace, late_minutes is the full gap from
+            // start_time, not the remainder past the grace period. intdiv,
+            // never round: seconds never count against the employee.
+            $minutesAfterStart = intdiv($firstIn->punched_at->getTimestamp() - $scheduledStart->getTimestamp(), 60);
+
+            if ($minutesAfterStart > $schedule->grace_minutes) {
+                $lateMinutes = $minutesAfterStart;
+            }
+
+            if ($hasBoth) {
                 $scheduledEnd = Carbon::parse($workDate->format('Y-m-d').' '.$schedule->end_time);
-
-                // Grace only decides WHETHER first_in counts as late, not how
-                // much: once outside grace, late_minutes is the full gap from
-                // start_time, not the remainder past the grace period.
-                $minutesAfterStart = intdiv($firstIn->punched_at->getTimestamp() - $scheduledStart->getTimestamp(), 60);
-
-                if ($minutesAfterStart > $schedule->grace_minutes) {
-                    $lateMinutes = $minutesAfterStart;
-                }
-
                 $minutesBeforeEnd = intdiv($scheduledEnd->getTimestamp() - $lastOut->punched_at->getTimestamp(), 60);
                 $earlyLeaveMinutes = max(0, $minutesBeforeEnd);
             }
@@ -284,7 +297,7 @@ class DailySummaryBuilder
         //   3. present      — both punches exist, on any day (workday,
         //                    holiday, or an ordinary weekend someone came in
         //                    on). A holiday doesn't need to override this —
-        //                    it already zeroed late/early above — and a
+        //                    timing is zeroed for it below — and a
         //                    fully-punched day is never "in progress"
         //                    regardless of the time of day.
         //   4. in_progress  — today, the schedule's end_time hasn't passed
@@ -304,7 +317,10 @@ class DailySummaryBuilder
         //
         // Timing is a separate dimension from all of this — see
         // AttendanceStatus's doc comment for why a `Late` status doesn't
-        // exist here.
+        // exist here. Since Phase 2.6 late_minutes may be non-zero on
+        // in_progress, incomplete and present rows (any row with an
+        // in-punch on a non-holiday workday); early_leave_minutes only ever
+        // on present rows.
         $status = match (true) {
             ! $hasIn && ! $hasOut && ! $isWorkday => AttendanceStatus::Off,
             ! $hasIn && ! $hasOut && $isHoliday => AttendanceStatus::Holiday,

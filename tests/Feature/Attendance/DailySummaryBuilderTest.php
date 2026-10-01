@@ -727,4 +727,138 @@ class DailySummaryBuilderTest extends TestCase
         $this->assertTrue($row->isLate());
         $this->assertSame(30, $row->late_minutes);
     }
+
+    // ---- Phase 2.6: late on the in-punch -------------------------------
+
+    public function test_an_in_progress_day_with_a_late_in_punch_records_late_minutes(): void
+    {
+        $this->travelTo(Carbon::parse(self::MONDAY.' 10:00:00'));
+        $employee = $this->employeeOn($this->schedule());
+        $this->punch($employee, self::MONDAY.' 08:25:00', 'in');
+
+        $row = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::MONDAY));
+
+        $this->assertSame(AttendanceStatus::InProgress, $row->status);
+        $this->assertSame(25, $row->late_minutes);
+        $this->assertSame(0, $row->early_leave_minutes);
+        $this->assertTrue($row->isLate());
+        $this->assertFalse($row->leftEarly());
+        // Status, and therefore colour, is unchanged: late is an annotation.
+        $this->assertSame('in_progress', $row->displayVariant());
+    }
+
+    public function test_an_incomplete_in_only_day_records_late_minutes_but_never_early_leave(): void
+    {
+        $employee = $this->employeeOn($this->schedule());
+        $this->punch($employee, self::MONDAY.' 08:25:00', 'in');
+
+        $row = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::MONDAY));
+
+        $this->assertSame(AttendanceStatus::Incomplete, $row->status);
+        $this->assertSame(25, $row->late_minutes);
+        $this->assertSame(0, $row->early_leave_minutes);
+        $this->assertSame(0, $row->worked_minutes);
+        $this->assertTrue($row->hasTimingException());
+        $this->assertSame('incomplete', $row->displayVariant());
+    }
+
+    public function test_an_out_only_day_has_no_late_and_no_early_leave_even_when_the_out_is_early(): void
+    {
+        $employee = $this->employeeOn($this->schedule());
+        $this->punch($employee, self::MONDAY.' 14:00:00', 'out');
+
+        $row = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::MONDAY));
+
+        $this->assertSame(AttendanceStatus::Incomplete, $row->status);
+        $this->assertSame(0, $row->late_minutes);
+        $this->assertSame(0, $row->early_leave_minutes);
+        $this->assertFalse($row->hasTimingException());
+    }
+
+    public function test_a_present_day_is_unchanged_late_and_early_from_the_paired_punches(): void
+    {
+        $employee = $this->employeeOn($this->schedule());
+        $this->punch($employee, self::MONDAY.' 08:25:00', 'in');
+        $this->punch($employee, self::MONDAY.' 16:00:00', 'out');
+
+        $row = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::MONDAY));
+
+        $this->assertSame(AttendanceStatus::Present, $row->status);
+        $this->assertSame(25, $row->late_minutes);
+        $this->assertSame(60, $row->early_leave_minutes);
+    }
+
+    public function test_an_in_progress_day_that_becomes_incomplete_keeps_its_late_minutes(): void
+    {
+        $employee = $this->employeeOn($this->schedule());
+        $this->punch($employee, self::MONDAY.' 08:40:00', 'in');
+        $builder = app(DailySummaryBuilder::class);
+
+        $this->travelTo(Carbon::parse(self::MONDAY.' 12:00:00'));
+        $midday = $builder->build($employee, Carbon::parse(self::MONDAY));
+        $this->assertSame(AttendanceStatus::InProgress, $midday->status);
+        $this->assertSame(40, $midday->late_minutes);
+
+        // end_time passes with no out-punch: the same row is rebuilt as incomplete.
+        $this->travelTo(Carbon::parse(self::MONDAY.' 18:00:00'));
+        $evening = $builder->build($employee, Carbon::parse(self::MONDAY));
+        $this->assertSame($midday->id, $evening->id);
+        $this->assertSame(AttendanceStatus::Incomplete, $evening->status);
+        $this->assertSame(40, $evening->late_minutes);
+    }
+
+    public function test_a_holiday_forces_timing_to_zero_for_in_progress_incomplete_and_present(): void
+    {
+        \App\Models\Holiday::factory()->create(['date' => self::MONDAY]);
+        $builder = app(DailySummaryBuilder::class);
+
+        $this->travelTo(Carbon::parse(self::MONDAY.' 10:00:00'));
+        $inProgress = $this->employeeOn($this->schedule());
+        $this->punch($inProgress, self::MONDAY.' 08:30:00', 'in');
+        $row = $builder->build($inProgress, Carbon::parse(self::MONDAY));
+        $this->assertSame(AttendanceStatus::InProgress, $row->status);
+        $this->assertSame(0, $row->late_minutes);
+
+        $this->travelTo(Carbon::parse(self::MONDAY.' 18:00:00'));
+        $incomplete = $this->employeeOn($this->schedule());
+        $this->punch($incomplete, self::MONDAY.' 08:30:00', 'in');
+        $row = $builder->build($incomplete, Carbon::parse(self::MONDAY));
+        $this->assertSame(AttendanceStatus::Incomplete, $row->status);
+        $this->assertSame(0, $row->late_minutes);
+
+        $present = $this->employeeOn($this->schedule());
+        $this->punch($present, self::MONDAY.' 08:30:00', 'in');
+        $this->punch($present, self::MONDAY.' 15:00:00', 'out');
+        $row = $builder->build($present, Carbon::parse(self::MONDAY));
+        $this->assertSame(AttendanceStatus::Present, $row->status);
+        $this->assertSame(0, $row->late_minutes);
+        $this->assertSame(0, $row->early_leave_minutes);
+    }
+
+    public function test_an_in_only_day_keeps_the_grace_boundary_and_truncation(): void
+    {
+        $builder = app(DailySummaryBuilder::class);
+
+        // 08:10:59 is still inside the 10 minutes' grace: not late.
+        $onGrace = $this->employeeOn($this->schedule());
+        $this->punch($onGrace, self::MONDAY.' 08:10:59', 'in');
+        $this->assertSame(0, $builder->build($onGrace, Carbon::parse(self::MONDAY))->late_minutes);
+
+        // 08:11:59 is 11 minutes late (truncated), not 12, and the full gap
+        // from start_time, not the remainder past grace.
+        $pastGrace = $this->employeeOn($this->schedule());
+        $this->punch($pastGrace, self::MONDAY.' 08:11:59', 'in');
+        $this->assertSame(11, $builder->build($pastGrace, Carbon::parse(self::MONDAY))->late_minutes);
+    }
+
+    public function test_a_late_in_punch_on_a_non_workday_is_never_late(): void
+    {
+        $employee = $this->employeeOn($this->schedule());
+        $this->punch($employee, self::SATURDAY.' 10:00:00', 'in');
+
+        $row = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::SATURDAY));
+
+        $this->assertSame(AttendanceStatus::Incomplete, $row->status);
+        $this->assertSame(0, $row->late_minutes);
+    }
 }
