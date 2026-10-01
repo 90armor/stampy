@@ -134,3 +134,13 @@ input:-webkit-autofill:focus {
         opacity: 1;
     }
 }
+
+/* Date range picker endpoints (dateRangePicker, resources/js/app.js). An
+   endpoint sits over half of the range band. In dark mode the tint is
+   translucent, so a translucent endpoint over the band would double it; the
+   endpoint instead layers the same tint over the panel colour, which makes it
+   opaque and identical to the band beside it. */
+.dark .date-range-endpoint {
+    background-color: theme('colors.slate.900');
+    background-image: linear-gradient(theme('colors.primary.900 / 30%'), theme('colors.primary.900 / 30%'));
+}

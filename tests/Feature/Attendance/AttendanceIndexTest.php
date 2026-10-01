@@ -472,8 +472,10 @@ class AttendanceIndexTest extends TestCase
 
         // Column order is an owner decision (docs/ATTENDANCE_UI.md): Date,
         // Employee, Department, the times, then Status and the chevron.
+        // Only the records table's headers (the date picker's grid has its own).
         $headers = [];
-        preg_match_all('/<th[^>]*>\s*(.*?)\s*<\/th>/s', $html, $matches);
+        preg_match('/<table class="min-w-\[64rem\] w-full">.*?<\/thead>/s', $html, $recordsHead);
+        preg_match_all('/<th[^>]*>\s*(.*?)\s*<\/th>/s', $recordsHead[0], $matches);
         foreach ($matches[1] as $cell) {
             $headers[] = trim(strip_tags(preg_replace('/<span class="sr-only">.*?<\/span>/s', '', $cell)));
         }
@@ -485,6 +487,40 @@ class AttendanceIndexTest extends TestCase
         $this->assertStringContainsString('<tr class="relative whitespace-nowrap', $html);
         // Empty values are a muted em dash.
         $this->assertStringContainsString('<span class="text-slate-300 dark:text-slate-600">—</span>', $html);
+    }
+
+    public function test_the_date_range_picker_is_a_labelled_grid_with_native_inputs_below_sm(): void
+    {
+        $this->travelTo('2026-03-04 10:00:00');
+
+        $html = Livewire::actingAs($this->admin())->test(Index::class)->html();
+
+        // The grid picker gets the app-timezone today from the server.
+        $this->assertStringContainsString('x-data="dateRangePicker({ today: \'2026-03-04\' })"', $html);
+        $this->assertStringContainsString('role="dialog"', $html);
+        $this->assertStringContainsString('aria-label="Choose a date range"', $html);
+        $this->assertStringContainsString('<table role="grid" aria-labelledby="attendance-date-month"', $html);
+        $this->assertStringContainsString('<h3 id="attendance-date-month"', $html);
+        $this->assertStringContainsString('<div class="hidden sm:block" wire:ignore>', $html);
+        $this->assertStringContainsString('abbr="Sunday"', $html);
+        // Below sm: the native inputs, bound to the same properties as before.
+        $this->assertStringContainsString('<div class="mt-2 space-y-3 sm:hidden">', $html);
+        $this->assertStringContainsString('wire:model.live="fromDate"', $html);
+        $this->assertStringContainsString('wire:model.live="toDate"', $html);
+    }
+
+    public function test_the_date_range_picker_writes_the_same_properties_and_url(): void
+    {
+        Livewire::actingAs($this->admin())
+            ->withQueryParams(['from' => '2026-02-01', 'to' => '2026-02-10'])
+            ->test(Index::class)
+            ->assertSet('fromDate', '2026-02-01')
+            ->assertSet('toDate', '2026-02-10')
+            // What dateRangePicker sends: both properties, one request.
+            ->set(['fromDate' => '2026-01-28', 'toDate' => '2026-02-03'])
+            ->assertSet('fromDate', '2026-01-28')
+            ->assertSet('toDate', '2026-02-03')
+            ->assertSee('28 Jan – 3 Feb');
     }
 
     public function test_the_summary_strip_states_its_range_wide_scope(): void

@@ -119,17 +119,33 @@
         </div>
 
         <div class="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 sm:p-6 lg:grid-cols-[auto_minmax(16rem,1fr)_14rem]">
-            <div class="relative" x-data="{ open: false }" @click.outside="open = false" @keydown.escape.window="open = false">
+            {{-- Date range: presets plus a month-grid range picker (dateRangePicker
+            in resources/js/app.js; rules in docs/ATTENDANCE_UI.md). It sets the
+            same fromDate/toDate properties the native inputs did, so the query
+            and the from/to URL are unchanged. Escape closes and returns focus
+            to the trigger. --}}
+            <div
+                class="relative"
+                x-data="dateRangePicker({ today: '{{ today()->format('Y-m-d') }}' })"
+                @click.outside="close(false)"
+                @keydown.escape.stop="close()"
+                @keydown.escape.window="close(false)"
+            >
                 <button
                     type="button"
-                    @click="open = !open"
+                    x-ref="trigger"
+                    @click="toggle()"
                     :aria-expanded="open"
+                    aria-haspopup="dialog"
                     aria-controls="attendance-date-panel"
                     class="inline-flex w-full items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 lg:w-auto"
                 >
                     <span class="inline-flex items-center gap-2"><x-icon name="calendar-days" class="h-4 w-4 text-slate-400 dark:text-slate-500" />{{ $rangeLabel }}</span>
                     <x-icon name="chevron-down" class="h-4 w-4 text-slate-400 dark:text-slate-500" />
                 </button>
+                {{-- Outside the panel, so a completed range is still announced
+                after the panel closes. --}}
+                <p class="sr-only" aria-live="polite" x-text="status"></p>
 
                 {{-- Popovers are content surfaces and therefore opaque. This
                 also prevents the status chips and rows below from bleeding
@@ -152,28 +168,99 @@
                     id="attendance-date-panel"
                     x-show="open"
                     x-cloak
+                    role="dialog"
+                    aria-label="Choose a date range"
                     class="absolute left-0 z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl bg-white p-4 shadow-xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800"
                 >
                     <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Quick ranges</p>
                     <div class="mt-2 grid grid-cols-2 gap-2">
                         @foreach (['today' => 'Today', 'yesterday' => 'Yesterday', 'last7' => 'Last 7 days', 'last30' => 'Last 30 days', 'thisMonth' => 'This month'] as $preset => $label)
-                            <button type="button" wire:click="setRange('{{ $preset }}')" @click="open = false" class="rounded-lg px-2 py-1.5 text-left text-sm text-slate-600 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:bg-slate-800">{{ $label }}</button>
+                            <button type="button" wire:click="setRange('{{ $preset }}')" @click="close()" class="rounded-lg px-2 py-1.5 text-left text-sm text-slate-600 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:bg-slate-800">{{ $label }}</button>
                         @endforeach
                     </div>
 
-                    {{-- From/To stacked, not side-by-side: a native date
-                    input's intrinsic width (digits + picker icon, ~150-180px
-                    depending on browser/OS/locale) doesn't reliably fit two
-                    across this panel's ~288px content width (w-80 minus p-4
-                    padding, minus the gap between columns) — that's exactly
-                    what the reported overflow was. Stacked, each input gets
-                    the full content width, well clear of any browser's
-                    intrinsic minimum. min-w-0 on top of that so a flex/grid
-                    child can never be held back above w-full by content
-                    size in the first place. --}}
                     <div class="mt-4 border-t border-slate-200/60 pt-4 dark:border-slate-800/60">
                         <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Custom</p>
-                        <div class="mt-2 space-y-3">
+
+                        {{-- From 640px: the month grid. Alpine renders it, so
+                        Livewire's morph leaves it alone (wire:ignore); it reads
+                        and writes $wire.fromDate / $wire.toDate directly.
+
+                        Visual language is the employee calendar's: Sunday first,
+                        today a filled primary circle (aria-current="date"). The
+                        range is the shared selected tint as a continuous band;
+                        its endpoints carry the full selected state (tint, primary
+                        border, semibold) — never a solid primary fill. --}}
+                        <div class="hidden sm:block" wire:ignore>
+                            <div class="mt-2 flex items-center justify-between">
+                                <button type="button" @click="shiftMonth(-1)" aria-label="Previous month" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100">
+                                    <x-icon name="chevron-left" class="h-4 w-4" />
+                                </button>
+                                <h3 id="attendance-date-month" class="text-sm font-semibold text-slate-900 dark:text-slate-100" aria-live="polite" x-text="monthLabel"></h3>
+                                <button type="button" @click="shiftMonth(1)" aria-label="Next month" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100">
+                                    <x-icon name="chevron-right" class="h-4 w-4" />
+                                </button>
+                            </div>
+
+                            <table role="grid" aria-labelledby="attendance-date-month" x-ref="grid" @keydown="onKeydown($event)" class="mt-2 w-full table-fixed border-collapse">
+                                <thead>
+                                    <tr>
+                                        @foreach (['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as $weekday)
+                                            <th scope="col" abbr="{{ $weekday }}" class="pb-1 text-center text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                                <span aria-hidden="true">{{ substr($weekday, 0, 2) }}</span>
+                                                <span class="sr-only">{{ $weekday }}</span>
+                                            </th>
+                                        @endforeach
+                                    </tr>
+                                </thead>
+                                <tbody @mouseleave="anchor && (preview = focused)">
+                                    <template x-for="week in weeks" :key="week.key">
+                                        <tr>
+                                            <template x-for="(cell, col) in week.days" :key="col">
+                                                <td
+                                                    class="group relative h-10 p-0 text-center focus:outline-none"
+                                                    :class="cell && 'cursor-pointer'"
+                                                    :data-date="cell ? cell.iso : null"
+                                                    :tabindex="cell ? (cell.iso === focused ? 0 : -1) : null"
+                                                    :aria-selected="cell ? String(isSelected(cell.iso)) : null"
+                                                    :aria-current="cell && cell.iso === today ? 'date' : null"
+                                                    :aria-label="cell ? label(cell.iso) : null"
+                                                    @click="cell && pick(cell.iso)"
+                                                    @mouseenter="cell && anchor && (preview = cell.iso)"
+                                                    @focus="cell && (focused = cell.iso)"
+                                                >
+                                                    <template x-if="cell">
+                                                        <div aria-hidden="true">
+                                                            <span class="pointer-events-none absolute inset-y-0.5 bg-primary-50 dark:bg-primary-900/30" :class="bandClass(cell)"></span>
+                                                            <span
+                                                                class="relative mx-auto flex h-9 w-9 items-center justify-center rounded-lg text-sm tabular-nums transition group-focus-visible:ring-2 group-focus-visible:ring-primary-500 dark:group-focus-visible:ring-primary-400"
+                                                                :class="{
+                                                                    'date-range-endpoint bg-primary-50 font-semibold text-primary-700 ring-1 ring-inset ring-primary-600 dark:text-primary-200 dark:ring-primary-500': isStart(cell.iso) || isEnd(cell.iso),
+                                                                    'font-medium text-primary-700 dark:text-primary-200': inRange(cell.iso) && ! isStart(cell.iso) && ! isEnd(cell.iso),
+                                                                    'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800': ! inRange(cell.iso),
+                                                                }"
+                                                            >
+                                                                <span
+                                                                    :class="cell.iso === today && 'inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary-600 font-bold text-white dark:bg-primary-400 dark:text-slate-900'"
+                                                                    x-text="cell.day"
+                                                                ></span>
+                                                            </span>
+                                                        </div>
+                                                    </template>
+                                                </td>
+                                            </template>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                            <p class="mt-2 text-xs text-slate-500 dark:text-slate-400" x-text="anchor ? 'Select an end date' : 'Select a start date'"></p>
+                        </div>
+
+                        {{-- Below 640px: native date inputs, stacked. A native
+                        input's intrinsic width (~150-180px) doesn't reliably fit
+                        two across this panel, so each takes the full width;
+                        min-w-0 so a grid child can't be held wider by content. --}}
+                        <div class="mt-2 space-y-3 sm:hidden">
                             <div class="min-w-0">
                                 <x-input-label for="attendance-from" value="From" class="!mb-1 !text-xs" />
                                 <input
