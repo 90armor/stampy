@@ -415,15 +415,21 @@
                                 <td class="table-pin table-pin-end py-2 pl-2 pr-6 text-right">
                                     {{-- The row's only link: visible at rest, a 40px target
                                     (negative margin keeps it from growing the row), no
-                                    whole-row click handler. --}}
-                                    <a
-                                        href="{{ route('attendance.show', $attendance->employee) }}?month={{ $attendance->work_date->format('Y-m') }}"
-                                        wire:navigate
-                                        aria-label="View attendance for {{ $attendance->employee->full_name }}, {{ $workDateLabel }}"
-                                        class="-my-1 ml-auto inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover:text-primary-600 dark:text-slate-400 dark:hover:bg-primary-900/30 dark:hover:text-primary-300 dark:group-hover:text-primary-400"
-                                    >
-                                        <x-icon name="chevron-right" class="h-4 w-4" />
-                                    </a>
+                                    whole-row click handler. The tooltip is the app's row
+                                    action tooltip (shown on hover and on keyboard focus,
+                                    never a native title); the aria-label stays the
+                                    accessible name, since it also names the record. --}}
+                                    <span class="group/action relative inline-flex">
+                                        <a
+                                            href="{{ route('attendance.show', $attendance->employee) }}?month={{ $attendance->work_date->format('Y-m') }}"
+                                            wire:navigate
+                                            aria-label="View attendance for {{ $attendance->employee->full_name }}, {{ $workDateLabel }}"
+                                            class="-my-1 ml-auto inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover:text-primary-600 dark:text-slate-400 dark:hover:bg-primary-900/30 dark:hover:text-primary-300 dark:group-hover:text-primary-400"
+                                        >
+                                            <x-icon name="chevron-right" class="h-4 w-4" />
+                                        </a>
+                                        <span role="tooltip" class="pointer-events-none absolute bottom-full right-0 z-10 mb-2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-sm transition-opacity group-hover/action:opacity-100 group-focus-within/action:opacity-100 dark:bg-slate-100 dark:text-slate-900">View attendance details</span>
+                                    </span>
                                 </td>
                             </tr>
                         @endforeach

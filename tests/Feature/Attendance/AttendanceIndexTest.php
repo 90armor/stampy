@@ -450,6 +450,10 @@ class AttendanceIndexTest extends TestCase
         $this->assertStringNotContainsString('text-primary-700 underline', $html);
         // 40px target.
         $this->assertStringContainsString('inline-flex h-10 w-10', $html);
+        // The shared tooltip, shown on hover and on keyboard focus; never a
+        // native title, and the aria-label stays the accessible name.
+        $this->assertMatchesRegularExpression('/<span role="tooltip" class="[^"]*group-hover\/action:opacity-100 group-focus-within\/action:opacity-100[^"]*">View attendance details<\/span>/', $html);
+        $this->assertStringNotContainsString('title="View attendance', $html);
     }
 
     public function test_the_early_header_is_abbreviated_with_an_accessible_full_name(): void
