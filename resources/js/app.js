@@ -435,6 +435,17 @@ document.addEventListener('alpine:init', () => {
         // order — the earlier day becomes From) and commits both properties
         // in a single Livewire request. Picking the same day twice is a
         // one-day range. Zooming out between the two picks keeps the anchor.
+        // Single mode's footer. Today picks today (the footer only offers it
+        // when today is pickable); Clear, on nullable fields only, empties the
+        // value — the trigger falls back to its placeholder.
+        pickToday() {
+            this.pick(this.today);
+        },
+        clear() {
+            this.$wire.$set(model, null, false);
+            this.announcement = 'Date cleared.';
+            this.closePanel();
+        },
         pick(iso) {
             if (this.isDisabled(iso)) return;
             this.focused = iso;

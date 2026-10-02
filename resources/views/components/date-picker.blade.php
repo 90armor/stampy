@@ -12,12 +12,21 @@ plain wire:model it replaces. Rules: docs/ATTENDANCE_UI.md, Date picker.
 - min / max: optional 'YYYY-MM-DD' bounds that mirror the field's server-side
   rule; days outside them are muted and can't be picked. The server rule stays
   the authority.
+- clearable: only for a field whose rule is nullable — adds Clear to the
+  footer. A required field gets none: picking again already replaces it.
+- The footer's Today shows only when today is inside min/max.
 - Other attributes (wire:loading.attr, autofocus, a width) go on the trigger.
 
 From 640px the trigger opens the shared calendar in a popover; below 640px a
 native date input, bound to the same property, takes its place — the same
 split as the Daily Attendance range. --}}
-@props(['id', 'model', 'label', 'min' => null, 'max' => null, 'placeholder' => 'Select a date'])
+@props(['id', 'model', 'label', 'min' => null, 'max' => null, 'placeholder' => 'Select a date', 'clearable' => false])
+
+@php
+    $today = today()->format('Y-m-d');
+    $todayAllowed = ($min === null || $today >= $min) && ($max === null || $today <= $max);
+    $footerButton = 'rounded-lg px-2 py-1 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500';
+@endphp
 
 <div>
     <div
@@ -61,6 +70,21 @@ split as the Daily Attendance range. --}}
             class="fixed z-50 w-80 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-xl bg-white p-4 pt-2 shadow-xl ring-1 ring-slate-200 dark:bg-slate-750 dark:ring-slate-600/40"
         >
             <x-date-picker.calendar />
+
+            @if ($clearable || $todayAllowed)
+                {{-- Footer: Clear on the left (nullable fields only), Today
+                on the right (only when today is pickable). --}}
+                <div class="mt-3 flex items-center justify-between gap-2 border-t border-slate-200/60 pt-3 dark:border-slate-600/15">
+                    @if ($clearable)
+                        <button type="button" @click="clear()" class="{{ $footerButton }} text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-600/30">Clear</button>
+                    @else
+                        <span></span>
+                    @endif
+                    @if ($todayAllowed)
+                        <button type="button" @click="pickToday()" class="{{ $footerButton }} text-primary-700 hover:bg-primary-50 dark:text-primary-300 dark:hover:bg-primary-600/35">Today</button>
+                    @endif
+                </div>
+            @endif
         </div>
     </div>
 

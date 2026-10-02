@@ -56,6 +56,37 @@ class DatePickerTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/<input[^>]*\b(min|max)="/s', $html);
     }
 
+    public function test_today_is_offered_only_when_today_is_inside_the_fields_bounds(): void
+    {
+        $this->travelTo('2026-03-04 10:00:00');
+        $today = '@click="pickToday()"';
+
+        $this->assertStringContainsString($today, (string) $this->blade('<x-date-picker id="d" model="date" label="Date" />'));
+        // Today on either edge still counts as inside.
+        $this->assertStringContainsString($today, (string) $this->blade('<x-date-picker id="d" model="date" label="Date" min="2026-03-04" max="2026-03-04" />'));
+        // A min after today (an employee who joins next month) or a max before it: no Today.
+        $this->assertStringNotContainsString($today, (string) $this->blade('<x-date-picker id="d" model="date" label="Date" min="2026-04-01" />'));
+        $this->assertStringNotContainsString($today, (string) $this->blade('<x-date-picker id="d" model="date" label="Date" max="2026-03-03" />'));
+    }
+
+    public function test_clear_is_only_for_nullable_fields_and_no_current_date_field_is_nullable(): void
+    {
+        $clear = '@click="clear()"';
+
+        $this->assertStringNotContainsString($clear, (string) $this->blade('<x-date-picker id="d" model="date" label="Date" />'));
+        $this->assertStringContainsString($clear, (string) $this->blade('<x-date-picker id="d" model="date" label="Date" clearable />'));
+
+        // Every date field's rule today is `required` (holiday date, join date,
+        // both effective dates, punch date), so none of them may offer Clear.
+        // When a nullable date field is added, pass `clearable` and add a test
+        // that clearing it persists null.
+        foreach (File::allFiles(resource_path('views')) as $file) {
+            if (str_contains($file->getContents(), '<x-date-picker ')) {
+                $this->assertDoesNotMatchRegularExpression('/<x-date-picker\b[^>]*\bclearable\b/', $file->getContents(), $file->getFilename());
+            }
+        }
+    }
+
     public function test_no_date_field_uses_a_bare_native_date_input(): void
     {
         // Native date inputs live only inside the picker (its below-640px
