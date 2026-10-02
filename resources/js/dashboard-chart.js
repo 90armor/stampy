@@ -62,11 +62,16 @@ function initAttendanceTrendChart() {
     Chart.getChart(canvas)?.destroy();
 
     const dark = document.documentElement.classList.contains('dark');
+    // Neutrals follow the theme's slate scale (stone in light mode, zinc in
+    // dark — resources/css/app.css), read from the same CSS variables the
+    // classes use, so the chart never keeps a hard-coded warm grey.
+    const slateVars = getComputedStyle(document.documentElement);
+    const slate = (step, alpha = 1) => `rgb(${slateVars.getPropertyValue(`--slate-${step}`).trim()} / ${alpha})`;
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const markers = JSON.parse(canvas.dataset.markers || '[]');
     const pending = JSON.parse(canvas.dataset.pending || '[]');
     const barColor = (index) => (pending[index] ? (dark ? '#1e4232' : '#b9d9c8') : '#3f8266');
-    const muted = dark ? '#a8a29e' : '#78716c';
+    const muted = dark ? slate(400) : slate(500);
 
     new Chart(canvas, {
         type: 'bar',
@@ -89,9 +94,9 @@ function initAttendanceTrendChart() {
                 legend: { display: false },
                 markerLabels: { markers, color: muted },
                 tooltip: {
-                    backgroundColor: dark ? '#f5f5f4' : '#1c1917',
-                    titleColor: dark ? '#1c1917' : '#f5f5f4',
-                    bodyColor: dark ? '#57534e' : '#d6d3d1',
+                    backgroundColor: dark ? slate(100) : slate(900),
+                    titleColor: dark ? slate(900) : slate(100),
+                    bodyColor: dark ? slate(600) : slate(300),
                     padding: 10,
                     displayColors: false,
                     filter: (item) => item.raw !== null,
@@ -108,7 +113,7 @@ function initAttendanceTrendChart() {
                 y: {
                     min: 0,
                     max: 100,
-                    grid: { color: dark ? 'rgba(168, 162, 158, 0.14)' : 'rgba(120, 113, 108, 0.12)' },
+                    grid: { color: dark ? slate(400, 0.14) : slate(500, 0.12) },
                     ticks: {
                         color: muted,
                         font: { size: 12 },

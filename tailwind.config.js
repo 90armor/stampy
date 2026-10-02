@@ -19,22 +19,15 @@ export default {
                 serif: ['"DM Serif Display"', 'Georgia', 'serif'],
             },
             colors: {
-                // Warm stone — replaces cool slate as the neutral scale (text/borders/surfaces)
-                // to match the warm cream background of the reference "Northstar" mockup.
-                slate: {
-                    50: '#fafaf9',
-                    100: '#f5f5f4',
-                    200: '#e7e5e4',
-                    300: '#d6d3d1',
-                    400: '#a8a29e',
-                    500: '#78716c',
-                    600: '#57534e',
-                    700: '#44403c',
-                    800: '#292524',
-                    900: '#1c1917',
-                    950: '#0c0a09',
-                    750: '#363230', // dark option B: custom stone step, OKLab-interpolated
-                },
+                // The neutral scale, as CSS variables (resources/css/app.css):
+                // warm stone in light mode, matching the warm cream of the
+                // reference "Northstar" mockup; a neutral, slightly cool zinc
+                // in dark mode, where stone's red-orange cast read as brown
+                // (dark option C). The `slate` name is kept so no class changes.
+                slate: Object.fromEntries(
+                    [50, 100, 200, 300, 400, 500, 600, 700, 750, 800, 900, 950]
+                        .map((step) => [step, `rgb(var(--slate-${step}) / <alpha-value>)`]),
+                ),
                 // Deep evergreen — primary brand color for buttons, links, active states.
                 primary: {
                     50: '#f1f7f4',

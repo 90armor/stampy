@@ -84,21 +84,21 @@ Do not add arbitrary pixel spacing until the standard scale demonstrably cannot 
 
 ## Dark surfaces
 
-Dark mode is one ladder of warm stone steps; every layer is defined relative to the card, so a change to the card moves everything with it.
+Dark mode is one ladder of steps on a **neutral, slightly cool gray** (Tailwind's zinc values: hue about 240°, 4–6% saturation), while light mode keeps warm stone. Both live in the same `slate` scale, defined as CSS variables (`--slate-50` … `--slate-950`, plus `--slate-750`) in `resources/css/app.css`: stone on `:root`, zinc under `.dark`, read by `tailwind.config.js` as `rgb(var(--slate-N) / <alpha-value>)`. So `dark:` classes name a step and the theme decides the hue; no class changes between themes. Stone's red-orange cast (hue 12–30°) made dark surfaces read as brown; zinc at the same lightness matches the neutral dark of macOS (window `#1e1f21`, grouped box `#252628`). Anything that colours a neutral outside a class — `@apply`, `theme()`, the dashboard chart — reads the same variables. Every layer is defined relative to the card, so a change to the card moves everything with it.
 
 | Layer | Dark value | Notes |
 |---|---|---|
-| Page | `slate-900` (`#1c1917`) | |
-| Card | `slate-800` (`#292524`) | card vs page 1.15:1 |
+| Page | `slate-900` (dark `#18181b`) | |
+| Card | `slate-800` (dark `#27272a`) | card vs page 1.19:1 |
 | Card ring | `slate-750`, full opacity | a shadow can't separate a card from a dark page |
-| Overlay (dropdown, popover, modal) and control | `slate-750` (`#363230`) | one step above the card |
+| Overlay (dropdown, popover, modal) and control | `slate-750` (dark `#333338`; OKLab midpoint of 800 and 700) | one step above the card |
 | Divider | `slate-600/15` (`/70` lines: `slate-600/20`) | translucent, so it reads on cards and overlays alike; same contrast against the card as before (≈1.09:1) |
 | Row hover | `slate-750/60` over the card | pinned table cells layer the same tint over the card |
 | Hover on a control or overlay | `slate-600/30` | translucent: it sits on cards and overlays, which share the control step |
 | Control border, strong line | `slate-600` | |
-| Selected tint | `primary-600/35` | the shared selected state and the date picker's range band (1.24:1 against the popover) |
+| Selected tint | `primary-600/35` | the shared selected state and the date picker's range band (1.25:1 against the popover) |
 
-Muted text is `slate-400`: 6.01:1 on the card, 5.03:1 on overlays and controls, 5.40:1 on a hovered row. Every status badge passes 4.5:1 on the card and on a hovered row (lowest: Absent on a hovered row, 4.72:1).
+Muted text is `slate-400`: 5.81:1 on the card, 4.90:1 on overlays and controls, 5.28:1 on a hovered row. Every status badge passes 4.5:1 on the card and on a hovered row (lowest: Absent on a hovered row, 4.70:1).
 
 ## Surface architecture
 

@@ -10,11 +10,11 @@ $colors = [
     // Added for Attendance's Incomplete status, so its table badge matches
     // the calendar/day-modal's violet instead of sharing Late's amber (see
     // CLAUDE.md's displayVariant() colour table). dark:text-violet-300 (not -400):
-    // 7.71:1 measured against this badge's own composited background,
+    // 7.65:1 measured against this badge's own composited background,
     // matching the other entries' actual-not-assumed contrast.
     'violet' => 'bg-violet-50 text-violet-700 ring-violet-600/20 dark:bg-violet-900/30 dark:text-violet-300 dark:ring-violet-500/30',
     // Added for Attendance's InProgress status. dark:text-blue-300 (not
-    // -400): 7.72:1 measured against this badge's own composited
+    // -400): 7.56:1 measured against this badge's own composited
     // background, matching the other entries' actual-not-assumed contrast.
     'blue' => 'bg-blue-50 text-blue-700 ring-blue-600/20 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-500/30',
     // Added for Attendance's Holiday status. dark:text-fuchsia-300 (not
