@@ -30,7 +30,7 @@ class DailySummaryBuilder
      * it — the shift is left incomplete rather than pairing punches that are
      * probably unrelated (e.g. the start of the *next* shift).
      */
-    private const MAX_SHIFT_HOURS = 18;
+    public const MAX_SHIFT_HOURS = 18;
 
     public function build(Employee $employee, CarbonInterface $date): DailyAttendance
     {
@@ -300,12 +300,19 @@ class DailySummaryBuilder
         //                    timing is zeroed for it below — and a
         //                    fully-punched day is never "in progress"
         //                    regardless of the time of day.
-        //   4. in_progress  — today, the schedule's end_time hasn't passed
-        //                    yet, and punches so far would otherwise resolve
-        //                    to incomplete or absent below. Only ever
-        //                    applies to today (see isInProgress()); not
-        //                    conditioned on isWorkday, matching rule 5's own
-        //                    workday-agnostic incomplete rule.
+        //   4. in_progress  — the day is still open, and punches so far would
+        //                    otherwise resolve to incomplete or absent below.
+        //                    "Open" depends on the punches (Phase 2.7, see
+        //                    isInProgress()): an in-only day stays open until
+        //                    its pairing window closes (first in-punch +
+        //                    MAX_SHIFT_HOURS) — past the schedule's end and
+        //                    past midnight, so someone on overtime is still
+        //                    "at work" and a (+1) out-punch turns the day
+        //                    present with no incomplete in between. A day
+        //                    with no punches, or only an out-punch, is open
+        //                    while it is today and the schedule's end_time
+        //                    hasn't passed. Not conditioned on isWorkday,
+        //                    matching rule 5's own workday-agnostic rule.
         //   5. incomplete   — exactly one of {in, out}, on any day. This
         //                    includes a one-sided punch on a holiday: the
         //                    punch being incomplete is a device-defect fact
@@ -313,7 +320,9 @@ class DailySummaryBuilder
         //                    so holiday does not suppress it the way it does
         //                    for "no punches at all" in rule 2.
         //   6. absent       — a workday, no punches, not a holiday, and not
-        //                    (today and still before end_time).
+        //                    (today and still before end_time) — unchanged
+        //                    by Phase 2.7: no punches still closes at the
+        //                    schedule's end.
         //
         // Timing is a separate dimension from all of this — see
         // AttendanceStatus's doc comment for why a `Late` status doesn't
@@ -325,7 +334,7 @@ class DailySummaryBuilder
             ! $hasIn && ! $hasOut && ! $isWorkday => AttendanceStatus::Off,
             ! $hasIn && ! $hasOut && $isHoliday => AttendanceStatus::Holiday,
             $hasBoth => AttendanceStatus::Present,
-            $this->isInProgress($workDate, $schedule) => AttendanceStatus::InProgress,
+            $this->isInProgress($workDate, $schedule, $firstIn, $lastOut) => AttendanceStatus::InProgress,
             $hasIn xor $hasOut => AttendanceStatus::Incomplete,
             default => AttendanceStatus::Absent,
         };
@@ -355,16 +364,30 @@ class DailySummaryBuilder
     }
 
     /**
-     * Only ever true for today: a day already in the past is either fully
-     * resolved (present/incomplete) or definitively absent by now, and a
-     * future date is never built at all. Rebuilding today after end_time has
-     * passed must downgrade this to absent/incomplete on its own — there is
-     * no separate "un-in-progress" step, it's simply that this returns false
-     * once now() has caught up, and the match() above falls through to
-     * whichever of those two the punches actually resolve to.
+     * Whether the day is still open (Phase 2.7). Only asked when the day
+     * doesn't already have both punches (rule 3 claims those as present).
+     *
+     * - An in-only day is open until its pairing window closes: first
+     *   in-punch + MAX_SHIFT_HOURS, the same bound build() uses to pair an
+     *   out-punch (inclusive, so the instant an out could still pair, the day
+     *   is still open). Past the schedule's end and past midnight: until
+     *   then an out-punch can still arrive and pair, so calling the day
+     *   incomplete would be premature — and someone on overtime would read
+     *   as gone. Rebuilding after the window closes turns it incomplete; the
+     *   scheduler rebuilds yesterday while it has open rows for exactly that.
+     * - A day with no punches, or only an out-punch, is open only while it is
+     *   today and the schedule's end_time hasn't passed — unchanged.
+     *
+     * A future date is never built at all. Nothing here un-opens a day by
+     * itself: a rebuild after the relevant moment simply falls through to
+     * incomplete or absent in calculate()'s match().
      */
-    private function isInProgress(Carbon $workDate, WorkSchedule $schedule): bool
+    private function isInProgress(Carbon $workDate, WorkSchedule $schedule, ?AttendanceLog $firstIn, ?AttendanceLog $lastOut): bool
     {
+        if ($firstIn !== null && $lastOut === null) {
+            return now()->lte($firstIn->punched_at->copy()->addHours(self::MAX_SHIFT_HOURS));
+        }
+
         if (! $workDate->isToday()) {
             return false;
         }

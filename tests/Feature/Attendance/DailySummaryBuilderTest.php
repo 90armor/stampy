@@ -799,12 +799,13 @@ class DailySummaryBuilderTest extends TestCase
         $this->assertSame(AttendanceStatus::InProgress, $midday->status);
         $this->assertSame(40, $midday->late_minutes);
 
-        // end_time passes with no out-punch: the same row is rebuilt as incomplete.
-        $this->travelTo(Carbon::parse(self::MONDAY.' 18:00:00'));
-        $evening = $builder->build($employee, Carbon::parse(self::MONDAY));
-        $this->assertSame($midday->id, $evening->id);
-        $this->assertSame(AttendanceStatus::Incomplete, $evening->status);
-        $this->assertSame(40, $evening->late_minutes);
+        // The pairing window (08:40 + 18h = 02:40 next day) closes with no
+        // out-punch: the same row is rebuilt as incomplete (Phase 2.7).
+        $this->travelTo(Carbon::parse(self::MONDAY.' 08:40:00')->addHours(18)->addMinute());
+        $closed = $builder->build($employee, Carbon::parse(self::MONDAY));
+        $this->assertSame($midday->id, $closed->id);
+        $this->assertSame(AttendanceStatus::Incomplete, $closed->status);
+        $this->assertSame(40, $closed->late_minutes);
     }
 
     public function test_a_holiday_forces_timing_to_zero_for_in_progress_incomplete_and_present(): void
@@ -819,7 +820,8 @@ class DailySummaryBuilderTest extends TestCase
         $this->assertSame(AttendanceStatus::InProgress, $row->status);
         $this->assertSame(0, $row->late_minutes);
 
-        $this->travelTo(Carbon::parse(self::MONDAY.' 18:00:00'));
+        // Past the in-only row's 18h pairing window, so it has closed as incomplete.
+        $this->travelTo(Carbon::parse(self::MONDAY.' 08:30:00')->addHours(18)->addMinute());
         $incomplete = $this->employeeOn($this->schedule());
         $this->punch($incomplete, self::MONDAY.' 08:30:00', 'in');
         $row = $builder->build($incomplete, Carbon::parse(self::MONDAY));
