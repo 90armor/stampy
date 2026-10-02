@@ -858,6 +858,9 @@ class DailySummaryBuilderTest extends TestCase
         $employee = $this->employeeOn($this->schedule());
         $this->punch($employee, self::SATURDAY.' 10:00:00', 'in');
 
+        // After the in-only row's 18h pairing window (Sunday 04:00), so it has
+        // closed as incomplete whatever the real clock says (Phase 2.7).
+        $this->travelTo(Carbon::parse(self::SATURDAY.' 10:00:00')->addHours(18)->addMinute());
         $row = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::SATURDAY));
 
         $this->assertSame(AttendanceStatus::Incomplete, $row->status);
