@@ -12,7 +12,7 @@
         // Fill emphasizes exceptions: a Present cell is the neutral card
         // surface; the green day number and check carry the status. 'pill' is
         // the day modal's status pill, which stays a green badge.
-        'present' => ['badge' => 'green', 'icon' => 'check', 'bg' => 'bg-white dark:bg-slate-900', 'text' => 'text-green-700 dark:text-green-400', 'ring' => 'ring-slate-200 dark:ring-slate-800', 'pill' => 'bg-green-50 ring-green-600/20 dark:bg-green-900/20 dark:ring-green-500/30'],
+        'present' => ['badge' => 'green', 'icon' => 'check', 'bg' => 'bg-white dark:bg-slate-800', 'text' => 'text-green-700 dark:text-green-400', 'ring' => 'ring-slate-200 dark:ring-slate-750', 'pill' => 'bg-green-50 ring-green-600/20 dark:bg-green-900/20 dark:ring-green-500/30'],
         // A deliberate one-time addition to the palette — see CLAUDE.md's
         // displayVariant() colour table. Incomplete (a device defect — the
         // person worked, nothing recorded it) must never read as amber, which
@@ -36,7 +36,7 @@
         // The number stays slate-500 (4.8:1, AA) and drops to medium weight
         // rather than going paler.
         // 'pill' keeps the day modal's Off pill a normal slate badge.
-        'off' => ['badge' => 'slate', 'icon' => 'calendar-days', 'bg' => 'bg-transparent', 'text' => 'text-slate-500 dark:text-slate-400', 'iconText' => 'text-slate-400 dark:text-slate-500', 'weight' => 'font-medium', 'ring' => 'ring-transparent border border-dashed border-slate-300 dark:border-slate-700', 'pill' => 'bg-slate-100 ring-slate-500/10 dark:bg-slate-800 dark:ring-slate-500/20'],
+        'off' => ['badge' => 'slate', 'icon' => 'calendar-days', 'bg' => 'bg-transparent', 'text' => 'text-slate-500 dark:text-slate-400', 'iconText' => 'text-slate-400 dark:text-slate-500', 'weight' => 'font-medium', 'ring' => 'ring-transparent border border-dashed border-slate-300 dark:border-slate-600', 'pill' => 'bg-slate-100 ring-slate-500/10 dark:bg-slate-750 dark:ring-slate-500/20'],
         // blue, not primary/evergreen: primary is still a green-family hue
         // (a different shade of the same "present" story present's own
         // stock-green already tells), which would repeat the exact
@@ -61,7 +61,7 @@
     // — deliberately not sharing 'off's calendar-days icon or 'absent's
     // x-mark: a flat dash has no shape overlap with either, so it can't be
     // mistaken for "did not work" or "day off" at a glance.
-    $notCalculatedStyle = ['icon' => 'minus', 'bg' => 'bg-slate-50 dark:bg-slate-800/40', 'text' => 'text-slate-400 dark:text-slate-600', 'ring' => 'ring-slate-200 dark:ring-slate-700/60'];
+    $notCalculatedStyle = ['icon' => 'minus', 'bg' => 'bg-slate-50 dark:bg-slate-750/40', 'text' => 'text-slate-400 dark:text-slate-600', 'ring' => 'ring-slate-200 dark:ring-slate-600/60'];
 
     $weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -103,7 +103,7 @@
 
         <div class="flex flex-wrap items-center justify-between gap-4">
             <div class="flex items-center gap-x-4">
-                <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-lg font-semibold bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-lg font-semibold bg-slate-100 text-slate-600 dark:bg-slate-750 dark:text-slate-300">
                     {{ strtoupper(substr($employee->full_name, 0, 1)) }}
                 </span>
                 <div>
@@ -151,7 +151,7 @@
                                 $summary['early_leave_days'] > 0 ? $summary['early_leave_days'].' left early' : null,
                             ]);
                         @endphp
-                        <span class="text-xs text-slate-400 dark:text-slate-500">(of which {{ implode(' · ', $timingParts) }})</span>
+                        <span class="text-xs text-slate-400 dark:text-slate-400">(of which {{ implode(' · ', $timingParts) }})</span>
                     @endif
                 </span>
                 <span class="text-slate-500 dark:text-slate-400">Absent <strong class="font-semibold text-slate-900 dark:text-slate-100">{{ $summary['absent'] }}</strong></span>
@@ -160,13 +160,13 @@
                     {{-- Late annotates its own status group, the same way as
                     Present's "(of which …)" (docs/ATTENDANCE_UI.md). --}}
                     @if ($summary['incomplete_late'] > 0)
-                        <span class="text-xs text-slate-400 dark:text-slate-500">({{ $summary['incomplete_late'] }} late)</span>
+                        <span class="text-xs text-slate-400 dark:text-slate-400">({{ $summary['incomplete_late'] }} late)</span>
                     @endif
                 </span>
             </div>
 
             @if ($summary['total_worked_minutes'] > 0)
-                <p class="mt-3 border-t border-slate-200/60 pt-3 text-xs text-slate-400 dark:border-slate-800/60 dark:text-slate-500">
+                <p class="mt-3 border-t border-slate-200/60 pt-3 text-xs text-slate-400 dark:border-slate-600/15 dark:text-slate-400">
                     Total worked this month: {{ \App\Support\Duration::format($summary['total_worked_minutes']) }}
                 </p>
             @endif
@@ -197,7 +197,7 @@
                     <button
                         type="button"
                         wire:click="previousMonth"
-                        class="rounded-lg border border-slate-300 bg-white p-1.5 text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
+                        class="rounded-lg border border-slate-300 bg-white p-1.5 text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700 dark:border-slate-600 dark:bg-slate-750 dark:text-slate-400 dark:hover:bg-slate-600"
                         aria-label="Previous month"
                     >
                         <x-icon name="chevron-left" class="h-4 w-4" />
@@ -206,7 +206,7 @@
                     <button
                         type="button"
                         wire:click="nextMonth"
-                        class="rounded-lg border border-slate-300 bg-white p-1.5 text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
+                        class="rounded-lg border border-slate-300 bg-white p-1.5 text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700 dark:border-slate-600 dark:bg-slate-750 dark:text-slate-400 dark:hover:bg-slate-600"
                         aria-label="Next month"
                     >
                         <x-icon name="chevron-right" class="h-4 w-4" />
@@ -218,11 +218,11 @@
                     @endunless
                 </div>
 
-                <div class="inline-flex rounded-lg border border-slate-300 bg-white p-0.5 dark:border-slate-700 dark:bg-slate-800" role="group" aria-label="View">
+                <div class="inline-flex rounded-lg border border-slate-300 bg-white p-0.5 dark:border-slate-600 dark:bg-slate-750" role="group" aria-label="View">
                     <button
                         type="button"
                         wire:click="$set('view', 'calendar')"
-                        class="rounded-md px-3 py-1.5 text-sm ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 {{ $view === 'calendar' ? 'font-semibold bg-primary-50 text-primary-700 ring-primary-600 dark:bg-primary-900/30 dark:text-primary-200 dark:ring-primary-500' : 'font-medium ring-transparent text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}"
+                        class="rounded-md px-3 py-1.5 text-sm ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 {{ $view === 'calendar' ? 'font-semibold bg-primary-50 text-primary-700 ring-primary-600 dark:bg-primary-600/35 dark:text-primary-200 dark:ring-primary-500' : 'font-medium ring-transparent text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}"
                         aria-pressed="{{ $view === 'calendar' ? 'true' : 'false' }}"
                     >
                         Calendar
@@ -230,7 +230,7 @@
                     <button
                         type="button"
                         wire:click="$set('view', 'table')"
-                        class="rounded-md px-3 py-1.5 text-sm ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 {{ $view === 'table' ? 'font-semibold bg-primary-50 text-primary-700 ring-primary-600 dark:bg-primary-900/30 dark:text-primary-200 dark:ring-primary-500' : 'font-medium ring-transparent text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}"
+                        class="rounded-md px-3 py-1.5 text-sm ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 {{ $view === 'table' ? 'font-semibold bg-primary-50 text-primary-700 ring-primary-600 dark:bg-primary-600/35 dark:text-primary-200 dark:ring-primary-500' : 'font-medium ring-transparent text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}"
                         aria-pressed="{{ $view === 'table' ? 'true' : 'false' }}"
                     >
                         Table
@@ -242,7 +242,7 @@
             <div class="px-6 pb-6">
                 <div class="grid grid-cols-7 gap-1.5 sm:gap-2">
                     @foreach ($weekdayLabels as $label)
-                        <div class="pb-1 text-center text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                        <div class="pb-1 text-center text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">
                             {{ $label }}
                         </div>
                     @endforeach
@@ -405,7 +405,7 @@
                 is worse than a colour, so this is a required companion to the
                 grid, not decoration. flex-wrap keeps it from overflowing on
                 narrow (mobile) widths; it just breaks onto more lines. --}}
-                <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-200/60 pt-3 text-xs text-slate-500 dark:border-slate-800/60 dark:text-slate-400">
+                <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-200/60 pt-3 text-xs text-slate-500 dark:border-slate-600/15 dark:text-slate-400">
                     @foreach ($legendItems as $item)
                         <span class="inline-flex items-center gap-1.5">
                             <x-icon :name="$item['icon']" class="h-3.5 w-3.5 shrink-0 {{ $item['text'] }}" />
@@ -450,13 +450,13 @@
                             <th @class(['py-3', 'px-6' => ! $canManagePunches, 'pl-6 pr-2' => $canManagePunches])>
                                 Note
                                 @unless ($canManagePunches)
-                                    <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
+                                    <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-600/15"></span>
                                 @endunless
                             </th>
                             @if ($canManagePunches)
                                 <th class="py-3 pl-2 pr-6">
                                     <span class="sr-only">Raw punches</span>
-                                    <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
+                                    <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-600/15"></span>
                                 </th>
                             @endif
                         </tr>
@@ -477,7 +477,7 @@
                             don't share scope unless a common ancestor carries it. --}}
                             <tbody wire:key="attendance-day-tbody-{{ $dayKey }}" x-data="{ open: false }">
                             <tr
-                                class="relative hover:bg-slate-50 dark:hover:bg-slate-800/60 {{ $day['date']->isToday() ? 'bg-primary-50/40 dark:bg-primary-900/10' : '' }}"
+                                class="relative hover:bg-slate-50 dark:hover:bg-slate-750/60 {{ $day['date']->isToday() ? 'bg-primary-50/40 dark:bg-primary-900/10' : '' }}"
                             >
                                 <td class="whitespace-nowrap px-6 py-2 text-sm tabular-nums text-slate-700 dark:text-slate-300">{{ $dayLabel }}</td>
                                 @if ($record)
@@ -498,7 +498,7 @@
                                         @if ($record->last_out)
                                             <x-time :time="$record->last_out" />
                                             @if ($record->isOvernightOut())
-                                                <span class="text-slate-400 dark:text-slate-500">(+1)</span>
+                                                <span class="text-slate-400 dark:text-slate-400">(+1)</span>
                                             @endif
                                         @else
                                             {!! $emDash !!}
@@ -510,7 +510,7 @@
                                     <td @class(['py-2 text-sm text-slate-500 dark:text-slate-400', 'px-6' => ! $canManagePunches, 'pl-6 pr-2' => $canManagePunches])>
                                         {!! $record->note !== null ? e($record->note) : $emDash !!}
                                         @if (! $canManagePunches && ! $loop->last)
-                                            <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
+                                            <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-600/15"></span>
                                         @endif
                                     </td>
                                 @else
@@ -530,7 +530,7 @@
                                     <td @class(['py-2 text-sm', 'px-6' => ! $canManagePunches, 'pl-6 pr-2' => $canManagePunches])>
                                         {!! $emDash !!}
                                         @if (! $canManagePunches && ! $loop->last)
-                                            <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
+                                            <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-600/15"></span>
                                         @endif
                                     </td>
                                 @endif
@@ -541,12 +541,12 @@
                                             @click="open = !open"
                                             :aria-expanded="open.toString()"
                                             aria-label="Show raw punches for {{ $dayLabel }}"
-                                            class="-my-1 ml-auto inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-primary-900/30 dark:hover:text-primary-300"
+                                            class="-my-1 ml-auto inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-primary-600/35 dark:hover:text-primary-300"
                                         >
                                             <x-icon name="chevron-right" class="h-4 w-4 transition" x-bind:class="open ? 'rotate-90' : ''" />
                                         </button>
                                         @unless ($loop->last)
-                                            <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
+                                            <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-600/15"></span>
                                         @endunless
                                     </td>
                                 @endif
@@ -557,7 +557,7 @@
                             explicit: keep it exactly as it was in Phase 2.4c. --}}
                             @can('update', $employee)
                                 <tr x-show="open" x-cloak>
-                                    <td colspan="9" class="bg-slate-50/60 px-6 py-4 dark:bg-slate-800/30">
+                                    <td colspan="9" class="bg-slate-50/60 px-6 py-4 dark:bg-slate-750/30">
                                         <x-attendance.day-detail-panel
                                             :employee="$employee"
                                             :date="$day['date']"
@@ -627,7 +627,7 @@
                         </div>
                     </div>
 
-                    <dl class="mt-4 grid grid-cols-2 gap-4 border-t border-slate-200/60 pt-4 dark:border-slate-800/60 sm:grid-cols-3">
+                    <dl class="mt-4 grid grid-cols-2 gap-4 border-t border-slate-200/60 pt-4 dark:border-slate-600/15 sm:grid-cols-3">
                         <div>
                             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Schedule</dt>
                             <dd class="mt-0.5 text-sm text-slate-900 dark:text-slate-100">
@@ -662,7 +662,7 @@
                                         <x-time :time="$modalRecord->last_out" />
                                     @endif
                                     @if ($modalRecord->isOvernightOut())
-                                        <span class="text-slate-400 dark:text-slate-500">(+1)</span>
+                                        <span class="text-slate-400 dark:text-slate-400">(+1)</span>
                                     @endif
                                 @else
                                     —
@@ -687,7 +687,7 @@
                         </div>
                     </dl>
 
-                    <div class="mt-4 border-t border-slate-200/60 pt-4 dark:border-slate-800/60">
+                    <div class="mt-4 border-t border-slate-200/60 pt-4 dark:border-slate-600/15">
                         <x-attendance.day-detail-panel
                             :employee="$employee"
                             :date="$modalDate"

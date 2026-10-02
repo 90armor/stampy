@@ -42,9 +42,9 @@
         @else
             <div role="list" aria-label="Holidays for {{ $yearFilter }}">
                 @foreach ($holidays as $holiday)
-                    <div wire:key="holiday-{{ $holiday->id }}" role="listitem" class="group relative grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 px-5 py-3.5 transition hover:bg-slate-50 dark:hover:bg-slate-800/60 sm:grid-cols-[9.5rem_minmax(0,1fr)_auto] sm:items-start sm:px-6 sm:py-4">
+                    <div wire:key="holiday-{{ $holiday->id }}" role="listitem" class="group relative grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 px-5 py-3.5 transition hover:bg-slate-50 dark:hover:bg-slate-750/60 sm:grid-cols-[9.5rem_minmax(0,1fr)_auto] sm:items-start sm:px-6 sm:py-4">
                         @unless ($loop->last)
-                            <span class="pointer-events-none absolute inset-x-5 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60 sm:inset-x-6"></span>
+                            <span class="pointer-events-none absolute inset-x-5 bottom-0 h-px bg-slate-200/60 dark:bg-slate-600/15 sm:inset-x-6"></span>
                         @endunless
 
                         <time datetime="{{ $holiday->date->format('Y-m-d') }}" class="col-start-1 text-sm font-medium tabular-nums text-slate-700 dark:text-slate-300">
@@ -65,7 +65,7 @@
                                     wire:click="edit({{ $holiday->id }})"
                                     wire:loading.attr="disabled"
                                     wire:target="edit({{ $holiday->id }})"
-                                    class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-600 active:bg-primary-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:hover:bg-primary-900/30 dark:hover:text-primary-400 dark:active:bg-primary-900/50"
+                                    class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-600 active:bg-primary-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:hover:bg-primary-600/35 dark:hover:text-primary-400 dark:active:bg-primary-900/50"
                                     aria-label="Edit {{ $holiday->name }} holiday on {{ \App\Support\DisplayDate::long($holiday->date) }}"
                                 >
                                     <x-icon name="pencil" class="w-4 h-4" />
@@ -96,7 +96,7 @@
 
             {{-- No footer (and no empty divider band) when everything fits on one page. --}}
             @if ($holidays->hasPages())
-                <div class="border-t border-slate-200/60 px-5 py-4 dark:border-slate-800/60 sm:px-6">
+                <div class="border-t border-slate-200/60 px-5 py-4 dark:border-slate-600/15 sm:px-6">
                     {{ $holidays->links() }}
                 </div>
             @endif

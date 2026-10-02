@@ -195,7 +195,7 @@ class CalendarReadabilityTest extends TestCase
         $this->assertStringNotContainsString('decoration-red', $html);
         $this->assertStringNotContainsString('aria-label="Left', $html);
         // The cell itself is an ordinary Present cell (neutral surface), not amber.
-        $this->assertStringContainsString('bg-white dark:bg-slate-900 ring-slate-200 dark:ring-slate-800', $html);
+        $this->assertStringContainsString('bg-white dark:bg-slate-800 ring-slate-200 dark:ring-slate-750', $html);
         $this->assertStringNotContainsString('bg-amber-50 dark:bg-amber-900/20', $html);
     }
 
@@ -411,7 +411,7 @@ class CalendarReadabilityTest extends TestCase
         // amber marked Out time.
         $this->assertStringNotContainsString('bg-amber-50 dark:bg-amber-900/20', $html);
         $this->assertStringNotContainsString('bg-green-50 dark:bg-green-900/20', $html);
-        $this->assertSame(2, substr_count($html, 'bg-white dark:bg-slate-900 ring-slate-200 dark:ring-slate-800'));
+        $this->assertSame(2, substr_count($html, 'bg-white dark:bg-slate-800 ring-slate-200 dark:ring-slate-750'));
         $this->assertStringContainsString('aria-label="Left 4 minutes early"', $html);
     }
 
@@ -448,9 +448,9 @@ class CalendarReadabilityTest extends TestCase
 
         // Quieter than a Present cell: no grey fill, a dashed boundary, and a
         // fainter icon than the day number.
-        $this->assertStringContainsString('bg-transparent ring-transparent border border-dashed border-slate-300 dark:border-slate-700', $html);
-        $this->assertStringNotContainsString('bg-slate-100 dark:bg-slate-800 ring-slate-500/10', $html);
-        $this->assertStringContainsString('text-slate-400 dark:text-slate-500', $html);
+        $this->assertStringContainsString('bg-transparent ring-transparent border border-dashed border-slate-300 dark:border-slate-600', $html);
+        $this->assertStringNotContainsString('bg-slate-100 dark:bg-slate-750 ring-slate-500/10', $html);
+        $this->assertStringContainsString('text-slate-400 dark:text-slate-400', $html);
     }
 
     public function test_off_cells_show_no_time_placeholder(): void

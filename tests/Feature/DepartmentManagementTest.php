@@ -48,14 +48,14 @@ class DepartmentManagementTest extends TestCase
         $html = Livewire::actingAs($admin)->test(Index::class)->html();
 
         $this->assertStringContainsString('Pagination Navigation', $html);
-        $this->assertStringContainsString('dark:border-slate-700 dark:bg-slate-800', $html);
+        $this->assertStringContainsString('dark:border-slate-600 dark:bg-slate-750', $html);
         $this->assertDoesNotMatchRegularExpression('/\b(?:dark:)?(?:[a-z:]+-)?(?:gray|blue)-\d{2,3}\b/', $html);
 
         // The current page is the shared selected state, and says so itself.
         $this->assertMatchesRegularExpression('/<span aria-current="page" class="([^"]*)">1<\/span>/', $html);
         preg_match('/<span aria-current="page" class="([^"]*)">1<\/span>/', $html, $current);
         $classes = explode(' ', $current[1]);
-        foreach (['font-semibold', 'border-primary-600', 'bg-primary-50', 'text-primary-700', 'dark:bg-primary-900/30'] as $class) {
+        foreach (['font-semibold', 'border-primary-600', 'bg-primary-50', 'text-primary-700', 'dark:bg-primary-600/35'] as $class) {
             $this->assertContains($class, $classes);
         }
         // No neutral surface alongside the tint: bg-white out-ranks bg-primary-50

@@ -22,10 +22,10 @@ $scrollIntoViewJsSnippet = ($scrollTo !== false)
 // border-slate-300 out-ranked the current page's tint in Tailwind's CSS order,
 // so the current page silently rendered as an ordinary white item.
 $item = 'relative inline-flex h-9 items-center justify-center text-sm border';
-$neutral = 'border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-800';
-$enabled = $neutral.' font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 focus:z-10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 active:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-slate-100 dark:active:bg-slate-600';
+$neutral = 'border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-750';
+$enabled = $neutral.' font-medium text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 focus:z-10 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 active:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-600 dark:hover:text-slate-100 dark:active:bg-slate-500';
 $disabled = $neutral.' cursor-default font-medium text-slate-300 dark:text-slate-600';
-$current = 'z-10 cursor-default font-semibold border-primary-600 bg-primary-50 text-primary-700 dark:border-primary-500 dark:bg-primary-900/30 dark:text-primary-200';
+$current = 'z-10 cursor-default font-semibold border-primary-600 bg-primary-50 text-primary-700 dark:border-primary-500 dark:bg-primary-600/35 dark:text-primary-200';
 @endphp
 
 <div>

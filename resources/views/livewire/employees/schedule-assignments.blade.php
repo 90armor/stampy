@@ -5,7 +5,7 @@
     </div>
 
     @if ($assignments->isEmpty())
-        <div class="mt-4 rounded-xl bg-slate-50 px-4 py-5 dark:bg-slate-800/60">
+        <div class="mt-4 rounded-xl bg-slate-50 px-4 py-5 dark:bg-slate-750/60">
             <p class="text-sm font-medium text-slate-800 dark:text-slate-200">No schedule assigned</p>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">This employee has no work schedule assignment.</p>
         </div>
@@ -50,7 +50,7 @@
                 type="button"
                 wire:click="create"
                 wire:loading.attr="disabled"
-                class="inline-flex items-center gap-1 rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-none ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-700"
+                class="inline-flex items-center gap-1 rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-none ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-750 dark:text-slate-200 dark:ring-slate-600 dark:hover:bg-slate-600"
             >
                 <x-icon name="plus" class="h-4 w-4" />
                 Assign schedule
@@ -66,7 +66,7 @@
             <a
                 href="{{ route('organization.index') }}?tab=schedules"
                 wire:navigate
-                class="inline-block rounded text-xs text-slate-500 underline decoration-slate-300 decoration-1 underline-offset-2 transition hover:text-primary-700 hover:decoration-primary-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:decoration-slate-700 dark:hover:text-primary-400"
+                class="inline-block rounded text-xs text-slate-500 underline decoration-slate-300 decoration-1 underline-offset-2 transition hover:text-primary-700 hover:decoration-primary-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:decoration-slate-600 dark:hover:text-primary-400"
             >
                 Moving more than one employee? Bulk reassign on the Schedules tab
             </a>
@@ -89,11 +89,11 @@
     @enderror
 
     @if ($assignments->count() > 1)
-        <div class="mt-5 border-t border-slate-200/60 pt-4 dark:border-slate-800/60">
+        <div class="mt-5 border-t border-slate-200/60 pt-4 dark:border-slate-600/15">
             <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Assignment history</p>
             <ul class="mt-3 space-y-2">
                 @foreach ($assignments->slice(0, -1)->reverse()->values() as $assignment)
-                    <li class="group flex items-center justify-between gap-3 rounded-xl border border-slate-200/60 px-4 py-3 dark:border-slate-800/60">
+                    <li class="group flex items-center justify-between gap-3 rounded-xl border border-slate-200/60 px-4 py-3 dark:border-slate-600/15">
                         <div class="min-w-0">
                             <p class="break-words text-sm font-medium text-slate-900 dark:text-slate-100">
                                 {{ $assignment->workSchedule->name }}
@@ -135,7 +135,7 @@
             maxWidth="sm"
             panelClass="mt-16"
         >
-            <div class="mx-6 border-b border-slate-200/60 py-5 dark:border-slate-800/60">
+            <div class="mx-6 border-b border-slate-200/60 py-5 dark:border-slate-600/15">
                 <h3 class="text-base font-semibold text-slate-900 dark:text-slate-100">Assign Schedule</h3>
             </div>
 
@@ -154,11 +154,11 @@
                 <div>
                     <x-input-label for="assign_effective_from" value="Effective from" />
                     <x-text-input id="assign_effective_from" type="date" wire:model="effective_from" class="mt-1 block w-full" />
-                    <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">Past dates correct a wrong assignment; future dates schedule a change ahead. Rebuilds this employee's attendance from this date through today — never a future date.</p>
+                    <p class="mt-1 text-xs text-slate-400 dark:text-slate-400">Past dates correct a wrong assignment; future dates schedule a change ahead. Rebuilds this employee's attendance from this date through today — never a future date.</p>
                     <x-input-error :messages="$errors->get('effective_from')" class="mt-1" />
                 </div>
 
-                <div class="flex items-center justify-end gap-3 border-t border-slate-200/60 pt-4 dark:border-slate-800/60">
+                <div class="flex items-center justify-end gap-3 border-t border-slate-200/60 pt-4 dark:border-slate-600/15">
                     <x-button type="button" variant="secondary" wire:click="$set('showModal', false)">Cancel</x-button>
                     <x-button type="submit" variant="primary">Assign</x-button>
                 </div>

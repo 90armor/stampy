@@ -33,6 +33,7 @@ export default {
                     800: '#292524',
                     900: '#1c1917',
                     950: '#0c0a09',
+                    750: '#363230', // dark option B: custom stone step, OKLab-interpolated
                 },
                 // Deep evergreen — primary brand color for buttons, links, active states.
                 primary: {

@@ -29,13 +29,13 @@ This document is the source of truth for Stampy's visual interface. It records c
 | Text / Primary | `text-slate-900` | `dark:text-slate-100` | Headings and primary readable content |
 | Text / Secondary | `text-slate-700` | `dark:text-slate-300` | Supporting body content and controls |
 | Text / Muted | `text-slate-500` | `dark:text-slate-400` | Metadata, hints, and secondary labels |
-| Text / Subtle | `text-slate-400` | `dark:text-slate-500` | Low-emphasis decoration; never critical copy |
-| Surface / Page | `bg-slate-100` | `dark:bg-slate-950` | Application and authentication background |
-| Surface / Card | `bg-white` | `dark:bg-slate-900` | Cards, table containers, information panels |
-| Surface / Control | `bg-white` | `dark:bg-slate-800` | Inputs, selects, textareas, compact controls |
-| Surface / Overlay panel | `bg-white` | `dark:bg-slate-900` | Dropdowns, popovers, modal panels |
-| Border / Default | `ring-slate-200/60` or `border-slate-300` | `dark:ring-slate-800` or `dark:border-slate-700` | Surface and control boundaries |
-| Border / Divider | `bg-slate-200/60` or `border-slate-200/60` | `dark:bg-slate-800/60` or `dark:border-slate-800/60` | Row and section separation |
+| Text / Subtle | `text-slate-400` | `dark:text-slate-500` (icons only) | Low-emphasis decoration; never critical copy. In dark mode `slate-500` is never used for text — it measures under 4.5:1 on the card; muted text is `slate-400` |
+| Surface / Page | `bg-slate-100` | `dark:bg-slate-900` | Application and authentication background |
+| Surface / Card | `bg-white` | `dark:bg-slate-800` | Cards, table containers, information panels |
+| Surface / Control | `bg-white` | `dark:bg-slate-750` | Inputs, selects, textareas, compact controls |
+| Surface / Overlay panel | `bg-white` | `dark:bg-slate-750` | Dropdowns, popovers, modal panels — one step above the card |
+| Border / Default | `ring-slate-200/60` or `border-slate-300` | `dark:ring-slate-750` or `dark:border-slate-600` | Surface and control boundaries |
+| Border / Divider | `bg-slate-200/60` or `border-slate-200/60` | `dark:bg-slate-600/15` or `dark:border-slate-600/15` | Row and section separation — translucent `slate-600`, so it reads on cards and overlays alike |
 | Action / Primary | `bg-primary-600 text-white` | same | Main action on a page or flow |
 | Action / Secondary | `bg-white text-slate-700` | `dark:bg-slate-800 dark:text-slate-200` | Supporting actions |
 | Action / Danger | `text-red-600` with red boundary/tint | `dark:text-red-400` | Destructive actions |
@@ -78,9 +78,27 @@ Do not add arbitrary pixel spacing until the standard scale demonstrably cannot 
 - `rounded-xl`: cards, dropdown menus, and popovers.
 - `rounded-2xl`: modal and large overlay panels.
 - `rounded-full`: geometry that is intentionally circular, including avatars, dots, progress tracks, and circular icon containers; not status badges or control styling.
-- Cards use `shadow-sm` plus a ring. Separation comes from the surface step first: white cards on a `slate-100` page in light mode. In dark mode a shadow is invisible on near-black, so the card edge is a full-opacity `ring-slate-800` around the `slate-900` card on the `slate-950` page; do not weaken it back to a translucent ring.
+- Cards use `shadow-sm` plus a ring. Separation comes from the surface step first: white cards on a `slate-100` page in light mode. In dark mode a shadow is invisible on near-black, so the card edge is a full-opacity `ring-slate-750` around the `slate-800` card on the `slate-900` page; do not weaken it back to a translucent ring.
 - Dropdowns and modal panels use `shadow-lg` or `shadow-xl` because they float above content.
 - Elevation communicates hierarchy, not decoration. Normal cards do not gain elevation or a colored ring on hover unless the entire card is interactive.
+
+## Dark surfaces
+
+Dark mode is one ladder of warm stone steps; every layer is defined relative to the card, so a change to the card moves everything with it.
+
+| Layer | Dark value | Notes |
+|---|---|---|
+| Page | `slate-900` (`#1c1917`) | |
+| Card | `slate-800` (`#292524`) | card vs page 1.15:1 |
+| Card ring | `slate-750`, full opacity | a shadow can't separate a card from a dark page |
+| Overlay (dropdown, popover, modal) and control | `slate-750` (`#363230`) | one step above the card |
+| Divider | `slate-600/15` (`/70` lines: `slate-600/20`) | translucent, so it reads on cards and overlays alike; same contrast against the card as before (≈1.09:1) |
+| Row hover | `slate-750/60` over the card | pinned table cells layer the same tint over the card |
+| Hover on a control or overlay | `slate-600/30` | translucent: it sits on cards and overlays, which share the control step |
+| Control border, strong line | `slate-600` | |
+| Selected tint | `primary-600/35` | the shared selected state and the date picker's range band (1.24:1 against the popover) |
+
+Muted text is `slate-400`: 6.01:1 on the card, 5.03:1 on overlays and controls, 5.40:1 on a hovered row. Every status badge passes 4.5:1 on the card and on a hovered row (lowest: Absent on a hovered row, 4.72:1).
 
 ## Surface architecture
 
@@ -92,7 +110,7 @@ The sidebar, topbar, and authentication shell may use translucency and `backdrop
 
 ### Content surfaces
 
-Cards, stat cards, table containers, information panels, controls, dropdown menus, popovers, and modal panels are solid. Use `bg-white`/`dark:bg-slate-900` for container surfaces and `bg-white`/`dark:bg-slate-800` for controls. Do not add `backdrop-blur` to content components.
+Cards, stat cards, table containers, information panels, controls, dropdown menus, popovers, and modal panels are solid. Use `bg-white`/`dark:bg-slate-800` for container surfaces, `bg-white`/`dark:bg-slate-750` for overlays (dropdowns, popovers, modal panels — one step above the card) and for controls. Do not add `backdrop-blur` to content components.
 
 ### Overlay treatment
 
@@ -136,7 +154,7 @@ Entity detail pages are operational records, not dashboards or profile heroes. L
 - Every interactive element has a visible rest state and a keyboard focus indicator. Equivalent primitives use the existing primary/evergreen palette for a clear, no-layout-shift `focus-visible` ring; the treatment respects the component type rather than forcing the same border construction onto buttons, links, fields, and navigation.
 - Hover may strengthen an existing affordance; it must not reveal the only action or link cue.
 - Pressed (`:active`) feedback is temporary and distinct from focus and selected/current state. Pointer activation must not create a decorative persistent ring.
-- **Selected state** is one shared control state, not an action, used by filter chips, segmented toggles (Calendar/Table) and the current pagination page: `bg-primary-50 text-primary-700 font-semibold` with a primary border (`ring-primary-600`, or `border-primary-600` on the bordered pagination items; dark: `bg-primary-900/30 text-primary-200` with a `primary-500` border), plus a check where the control is a multi-select chip. Unselected is a neutral outline at `font-medium`. Each carries its semantic state attribute: `aria-pressed` on chips and toggles, `aria-current="page"` on the current page. Never use a solid primary fill for selection; it must not out-weigh the page's primary action. A default filter state must read as "no filter applied" rather than as many selected chips.
+- **Selected state** is one shared control state, not an action, used by filter chips, segmented toggles (Calendar/Table) and the current pagination page: `bg-primary-50 text-primary-700 font-semibold` with a primary border (`ring-primary-600`, or `border-primary-600` on the bordered pagination items; dark: `bg-primary-600/35 text-primary-200` with a `primary-500` border), plus a check where the control is a multi-select chip. Unselected is a neutral outline at `font-medium`. Each carries its semantic state attribute: `aria-pressed` on chips and toggles, `aria-current="page"` on the current page. Never use a solid primary fill for selection; it must not out-weigh the page's primary action. A default filter state must read as "no filter applied" rather than as many selected chips.
 - Disabled controls use reduced contrast and `cursor-not-allowed` where appropriate, while remaining readable. Loading actions remain disabled against repeat submission and retain meaningful copy or an accessible loading indicator.
 - Text-entry and selection controls may retain a visible `focus` border/ring while being edited; action controls and links prefer `focus-visible` so keyboard focus is prominent without adding unnecessary pointer-click persistence.
 - Destructive actions use red semantics and require confirmation when the effect is material.
@@ -159,8 +177,8 @@ Keep touch targets at least 44px high for primary auth controls and small-screen
 
 - Use uppercase `text-xs` headers that never wrap, and `px-6 py-3` headings. Body cells default to `px-6 py-4`; dense operational tables (Attendance) use `px-6 py-2` for about 52px rows. Abbreviate a long header rather than let it wrap, exposing the full name with `<abbr title>` or `sr-only` text.
 - Empty cell values are a muted em dash (`text-slate-300 dark:text-slate-600`), so data reads before placeholders.
-- Use the established inset `slate-200/60` divider (dark: `slate-800/60`), omitting a trailing divider after the last row.
-- Row hover is `hover:bg-slate-50 dark:hover:bg-slate-800/60`.
+- Use the established inset `slate-200/60` divider (dark: `slate-600/15`), omitting a trailing divider after the last row.
+- Row hover is `hover:bg-slate-50 dark:hover:bg-slate-750/60`.
 - Preserve selectable data when choosing between a cell link and a whole-row target.
 - Wrap wide tables in `overflow-x-auto`; do not compress data until it becomes unreadable. From `sm` to below `xl` (640–1279px), a dense table may pin its Status and trailing action columns with `.table-pin` (opaque, row-matched surfaces; an edge shadow only while content passes under them) — never a leading column, never on a phone (below `sm` the pair would cover half the card), and never from `xl` up.
 - Place pagination within the same solid data surface, separated by a standard divider. Render the footer (and its divider) only when `hasPages()` is true; a one-page list ends at its last row, with no empty band.

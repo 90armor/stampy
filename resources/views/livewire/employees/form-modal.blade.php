@@ -37,7 +37,7 @@
                 </div>
             </div>
         @else
-            <div class="mx-6 border-b border-slate-200/60 py-5 dark:border-slate-800/60">
+            <div class="mx-6 border-b border-slate-200/60 py-5 dark:border-slate-600/15">
                 <h3 class="text-base font-semibold text-slate-900 dark:text-slate-100">
                     {{ $editing ? 'Edit — '.$editing->full_name : 'Add Employee' }}
                 </h3>
@@ -63,7 +63,7 @@
                         <div>
                             <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">Identity</p>
 
-                            <div class="mt-3 divide-y divide-slate-200/60 dark:divide-slate-800/60">
+                            <div class="mt-3 divide-y divide-slate-200/60 dark:divide-slate-600/15">
                                 <div class="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
                                     <div class="sm:max-w-[240px]">
                                         <x-input-label for="emp_full_name" value="Full name" class="!mb-0" />
@@ -78,7 +78,7 @@
                                     <div class="sm:max-w-[240px]">
                                         <x-input-label for="emp_employee_code" value="Employee code" class="!mb-0" />
                                         @if ($editing)
-                                            <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Can't be changed after creation.</p>
+                                            <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-400">Can't be changed after creation.</p>
                                         @endif
                                     </div>
                                     <div class="sm:w-[320px] sm:shrink-0">
@@ -97,7 +97,7 @@
                         <div>
                             <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">Work</p>
 
-                            <div class="mt-3 divide-y divide-slate-200/60 dark:divide-slate-800/60">
+                            <div class="mt-3 divide-y divide-slate-200/60 dark:divide-slate-600/15">
                                 <div class="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
                                     <div class="sm:max-w-[240px]">
                                         <x-input-label for="emp_department_id" value="Department" class="!mb-0" />
@@ -131,7 +131,7 @@
                                 <div class="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
                                     <div class="sm:max-w-[240px]">
                                         <x-input-label for="emp_manager_id" value="Manager" class="!mb-0" />
-                                        <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Leave blank for a top-level employee.</p>
+                                        <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-400">Leave blank for a top-level employee.</p>
                                     </div>
                                     <div class="sm:w-[320px] sm:shrink-0">
                                         <x-select id="emp_manager_id" wire:model="manager_id">
@@ -160,11 +160,11 @@
                         <div>
                             <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">System</p>
 
-                            <div class="mt-3 divide-y divide-slate-200/60 dark:divide-slate-800/60">
+                            <div class="mt-3 divide-y divide-slate-200/60 dark:divide-slate-600/15">
                                 <div class="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
                                     <div class="sm:max-w-[240px]">
                                         <x-input-label for="emp_device_user_id" value="Device user ID" class="!mb-0" />
-                                        <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Must match the user ID enrolled on the fingerprint device.</p>
+                                        <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-400">Must match the user ID enrolled on the fingerprint device.</p>
                                     </div>
                                     <div class="sm:w-[320px] sm:shrink-0">
                                         <x-text-input id="emp_device_user_id" type="text" wire:model="device_user_id" placeholder="ZKTeco device user ID" />
@@ -209,7 +209,7 @@
                                                 method: 'resetPassword',
                                                 args: [],
                                             })"
-                                            class="inline-flex shrink-0 items-center justify-center gap-x-1.5 rounded-lg bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-none ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-700 dark:active:bg-slate-600 dark:focus-visible:ring-offset-slate-900"
+                                            class="inline-flex shrink-0 items-center justify-center gap-x-1.5 rounded-lg bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-none ring-1 ring-inset ring-slate-300 transition hover:bg-slate-50 active:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:bg-slate-750 dark:text-slate-200 dark:ring-slate-600 dark:hover:bg-slate-600 dark:active:bg-slate-500 dark:focus-visible:ring-offset-slate-800"
                                         >
                                             Reset password
                                         </button>
@@ -222,11 +222,11 @@
                                         </label>
 
                                         @if ($create_user)
-                                            <div class="mt-4 space-y-4 border-t border-slate-200/60 pt-4 dark:border-slate-800/60">
+                                            <div class="mt-4 space-y-4 border-t border-slate-200/60 pt-4 dark:border-slate-600/15">
                                                 <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
                                                     <div class="sm:max-w-[240px]">
                                                         <x-input-label for="emp_username" value="Username" class="!mb-0" />
-                                                        <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-500">Login identifier. Defaults to the employee code.</p>
+                                                        <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-400">Login identifier. Defaults to the employee code.</p>
                                                     </div>
                                                     <div class="sm:w-[320px] sm:shrink-0">
                                                         <x-text-input id="emp_username" type="text" wire:model="username" />
@@ -269,12 +269,12 @@
                 </div>
 
                 <div
-                    class="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent transition-opacity duration-150 dark:from-slate-900"
+                    class="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent transition-opacity duration-150 dark:from-slate-750"
                     :class="atBottom ? 'opacity-0' : 'opacity-100'"
                 ></div>
             </div>
 
-            <div class="mx-6 flex items-center justify-end gap-3 border-t border-slate-200/60 py-4 dark:border-slate-800/60">
+            <div class="mx-6 flex items-center justify-end gap-3 border-t border-slate-200/60 py-4 dark:border-slate-600/15">
                 <x-button type="button" variant="secondary" wire:click="$set('showModal', false)">Cancel</x-button>
                 <x-button type="submit" form="employee-form" variant="primary">Save Employee</x-button>
             </div>

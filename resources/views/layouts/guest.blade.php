@@ -31,7 +31,7 @@
         @livewireStyles
     </head>
     <body class="font-sans text-slate-900 antialiased dark:text-slate-100">
-        <div class="min-h-screen min-h-dvh grid grid-cols-1 lg:grid-cols-[46%_54%] bg-slate-100 dark:bg-slate-950 bg-shell">
+        <div class="min-h-screen min-h-dvh grid grid-cols-1 lg:grid-cols-[46%_54%] bg-slate-100 dark:bg-slate-900 bg-shell">
             <!-- Hero panel -->
             <section class="hidden lg:flex flex-col bg-primary-700 text-white px-16 py-12">
                 <x-logo-lockup size="32" variant="dark" />
@@ -55,7 +55,7 @@
                     type="button"
                     x-data="{ isDark: document.documentElement.classList.contains('dark') }"
                     @click="document.documentElement.classList.toggle('dark'); isDark = document.documentElement.classList.contains('dark'); localStorage.setItem('theme', isDark ? 'dark' : 'light')"
-                    class="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 sm:right-6 sm:top-6 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100 dark:focus-visible:ring-offset-slate-950"
+                    class="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 sm:right-6 sm:top-6 dark:text-slate-300 dark:hover:bg-slate-600/30 dark:hover:text-slate-100 dark:focus-visible:ring-offset-slate-900"
                     :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
                     :aria-pressed="isDark.toString()"
                 >

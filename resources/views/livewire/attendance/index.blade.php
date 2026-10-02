@@ -68,7 +68,7 @@
         <div class="flex items-baseline justify-end gap-4 px-6 pt-4">
             <p class="text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ $summaryScope }}</p>
         </div>
-        <dl class="grid grid-cols-3 divide-x divide-slate-200/60 dark:divide-slate-800/60">
+        <dl class="grid grid-cols-3 divide-x divide-slate-200/60 dark:divide-slate-600/15">
             @if ($live)
                 {{-- Exactly today: the live "who is here now" strip. Any other
                 range: end-of-day status counts ("did they attend"). --}}
@@ -109,7 +109,7 @@
                     <button
                         type="button"
                         wire:click="resetFilters"
-                        class="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-primary-300"
+                        class="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-600/30 dark:hover:text-primary-300"
                     >
                         <x-icon name="x-mark" class="h-3.5 w-3.5" />
                         Reset filters
@@ -138,7 +138,7 @@
                     :aria-expanded="panelOpen"
                     aria-haspopup="dialog"
                     aria-controls="attendance-date-panel"
-                    class="inline-flex w-full items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 lg:w-auto"
+                    class="inline-flex w-full items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-600 dark:bg-slate-750 dark:text-slate-200 dark:hover:bg-slate-600 lg:w-auto"
                 >
                     <span class="inline-flex items-center gap-2"><x-icon name="calendar-days" class="h-4 w-4 text-slate-400 dark:text-slate-500" />{{ $rangeLabel }}</span>
                     <x-icon name="chevron-down" class="h-4 w-4 text-slate-400 dark:text-slate-500" />
@@ -170,7 +170,7 @@
                     x-cloak
                     role="dialog"
                     aria-label="Choose a date range"
-                    class="absolute left-0 z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl bg-white p-4 shadow-xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800"
+                    class="absolute left-0 z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl bg-white p-4 shadow-xl ring-1 ring-slate-200 dark:bg-slate-750 dark:ring-slate-750"
                 >
                     <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Quick ranges</p>
                     {{-- A preset shows the shared selected state while the
@@ -185,13 +185,13 @@
                                 :aria-pressed="String(presetActive('{{ $preset }}'))"
                                 class="rounded-lg px-2 py-1.5 text-left text-sm ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                                 :class="presetActive('{{ $preset }}')
-                                    ? 'bg-primary-50 font-semibold text-primary-700 ring-primary-600 dark:bg-primary-900/30 dark:text-primary-200 dark:ring-primary-500'
-                                    : 'font-normal text-slate-600 ring-transparent hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'"
+                                    ? 'bg-primary-50 font-semibold text-primary-700 ring-primary-600 dark:bg-primary-600/35 dark:text-primary-200 dark:ring-primary-500'
+                                    : 'font-normal text-slate-600 ring-transparent hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-600/30'"
                             >{{ $range['label'] }}</button>
                         @endforeach
                     </div>
 
-                    <div class="mt-4 border-t border-slate-200/60 pt-4 dark:border-slate-800/60">
+                    <div class="mt-4 border-t border-slate-200/60 pt-4 dark:border-slate-600/15">
                         <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Custom</p>
 
                         {{-- From 640px: the range picker. Alpine renders it, so
@@ -215,15 +215,15 @@
                         tinted, the current one has the quiet marker. A ring is
                         only ever keyboard focus. --}}
                         @php
-                            $pickerNavButton = 'inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100';
+                            $pickerNavButton = 'inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-600/30 dark:hover:text-slate-100';
                             // Month and year cells: same states as a day, as a 3-wide grid of buttons-in-cells.
                             // The only ring in the picker is keyboard focus, offset so it
                             // also reads on a filled endpoint.
-                            $pickerFocus = 'group-focus-visible:ring-2 group-focus-visible:ring-primary-500 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-white dark:group-focus-visible:ring-primary-400 dark:group-focus-visible:ring-offset-slate-900';
+                            $pickerFocus = 'group-focus-visible:ring-2 group-focus-visible:ring-primary-500 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-white dark:group-focus-visible:ring-primary-400 dark:group-focus-visible:ring-offset-slate-750';
                             $pickerFill = 'bg-primary-600 font-semibold text-white dark:bg-primary-400 dark:text-slate-900';
-                            $pickerTint = 'bg-primary-50 font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-200';
-                            $pickerPlain = 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800';
-                            $pickerCurrent = 'font-semibold text-primary-700 hover:bg-slate-100 dark:text-primary-300 dark:hover:bg-slate-800';
+                            $pickerTint = 'bg-primary-50 font-medium text-primary-700 dark:bg-primary-600/35 dark:text-primary-200';
+                            $pickerPlain = 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-600/30';
+                            $pickerCurrent = 'font-semibold text-primary-700 hover:bg-slate-100 dark:text-primary-300 dark:hover:bg-slate-600/30';
                             // Month and year cells: a 3-wide grid of buttons-in-cells.
                             $pickerZoomCell = 'relative flex h-10 w-full items-center justify-center rounded-lg text-sm transition '.$pickerFocus;
                         @endphp
@@ -238,7 +238,7 @@
                                         x-show="view !== 'years'"
                                         @click="zoomOut()"
                                         :aria-label="zoomLabel"
-                                        class="inline-flex items-center gap-1 rounded-lg px-2 py-1 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-slate-800"
+                                        class="inline-flex items-center gap-1 rounded-lg px-2 py-1 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-slate-600/30"
                                     >
                                         <span x-text="heading"></span>
                                         <x-icon name="chevron-down" class="h-4 w-4 text-slate-400 dark:text-slate-500" />
@@ -283,7 +283,7 @@
                                                 >
                                                     <template x-if="cell">
                                                         <div aria-hidden="true">
-                                                            <span class="pointer-events-none absolute inset-y-0.5 bg-primary-50 dark:bg-primary-900/30" :class="bandClass(cell)"></span>
+                                                            <span class="pointer-events-none absolute inset-y-0.5 bg-primary-50 dark:bg-primary-600/35" :class="bandClass(cell)"></span>
                                                             <span
                                                                 class="relative mx-auto flex h-9 w-9 items-center justify-center rounded-lg text-sm tabular-nums transition {{ $pickerFocus }}"
                                                                 :class="isStart(cell.iso) || isEnd(cell.iso)
@@ -397,7 +397,7 @@
                                     id="attendance-from"
                                     type="date"
                                     wire:model.live="fromDate"
-                                    class="block w-full min-w-0 rounded-lg border-slate-300 bg-white text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                                    class="block w-full min-w-0 rounded-lg border-slate-300 bg-white text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-750 dark:border-slate-600 dark:text-slate-100"
                                 >
                             </div>
                             <div class="min-w-0">
@@ -406,7 +406,7 @@
                                     id="attendance-to"
                                     type="date"
                                     wire:model.live="toDate"
-                                    class="block w-full min-w-0 rounded-lg border-slate-300 bg-white text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
+                                    class="block w-full min-w-0 rounded-lg border-slate-300 bg-white text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-750 dark:border-slate-600 dark:text-slate-100"
                                 >
                             </div>
                         </div>
@@ -422,7 +422,7 @@
                     type="text"
                     wire:model.live.debounce.300ms="employeeFilter"
                     placeholder="Name or employee code…"
-                    class="block w-full rounded-lg border-slate-300 bg-white pl-9 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:placeholder-slate-500"
+                    class="block w-full rounded-lg border-slate-300 bg-white pl-9 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-750 dark:border-slate-600 dark:text-slate-100 dark:placeholder-slate-400"
                 >
             </div>
 
@@ -451,14 +451,14 @@
         state looks like what it is: no filter. Off is its own "Show off
         days" toggle. See Index::toggleStatus() for the mapping. --}}
         @php
-            $chipBase = 'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-slate-900';
-            $chipSelected = 'font-semibold bg-primary-50 text-primary-700 ring-primary-600 hover:bg-primary-100 dark:bg-primary-900/30 dark:text-primary-200 dark:ring-primary-500 dark:hover:bg-primary-900/50';
-            $chipUnselected = 'font-medium bg-white text-slate-600 ring-slate-300 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700 dark:hover:bg-slate-700 dark:hover:text-white dark:active:bg-slate-600';
+            $chipBase = 'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-slate-800';
+            $chipSelected = 'font-semibold bg-primary-50 text-primary-700 ring-primary-600 hover:bg-primary-100 dark:bg-primary-600/35 dark:text-primary-200 dark:ring-primary-500 dark:hover:bg-primary-600/45';
+            $chipUnselected = 'font-medium bg-white text-slate-600 ring-slate-300 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 dark:bg-slate-750 dark:text-slate-300 dark:ring-slate-600 dark:hover:bg-slate-600 dark:hover:text-white dark:active:bg-slate-500';
             $workingStatuses = collect($allStatuses)->reject(fn ($status) => $status === \App\Enums\AttendanceStatus::Off);
             $allWorkingSelected = $workingStatuses->every(fn ($status) => in_array($status->value, $statuses, true));
             $showsOffDays = in_array(\App\Enums\AttendanceStatus::Off->value, $statuses, true);
         @endphp
-        <div class="grid gap-4 border-t border-slate-200/60 px-5 py-4 dark:border-slate-800/60 sm:px-6 xl:grid-cols-[minmax(0,1fr)_auto]">
+        <div class="grid gap-4 border-t border-slate-200/60 px-5 py-4 dark:border-slate-600/15 sm:px-6 xl:grid-cols-[minmax(0,1fr)_auto]">
         <fieldset>
         <legend class="text-xs font-medium text-slate-700 dark:text-slate-300">Status</legend>
         <div class="mt-2 flex flex-wrap gap-2">
@@ -520,15 +520,15 @@
         @endif
 
         @if ($attendances->isEmpty())
-            <div class="border-t border-slate-200/60 px-6 py-10 text-center dark:border-slate-800/60">
-                <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500">
+            <div class="border-t border-slate-200/60 px-6 py-10 text-center dark:border-slate-600/15">
+                <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-slate-750 dark:text-slate-400">
                     <x-icon name="clock" class="h-5 w-5" />
                 </span>
                 <h3 class="mt-3 text-sm font-medium text-slate-900 dark:text-slate-100">No attendance records</h3>
                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Try widening the date range or adjusting the filters above.</p>
             </div>
         @else
-            <div class="border-t border-slate-200/60 dark:border-slate-800/60">
+            <div class="border-t border-slate-200/60 dark:border-slate-600/15">
                 {{-- The table's natural width is ~1119px; it first fits the card
                 at a 1440px viewport (1134px card), so the cue shows below that —
                 including 1024–1439, where it used to be hidden while the table
@@ -554,7 +554,7 @@
                         <tr class="relative whitespace-nowrap text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
                             <th class="px-6 py-3">
                                 Date
-                                <span class="pointer-events-none absolute inset-x-6 bottom-0 z-[2] h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
+                                <span class="pointer-events-none absolute inset-x-6 bottom-0 z-[2] h-px bg-slate-200/60 dark:bg-slate-600/15"></span>
                             </th>
                             <th class="min-w-[11rem] px-6 py-3">Employee</th>
                             <th class="px-6 py-3">Department</th>
@@ -581,14 +581,14 @@
                                 $style = $variantStyles[$attendance->displayVariant()];
                                 $workDateLabel = \App\Support\DisplayDate::compact($attendance->work_date);
                             @endphp
-                            <tr wire:key="daily-attendance-{{ $attendance->id }}" class="group relative hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                            <tr wire:key="daily-attendance-{{ $attendance->id }}" class="group relative hover:bg-slate-50 dark:hover:bg-slate-750/60">
                                 <td class="whitespace-nowrap px-6 py-2 text-sm tabular-nums {{ $dateCellClass }}">
                                     {{ $workDateLabel }}
                                     {{-- The row divider lives in the first cell (positioned
                                     against the row) and sits above the pinned cells, so it
                                     runs unbroken beneath them. --}}
                                     @unless ($loop->last)
-                                        <span class="pointer-events-none absolute inset-x-6 bottom-0 z-[2] h-px bg-slate-200/60 dark:bg-slate-800/60"></span>
+                                        <span class="pointer-events-none absolute inset-x-6 bottom-0 z-[2] h-px bg-slate-200/60 dark:bg-slate-600/15"></span>
                                     @endunless
                                 </td>
                                 {{-- Plain text, not a link: the row's one navigation target is
@@ -610,7 +610,7 @@
                                     @if ($attendance->last_out)
                                         <x-time :time="$attendance->last_out" />
                                         @if ($attendance->isOvernightOut())
-                                            <span class="text-slate-400 dark:text-slate-500">(+1)</span>
+                                            <span class="text-slate-400 dark:text-slate-400">(+1)</span>
                                         @endif
                                     @else
                                         {!! $emDash !!}
@@ -641,7 +641,7 @@
                                             href="{{ route('attendance.show', $attendance->employee) }}?month={{ $attendance->work_date->format('Y-m') }}"
                                             wire:navigate
                                             aria-label="View attendance for {{ $attendance->employee->full_name }}, {{ $workDateLabel }}"
-                                            class="-my-1 ml-auto inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover:text-primary-600 dark:text-slate-400 dark:hover:bg-primary-900/30 dark:hover:text-primary-300 dark:group-hover:text-primary-400"
+                                            class="-my-1 ml-auto inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover:text-primary-600 dark:text-slate-400 dark:hover:bg-primary-600/35 dark:hover:text-primary-300 dark:group-hover:text-primary-400"
                                         >
                                             <x-icon name="chevron-right" class="h-4 w-4" />
                                         </a>
@@ -657,7 +657,7 @@
 
             {{-- No footer (and no empty divider band) when everything fits on one page. --}}
             @if ($attendances->hasPages())
-                <div class="mx-6 border-t border-slate-200/60 py-4 dark:border-slate-800/60">
+                <div class="mx-6 border-t border-slate-200/60 py-4 dark:border-slate-600/15">
                     {{ $attendances->links() }}
                 </div>
             @endif

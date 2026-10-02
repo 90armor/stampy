@@ -7,7 +7,7 @@
         maxWidth="sm"
         panelClass="mb-6"
     >
-        <div class="mx-6 border-b border-slate-200/60 py-5 dark:border-slate-800/60">
+        <div class="mx-6 border-b border-slate-200/60 py-5 dark:border-slate-600/15">
             <h3 class="text-base font-semibold text-slate-900 dark:text-slate-100">Bulk Reassign</h3>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Move everyone currently on one schedule to another.</p>
         </div>
@@ -59,9 +59,9 @@
                 </div>
 
                 <div class="flex items-center gap-3" aria-hidden="true">
-                    <span class="h-px flex-1 bg-slate-200/60 dark:bg-slate-800/60"></span>
+                    <span class="h-px flex-1 bg-slate-200/60 dark:bg-slate-600/15"></span>
                     <x-icon name="chevron-down" class="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                    <span class="h-px flex-1 bg-slate-200/60 dark:bg-slate-800/60"></span>
+                    <span class="h-px flex-1 bg-slate-200/60 dark:bg-slate-600/15"></span>
                 </div>
 
                 <div>
@@ -90,7 +90,7 @@
             employeesCurrentlyOn()), so this can never show a different
             set of people than the ones who actually get moved. --}}
             @if ($bulkFromEmployees !== null)
-                <div class="rounded-lg border border-slate-200/60 px-3 py-2.5 text-xs dark:border-slate-700/60">
+                <div class="rounded-lg border border-slate-200/60 px-3 py-2.5 text-xs dark:border-slate-600/60">
                     @if ($bulkFromEmployees->isEmpty())
                         <p class="text-slate-500 dark:text-slate-400">No active employees are currently on this schedule — nothing to move.</p>
                     @else
@@ -108,7 +108,7 @@
                 </div>
             @endif
 
-            <div class="flex items-center justify-end gap-3 border-t border-slate-200/60 pt-4 dark:border-slate-800/60">
+            <div class="flex items-center justify-end gap-3 border-t border-slate-200/60 pt-4 dark:border-slate-600/15">
                 <x-button type="button" variant="secondary" wire:click="$set('showBulkModal', false)" wire:loading.attr="disabled" wire:target="bulkReassign">Close</x-button>
                 <x-button type="submit" variant="primary" wire:loading.attr="disabled" wire:target="bulkReassign" :disabled="$bulkFromEmployees?->isEmpty() ?? false">
                     <span wire:loading.remove wire:target="bulkReassign">Reassign</span>

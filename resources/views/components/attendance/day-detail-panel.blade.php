@@ -30,12 +30,12 @@ divergence here would be a real correctness bug, not just a style one. --}}
                         <x-time :time="$punch->punched_at" />
                         {{-- Both directions neutral: green means Present, and an in-punch is not a status. --}}
                         <x-badge color="slate">{{ $punch->punch_type->label() }}</x-badge>
-                        <span class="text-xs text-slate-400 dark:text-slate-500">{{ $punch->source->label() }}</span>
+                        <span class="text-xs text-slate-400 dark:text-slate-400">{{ $punch->source->label() }}</span>
                         @if ($punch->source->value === 'manual' && $punch->createdBy)
-                            <span class="text-xs text-slate-400 dark:text-slate-500">by {{ $punch->createdBy->name }}</span>
+                            <span class="text-xs text-slate-400 dark:text-slate-400">by {{ $punch->createdBy->name }}</span>
                         @endif
                         @if ($punch->voided_at)
-                            <span class="text-xs text-slate-400 dark:text-slate-500">voided by {{ $punch->voidedBy?->name ?? 'unknown' }}, {{ $punch->voided_at->format('M j') }} {{ \App\Support\AttendanceTime::format($punch->voided_at) }}</span>
+                            <span class="text-xs text-slate-400 dark:text-slate-400">voided by {{ $punch->voidedBy?->name ?? 'unknown' }}, {{ $punch->voided_at->format('M j') }} {{ \App\Support\AttendanceTime::format($punch->voided_at) }}</span>
                         @endif
                     </span>
                     @can('update', $employee)
@@ -62,7 +62,7 @@ divergence here would be a real correctness bug, not just a style one. --}}
 
     @can('update', $employee)
         @if ($addingPunchFor === $dayKey)
-            <form wire:submit="addPunch" class="mt-3 flex flex-wrap items-end gap-3 border-t border-slate-200/60 pt-3 dark:border-slate-800/60">
+            <form wire:submit="addPunch" class="mt-3 flex flex-wrap items-end gap-3 border-t border-slate-200/60 pt-3 dark:border-slate-600/15">
                 <div>
                     <x-input-label for="new_punch_date_{{ $dayKey }}" value="Date" class="!mb-1 !text-xs" />
                     <x-text-input id="new_punch_date_{{ $dayKey }}" type="date" wire:model="newPunchDate" class="!w-auto" />

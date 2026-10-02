@@ -48,7 +48,7 @@
                     Today, {{ \App\Support\DisplayDate::compact(today()) }} · {{ $attendance['today']['total'] }} active {{ $attendance['today']['total'] === 1 ? 'employee' : 'employees' }}
                 </p>
             </div>
-            <dl class="grid grid-cols-3 divide-x divide-slate-200/60 dark:divide-slate-800/60">
+            <dl class="grid grid-cols-3 divide-x divide-slate-200/60 dark:divide-slate-600/15">
                 @foreach ($stripCells as $cell)
                     <x-stat-card
                         :icon="$cell['icon']"
@@ -80,7 +80,7 @@
             $cardHeader = 'flex items-baseline justify-between gap-4';
             $cardTitle = 'text-lg font-semibold text-slate-900 dark:text-slate-100';
             $cardMeta = 'shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400';
-            $avatar = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300';
+            $avatar = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600 dark:bg-slate-750 dark:text-slate-300';
         @endphp
         <div class="flex flex-col gap-6 lg:grid lg:grid-cols-12 lg:items-start">
             <div class="contents lg:col-span-8 lg:flex lg:min-w-0 lg:flex-col lg:gap-6">
@@ -132,7 +132,7 @@
                                         @endif
                                     </div>
                                     <p class="text-xs text-slate-500 dark:text-slate-400">{{ $department['employees'] }} {{ $department['employees'] === 1 ? 'employee' : 'employees' }}</p>
-                                    <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"><div @class(['h-full rounded-full', 'bg-primary-200 dark:bg-primary-800' => $department['pending'], 'bg-primary-500' => ! $department['pending']]) style="width: {{ $departmentShare }}%"></div></div>
+                                    <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-750"><div @class(['h-full rounded-full', 'bg-primary-200 dark:bg-primary-800' => $department['pending'], 'bg-primary-500' => ! $department['pending']]) style="width: {{ $departmentShare }}%"></div></div>
                                 </div>
                             @endforeach
                         </div>
@@ -149,7 +149,7 @@
                         @if (count($attendance['needsAttention']))<p class="{{ $cardMeta }}">{{ count($attendance['needsAttention']) }} today</p>@endif
                     </div>
                     @if (count($attendance['needsAttention']))
-                        <ul class="mt-4 divide-y divide-slate-200/60 dark:divide-slate-800/60">
+                        <ul class="mt-4 divide-y divide-slate-200/60 dark:divide-slate-600/15">
                             @foreach ($attendance['needsAttention'] as $person)
                                 <li class="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
                                     <span class="{{ $avatar }}" aria-hidden="true">{{ strtoupper(substr($person['name'], 0, 1)) }}</span>
@@ -181,7 +181,7 @@
                         <h2 class="{{ $cardTitle }}">Recent activity</h2>
                     </div>
                     @if (count($attendance['recent']))
-                        <div class="mt-4 divide-y divide-slate-200/60 dark:divide-slate-800/60">
+                        <div class="mt-4 divide-y divide-slate-200/60 dark:divide-slate-600/15">
                             @foreach ($attendance['recent'] as $activity)
                                 <div class="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
                                     <span class="{{ $avatar }}" aria-hidden="true">{{ strtoupper(substr($activity['name'], 0, 1)) }}</span>
@@ -207,7 +207,7 @@
                         <h2 class="{{ $cardTitle }}">Quick actions</h2>
                         <div class="mt-3 space-y-1">
                             @foreach ($quickActions as $action)
-                                <a href="{{ route($action['route']) }}" wire:navigate class="group -mx-3 flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white">
+                                <a href="{{ route($action['route']) }}" wire:navigate class="group -mx-3 flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:bg-slate-600/30 dark:hover:text-white">
                                     <x-icon :name="$action['icon']" class="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
                                     {{ $action['label'] }}
                                 </a>
@@ -222,7 +222,7 @@
                         <ul class="mt-4 space-y-3">
                             @foreach ($setupSteps as $step)
                                 <li class="flex items-center gap-x-2.5 text-sm">
-                                    @if ($step['done'])<span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white"><x-icon name="check" class="h-3 w-3" /></span>@else<span class="h-5 w-5 shrink-0 rounded-full border-2 border-slate-300 dark:border-slate-700"></span>@endif
+                                    @if ($step['done'])<span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white"><x-icon name="check" class="h-3 w-3" /></span>@else<span class="h-5 w-5 shrink-0 rounded-full border-2 border-slate-300 dark:border-slate-600"></span>@endif
                                     <span class="text-slate-600 dark:text-slate-300">{{ $step['label'] }}</span>
                                 </li>
                             @endforeach

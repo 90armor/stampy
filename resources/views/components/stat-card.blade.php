@@ -13,7 +13,7 @@ for a short breakdown ("7 late · 10 early", "3 early"). Content is
 top-aligned (`lg:items-start`) so a sub-line in one cell never shifts the
 label and value of its neighbours. --}}
 <div {{ $attributes->merge(['class' => 'min-w-0 px-6 py-4 lg:flex lg:items-start lg:gap-3']) }}>
-    <span class="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 lg:flex dark:bg-slate-800 dark:text-slate-400" aria-hidden="true">
+    <span class="hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 lg:flex dark:bg-slate-750 dark:text-slate-400" aria-hidden="true">
         <x-icon :name="$icon" class="h-4 w-4" />
     </span>
     <div class="min-w-0">

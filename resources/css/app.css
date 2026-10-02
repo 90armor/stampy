@@ -8,7 +8,7 @@
    distinguish checked from unchecked when interaction is unavailable. */
 input:where([type='checkbox']),
 input:where([type='radio']) {
-    @apply cursor-pointer border-slate-300 bg-white text-primary-600 focus:ring-0 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed dark:border-slate-700 dark:bg-slate-800 dark:focus-visible:ring-offset-slate-900;
+    @apply cursor-pointer border-slate-300 bg-white text-primary-600 focus:ring-0 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed dark:border-slate-600 dark:bg-slate-750 dark:focus-visible:ring-offset-slate-800;
 }
 
 input:where([type='checkbox']) {
@@ -32,12 +32,12 @@ input:where([type='radio']):checked:not(:disabled):hover {
 
 input:where([type='checkbox']):disabled:not(:checked),
 input:where([type='radio']):disabled:not(:checked) {
-    @apply border-slate-300 bg-slate-100 dark:border-slate-700 dark:bg-slate-900;
+    @apply border-slate-300 bg-slate-100 dark:border-slate-600 dark:bg-slate-800;
 }
 
 input:where([type='checkbox']):disabled:checked,
 input:where([type='radio']):disabled:checked {
-    @apply border-slate-500 bg-slate-500 text-slate-500 dark:border-slate-500 dark:bg-slate-600 dark:text-slate-600;
+    @apply border-slate-500 bg-slate-500 text-slate-500 dark:border-slate-500 dark:bg-slate-500 dark:text-slate-600;
 }
 
 input:where([type='checkbox'])[aria-invalid='true'],
@@ -57,7 +57,7 @@ input:where([type='radio'])[aria-invalid='true'] {
     --input-text: #1c1917;
 }
 .dark {
-    --input-bg: #292524;
+    --input-bg: #363230;
     --input-text: #f5f5f4;
 }
 input:-webkit-autofill,
@@ -102,13 +102,13 @@ input:-webkit-autofill:focus {
         position: sticky;
         z-index: 1;
         transition: inherit;
-        @apply bg-white dark:bg-slate-900;
+        @apply bg-white dark:bg-slate-800;
     }
     tr:hover > .table-pin {
-        @apply bg-slate-50 dark:bg-slate-900;
+        @apply bg-slate-50 dark:bg-slate-800;
     }
     .dark tr:hover > .table-pin {
-        background-image: linear-gradient(theme('colors.slate.800 / 60%'), theme('colors.slate.800 / 60%'));
+        background-image: linear-gradient(theme('colors.slate.750 / 60%'), theme('colors.slate.750 / 60%'));
     }
     .table-pin-end {
         right: 0;

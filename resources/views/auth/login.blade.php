@@ -84,7 +84,7 @@
             </label>
 
             @if (Route::has('password.request'))
-                <a class="inline-flex min-h-11 items-center text-sm font-semibold text-primary-700 hover:text-primary-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:text-accent-300 dark:hover:text-accent-200 dark:focus:ring-offset-slate-950" href="{{ route('password.request') }}" wire:navigate>
+                <a class="inline-flex min-h-11 items-center text-sm font-semibold text-primary-700 hover:text-primary-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:text-accent-300 dark:hover:text-accent-200 dark:focus:ring-offset-slate-900" href="{{ route('password.request') }}" wire:navigate>
                     {{ __('Forgot password?') }}
                 </a>
             @endif

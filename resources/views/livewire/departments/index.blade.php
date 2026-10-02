@@ -30,9 +30,9 @@
         @else
             <div role="list" aria-label="Departments">
                 @foreach ($departments as $department)
-                    <div wire:key="department-{{ $department->id }}" role="listitem" class="group relative flex items-center justify-between gap-4 px-5 py-3.5 transition hover:bg-slate-50 dark:hover:bg-slate-800/60 sm:px-6">
+                    <div wire:key="department-{{ $department->id }}" role="listitem" class="group relative flex items-center justify-between gap-4 px-5 py-3.5 transition hover:bg-slate-50 dark:hover:bg-slate-750/60 sm:px-6">
                         @unless ($loop->last)
-                            <span class="pointer-events-none absolute inset-x-5 bottom-0 h-px bg-slate-200/60 dark:bg-slate-800/60 sm:inset-x-6"></span>
+                            <span class="pointer-events-none absolute inset-x-5 bottom-0 h-px bg-slate-200/60 dark:bg-slate-600/15 sm:inset-x-6"></span>
                         @endunless
 
                         <div class="min-w-0">
@@ -54,7 +54,7 @@
                                     wire:click="edit({{ $department->id }})"
                                     wire:loading.attr="disabled"
                                     wire:target="edit({{ $department->id }})"
-                                    class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-600 active:bg-primary-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:hover:bg-primary-900/30 dark:hover:text-primary-400 dark:active:bg-primary-900/50"
+                                    class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-600 active:bg-primary-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:hover:bg-primary-600/35 dark:hover:text-primary-400 dark:active:bg-primary-900/50"
                                     aria-label="Edit {{ $department->name }} department"
                                 >
                                     <x-icon name="pencil" class="w-4 h-4" />
@@ -85,7 +85,7 @@
 
             {{-- No footer (and no empty divider band) when everything fits on one page. --}}
             @if ($departments->hasPages())
-                <div class="border-t border-slate-200/60 px-5 py-4 dark:border-slate-800/60 sm:px-6">
+                <div class="border-t border-slate-200/60 px-5 py-4 dark:border-slate-600/15 sm:px-6">
                     {{ $departments->links() }}
                 </div>
             @endif

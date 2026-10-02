@@ -7,7 +7,7 @@
         maxWidth="lg"
         panelClass="mb-6"
     >
-        <div class="mx-6 border-b border-slate-200/60 py-5 dark:border-slate-800/60">
+        <div class="mx-6 border-b border-slate-200/60 py-5 dark:border-slate-600/15">
             <h3 class="text-base font-semibold text-slate-900 dark:text-slate-100">
                 {{ $editing ? 'Edit — '.$editing->name : 'Add Schedule' }}
             </h3>
@@ -30,7 +30,7 @@
                 </div>
             @endif
 
-            <div class="divide-y divide-slate-200/60 dark:divide-slate-800/60">
+            <div class="divide-y divide-slate-200/60 dark:divide-slate-600/15">
                 <section class="py-4">
                     <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Identity</h4>
                     <div class="mt-3">
@@ -114,7 +114,7 @@
             </div>
         </form>
 
-        <div class="mx-6 flex items-center justify-end gap-3 border-t border-slate-200/60 py-4 dark:border-slate-800/60">
+        <div class="mx-6 flex items-center justify-end gap-3 border-t border-slate-200/60 py-4 dark:border-slate-600/15">
             <x-button type="button" variant="secondary" wire:click="$set('showModal', false)" wire:loading.attr="disabled" wire:target="save">Cancel</x-button>
             <x-button type="submit" form="schedule-form" variant="primary" wire:loading.attr="disabled" wire:target="save">
                 <span wire:loading.remove wire:target="save">Save</span>

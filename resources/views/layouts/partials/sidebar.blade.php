@@ -13,7 +13,7 @@ $navItems = [
 ];
 @endphp
 
-<div class="flex h-full w-[242px] flex-col bg-white/70 backdrop-blur-xl border-r border-slate-200/60 dark:bg-slate-900/60 dark:border-slate-800/70">
+<div class="flex h-full w-[242px] flex-col bg-white/70 backdrop-blur-xl border-r border-slate-200/60 dark:bg-slate-800/60 dark:border-slate-600/20">
     <div class="flex h-16 shrink-0 items-center px-6">
         <a href="{{ route('dashboard') }}" wire:navigate class="flex items-center gap-2.5 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
             <x-logo size="28" />
@@ -25,7 +25,7 @@ $navItems = [
         @foreach ($navItems as $item)
             @continue(! $item['visible'])
             @if ($item['label'] === 'Attendance')
-                <div class="my-2 border-t border-slate-200/70 dark:border-slate-800/70"></div>
+                <div class="my-2 border-t border-slate-200/70 dark:border-slate-600/20"></div>
             @endif
             @if ($item['enabled'])
                 {{-- Match on the route-name prefix (e.g. 'employees*'), not the exact
@@ -37,7 +37,7 @@ $navItems = [
                     href="{{ route($item['route']) }}"
                     wire:navigate
                     class="group relative flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500
-                        {{ $active ? 'bg-primary-100/80 font-semibold text-primary-700 dark:bg-primary-900/50 dark:text-primary-300' : 'font-medium text-slate-500 hover:bg-slate-100/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white' }}"
+                        {{ $active ? 'bg-primary-100/80 font-semibold text-primary-700 dark:bg-primary-900/50 dark:text-primary-300' : 'font-medium text-slate-500 hover:bg-slate-100/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-750/60 dark:hover:text-white' }}"
                 >
                     @if ($active)
                         <span class="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-primary-600 dark:bg-primary-400"></span>
@@ -52,7 +52,7 @@ $navItems = [
                 >
                     <x-icon :name="$item['icon']" class="w-5 h-5 shrink-0 text-slate-400 dark:text-slate-600" />
                     {{ $item['label'] }}
-                    <span class="ml-auto rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Soon</span>
+                    <span class="ml-auto rounded-md bg-slate-100 dark:bg-slate-750 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">Soon</span>
                 </div>
             @endif
         @endforeach
