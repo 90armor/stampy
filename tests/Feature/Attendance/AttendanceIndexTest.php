@@ -499,9 +499,14 @@ class AttendanceIndexTest extends TestCase
         $this->assertStringContainsString('x-data="dateRangePicker({ today: \'2026-03-04\' })"', $html);
         $this->assertStringContainsString('role="dialog"', $html);
         $this->assertStringContainsString('aria-label="Choose a date range"', $html);
-        $this->assertStringContainsString('<table role="grid" aria-labelledby="attendance-date-month"', $html);
-        $this->assertStringContainsString('<h3 id="attendance-date-month"', $html);
-        $this->assertStringContainsString('<div class="hidden sm:block" wire:ignore>', $html);
+        $this->assertStringContainsString('<div class="hidden sm:block" wire:ignore x-ref="picker"', $html);
+        // Three grids — days, months, years — each labelled by what it shows,
+        // and the heading zooms out from days to months to years.
+        $this->assertStringContainsString('<table x-show="view === \'days\'" role="grid" :aria-label="gridLabel"', $html);
+        $this->assertStringContainsString('<table x-show="view === \'months\'" x-cloak role="grid" :aria-label="gridLabel"', $html);
+        $this->assertStringContainsString('<table x-show="view === \'years\'" x-cloak role="grid" :aria-label="gridLabel"', $html);
+        $this->assertStringContainsString('@click="zoomOut()"', $html);
+        $this->assertStringContainsString('<span class="sr-only" aria-live="polite" x-text="gridLabel"></span>', $html);
         $this->assertStringContainsString('abbr="Sunday"', $html);
         // Below sm: the native inputs, bound to the same properties as before.
         $this->assertStringContainsString('<div class="mt-2 space-y-3 sm:hidden">', $html);

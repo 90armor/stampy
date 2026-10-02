@@ -45,6 +45,7 @@ document.addEventListener('alpine:init', () => {
 // name the markup uses against window instead, and @click.outside="close()"
 // became window.close() — any click closed the browser tab.
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const YEARS_PER_PAGE = 12;
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 const parseIso = (iso) => {
@@ -65,6 +66,13 @@ const addMonths = (iso, n) => {
     target.setUTCDate(Math.min(d.getUTCDate(), last));
     return toIso(target);
 };
+// Matches App\Support\DisplayDate::compact() ("Tue 29 Sep", with the year
+// only outside the current year: "Mon 3 Feb 2025").
+const compactDate = (iso, currentYear) => {
+    const d = parseIso(iso);
+    const year = d.getUTCFullYear() === currentYear ? '' : ` ${d.getUTCFullYear()}`;
+    return `${WEEKDAYS[d.getUTCDay()].slice(0, 3)} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()].slice(0, 3)}${year}`;
+};
 const isValidIso = (iso) => typeof iso === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(iso) && toIso(parseIso(iso)) === iso;
 // Matches App\Support\DisplayDate::long() ("Tuesday, 29 September 2026").
 const longDate = (iso) => {
@@ -76,7 +84,11 @@ document.addEventListener('alpine:init', () => {
     window.Alpine.data('dateRangePicker', ({ today, from = 'fromDate', to = 'toDate' }) => ({
         panelOpen: false,
         today,
-        focused: today, // the grid's single tab stop (roving tabindex)
+        // Which grid is on screen. 'days' is where a range is picked; the
+        // heading zooms out to 'months' and then 'years' for long jumps, and
+        // picking a year or a month zooms back in.
+        view: 'days',
+        focused: today, // the active cell in every view (roving tabindex): a day, its month, its year
         anchor: null, // the first day picked while a new range is in progress
         preview: null, // the day under the pointer or focus while anchored
         announcement: '', // announced politely to screen readers
@@ -88,11 +100,47 @@ document.addEventListener('alpine:init', () => {
             return this.$wire[to];
         },
 
-        // The month on screen always follows the focused day.
+        // What is on screen always follows the focused day.
+        get focusedYear() {
+            return parseIso(this.focused).getUTCFullYear();
+        },
+        get focusedMonthKey() {
+            return this.focused.slice(0, 7);
+        },
+        get yearBlockStart() {
+            return Math.floor(this.focusedYear / YEARS_PER_PAGE) * YEARS_PER_PAGE;
+        },
         get monthLabel() {
             const d = parseIso(this.focused);
             return `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
         },
+        get heading() {
+            if (this.view === 'months') return String(this.focusedYear);
+            if (this.view === 'years') return `${this.yearBlockStart}–${this.yearBlockStart + YEARS_PER_PAGE - 1}`;
+            return this.monthLabel;
+        },
+        get gridLabel() {
+            if (this.view === 'months') return `Months of ${this.focusedYear}`;
+            if (this.view === 'years') return `Years ${this.yearBlockStart} to ${this.yearBlockStart + YEARS_PER_PAGE - 1}`;
+            return this.monthLabel;
+        },
+        get zoomLabel() {
+            return this.view === 'days' ? `${this.monthLabel}. Choose month and year` : `${this.focusedYear}. Choose year`;
+        },
+        get stepLabels() {
+            if (this.view === 'months') return ['Previous year', 'Next year'];
+            if (this.view === 'years') return [`Previous ${YEARS_PER_PAGE} years`, `Next ${YEARS_PER_PAGE} years`];
+            return ['Previous month', 'Next month'];
+        },
+        // While a range is in progress the hint names its start, which may
+        // be months or years away from what is on screen.
+        get hint() {
+            const from = this.anchor ? `From ${compactDate(this.anchor, parseIso(this.today).getUTCFullYear())} · ` : '';
+            if (this.view === 'months') return this.anchor ? `${from}choose the end date's month` : 'Choose a month';
+            if (this.view === 'years') return this.anchor ? `${from}choose the end date's year` : 'Choose a year';
+            return this.anchor ? `${from}select an end date` : 'Select a start date';
+        },
+
         get weeks() {
             const d = parseIso(this.focused);
             const first = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
@@ -110,6 +158,25 @@ document.addEventListener('alpine:init', () => {
                 weeks.push({ key: `${this.monthLabel}-${i}`, days: cells.slice(i, i + 7).map((cell, col) => cell && { ...cell, col }) });
             }
             return weeks;
+        },
+        // Months and years are 3-wide grids. Each cell knows its first and
+        // last possible day, so "does the range touch it" is a string compare
+        // ('-31' is past every real day of any month).
+        get monthRows() {
+            const y = this.focusedYear;
+            const cells = MONTHS.map((name, i) => {
+                const key = `${y}-${String(i + 1).padStart(2, '0')}`;
+                return { key, label: name.slice(0, 3), name: `${name} ${y}`, first: `${key}-01`, last: `${key}-31` };
+            });
+            return [0, 3, 6, 9].map((i) => ({ key: `${y}-${i}`, cells: cells.slice(i, i + 3) }));
+        },
+        get yearRows() {
+            const start = this.yearBlockStart;
+            const cells = Array.from({ length: YEARS_PER_PAGE }, (_, i) => {
+                const year = start + i;
+                return { year, first: `${year}-01-01`, last: `${year}-12-31` };
+            });
+            return [0, 3, 6, 9].map((i) => ({ key: `${start}-${i}`, cells: cells.slice(i, i + 3) }));
         },
 
         // The range drawn on the grid: the committed one, or — while a new
@@ -130,6 +197,12 @@ document.addEventListener('alpine:init', () => {
         inRange(iso) {
             const [start, end] = this.range;
             return start !== null && iso >= start && iso <= end;
+        },
+        // A month or year the range reaches into, so a long range stays
+        // visible while zoomed out.
+        touchesRange(cell) {
+            const [start, end] = this.range;
+            return start !== null && cell.first <= end && cell.last >= start;
         },
         // aria-selected reflects only what is actually chosen: the committed
         // range, or just the anchor while a new range is in progress.
@@ -159,6 +232,7 @@ document.addEventListener('alpine:init', () => {
             this.anchor = null;
             this.preview = null;
             this.announcement = '';
+            this.view = 'days';
             this.focused = isValidIso(this.to) ? this.to : this.today;
             this.panelOpen = true;
         },
@@ -172,38 +246,97 @@ document.addEventListener('alpine:init', () => {
             if (restoreFocus) this.$nextTick(() => this.$refs.trigger.focus());
         },
 
+        // Focus the active cell of whichever grid is on screen, once it has
+        // rendered.
+        focusActiveCell() {
+            this.$nextTick(() => {
+                const selector = {
+                    days: `[data-date="${this.focused}"]`,
+                    months: `[data-month="${this.focusedMonthKey}"]`,
+                    years: `[data-year="${this.focusedYear}"]`,
+                }[this.view];
+                this.$refs.picker?.querySelector(selector)?.focus();
+            });
+        },
         moveFocus(iso) {
             this.focused = iso;
-            if (this.anchor) this.preview = iso;
-            this.$nextTick(() => this.$refs.grid?.querySelector(`[data-date="${iso}"]`)?.focus());
+            if (this.anchor && this.view === 'days') this.preview = iso;
+            this.focusActiveCell();
         },
-        shiftMonth(n) {
-            this.focused = addMonths(this.focused, n);
+        // The heading's arrows: a month, a year or a page of years.
+        step(n) {
+            this.focused = addMonths(this.focused, n * { days: 1, months: 12, years: 12 * YEARS_PER_PAGE }[this.view]);
         },
+        zoomOut() {
+            this.view = this.view === 'days' ? 'months' : 'years';
+            this.focusActiveCell();
+        },
+        // Moving between months and years keeps the day of the month,
+        // clamped (31 Jan → 28/29 Feb).
+        sameDayInMonth(key) {
+            const [y, m] = key.split('-').map(Number);
+            const d = parseIso(this.focused);
+            return addMonths(this.focused, (y - d.getUTCFullYear()) * 12 + (m - 1 - d.getUTCMonth()));
+        },
+        sameDayInYear(year) {
+            return addMonths(this.focused, (year - this.focusedYear) * 12);
+        },
+        pickYear(year) {
+            this.focused = this.sameDayInYear(year);
+            this.view = 'months';
+            this.focusActiveCell();
+        },
+        pickMonth(key) {
+            this.focused = this.sameDayInMonth(key);
+            this.view = 'days';
+            this.focusActiveCell();
+        },
+
         onKeydown(event) {
-            const moves = {
-                ArrowLeft: () => addDays(this.focused, -1),
-                ArrowRight: () => addDays(this.focused, 1),
-                ArrowUp: () => addDays(this.focused, -7),
-                ArrowDown: () => addDays(this.focused, 7),
-                Home: () => addDays(this.focused, -parseIso(this.focused).getUTCDay()),
-                End: () => addDays(this.focused, 6 - parseIso(this.focused).getUTCDay()),
-                PageUp: () => addMonths(this.focused, event.shiftKey ? -12 : -1),
-                PageDown: () => addMonths(this.focused, event.shiftKey ? 12 : 1),
-            };
+            // Only the grids' cells; the heading and arrow buttons keep their
+            // native keys (Enter on the heading must zoom, not pick a day).
+            if (event.target.tagName !== 'TD') return;
+            const f = this.focused;
+            const col = this.view === 'months' ? parseIso(f).getUTCMonth() % 3 : (this.focusedYear - this.yearBlockStart) % 3;
+            // Months and years move by month-steps: a year is 12, a row of
+            // years is 36, a page of years is 12 × YEARS_PER_PAGE.
+            const unit = this.view === 'years' ? 12 : 1;
+            const moves = this.view === 'days'
+                ? {
+                    ArrowLeft: () => addDays(f, -1),
+                    ArrowRight: () => addDays(f, 1),
+                    ArrowUp: () => addDays(f, -7),
+                    ArrowDown: () => addDays(f, 7),
+                    Home: () => addDays(f, -parseIso(f).getUTCDay()),
+                    End: () => addDays(f, 6 - parseIso(f).getUTCDay()),
+                    PageUp: () => addMonths(f, event.shiftKey ? -12 : -1),
+                    PageDown: () => addMonths(f, event.shiftKey ? 12 : 1),
+                }
+                : {
+                    ArrowLeft: () => addMonths(f, -unit),
+                    ArrowRight: () => addMonths(f, unit),
+                    ArrowUp: () => addMonths(f, -3 * unit),
+                    ArrowDown: () => addMonths(f, 3 * unit),
+                    Home: () => addMonths(f, -col * unit),
+                    End: () => addMonths(f, (2 - col) * unit),
+                    PageUp: () => addMonths(f, -12 * (this.view === 'years' ? YEARS_PER_PAGE : 1)),
+                    PageDown: () => addMonths(f, 12 * (this.view === 'years' ? YEARS_PER_PAGE : 1)),
+                };
             if (moves[event.key]) {
                 event.preventDefault();
                 this.moveFocus(moves[event.key]());
             } else if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
-                this.pick(this.focused);
+                if (this.view === 'days') this.pick(f);
+                else if (this.view === 'months') this.pickMonth(this.focusedMonthKey);
+                else this.pickYear(this.focusedYear);
             }
         },
 
         // First pick anchors a new range; the second completes it (either
         // order — the earlier day becomes From) and commits both properties
         // in a single Livewire request. Picking the same day twice is a
-        // one-day range.
+        // one-day range. Zooming out between the two picks keeps the anchor.
         pick(iso) {
             this.focused = iso;
             if (!this.anchor) {
