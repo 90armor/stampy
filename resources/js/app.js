@@ -39,6 +39,11 @@ document.addEventListener('alpine:init', () => {
 // Dates are handled as 'YYYY-MM-DD' strings with UTC arithmetic, so a DST
 // shift in the browser's own timezone can never skip or repeat a day. "Today"
 // comes from the server (the app timezone), not from the browser's clock.
+//
+// No member may share a name with a window global (open, close, status, name,
+// focus, scroll, print…): if this file ever fails to load, Alpine resolves a
+// name the markup uses against window instead, and @click.outside="close()"
+// became window.close() — any click closed the browser tab.
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -69,12 +74,12 @@ const longDate = (iso) => {
 
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('dateRangePicker', ({ today, from = 'fromDate', to = 'toDate' }) => ({
-        open: false,
+        panelOpen: false,
         today,
         focused: today, // the grid's single tab stop (roving tabindex)
         anchor: null, // the first day picked while a new range is in progress
         preview: null, // the day under the pointer or focus while anchored
-        status: '', // announced politely to screen readers
+        announcement: '', // announced politely to screen readers
 
         get from() {
             return this.$wire[from];
@@ -147,21 +152,21 @@ document.addEventListener('alpine:init', () => {
             return longDate(iso);
         },
 
-        toggle() {
-            this.open ? this.close() : this.show();
+        togglePanel() {
+            this.panelOpen ? this.closePanel() : this.openPanel();
         },
-        show() {
+        openPanel() {
             this.anchor = null;
             this.preview = null;
-            this.status = '';
+            this.announcement = '';
             this.focused = isValidIso(this.to) ? this.to : this.today;
-            this.open = true;
+            this.panelOpen = true;
         },
         // Escape and the presets return focus to the trigger; a click outside
         // leaves focus wherever the click put it.
-        close(restoreFocus = true) {
-            if (!this.open) return;
-            this.open = false;
+        closePanel(restoreFocus = true) {
+            if (!this.panelOpen) return;
+            this.panelOpen = false;
             this.anchor = null;
             this.preview = null;
             if (restoreFocus) this.$nextTick(() => this.$refs.trigger.focus());
@@ -204,14 +209,14 @@ document.addEventListener('alpine:init', () => {
             if (!this.anchor) {
                 this.anchor = iso;
                 this.preview = iso;
-                this.status = `Start date ${longDate(iso)}. Choose an end date.`;
+                this.announcement = `Start date ${longDate(iso)}. Choose an end date.`;
                 return;
             }
             const [start, end] = iso < this.anchor ? [iso, this.anchor] : [this.anchor, iso];
             this.$wire.$set(from, start, false);
             this.$wire.$set(to, end);
-            this.status = start === end ? `Selected ${longDate(start)}.` : `Selected ${longDate(start)} to ${longDate(end)}.`;
-            this.close();
+            this.announcement = start === end ? `Selected ${longDate(start)}.` : `Selected ${longDate(start)} to ${longDate(end)}.`;
+            this.closePanel();
         },
     }));
 });

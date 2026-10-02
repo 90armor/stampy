@@ -127,15 +127,15 @@
             <div
                 class="relative"
                 x-data="dateRangePicker({ today: '{{ today()->format('Y-m-d') }}' })"
-                @click.outside="close(false)"
-                @keydown.escape.stop="close()"
-                @keydown.escape.window="close(false)"
+                @click.outside="closePanel(false)"
+                @keydown.escape.stop="closePanel()"
+                @keydown.escape.window="closePanel(false)"
             >
                 <button
                     type="button"
                     x-ref="trigger"
-                    @click="toggle()"
-                    :aria-expanded="open"
+                    @click="togglePanel()"
+                    :aria-expanded="panelOpen"
                     aria-haspopup="dialog"
                     aria-controls="attendance-date-panel"
                     class="inline-flex w-full items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 lg:w-auto"
@@ -145,7 +145,7 @@
                 </button>
                 {{-- Outside the panel, so a completed range is still announced
                 after the panel closes. --}}
-                <p class="sr-only" aria-live="polite" x-text="status"></p>
+                <p class="sr-only" aria-live="polite" x-text="announcement"></p>
 
                 {{-- Popovers are content surfaces and therefore opaque. This
                 also prevents the status chips and rows below from bleeding
@@ -166,7 +166,7 @@
                 flip it to open upward, not with teleport. --}}
                 <div
                     id="attendance-date-panel"
-                    x-show="open"
+                    x-show="panelOpen"
                     x-cloak
                     role="dialog"
                     aria-label="Choose a date range"
@@ -175,7 +175,7 @@
                     <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Quick ranges</p>
                     <div class="mt-2 grid grid-cols-2 gap-2">
                         @foreach (['today' => 'Today', 'yesterday' => 'Yesterday', 'last7' => 'Last 7 days', 'last30' => 'Last 30 days', 'thisMonth' => 'This month'] as $preset => $label)
-                            <button type="button" wire:click="setRange('{{ $preset }}')" @click="close()" class="rounded-lg px-2 py-1.5 text-left text-sm text-slate-600 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:bg-slate-800">{{ $label }}</button>
+                            <button type="button" wire:click="setRange('{{ $preset }}')" @click="closePanel()" class="rounded-lg px-2 py-1.5 text-left text-sm text-slate-600 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:bg-slate-800">{{ $label }}</button>
                         @endforeach
                     </div>
 
