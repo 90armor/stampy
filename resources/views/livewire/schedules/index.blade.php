@@ -48,7 +48,7 @@
                 @foreach ($schedules as $schedule)
                     <div wire:key="schedule-{{ $schedule->id }}" role="listitem" class="group relative grid grid-cols-1 gap-x-4 px-5 py-4 transition hover:bg-slate-50 dark:hover:bg-slate-750/60 sm:grid-cols-[minmax(0,1fr)_auto] sm:px-6">
                         @unless ($loop->last)
-                            <span class="pointer-events-none absolute inset-x-5 bottom-0 h-px bg-slate-200/60 dark:bg-slate-600/15 sm:inset-x-6"></span>
+                            <span class="pointer-events-none absolute inset-x-5 bottom-0 h-px bg-slate-divider sm:inset-x-6"></span>
                         @endunless
 
                         <div class="min-w-0">
@@ -127,7 +127,7 @@
 
             {{-- No footer (and no empty divider band) when everything fits on one page. --}}
             @if ($schedules->hasPages())
-                <div class="border-t border-slate-200/60 px-5 py-4 dark:border-slate-600/15 sm:px-6">
+                <div class="border-t border-slate-divider px-5 py-4 sm:px-6">
                     {{ $schedules->links() }}
                 </div>
             @endif

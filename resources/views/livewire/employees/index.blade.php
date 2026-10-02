@@ -16,7 +16,7 @@
         <x-no-employee-record subject="The employee directory" />
     @else
     <x-card :padding="false">
-        <dl class="grid grid-cols-3 divide-x divide-slate-200/60 dark:divide-slate-600/15">
+        <dl class="grid grid-cols-3 divide-x divide-slate-divider">
             <x-stat-card icon="users" label="Total employees" :value="$stats['total_employees']" />
             <x-stat-card icon="user-circle" label="Active employees" :value="$stats['active_employees']" />
             <x-stat-card icon="user-x" label="Inactive employees" :value="$stats['inactive_employees']" />
@@ -55,7 +55,7 @@
                 type="text"
                 wire:model.live.debounce.300ms="search"
                 placeholder="Search by name or employee code…"
-                class="block w-full rounded-lg border-slate-300 bg-white pl-9 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-750 dark:border-slate-600 dark:text-slate-100 dark:placeholder-slate-400"
+                class="block w-full rounded-lg border-slate-border bg-white pl-9 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-750 dark:text-slate-100 dark:placeholder-slate-400"
             >
         </div>
 
@@ -77,7 +77,7 @@
 
     @if ($employees->isEmpty())
         @if ($hasAnyEmployees)
-            <div class="border-t border-slate-200/60 px-6 py-10 text-center dark:border-slate-600/15">
+            <div class="border-t border-slate-divider px-6 py-10 text-center">
                 <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-slate-750 dark:text-slate-500"><x-icon name="search" class="h-5 w-5" /></span>
                 <h3 class="mt-3 text-sm font-medium text-slate-900 dark:text-slate-100">No employees found</h3>
                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Try adjusting your search or filters.</p>
@@ -102,7 +102,7 @@
             </x-empty-state>
         @endif
     @else
-        <div class="border-t border-slate-200/60 dark:border-slate-600/15">
+        <div class="border-t border-slate-divider">
             {{-- The table's natural width is ~959px (min-w-[60rem]); it fits the
             card from xl (974px) up, so the cue shows exactly while it scrolls. --}}
             <div class="flex items-center justify-end gap-1.5 px-5 py-2 text-xs text-slate-500 dark:text-slate-400 xl:hidden" aria-hidden="true">
@@ -123,7 +123,7 @@
                     <tr class="relative text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
                         <th class="px-6 py-3">
                             Employee
-                            <span class="pointer-events-none absolute inset-x-6 bottom-0 z-[2] h-px bg-slate-200/60 dark:bg-slate-600/15"></span>
+                            <span class="pointer-events-none absolute inset-x-6 bottom-0 z-[2] h-px bg-slate-divider"></span>
                         </th>
                         <th class="px-6 py-3">Department</th>
                         <th class="px-6 py-3">Position</th>
@@ -140,7 +140,7 @@
                                 against the row) and sits above the pinned cells, so it
                                 runs unbroken beneath them. --}}
                                 @unless ($loop->last)
-                                    <span class="pointer-events-none absolute inset-x-6 bottom-0 z-[2] h-px bg-slate-200/60 dark:bg-slate-600/15"></span>
+                                    <span class="pointer-events-none absolute inset-x-6 bottom-0 z-[2] h-px bg-slate-divider"></span>
                                 @endunless
                                 <div class="flex items-center gap-x-3">
                                     <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-750 dark:text-slate-300">
@@ -225,7 +225,7 @@
 
         {{-- No footer (and no empty divider band) when everything fits on one page. --}}
         @if ($employees->hasPages())
-            <div class="mx-6 border-t border-slate-200/60 py-4 dark:border-slate-600/15">
+            <div class="mx-6 border-t border-slate-divider py-4">
                 {{ $employees->links() }}
             </div>
         @endif

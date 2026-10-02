@@ -24,10 +24,18 @@ export default {
                 // reference "Northstar" mockup; a neutral, slightly cool zinc
                 // in dark mode, where stone's red-orange cast read as brown
                 // (dark option C). The `slate` name is kept so no class changes.
-                slate: Object.fromEntries(
-                    [50, 100, 200, 300, 400, 500, 600, 700, 750, 800, 900, 950]
-                        .map((step) => [step, `rgb(var(--slate-${step}) / <alpha-value>)`]),
-                ),
+                // Plus the two line tokens (docs/DESIGN_SYSTEM.md, Lines):
+                // `divider` for lines inside a surface, `border` for surface
+                // edges and controls. Each carries its own opacity, so they
+                // take no opacity modifier.
+                slate: {
+                    ...Object.fromEntries(
+                        [50, 100, 200, 300, 400, 500, 600, 700, 750, 800, 900, 950]
+                            .map((step) => [step, `rgb(var(--slate-${step}) / <alpha-value>)`]),
+                    ),
+                    divider: 'rgb(var(--slate-divider))',
+                    border: 'rgb(var(--slate-border))',
+                },
                 // Deep evergreen — primary brand color for buttons, links, active states.
                 primary: {
                     50: '#f1f7f4',

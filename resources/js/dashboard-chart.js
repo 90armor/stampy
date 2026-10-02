@@ -113,7 +113,7 @@ function initAttendanceTrendChart() {
                 y: {
                     min: 0,
                     max: 100,
-                    grid: { color: dark ? slate(400, 0.14) : slate(500, 0.12) },
+                    grid: { color: `rgb(${slateVars.getPropertyValue('--slate-divider').trim()})` }, // the divider line token
                     ticks: {
                         color: muted,
                         font: { size: 12 },

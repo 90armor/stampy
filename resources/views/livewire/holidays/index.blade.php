@@ -44,7 +44,7 @@
                 @foreach ($holidays as $holiday)
                     <div wire:key="holiday-{{ $holiday->id }}" role="listitem" class="group relative grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 px-5 py-3.5 transition hover:bg-slate-50 dark:hover:bg-slate-750/60 sm:grid-cols-[9.5rem_minmax(0,1fr)_auto] sm:items-start sm:px-6 sm:py-4">
                         @unless ($loop->last)
-                            <span class="pointer-events-none absolute inset-x-5 bottom-0 h-px bg-slate-200/60 dark:bg-slate-600/15 sm:inset-x-6"></span>
+                            <span class="pointer-events-none absolute inset-x-5 bottom-0 h-px bg-slate-divider sm:inset-x-6"></span>
                         @endunless
 
                         <time datetime="{{ $holiday->date->format('Y-m-d') }}" class="col-start-1 text-sm font-medium tabular-nums text-slate-700 dark:text-slate-300">
@@ -96,7 +96,7 @@
 
             {{-- No footer (and no empty divider band) when everything fits on one page. --}}
             @if ($holidays->hasPages())
-                <div class="border-t border-slate-200/60 px-5 py-4 dark:border-slate-600/15 sm:px-6">
+                <div class="border-t border-slate-divider px-5 py-4 sm:px-6">
                     {{ $holidays->links() }}
                 </div>
             @endif

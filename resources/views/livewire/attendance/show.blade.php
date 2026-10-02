@@ -12,7 +12,7 @@
         // Fill emphasizes exceptions: a Present cell is the neutral card
         // surface; the green day number and check carry the status. 'pill' is
         // the day modal's status pill, which stays a green badge.
-        'present' => ['badge' => 'green', 'icon' => 'check', 'bg' => 'bg-white dark:bg-slate-800', 'text' => 'text-green-700 dark:text-green-400', 'ring' => 'ring-slate-200 dark:ring-slate-750', 'pill' => 'bg-green-50 ring-green-600/20 dark:bg-green-900/20 dark:ring-green-500/30'],
+        'present' => ['badge' => 'green', 'icon' => 'check', 'bg' => 'bg-white dark:bg-slate-800', 'text' => 'text-green-700 dark:text-green-400', 'ring' => 'ring-slate-divider', 'pill' => 'bg-green-50 ring-green-600/20 dark:bg-green-900/20 dark:ring-green-500/30'],
         // A deliberate one-time addition to the palette — see CLAUDE.md's
         // displayVariant() colour table. Incomplete (a device defect — the
         // person worked, nothing recorded it) must never read as amber, which
@@ -36,7 +36,7 @@
         // The number stays slate-500 (4.8:1, AA) and drops to medium weight
         // rather than going paler.
         // 'pill' keeps the day modal's Off pill a normal slate badge.
-        'off' => ['badge' => 'slate', 'icon' => 'calendar-days', 'bg' => 'bg-transparent', 'text' => 'text-slate-500 dark:text-slate-400', 'iconText' => 'text-slate-400 dark:text-slate-500', 'weight' => 'font-medium', 'ring' => 'ring-transparent border border-dashed border-slate-300 dark:border-slate-600', 'pill' => 'bg-slate-100 ring-slate-500/10 dark:bg-slate-750 dark:ring-slate-500/20'],
+        'off' => ['badge' => 'slate', 'icon' => 'calendar-days', 'bg' => 'bg-transparent', 'text' => 'text-slate-500 dark:text-slate-400', 'iconText' => 'text-slate-400 dark:text-slate-500', 'weight' => 'font-medium', 'ring' => 'ring-transparent border border-dashed border-slate-divider', 'pill' => 'bg-slate-100 ring-slate-500/10 dark:bg-slate-750 dark:ring-slate-500/20'],
         // blue, not primary/evergreen: primary is still a green-family hue
         // (a different shade of the same "present" story present's own
         // stock-green already tells), which would repeat the exact
@@ -61,7 +61,7 @@
     // — deliberately not sharing 'off's calendar-days icon or 'absent's
     // x-mark: a flat dash has no shape overlap with either, so it can't be
     // mistaken for "did not work" or "day off" at a glance.
-    $notCalculatedStyle = ['icon' => 'minus', 'bg' => 'bg-slate-50 dark:bg-slate-750/40', 'text' => 'text-slate-400 dark:text-slate-600', 'ring' => 'ring-slate-200 dark:ring-slate-600/60'];
+    $notCalculatedStyle = ['icon' => 'minus', 'bg' => 'bg-slate-50 dark:bg-slate-750/40', 'text' => 'text-slate-400 dark:text-slate-600', 'ring' => 'ring-slate-divider'];
 
     $weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -166,7 +166,7 @@
             </div>
 
             @if ($summary['total_worked_minutes'] > 0)
-                <p class="mt-3 border-t border-slate-200/60 pt-3 text-xs text-slate-400 dark:border-slate-600/15 dark:text-slate-400">
+                <p class="mt-3 border-t border-slate-divider pt-3 text-xs text-slate-400 dark:text-slate-400">
                     Total worked this month: {{ \App\Support\Duration::format($summary['total_worked_minutes']) }}
                 </p>
             @endif
@@ -197,7 +197,7 @@
                     <button
                         type="button"
                         wire:click="previousMonth"
-                        class="rounded-lg border border-slate-300 bg-white p-1.5 text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700 dark:border-slate-600 dark:bg-slate-750 dark:text-slate-400 dark:hover:bg-slate-600"
+                        class="rounded-lg border border-slate-border bg-white p-1.5 text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700 dark:bg-slate-750 dark:text-slate-400 dark:hover:bg-slate-600"
                         aria-label="Previous month"
                     >
                         <x-icon name="chevron-left" class="h-4 w-4" />
@@ -206,7 +206,7 @@
                     <button
                         type="button"
                         wire:click="nextMonth"
-                        class="rounded-lg border border-slate-300 bg-white p-1.5 text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700 dark:border-slate-600 dark:bg-slate-750 dark:text-slate-400 dark:hover:bg-slate-600"
+                        class="rounded-lg border border-slate-border bg-white p-1.5 text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700 dark:bg-slate-750 dark:text-slate-400 dark:hover:bg-slate-600"
                         aria-label="Next month"
                     >
                         <x-icon name="chevron-right" class="h-4 w-4" />
@@ -218,7 +218,7 @@
                     @endunless
                 </div>
 
-                <div class="inline-flex rounded-lg border border-slate-300 bg-white p-0.5 dark:border-slate-600 dark:bg-slate-750" role="group" aria-label="View">
+                <div class="inline-flex rounded-lg border border-slate-border bg-white p-0.5 dark:bg-slate-750" role="group" aria-label="View">
                     <button
                         type="button"
                         wire:click="$set('view', 'calendar')"
@@ -405,7 +405,7 @@
                 is worse than a colour, so this is a required companion to the
                 grid, not decoration. flex-wrap keeps it from overflowing on
                 narrow (mobile) widths; it just breaks onto more lines. --}}
-                <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-200/60 pt-3 text-xs text-slate-500 dark:border-slate-600/15 dark:text-slate-400">
+                <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-divider pt-3 text-xs text-slate-500 dark:text-slate-400">
                     @foreach ($legendItems as $item)
                         <span class="inline-flex items-center gap-1.5">
                             <x-icon :name="$item['icon']" class="h-3.5 w-3.5 shrink-0 {{ $item['text'] }}" />
@@ -450,13 +450,13 @@
                             <th @class(['py-3', 'px-6' => ! $canManagePunches, 'pl-6 pr-2' => $canManagePunches])>
                                 Note
                                 @unless ($canManagePunches)
-                                    <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-600/15"></span>
+                                    <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-divider"></span>
                                 @endunless
                             </th>
                             @if ($canManagePunches)
                                 <th class="py-3 pl-2 pr-6">
                                     <span class="sr-only">Raw punches</span>
-                                    <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-600/15"></span>
+                                    <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-divider"></span>
                                 </th>
                             @endif
                         </tr>
@@ -510,7 +510,7 @@
                                     <td @class(['py-2 text-sm text-slate-500 dark:text-slate-400', 'px-6' => ! $canManagePunches, 'pl-6 pr-2' => $canManagePunches])>
                                         {!! $record->note !== null ? e($record->note) : $emDash !!}
                                         @if (! $canManagePunches && ! $loop->last)
-                                            <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-600/15"></span>
+                                            <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-divider"></span>
                                         @endif
                                     </td>
                                 @else
@@ -530,7 +530,7 @@
                                     <td @class(['py-2 text-sm', 'px-6' => ! $canManagePunches, 'pl-6 pr-2' => $canManagePunches])>
                                         {!! $emDash !!}
                                         @if (! $canManagePunches && ! $loop->last)
-                                            <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-600/15"></span>
+                                            <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-divider"></span>
                                         @endif
                                     </td>
                                 @endif
@@ -546,7 +546,7 @@
                                             <x-icon name="chevron-right" class="h-4 w-4 transition" x-bind:class="open ? 'rotate-90' : ''" />
                                         </button>
                                         @unless ($loop->last)
-                                            <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-200/60 dark:bg-slate-600/15"></span>
+                                            <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-divider"></span>
                                         @endunless
                                     </td>
                                 @endif
@@ -627,7 +627,7 @@
                         </div>
                     </div>
 
-                    <dl class="mt-4 grid grid-cols-2 gap-4 border-t border-slate-200/60 pt-4 dark:border-slate-600/15 sm:grid-cols-3">
+                    <dl class="mt-4 grid grid-cols-2 gap-4 border-t border-slate-divider pt-4 sm:grid-cols-3">
                         <div>
                             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Schedule</dt>
                             <dd class="mt-0.5 text-sm text-slate-900 dark:text-slate-100">
@@ -687,7 +687,7 @@
                         </div>
                     </dl>
 
-                    <div class="mt-4 border-t border-slate-200/60 pt-4 dark:border-slate-600/15">
+                    <div class="mt-4 border-t border-slate-divider pt-4">
                         <x-attendance.day-detail-panel
                             :employee="$employee"
                             :date="$modalDate"

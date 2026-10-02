@@ -47,7 +47,7 @@ split as the Daily Attendance range. --}}
             aria-haspopup="dialog"
             aria-controls="{{ $id }}-panel"
             :aria-label="@js($label) + ', ' + (displayLong || 'no date selected')"
-            {{ $attributes->merge(['class' => 'inline-flex w-full items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm leading-5 text-slate-900 shadow-sm transition hover:bg-slate-50 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 dark:border-slate-600 dark:bg-slate-750 dark:text-slate-100 dark:hover:bg-slate-600/30 dark:disabled:bg-slate-800 dark:disabled:text-slate-600']) }}
+            {{ $attributes->merge(['class' => 'inline-flex w-full items-center justify-between gap-2 rounded-lg border border-slate-border bg-white px-3 py-2 text-left text-sm leading-5 text-slate-900 shadow-sm transition hover:bg-slate-50 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 dark:bg-slate-750 dark:text-slate-100 dark:hover:bg-slate-600/30 dark:disabled:bg-slate-800 dark:disabled:text-slate-600']) }}
         >
             <span class="inline-flex min-w-0 items-center gap-2">
                 <x-icon name="calendar-days" class="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
@@ -67,14 +67,14 @@ split as the Daily Attendance range. --}}
             x-cloak
             role="dialog"
             aria-label="Choose a date: {{ $label }}"
-            class="fixed z-50 w-80 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-xl bg-white p-4 pt-2 shadow-xl ring-1 ring-slate-200 dark:bg-slate-750 dark:ring-slate-600/40"
+            class="fixed z-50 w-80 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-xl bg-white p-4 pt-2 shadow-xl ring-1 ring-slate-border dark:bg-slate-750"
         >
             <x-date-picker.calendar />
 
             @if ($clearable || $todayAllowed)
                 {{-- Footer: Clear on the left (nullable fields only), Today
                 on the right (only when today is pickable). --}}
-                <div class="mt-3 flex items-center justify-between gap-2 border-t border-slate-200/60 pt-3 dark:border-slate-600/15">
+                <div class="mt-3 flex items-center justify-between gap-2 border-t border-slate-divider pt-3">
                     @if ($clearable)
                         <button type="button" @click="clear()" class="{{ $footerButton }} text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-600/30">Clear</button>
                     @else
@@ -95,6 +95,6 @@ split as the Daily Attendance range. --}}
         wire:model="{{ $model }}"
         @if ($min) min="{{ $min }}" @endif
         @if ($max) max="{{ $max }}" @endif
-        class="block w-full min-w-0 rounded-lg border-slate-300 bg-white text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-750 dark:text-slate-100 sm:hidden"
+        class="block w-full min-w-0 rounded-lg border-slate-border bg-white text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 dark:bg-slate-750 dark:text-slate-100 sm:hidden"
     >
 </div>

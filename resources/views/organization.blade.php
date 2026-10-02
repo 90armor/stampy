@@ -21,7 +21,7 @@
         </div>
 
         <div class="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-            <nav aria-label="Organization sections" class="flex min-w-max border-b border-slate-200/70 dark:border-slate-600/20">
+            <nav aria-label="Organization sections" class="flex min-w-max border-b border-slate-divider">
                 @foreach (['departments' => 'Departments', 'positions' => 'Positions', 'holidays' => 'Holidays', 'schedules' => 'Schedules'] as $section => $label)
                     <button
                         type="button"
@@ -29,7 +29,7 @@
                         :aria-current="tab === '{{ $section }}' ? 'page' : null"
                         :class="tab === '{{ $section }}'
                             ? 'border-primary-600 font-semibold text-primary-700 dark:border-primary-400 dark:text-primary-300'
-                            : 'border-transparent font-medium text-slate-500 hover:border-slate-300 hover:text-slate-800 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-slate-200'"
+                            : 'border-transparent font-medium text-slate-500 hover:border-slate-border hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'"
                         class="-mb-px whitespace-nowrap border-b-2 px-4 py-3 text-sm transition focus:outline-none focus-visible:relative focus-visible:z-10 focus-visible:rounded-t-lg focus-visible:ring-2 focus-visible:ring-primary-500"
                     >
                         {{ $label }}

@@ -13,7 +13,7 @@ $navItems = [
 ];
 @endphp
 
-<div class="flex h-full w-[242px] flex-col bg-white/70 backdrop-blur-xl border-r border-slate-200/60 dark:bg-slate-800/60 dark:border-slate-600/20">
+<div class="flex h-full w-[242px] flex-col bg-white/70 backdrop-blur-xl border-r border-slate-border dark:bg-slate-800/60">
     <div class="flex h-16 shrink-0 items-center px-6">
         <a href="{{ route('dashboard') }}" wire:navigate class="flex items-center gap-2.5 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
             <x-logo size="28" />
@@ -25,7 +25,7 @@ $navItems = [
         @foreach ($navItems as $item)
             @continue(! $item['visible'])
             @if ($item['label'] === 'Attendance')
-                <div class="my-2 border-t border-slate-200/70 dark:border-slate-600/20"></div>
+                <div class="my-2 border-t border-slate-divider"></div>
             @endif
             @if ($item['enabled'])
                 {{-- Match on the route-name prefix (e.g. 'employees*'), not the exact

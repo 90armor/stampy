@@ -48,7 +48,7 @@
                     Today, {{ \App\Support\DisplayDate::compact(today()) }} · {{ $attendance['today']['total'] }} active {{ $attendance['today']['total'] === 1 ? 'employee' : 'employees' }}
                 </p>
             </div>
-            <dl class="grid grid-cols-3 divide-x divide-slate-200/60 dark:divide-slate-600/15">
+            <dl class="grid grid-cols-3 divide-x divide-slate-divider">
                 @foreach ($stripCells as $cell)
                     <x-stat-card
                         :icon="$cell['icon']"
@@ -149,7 +149,7 @@
                         @if (count($attendance['needsAttention']))<p class="{{ $cardMeta }}">{{ count($attendance['needsAttention']) }} today</p>@endif
                     </div>
                     @if (count($attendance['needsAttention']))
-                        <ul class="mt-4 divide-y divide-slate-200/60 dark:divide-slate-600/15">
+                        <ul class="mt-4 divide-y divide-slate-divider">
                             @foreach ($attendance['needsAttention'] as $person)
                                 <li class="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
                                     <span class="{{ $avatar }}" aria-hidden="true">{{ strtoupper(substr($person['name'], 0, 1)) }}</span>
@@ -181,7 +181,7 @@
                         <h2 class="{{ $cardTitle }}">Recent activity</h2>
                     </div>
                     @if (count($attendance['recent']))
-                        <div class="mt-4 divide-y divide-slate-200/60 dark:divide-slate-600/15">
+                        <div class="mt-4 divide-y divide-slate-divider">
                             @foreach ($attendance['recent'] as $activity)
                                 <div class="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
                                     <span class="{{ $avatar }}" aria-hidden="true">{{ strtoupper(substr($activity['name'], 0, 1)) }}</span>
@@ -222,7 +222,7 @@
                         <ul class="mt-4 space-y-3">
                             @foreach ($setupSteps as $step)
                                 <li class="flex items-center gap-x-2.5 text-sm">
-                                    @if ($step['done'])<span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white"><x-icon name="check" class="h-3 w-3" /></span>@else<span class="h-5 w-5 shrink-0 rounded-full border-2 border-slate-300 dark:border-slate-600"></span>@endif
+                                    @if ($step['done'])<span class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white"><x-icon name="check" class="h-3 w-3" /></span>@else<span class="h-5 w-5 shrink-0 rounded-full border-2 border-slate-border"></span>@endif
                                     <span class="text-slate-600 dark:text-slate-300">{{ $step['label'] }}</span>
                                 </li>
                             @endforeach

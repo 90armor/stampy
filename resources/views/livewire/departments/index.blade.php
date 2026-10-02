@@ -32,7 +32,7 @@
                 @foreach ($departments as $department)
                     <div wire:key="department-{{ $department->id }}" role="listitem" class="group relative flex items-center justify-between gap-4 px-5 py-3.5 transition hover:bg-slate-50 dark:hover:bg-slate-750/60 sm:px-6">
                         @unless ($loop->last)
-                            <span class="pointer-events-none absolute inset-x-5 bottom-0 h-px bg-slate-200/60 dark:bg-slate-600/15 sm:inset-x-6"></span>
+                            <span class="pointer-events-none absolute inset-x-5 bottom-0 h-px bg-slate-divider sm:inset-x-6"></span>
                         @endunless
 
                         <div class="min-w-0">
@@ -85,7 +85,7 @@
 
             {{-- No footer (and no empty divider band) when everything fits on one page. --}}
             @if ($departments->hasPages())
-                <div class="border-t border-slate-200/60 px-5 py-4 dark:border-slate-600/15 sm:px-6">
+                <div class="border-t border-slate-divider px-5 py-4 sm:px-6">
                     {{ $departments->links() }}
                 </div>
             @endif

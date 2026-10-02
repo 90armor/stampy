@@ -42,8 +42,8 @@ This document is the source of truth for Stampy's visual interface. It records c
 | Surface / Card | `bg-white` | `dark:bg-slate-800` | Cards, table containers, information panels |
 | Surface / Control | `bg-white` | `dark:bg-slate-750` | Inputs, selects, textareas, compact controls |
 | Surface / Overlay panel | `bg-white` | `dark:bg-slate-750` | Dropdowns, popovers, modal panels — one step above the card |
-| Border / Default | `ring-slate-200/60` or `border-slate-300` | `dark:ring-slate-750` or `dark:border-slate-600` | Surface and control boundaries |
-| Border / Divider | `bg-slate-200/60` or `border-slate-200/60` | `dark:bg-slate-600/15` or `dark:border-slate-600/15` | Row and section separation — translucent `slate-600`, so it reads on cards and overlays alike |
+| Line / Border | `ring-slate-border` or `border-slate-border` | same (the token switches with the theme) | Surface edges and controls (see Lines) |
+| Line / Divider | `border-slate-divider`, `divide-slate-divider` or `bg-slate-divider` | same | Every line inside a surface (see Lines) |
 | Action / Primary | `bg-primary-600 text-white` | same | Main action on a page or flow |
 | Action / Secondary | `bg-white text-slate-700` | `dark:bg-slate-800 dark:text-slate-200` | Supporting actions |
 | Action / Danger | `text-red-600` with red boundary/tint | `dark:text-red-400` | Destructive actions |
@@ -86,7 +86,7 @@ Do not add arbitrary pixel spacing until the standard scale demonstrably cannot 
 - `rounded-xl`: cards, dropdown menus, and popovers.
 - `rounded-2xl`: modal and large overlay panels.
 - `rounded-full`: geometry that is intentionally circular, including avatars, dots, progress tracks, and circular icon containers; not status badges or control styling.
-- Cards use `shadow-sm` plus a ring. Separation comes from the surface step first: white cards on a `slate-100` page in light mode. In dark mode a shadow is invisible on near-black, so the card edge is a full-opacity `ring-slate-750` around the `slate-800` card on the `slate-900` page; do not weaken it back to a translucent ring.
+- Cards use `shadow-sm` plus a ring. Separation comes from the surface step first: white cards on a `slate-100` page in light mode. In dark mode a shadow is invisible on near-black, so the card edge is the `border` line token (`ring-slate-border`, 1.47:1 against the dark page) around the `slate-800` card on the `slate-900` page; do not drop it for a shadow.
 - Dropdowns and modal panels use `shadow-lg` or `shadow-xl` because they float above content.
 - Elevation communicates hierarchy, not decoration. Normal cards do not gain elevation or a colored ring on hover unless the entire card is interactive.
 
@@ -98,15 +98,29 @@ Dark mode is one ladder of steps on the cool zinc neutrals (see Neutral scale). 
 |---|---|---|
 | Page | `slate-900` (dark `#18181b`) | |
 | Card | `slate-800` (dark `#27272a`) | card vs page 1.19:1 |
-| Card ring | `slate-750`, full opacity | a shadow can't separate a card from a dark page |
+| Card ring | the `border` line token | a shadow can't separate a card from a dark page |
 | Overlay (dropdown, popover, modal) and control | `slate-750` (dark `#333338`; OKLab midpoint of 800 and 700) | one step above the card |
-| Divider | `slate-600/15` (`/70` lines: `slate-600/20`) | translucent, so it reads on cards and overlays alike; same contrast against the card as before (≈1.09:1) |
+| Divider | the `divider` line token | see Lines |
 | Row hover | `slate-750/60` over the card | pinned table cells layer the same tint over the card |
 | Hover on a control or overlay | `slate-600/30` | translucent: it sits on cards and overlays, which share the control step |
-| Control border, strong line | `slate-600` | |
+| Control border | the `border` line token | see Lines |
 | Selected tint | `primary-600/35` | the shared selected state and the date picker's range band (1.25:1 against the popover) |
 
 Muted text is `slate-400`: 5.81:1 on the card, 4.90:1 on overlays and controls, 5.28:1 on a hovered row. Every status badge passes 4.5:1 on the card and on a hovered row (lowest: Absent on a hovered row, 4.70:1).
+
+## Lines
+
+There are two line levels, and every neutral line uses one of them. Both are tokens on the `slate` scale, defined as CSS variables in `resources/css/app.css` (`--slate-divider`, `--slate-border`), so a class names the level and the theme supplies the colour:
+
+| Token | Use | Classes | Light | Dark |
+|---|---|---|---|---|
+| `divider` | Every line **inside** a surface: table row lines, card section lines, list dividers, the stat strip's dividers, modal header and footer lines, the calendar's cell edges, the dashboard chart's grid | `border-slate-divider`, `divide-slate-divider`, `bg-slate-divider` (on an `h-px`/`w-px` rule), `ring-slate-divider` | stone ink at 11% — **1.25:1** on the white card | zinc ink at 9% — **1.27:1** on the card |
+| `border` | **Edges**: the card ring, popover, dropdown and modal edges, the sidebar and topbar edges, boxed list items; and **controls**: inputs, selects, textareas, the date-picker trigger, outline buttons, unselected chips, pagination items, checkboxes | `ring-slate-border`, `border-slate-border` | stone ink at 19% — **1.49:1** on the white card | zinc ink at 15% — **1.51:1** on the card |
+
+- **Why two levels.** A line inside a surface separates content that already belongs together, so it should recede; an edge or a control boundary says "this is a separate thing" or "this takes input", so it is a step stronger. The dark divider matches the chart grid the owner liked (sampled `#38383c` on `#27272a`, 1.28:1); light mode mirrors it at 1.25:1.
+- **Translucent ink, so one value works on every surface.** A solid divider one step above the card would vanish on overlays, which sit on that same step. Ink at a fixed opacity keeps both tokens' contrast within a few hundredths on the card, the page and an overlay (dark divider 1.24–1.28:1, dark border 1.49–1.52:1). The ink is warm stone in light mode and cool zinc in dark, like the neutrals. Measured on the rendered page: divider 1.25:1 (light) / 1.27:1 (dark) against the card; the card ring 1.49:1 / 1.47:1 against the page; an input border 1.48:1 / 1.77:1 against the card (higher in dark because the border composites over the input's own lighter fill).
+- **No other line values.** Don't add a numbered slate step, an opacity modifier or a third level for a line; the tokens take no opacity modifier. Two exceptions, both outside the line system: the slate status badge's ring (`ring-slate-500/10`, dark `/20`) belongs to the badge colour system, like every status badge's ring, and the day modal's Off pill mirrors it; a disabled checked checkbox's `border-slate-500` is its fill, not a line. `NeutralScaleTest` fails on any other numbered slate line class.
+- **The chart reads the token.** The dashboard chart's grid is `--slate-divider`, so it can't drift from the table lines.
 
 ## Surface architecture
 
@@ -186,7 +200,7 @@ Keep touch targets at least 44px high for primary auth controls and small-screen
 
 - Use uppercase `text-xs` headers that never wrap, and `px-6 py-3` headings. Body cells default to `px-6 py-4`; dense operational tables (Attendance) use `px-6 py-2` for about 52px rows. Abbreviate a long header rather than let it wrap, exposing the full name with `<abbr title>` or `sr-only` text.
 - Empty cell values are a muted em dash (`text-slate-300 dark:text-slate-600`), so data reads before placeholders.
-- Use the established inset `slate-200/60` divider (dark: `slate-600/15`), omitting a trailing divider after the last row.
+- Use the inset `divider` line (`bg-slate-divider` on an `h-px` span, or `border-slate-divider`), omitting a trailing divider after the last row.
 - Row hover is `hover:bg-slate-50 dark:hover:bg-slate-750/60`.
 - Preserve selectable data when choosing between a cell link and a whole-row target.
 - Wrap wide tables in `overflow-x-auto`; do not compress data until it becomes unreadable. From `sm` to below `xl` (640–1279px), a dense table may pin its Status and trailing action columns with `.table-pin` (opaque, row-matched surfaces; an edge shadow only while content passes under them) — never a leading column, never on a phone (below `sm` the pair would cover half the card), and never from `xl` up.

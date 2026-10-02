@@ -1,4 +1,4 @@
-<div class="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-x-4 border-b border-slate-200/60 bg-white/70 backdrop-blur-xl px-4 sm:px-6 dark:border-slate-600/20 dark:bg-slate-800/60">
+<div class="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-x-4 border-b border-slate-border bg-white/70 backdrop-blur-xl px-4 sm:px-6 dark:bg-slate-800/60">
     <button type="button" class="rounded-lg p-2 text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:hidden dark:text-slate-400" @click="openSidebar()">
         <span class="sr-only">Open sidebar</span>
         <x-icon name="bars-3" class="w-6 h-6" />

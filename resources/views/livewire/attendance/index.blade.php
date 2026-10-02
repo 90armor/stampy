@@ -68,7 +68,7 @@
         <div class="flex items-baseline justify-end gap-4 px-6 pt-4">
             <p class="text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ $summaryScope }}</p>
         </div>
-        <dl class="grid grid-cols-3 divide-x divide-slate-200/60 dark:divide-slate-600/15">
+        <dl class="grid grid-cols-3 divide-x divide-slate-divider">
             @if ($live)
                 {{-- Exactly today: the live "who is here now" strip. Any other
                 range: end-of-day status counts ("did they attend"). --}}
@@ -139,7 +139,7 @@
                     :aria-expanded="panelOpen"
                     aria-haspopup="dialog"
                     aria-controls="attendance-date-panel"
-                    class="inline-flex w-full items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-slate-600 dark:bg-slate-750 dark:text-slate-200 dark:hover:bg-slate-600 lg:w-auto"
+                    class="inline-flex w-full items-center justify-between gap-2 rounded-lg border border-slate-border bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:bg-slate-750 dark:text-slate-200 dark:hover:bg-slate-600 lg:w-auto"
                 >
                     <span class="inline-flex items-center gap-2"><x-icon name="calendar-days" class="h-4 w-4 text-slate-400 dark:text-slate-500" />{{ $rangeLabel }}</span>
                     <x-icon name="chevron-down" class="h-4 w-4 text-slate-400 dark:text-slate-500" />
@@ -161,7 +161,7 @@
                     x-ref="panel"
                     role="dialog"
                     aria-label="Choose a date range"
-                    class="fixed z-20 w-80 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-xl bg-white p-4 shadow-xl ring-1 ring-slate-200 dark:bg-slate-750 dark:ring-slate-750"
+                    class="fixed z-20 w-80 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-xl bg-white p-4 shadow-xl ring-1 ring-slate-border dark:bg-slate-750"
                 >
                     <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Quick ranges</p>
                     {{-- A preset shows the shared selected state while the
@@ -182,7 +182,7 @@
                         @endforeach
                     </div>
 
-                    <div class="mt-4 border-t border-slate-200/60 pt-4 dark:border-slate-600/15">
+                    <div class="mt-4 border-t border-slate-divider pt-4">
                         <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Custom</p>
 
                         {{-- From 640px: the shared calendar (treatments and keys in
@@ -200,7 +200,7 @@
                                     id="attendance-from"
                                     type="date"
                                     wire:model.live="fromDate"
-                                    class="block w-full min-w-0 rounded-lg border-slate-300 bg-white text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-750 dark:border-slate-600 dark:text-slate-100"
+                                    class="block w-full min-w-0 rounded-lg border-slate-border bg-white text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-750 dark:text-slate-100"
                                 >
                             </div>
                             <div class="min-w-0">
@@ -209,7 +209,7 @@
                                     id="attendance-to"
                                     type="date"
                                     wire:model.live="toDate"
-                                    class="block w-full min-w-0 rounded-lg border-slate-300 bg-white text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-750 dark:border-slate-600 dark:text-slate-100"
+                                    class="block w-full min-w-0 rounded-lg border-slate-border bg-white text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-750 dark:text-slate-100"
                                 >
                             </div>
                         </div>
@@ -225,7 +225,7 @@
                     type="text"
                     wire:model.live.debounce.300ms="employeeFilter"
                     placeholder="Name or employee code…"
-                    class="block w-full rounded-lg border-slate-300 bg-white pl-9 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-750 dark:border-slate-600 dark:text-slate-100 dark:placeholder-slate-400"
+                    class="block w-full rounded-lg border-slate-border bg-white pl-9 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-750 dark:text-slate-100 dark:placeholder-slate-400"
                 >
             </div>
 
@@ -256,12 +256,12 @@
         @php
             $chipBase = 'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-slate-800';
             $chipSelected = 'font-semibold bg-primary-50 text-primary-700 ring-primary-600 hover:bg-primary-100 dark:bg-primary-600/35 dark:text-primary-200 dark:ring-primary-500 dark:hover:bg-primary-600/45';
-            $chipUnselected = 'font-medium bg-white text-slate-600 ring-slate-300 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 dark:bg-slate-750 dark:text-slate-300 dark:ring-slate-600 dark:hover:bg-slate-600 dark:hover:text-white dark:active:bg-slate-500';
+            $chipUnselected = 'font-medium bg-white text-slate-600 ring-slate-border hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 dark:bg-slate-750 dark:text-slate-300 dark:hover:bg-slate-600 dark:hover:text-white dark:active:bg-slate-500';
             $workingStatuses = collect($allStatuses)->reject(fn ($status) => $status === \App\Enums\AttendanceStatus::Off);
             $allWorkingSelected = $workingStatuses->every(fn ($status) => in_array($status->value, $statuses, true));
             $showsOffDays = in_array(\App\Enums\AttendanceStatus::Off->value, $statuses, true);
         @endphp
-        <div class="grid gap-4 border-t border-slate-200/60 px-5 py-4 dark:border-slate-600/15 sm:px-6 xl:grid-cols-[minmax(0,1fr)_auto]">
+        <div class="grid gap-4 border-t border-slate-divider px-5 py-4 sm:px-6 xl:grid-cols-[minmax(0,1fr)_auto]">
         <fieldset>
         <legend class="text-xs font-medium text-slate-700 dark:text-slate-300">Status</legend>
         <div class="mt-2 flex flex-wrap gap-2">
@@ -323,7 +323,7 @@
         @endif
 
         @if ($attendances->isEmpty())
-            <div class="border-t border-slate-200/60 px-6 py-10 text-center dark:border-slate-600/15">
+            <div class="border-t border-slate-divider px-6 py-10 text-center">
                 <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-slate-750 dark:text-slate-400">
                     <x-icon name="clock" class="h-5 w-5" />
                 </span>
@@ -331,7 +331,7 @@
                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Try widening the date range or adjusting the filters above.</p>
             </div>
         @else
-            <div class="border-t border-slate-200/60 dark:border-slate-600/15">
+            <div class="border-t border-slate-divider">
                 {{-- The table's natural width is ~1119px; it first fits the card
                 at a 1440px viewport (1134px card), so the cue shows below that —
                 including 1024–1439, where it used to be hidden while the table
@@ -357,7 +357,7 @@
                         <tr class="relative whitespace-nowrap text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
                             <th class="px-6 py-3">
                                 Date
-                                <span class="pointer-events-none absolute inset-x-6 bottom-0 z-[2] h-px bg-slate-200/60 dark:bg-slate-600/15"></span>
+                                <span class="pointer-events-none absolute inset-x-6 bottom-0 z-[2] h-px bg-slate-divider"></span>
                             </th>
                             <th class="min-w-[11rem] px-6 py-3">Employee</th>
                             <th class="px-6 py-3">Department</th>
@@ -391,7 +391,7 @@
                                     against the row) and sits above the pinned cells, so it
                                     runs unbroken beneath them. --}}
                                     @unless ($loop->last)
-                                        <span class="pointer-events-none absolute inset-x-6 bottom-0 z-[2] h-px bg-slate-200/60 dark:bg-slate-600/15"></span>
+                                        <span class="pointer-events-none absolute inset-x-6 bottom-0 z-[2] h-px bg-slate-divider"></span>
                                     @endunless
                                 </td>
                                 {{-- Plain text, not a link: the row's one navigation target is
@@ -460,7 +460,7 @@
 
             {{-- No footer (and no empty divider band) when everything fits on one page. --}}
             @if ($attendances->hasPages())
-                <div class="mx-6 border-t border-slate-200/60 py-4 dark:border-slate-600/15">
+                <div class="mx-6 border-t border-slate-divider py-4">
                     {{ $attendances->links() }}
                 </div>
             @endif

@@ -62,7 +62,7 @@ divergence here would be a real correctness bug, not just a style one. --}}
 
     @can('update', $employee)
         @if ($addingPunchFor === $dayKey)
-            <form wire:submit="addPunch" class="mt-3 flex flex-wrap items-end gap-3 border-t border-slate-200/60 pt-3 dark:border-slate-600/15">
+            <form wire:submit="addPunch" class="mt-3 flex flex-wrap items-end gap-3 border-t border-slate-divider pt-3">
                 <div>
                     <x-input-label for="new_punch_date_{{ $dayKey }}" value="Date" class="!mb-1 !text-xs" />
                     {{-- min/max mirror addPunch()'s rule: from the join date to today. --}}

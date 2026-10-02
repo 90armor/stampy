@@ -9,8 +9,16 @@
    a stock step: it is the OKLab midpoint of 800 and 700 in each family. Every
    colour that should follow the neutral scale reads these variables (classes,
    @apply, theme() below, and the dashboard chart), so nothing warm is left in
-   dark mode. */
+   dark mode.
+
+   The two line tokens, `divider` (lines inside a surface: rows, sections,
+   strip dividers, chart grid) and `border` (surface edges and controls), are
+   translucent ink — warm stone in light mode, cool zinc in dark — so one
+   value reads the same on a card, the page or an overlay. Measured against
+   the card: divider 1.25:1 light / 1.27:1 dark, border 1.49:1 / 1.51:1. */
 :root {
+    --slate-divider: 28 25 23 / 0.11;
+    --slate-border: 28 25 23 / 0.19;
     --slate-50: 250 250 249;
     --slate-100: 245 245 244;
     --slate-200: 231 229 228;
@@ -25,6 +33,8 @@
     --slate-950: 12 10 9;
 }
 .dark {
+    --slate-divider: 228 228 231 / 0.09;
+    --slate-border: 228 228 231 / 0.15;
     --slate-50: 250 250 250;
     --slate-100: 244 244 245;
     --slate-200: 228 228 231;
@@ -45,7 +55,7 @@
    distinguish checked from unchecked when interaction is unavailable. */
 input:where([type='checkbox']),
 input:where([type='radio']) {
-    @apply cursor-pointer border-slate-300 bg-white text-primary-600 focus:ring-0 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed dark:border-slate-600 dark:bg-slate-750 dark:focus-visible:ring-offset-slate-800;
+    @apply cursor-pointer border-slate-border bg-white text-primary-600 focus:ring-0 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed dark:bg-slate-750 dark:focus-visible:ring-offset-slate-800;
 }
 
 input:where([type='checkbox']) {
@@ -69,7 +79,7 @@ input:where([type='radio']):checked:not(:disabled):hover {
 
 input:where([type='checkbox']):disabled:not(:checked),
 input:where([type='radio']):disabled:not(:checked) {
-    @apply border-slate-300 bg-slate-100 dark:border-slate-600 dark:bg-slate-800;
+    @apply border-slate-border bg-slate-100 dark:bg-slate-800;
 }
 
 input:where([type='checkbox']):disabled:checked,

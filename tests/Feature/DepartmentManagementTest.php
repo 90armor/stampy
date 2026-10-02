@@ -48,7 +48,7 @@ class DepartmentManagementTest extends TestCase
         $html = Livewire::actingAs($admin)->test(Index::class)->html();
 
         $this->assertStringContainsString('Pagination Navigation', $html);
-        $this->assertStringContainsString('dark:border-slate-600 dark:bg-slate-750', $html);
+        $this->assertStringContainsString('border-slate-border bg-white dark:bg-slate-750', $html);
         $this->assertDoesNotMatchRegularExpression('/\b(?:dark:)?(?:[a-z:]+-)?(?:gray|blue)-\d{2,3}\b/', $html);
 
         // The current page is the shared selected state, and says so itself.
