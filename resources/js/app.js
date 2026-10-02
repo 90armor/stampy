@@ -30,11 +30,15 @@ document.addEventListener('alpine:init', () => {
     }));
 });
 
-// Date range picker (docs/ATTENDANCE_UI.md, "Date range picker"). A month grid
-// for choosing a from/to range, bound to a Livewire component's fromDate and
-// toDate properties — the same properties, values ('YYYY-MM-DD') and URL the
-// native date inputs use, so the query and URL format don't change. Below
-// 640px the markup shows native date inputs instead and this grid is hidden.
+// Date picker (docs/ATTENDANCE_UI.md, "Date picker"). One component, two modes,
+// one calendar (resources/views/components/date-picker/calendar.blade.php):
+// - mode 'range': the Daily Attendance range, bound to the Livewire fromDate
+//   and toDate properties — the same values ('YYYY-MM-DD') and URL the native
+//   inputs used.
+// - mode 'single': <x-date-picker>, one date bound to one Livewire property
+//   (`model`), written deferred like a plain wire:model, with optional
+//   min/max ('YYYY-MM-DD') mirroring the field's server-side rule.
+// Below 640px the markup shows native date inputs instead of this calendar.
 //
 // Dates are handled as 'YYYY-MM-DD' strings with UTC arithmetic, so a DST
 // shift in the browser's own timezone can never skip or repeat a day. "Today"
@@ -81,9 +85,12 @@ const longDate = (iso) => {
 };
 
 document.addEventListener('alpine:init', () => {
-    window.Alpine.data('dateRangePicker', ({ today, presets = {}, from = 'fromDate', to = 'toDate' }) => ({
+    window.Alpine.data('datePicker', ({ mode = 'range', today, presets = {}, from = 'fromDate', to = 'toDate', model = null, min = null, max = null }) => ({
+        mode,
         panelOpen: false,
         today,
+        min, // the first and last pickable dates, or null
+        max,
         presets, // { key: { label, from, to } } — Attendance\Index::presetRanges()
         // Which grid is on screen. 'days' is where a range is picked; the
         // heading zooms out to 'months' and then 'years' for long jumps, and
@@ -94,11 +101,24 @@ document.addEventListener('alpine:init', () => {
         preview: null, // the day under the pointer or focus while anchored
         announcement: '', // announced politely to screen readers
 
+        // A single date is a one-day range: from and to are the same value,
+        // so the calendar's endpoint, band and zoom treatments need no
+        // single-date branch.
         get from() {
-            return this.$wire[from];
+            return this.$wire[this.mode === 'single' ? model : from];
         },
         get to() {
-            return this.$wire[to];
+            return this.$wire[this.mode === 'single' ? model : to];
+        },
+        // The single-date trigger's text and accessible name.
+        get display() {
+            return isValidIso(this.from) ? compactDate(this.from, parseIso(this.today).getUTCFullYear()) : '';
+        },
+        get displayLong() {
+            return isValidIso(this.from) ? longDate(this.from) : '';
+        },
+        isDisabled(iso) {
+            return (this.min !== null && iso < this.min) || (this.max !== null && iso > this.max);
         },
 
         // What is on screen always follows the focused day.
@@ -136,6 +156,9 @@ document.addEventListener('alpine:init', () => {
         // While a range is in progress the hint names its start, which may
         // be months or years away from what is on screen.
         get hint() {
+            if (this.mode === 'single') {
+                return { days: 'Select a date', months: 'Choose a month', years: 'Choose a year' }[this.view];
+            }
             const from = this.anchor ? `From ${compactDate(this.anchor, parseIso(this.today).getUTCFullYear())} · ` : '';
             if (this.view === 'months') return this.anchor ? `${from}choose the end date's month` : 'Choose a month';
             if (this.view === 'years') return this.anchor ? `${from}choose the end date's year` : 'Choose a year';
@@ -263,8 +286,12 @@ document.addEventListener('alpine:init', () => {
             this.preview = null;
             this.announcement = '';
             this.view = 'days';
-            this.focused = isValidIso(this.to) ? this.to : this.today;
+            let start = isValidIso(this.to) ? this.to : this.today;
+            if (this.min !== null && start < this.min) start = this.min;
+            if (this.max !== null && start > this.max) start = this.max;
+            this.focused = start;
             this.panelOpen = true;
+            this.$nextTick(() => this.place());
         },
         // Escape and the presets return focus to the trigger; a click outside
         // leaves focus wherever the click put it.
@@ -274,6 +301,47 @@ document.addEventListener('alpine:init', () => {
             this.anchor = null;
             this.preview = null;
             if (restoreFocus) this.$nextTick(() => this.$refs.trigger.focus());
+        },
+
+        // The popover is position: fixed, placed against the trigger, so no
+        // scrolling ancestor can clip it (the employee form scrolls its own
+        // body). Under the trigger when it fits, else above, else whichever
+        // side has more room, with the panel scrolling inside that space. A
+        // fixed element is placed relative to its containing block, which a
+        // transformed ancestor (the modal panel) changes: measuring where
+        // top/left 0 lands gives that origin, whatever it is.
+        place() {
+            const panel = this.$refs.panel, trigger = this.$refs.trigger;
+            if (!this.panelOpen || !panel || !trigger) return;
+            const gap = 8, margin = 16;
+            panel.style.maxHeight = '';
+            panel.style.top = '0px';
+            panel.style.left = '0px';
+            const origin = panel.getBoundingClientRect();
+            const t = trigger.getBoundingClientRect();
+            const h = panel.offsetHeight, w = panel.offsetWidth;
+            const below = window.innerHeight - t.bottom - gap - margin;
+            const above = t.top - gap - margin;
+            let top;
+            if (h <= below || below >= above) {
+                top = t.bottom + gap;
+                if (h > below) panel.style.maxHeight = `${Math.max(below, 160)}px`;
+            } else {
+                top = t.top - gap - Math.min(h, above);
+                if (h > above) panel.style.maxHeight = `${above}px`;
+            }
+            const left = Math.min(Math.max(t.left, margin), window.innerWidth - margin - w);
+            panel.style.top = `${top - origin.top}px`;
+            panel.style.left = `${left - origin.left}px`;
+        },
+        init() {
+            this.reflow = () => this.panelOpen && this.place();
+            window.addEventListener('scroll', this.reflow, true);
+            window.addEventListener('resize', this.reflow);
+        },
+        destroy() {
+            window.removeEventListener('scroll', this.reflow, true);
+            window.removeEventListener('resize', this.reflow);
         },
 
         // Focus the active cell of whichever grid is on screen, once it has
@@ -368,7 +436,16 @@ document.addEventListener('alpine:init', () => {
         // in a single Livewire request. Picking the same day twice is a
         // one-day range. Zooming out between the two picks keeps the anchor.
         pick(iso) {
+            if (this.isDisabled(iso)) return;
             this.focused = iso;
+            if (this.mode === 'single') {
+                // Deferred, like the plain wire:model it replaces: the value
+                // travels with the form's next request.
+                this.$wire.$set(model, iso, false);
+                this.announcement = `Selected ${longDate(iso)}.`;
+                this.closePanel();
+                return;
+            }
             if (!this.anchor) {
                 this.anchor = iso;
                 this.preview = iso;

@@ -79,7 +79,8 @@
 
             <div>
                 <x-input-label for="bulk_effective_from" value="Effective from" />
-                <x-text-input id="bulk_effective_from" type="date" wire:model="bulk_effective_from" wire:loading.attr="disabled" wire:target="bulkReassign" class="mt-1 block w-full" />
+                {{-- min mirrors the rule: at most MAX_BULK_LOOKBACK_DAYS back. --}}
+                <x-date-picker id="bulk_effective_from" model="bulk_effective_from" label="Effective from" :min="today()->subDays(\App\Services\Attendance\EmployeeScheduleAssigner::MAX_BULK_LOOKBACK_DAYS)->format('Y-m-d')" wire:loading.attr="disabled" wire:target="bulkReassign" />
                 <x-input-error :messages="$errors->get('bulk_effective_from')" class="mt-1" />
                 <p class="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">A new assignment starts on this date. Attendance from then through today is recalculated; a future date does not change past attendance.</p>
             </div>

@@ -496,10 +496,14 @@ class AttendanceIndexTest extends TestCase
         $html = Livewire::actingAs($this->admin())->test(Index::class)->html();
 
         // The grid picker gets the app-timezone today from the server.
-        $this->assertStringContainsString('x-data="dateRangePicker({ today: \'2026-03-04\', presets: ', $html);
+        $this->assertStringContainsString('x-data="datePicker({ mode: \'range\', today: \'2026-03-04\', presets: ', $html);
         $this->assertStringContainsString('role="dialog"', $html);
         $this->assertStringContainsString('aria-label="Choose a date range"', $html);
-        $this->assertStringContainsString('<div class="hidden sm:block" wire:ignore x-ref="picker"', $html);
+        // The shared calendar (<x-date-picker.calendar>), Alpine-rendered,
+        // so out of Livewire's morph.
+        $this->assertMatchesRegularExpression('/<div x-ref="picker" @keydown="onKeydown\(\$event\)" class="hidden sm:block" wire:ignore/', $html);
+        // A fixed panel, placed against the trigger so nothing can clip it.
+        $this->assertMatchesRegularExpression('/x-ref="panel"\s+role="dialog"\s+aria-label="Choose a date range"\s+class="fixed /', $html);
         // Three grids — days, months, years — each labelled by what it shows,
         // and the heading zooms out from days to months to years.
         $this->assertStringContainsString('<table x-show="view === \'days\'" role="grid" :aria-label="gridLabel"', $html);
@@ -561,7 +565,7 @@ class AttendanceIndexTest extends TestCase
             ->test(Index::class)
             ->assertSet('fromDate', '2026-02-01')
             ->assertSet('toDate', '2026-02-10')
-            // What dateRangePicker sends: both properties, one request.
+            // What datePicker (range mode) sends: both properties, one request.
             ->set(['fromDate' => '2026-01-28', 'toDate' => '2026-02-03'])
             ->assertSet('fromDate', '2026-01-28')
             ->assertSet('toDate', '2026-02-03')

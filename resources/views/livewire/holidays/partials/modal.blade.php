@@ -20,7 +20,7 @@
                         <x-input-label for="holiday_date" value="Date" class="!mb-0" />
                     </div>
                     <div class="min-w-0">
-                        <x-text-input id="holiday_date" type="date" wire:model="date" autofocus />
+                        <x-date-picker id="holiday_date" model="date" label="Date" autofocus />
                         <x-input-error :messages="$errors->get('date')" class="mt-1" />
                     </div>
                 </div>

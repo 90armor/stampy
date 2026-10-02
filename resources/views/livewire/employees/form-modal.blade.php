@@ -149,7 +149,7 @@
                                         <x-input-label for="emp_join_date" value="Join date" class="!mb-0" />
                                     </div>
                                     <div class="sm:w-[320px] sm:shrink-0">
-                                        <x-text-input id="emp_join_date" type="date" wire:model="join_date" />
+                                        <x-date-picker id="emp_join_date" model="join_date" label="Join date" />
                                         <x-input-error :messages="$errors->get('join_date')" class="mt-1" />
                                     </div>
                                 </div>

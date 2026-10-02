@@ -65,7 +65,8 @@ divergence here would be a real correctness bug, not just a style one. --}}
             <form wire:submit="addPunch" class="mt-3 flex flex-wrap items-end gap-3 border-t border-slate-200/60 pt-3 dark:border-slate-600/15">
                 <div>
                     <x-input-label for="new_punch_date_{{ $dayKey }}" value="Date" class="!mb-1 !text-xs" />
-                    <x-text-input id="new_punch_date_{{ $dayKey }}" type="date" wire:model="newPunchDate" class="!w-auto" />
+                    {{-- min/max mirror addPunch()'s rule: from the join date to today. --}}
+                    <x-date-picker id="new_punch_date_{{ $dayKey }}" model="newPunchDate" label="Date" :min="$employee->join_date->format('Y-m-d')" :max="today()->format('Y-m-d')" class="sm:w-44" />
                 </div>
                 <div>
                     <x-input-label for="new_punch_time_{{ $dayKey }}" value="Time" class="!mb-1 !text-xs" />

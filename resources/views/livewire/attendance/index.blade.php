@@ -119,14 +119,15 @@
         </div>
 
         <div class="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 sm:p-6 lg:grid-cols-[auto_minmax(16rem,1fr)_14rem]">
-            {{-- Date range: presets plus a month-grid range picker (dateRangePicker
-            in resources/js/app.js; rules in docs/ATTENDANCE_UI.md). It sets the
+            {{-- Date range: presets plus the date picker in range mode (datePicker
+            in resources/js/app.js, calendar in <x-date-picker.calendar>; rules
+            in docs/ATTENDANCE_UI.md). It sets the
             same fromDate/toDate properties the native inputs did, so the query
             and the from/to URL are unchanged. Escape closes and returns focus
             to the trigger. --}}
             <div
                 class="relative"
-                x-data="dateRangePicker({ today: '{{ today()->format('Y-m-d') }}', presets: @js($presetRanges) })"
+                x-data="datePicker({ mode: 'range', today: '{{ today()->format('Y-m-d') }}', presets: @js($presetRanges) })"
                 @click.outside="closePanel(false)"
                 @keydown.escape.stop="closePanel()"
                 @keydown.escape.window="closePanel(false)"
@@ -147,30 +148,20 @@
                 after the panel closes. --}}
                 <p class="sr-only" aria-live="polite" x-text="announcement"></p>
 
-                {{-- Popovers are content surfaces and therefore opaque. This
-                also prevents the status chips and rows below from bleeding
-                through and reducing legibility.
-
-                Not teleported to <body>: tried that for a suspected
-                vertical-overflow issue, but the actual bug was the date
-                inputs overflowing the panel horizontally (see below) —
-                unrelated to where the panel lives in the DOM. Teleporting
-                also has real downsides for a panel containing wire:model
-                inputs: Alpine's x-teleport moves nodes outside the Livewire
-                component root, where Livewire's morph doesn't reliably
-                reach them on re-render (Livewire 3 has its own @teleport
-                directive specifically because x-teleport isn't morph-safe
-                inside a component) — bindings could silently stop syncing.
-                Reverted; if a genuine vertical-overflow case shows up later,
-                solve it with max-height + overflow-y-auto on the panel, or
-                flip it to open upward, not with teleport. --}}
+                {{-- Popovers are content surfaces and therefore opaque, so the
+                chips and rows below can't bleed through. Not teleported: the
+                panel holds wire:model inputs (below 640px), which must stay
+                inside the Livewire component root. It is position: fixed and
+                placed against the trigger by datePicker's place() — below it,
+                or above when there isn't room — so no ancestor can clip it. --}}
                 <div
                     id="attendance-date-panel"
                     x-show="panelOpen"
                     x-cloak
+                    x-ref="panel"
                     role="dialog"
                     aria-label="Choose a date range"
-                    class="absolute left-0 z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl bg-white p-4 shadow-xl ring-1 ring-slate-200 dark:bg-slate-750 dark:ring-slate-750"
+                    class="fixed z-20 w-80 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-xl bg-white p-4 shadow-xl ring-1 ring-slate-200 dark:bg-slate-750 dark:ring-slate-750"
                 >
                     <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Quick ranges</p>
                     {{-- A preset shows the shared selected state while the
@@ -194,197 +185,9 @@
                     <div class="mt-4 border-t border-slate-200/60 pt-4 dark:border-slate-600/15">
                         <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Custom</p>
 
-                        {{-- From 640px: the range picker. Alpine renders it, so
-                        Livewire's morph leaves it alone (wire:ignore); it reads
-                        and writes $wire.fromDate / $wire.toDate directly.
-
-                        Three views, like an ordinary calendar: days (where the
-                        range is picked), and — through the heading — months and
-                        years, for long jumps. A start day picked before zooming
-                        out stays the anchor.
-
-                        Treatments (docs/ATTENDANCE_UI.md, Date range picker):
-                        endpoints — and a one-day range's day — are filled
-                        (primary-600 + white; dark primary-400 + slate-900, the
-                        employee calendar's today colours); the days between are
-                        the shared tint as one continuous band. Today is a quiet
-                        marker (primary semibold number and a dot beneath, with
-                        aria-current="date"), never a fill, since a fill now
-                        means "endpoint". Zoomed out: a month/year holding a
-                        chosen endpoint is filled, one the range reaches into is
-                        tinted, the current one has the quiet marker. A ring is
-                        only ever keyboard focus. --}}
-                        @php
-                            $pickerNavButton = 'inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-600/30 dark:hover:text-slate-100';
-                            // Month and year cells: same states as a day, as a 3-wide grid of buttons-in-cells.
-                            // The only ring in the picker is keyboard focus, offset so it
-                            // also reads on a filled endpoint.
-                            $pickerFocus = 'group-focus-visible:ring-2 group-focus-visible:ring-primary-500 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-white dark:group-focus-visible:ring-primary-400 dark:group-focus-visible:ring-offset-slate-750';
-                            $pickerFill = 'bg-primary-600 font-semibold text-white dark:bg-primary-400 dark:text-slate-900';
-                            $pickerTint = 'bg-primary-50 font-medium text-primary-700 dark:bg-primary-600/35 dark:text-primary-200';
-                            $pickerPlain = 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-600/30';
-                            $pickerCurrent = 'font-semibold text-primary-700 hover:bg-slate-100 dark:text-primary-300 dark:hover:bg-slate-600/30';
-                            // Month and year cells: a 3-wide grid of buttons-in-cells.
-                            $pickerZoomCell = 'relative flex h-10 w-full items-center justify-center rounded-lg text-sm transition '.$pickerFocus;
-                        @endphp
-                        <div class="hidden sm:block" wire:ignore x-ref="picker" @keydown="onKeydown($event)">
-                            <div class="mt-2 flex items-center justify-between">
-                                <button type="button" @click="step(-1)" :aria-label="stepLabels[0]" class="{{ $pickerNavButton }}">
-                                    <x-icon name="chevron-left" class="h-4 w-4" />
-                                </button>
-                                <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                                    <button
-                                        type="button"
-                                        x-show="view !== 'years'"
-                                        @click="zoomOut()"
-                                        :aria-label="zoomLabel"
-                                        class="inline-flex items-center gap-1 rounded-lg px-2 py-1 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-slate-600/30"
-                                    >
-                                        <span x-text="heading"></span>
-                                        <x-icon name="chevron-down" class="h-4 w-4 text-slate-400 dark:text-slate-500" />
-                                    </button>
-                                    <span x-show="view === 'years'" class="inline-block px-2 py-1 tabular-nums" x-text="heading"></span>
-                                </h3>
-                                <button type="button" @click="step(1)" :aria-label="stepLabels[1]" class="{{ $pickerNavButton }}">
-                                    <x-icon name="chevron-right" class="h-4 w-4" />
-                                </button>
-                            </div>
-                            {{-- The grid's label, announced politely as it changes
-                            (paging months, zooming out or in). --}}
-                            <span class="sr-only" aria-live="polite" x-text="gridLabel"></span>
-
-                            {{-- Days --}}
-                            <table x-show="view === 'days'" role="grid" :aria-label="gridLabel" class="mt-2 w-full table-fixed border-collapse">
-                                <thead>
-                                    <tr>
-                                        @foreach (['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as $weekday)
-                                            <th scope="col" abbr="{{ $weekday }}" class="pb-1 text-center text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                                                <span aria-hidden="true">{{ substr($weekday, 0, 2) }}</span>
-                                                <span class="sr-only">{{ $weekday }}</span>
-                                            </th>
-                                        @endforeach
-                                    </tr>
-                                </thead>
-                                <tbody @mouseleave="anchor && (preview = focused)">
-                                    <template x-for="week in weeks" :key="week.key">
-                                        <tr>
-                                            <template x-for="(cell, col) in week.days" :key="col">
-                                                <td
-                                                    class="group relative h-10 p-0 text-center focus:outline-none"
-                                                    :class="cell && 'cursor-pointer'"
-                                                    :data-date="cell ? cell.iso : null"
-                                                    :tabindex="cell ? (cell.iso === focused ? 0 : -1) : null"
-                                                    :aria-selected="cell ? String(isSelected(cell.iso)) : null"
-                                                    :aria-current="cell && cell.iso === today ? 'date' : null"
-                                                    :aria-label="cell ? label(cell.iso) : null"
-                                                    @click="cell && pick(cell.iso)"
-                                                    @mouseenter="cell && anchor && (preview = cell.iso)"
-                                                    @focus="cell && (focused = cell.iso)"
-                                                >
-                                                    <template x-if="cell">
-                                                        <div aria-hidden="true">
-                                                            <span class="pointer-events-none absolute inset-y-0.5 bg-primary-50 dark:bg-primary-600/35" :class="bandClass(cell)"></span>
-                                                            <span
-                                                                class="relative mx-auto flex h-9 w-9 items-center justify-center rounded-lg text-sm tabular-nums transition {{ $pickerFocus }}"
-                                                                :class="isStart(cell.iso) || isEnd(cell.iso)
-                                                                    ? '{{ $pickerFill }}'
-                                                                    : (inRange(cell.iso)
-                                                                        ? 'font-medium text-primary-700 dark:text-primary-200'
-                                                                        : (cell.iso === today ? '{{ $pickerCurrent }}' : '{{ $pickerPlain }}'))"
-                                                            >
-                                                                <span x-text="cell.day"></span>
-                                                                {{-- Today's quiet marker; white (dark: slate-900) on a fill. --}}
-                                                                <span
-                                                                    x-show="cell.iso === today"
-                                                                    class="absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full"
-                                                                    :class="isStart(cell.iso) || isEnd(cell.iso) ? 'bg-white dark:bg-slate-900' : 'bg-primary-600 dark:bg-primary-400'"
-                                                                ></span>
-                                                            </span>
-                                                        </div>
-                                                    </template>
-                                                </td>
-                                            </template>
-                                        </tr>
-                                    </template>
-                                </tbody>
-                            </table>
-
-                            {{-- Months --}}
-                            <table x-show="view === 'months'" x-cloak role="grid" :aria-label="gridLabel" class="mt-2 w-full table-fixed border-separate border-spacing-1">
-                                <tbody>
-                                    <template x-for="row in monthRows" :key="row.key">
-                                        <tr>
-                                            <template x-for="cell in row.cells" :key="cell.key">
-                                                <td
-                                                    class="group cursor-pointer p-0 focus:outline-none"
-                                                    :data-month="cell.key"
-                                                    :tabindex="cell.key === focusedMonthKey ? 0 : -1"
-                                                    :aria-selected="String(holdsEndpoint(cell))"
-                                                    :aria-current="cell.key === today.slice(0, 7) ? 'date' : null"
-                                                    :aria-label="cell.name"
-                                                    @click="pickMonth(cell.key)"
-                                                    @focus="focused = sameDayInMonth(cell.key)"
-                                                >
-                                                    <span
-                                                        aria-hidden="true"
-                                                        class="{{ $pickerZoomCell }}"
-                                                        :class="holdsEndpoint(cell)
-                                                            ? '{{ $pickerFill }}'
-                                                            : (touchesRange(cell) ? '{{ $pickerTint }}' : (isCurrentMonth(cell) ? '{{ $pickerCurrent }}' : '{{ $pickerPlain }}'))"
-                                                    >
-                                                        <span x-text="cell.label"></span>
-                                                        <span
-                                                            x-show="isCurrentMonth(cell)"
-                                                            class="absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full"
-                                                            :class="holdsEndpoint(cell) ? 'bg-white dark:bg-slate-900' : 'bg-primary-600 dark:bg-primary-400'"
-                                                        ></span>
-                                                    </span>
-                                                </td>
-                                            </template>
-                                        </tr>
-                                    </template>
-                                </tbody>
-                            </table>
-
-                            {{-- Years --}}
-                            <table x-show="view === 'years'" x-cloak role="grid" :aria-label="gridLabel" class="mt-2 w-full table-fixed border-separate border-spacing-1">
-                                <tbody>
-                                    <template x-for="row in yearRows" :key="row.key">
-                                        <tr>
-                                            <template x-for="cell in row.cells" :key="cell.year">
-                                                <td
-                                                    class="group cursor-pointer p-0 focus:outline-none"
-                                                    :data-year="cell.year"
-                                                    :tabindex="cell.year === focusedYear ? 0 : -1"
-                                                    :aria-selected="String(holdsEndpoint(cell))"
-                                                    :aria-current="String(cell.year) === today.slice(0, 4) ? 'date' : null"
-                                                    :aria-label="String(cell.year)"
-                                                    @click="pickYear(cell.year)"
-                                                    @focus="focused = sameDayInYear(cell.year)"
-                                                >
-                                                    <span
-                                                        aria-hidden="true"
-                                                        class="{{ $pickerZoomCell }} tabular-nums"
-                                                        :class="holdsEndpoint(cell)
-                                                            ? '{{ $pickerFill }}'
-                                                            : (touchesRange(cell) ? '{{ $pickerTint }}' : (isCurrentYear(cell) ? '{{ $pickerCurrent }}' : '{{ $pickerPlain }}'))"
-                                                    >
-                                                        <span x-text="cell.year"></span>
-                                                        <span
-                                                            x-show="isCurrentYear(cell)"
-                                                            class="absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full"
-                                                            :class="holdsEndpoint(cell) ? 'bg-white dark:bg-slate-900' : 'bg-primary-600 dark:bg-primary-400'"
-                                                        ></span>
-                                                    </span>
-                                                </td>
-                                            </template>
-                                        </tr>
-                                    </template>
-                                </tbody>
-                            </table>
-
-                            <p class="mt-2 text-xs text-slate-500 dark:text-slate-400" x-text="hint"></p>
-                        </div>
+                        {{-- From 640px: the shared calendar (treatments and keys in
+                        docs/ATTENDANCE_UI.md). wire:ignore: Alpine renders it. --}}
+                        <x-date-picker.calendar class="hidden sm:block" wire:ignore />
 
                         {{-- Below 640px: native date inputs, stacked. A native
                         input's intrinsic width (~150-180px) doesn't reliably fit
