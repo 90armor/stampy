@@ -19,8 +19,16 @@ This document is the source of truth for Stampy's visual interface. It records c
 
 - `primary-*`: deep evergreen. Primary actions, active navigation, links, and focus emphasis.
 - `accent-*`: mint. Brand marks, restrained highlights, and the Leave status; not a primary-action substitute.
-- `slate-*`: Stampy's warm neutral scale (mapped to stone-like values). Page, surface, border, and text hierarchy.
+- `slate-*`: Stampy's neutral scale — warm stone in light mode, cool zinc in dark mode (see Neutral scale, below). Page, surface, border, and text hierarchy.
 - Status colors: green, amber, violet, red, slate, accent, blue, and fuchsia retain the meanings defined below.
+
+### Neutral scale
+
+**Light neutrals are warm stone; dark neutrals are cool zinc.** Both are the one `slate` scale, implemented as CSS variables: `resources/css/app.css` defines `--slate-50` … `--slate-950` (plus the in-between `--slate-750`) as RGB channels, with Tailwind's stone values on `:root` and its zinc values under `.dark`, and `tailwind.config.js` reads every step as `rgb(var(--slate-N) / <alpha-value>)`. A class names a step; the theme picks the hue. Opacity modifiers, `@apply` and `theme()` all resolve through the same variables, and any colour set outside a class (the dashboard chart, the autofill surface) reads `--slate-N` too. The `750` step is the OKLab midpoint of 800 and 700 in each family.
+
+**Why two hues.** Warm hues that look like paper in light mode read as brown at dark-mode lightness. Measured on the rendered dark surfaces, stone sat at a hue of 12–24° with 6–10% HSL saturation (card 12° / 6.5%, page 24° / 9.8%), and the owner read it as brown. Zinc at the same lightness sits at 240° with 4–6% saturation (card 240° / 3.7%), close to the neutral, slightly cool dark of macOS (window `#1e1f21`, grouped box `#252628`, both about 220–240° and 4–5%). Light mode keeps stone because the warm cream is part of the brand; switching the dark hue changed no light-mode pixel.
+
+**Always use the `slate` scale for neutrals.** New code must never use `stone-*`, `zinc-*`, `neutral-*` (or `gray-*`) classes or hard-coded neutral hex values: they bypass the variables, so they would show the wrong hue in one of the two themes. If a neutral is needed outside a class, read `--slate-N`. `NeutralScaleTest` fails the build on a stone/zinc/neutral class in the app's views, scripts or styles.
 
 ### Semantic roles
 
@@ -84,7 +92,7 @@ Do not add arbitrary pixel spacing until the standard scale demonstrably cannot 
 
 ## Dark surfaces
 
-Dark mode is one ladder of steps on a **neutral, slightly cool gray** (Tailwind's zinc values: hue about 240°, 4–6% saturation), while light mode keeps warm stone. Both live in the same `slate` scale, defined as CSS variables (`--slate-50` … `--slate-950`, plus `--slate-750`) in `resources/css/app.css`: stone on `:root`, zinc under `.dark`, read by `tailwind.config.js` as `rgb(var(--slate-N) / <alpha-value>)`. So `dark:` classes name a step and the theme decides the hue; no class changes between themes. Stone's red-orange cast (hue 12–30°) made dark surfaces read as brown; zinc at the same lightness matches the neutral dark of macOS (window `#1e1f21`, grouped box `#252628`). Anything that colours a neutral outside a class — `@apply`, `theme()`, the dashboard chart — reads the same variables. Every layer is defined relative to the card, so a change to the card moves everything with it.
+Dark mode is one ladder of steps on the cool zinc neutrals (see Neutral scale). Every layer is defined relative to the card, so a change to the card moves everything with it. The page step stays clearly below the card on purpose: Stampy's layout is cards on a page, and that separation is what the eye uses to find them, so the page is not lifted to match the macOS window (`#1e1f21`).
 
 | Layer | Dark value | Notes |
 |---|---|---|
@@ -106,7 +114,7 @@ Surface role determines treatment; pages do not choose between glass and solid v
 
 ### Shell surfaces
 
-The sidebar, topbar, and authentication shell may use translucency and `backdrop-blur`. `.bg-shell` supplies the restrained decorative background that makes this treatment legible. Keep the effect subtle and retain clear borders. In dark mode the `.bg-shell` glow is confined to the top-left corner behind the sidebar; it must not tint the page behind content cards, where it erodes the already small dark-mode surface step.
+The sidebar, topbar, and authentication shell may use translucency and `backdrop-blur`. `.bg-shell` supplies the restrained decorative background that makes this treatment legible. Keep the effect subtle and retain clear borders. `.bg-shell` is a light-mode treatment only: in dark mode it paints nothing. A glow tinted the page between cards and, even confined to the top-left corner, put a green cast into the glass sidebar and topbar; the dark shell is the plain neutral page step.
 
 ### Content surfaces
 
@@ -231,6 +239,6 @@ The principal inconsistency was content glass: cards, form controls, dropdowns, 
 
 ## Future tokenization
 
-The semantic roles in this document are guidance mapped to existing Tailwind classes, not new utilities. Do not add utilities such as `text-muted`, `bg-surface`, or `border-default`, and do not add a semantic palette to `tailwind.config.js` in v1.
+The semantic roles in this document are guidance mapped to existing Tailwind classes, not new utilities. The `slate` CSS variables (Neutral scale) are not semantic tokens either: they keep the scale's step names and only let the theme choose the hue. Do not add utilities such as `text-muted`, `bg-surface`, or `border-default`, and do not add a semantic palette to `tailwind.config.js` in v1.
 
 After multiple representative screens have been redesigned and these roles have proven stable, implementation-level semantic tokens may be evaluated. Any proposal should demonstrate that it reduces drift without obscuring Tailwind behavior, preserves status semantics, and works in both themes. Until then, use the mappings above.

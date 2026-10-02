@@ -107,10 +107,11 @@ input:-webkit-autofill:focus {
 }
 
 /* Soft decorative backdrop behind the application and authentication shells.
-   Only shell surfaces use glass; content surfaces stay opaque. In dark mode
-   the glow is confined to the top-left corner (behind the sidebar): a green
-   haze behind the content area tinted the near-black page between cards and
-   erased what little separation dark cards have. */
+   Only shell surfaces use glass; content surfaces stay opaque. Light mode
+   only: dark mode has no glow at all. It was first confined to the top-left
+   corner (a haze behind the content tinted the page between cards), then
+   removed, so the neutral zinc surfaces stay clean — even a corner of green
+   behind the glass sidebar and topbar tinted them. */
 .bg-shell {
     background-image:
         radial-gradient(circle at 12% 8%, rgba(175, 240, 209, 0.35), transparent 32%),
@@ -118,7 +119,7 @@ input:-webkit-autofill:focus {
     background-attachment: fixed;
 }
 .dark .bg-shell {
-    background-image: radial-gradient(280px 480px at 0 0, rgba(20, 97, 68, 0.25), transparent);
+    background-image: none;
 }
 
 /* Pinned trailing table columns (docs/ATTENDANCE_UI.md, Responsive behavior).
