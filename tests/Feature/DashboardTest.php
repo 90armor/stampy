@@ -217,7 +217,7 @@ class DashboardTest extends TestCase
         });
     }
 
-    public function test_weekly_trend_is_seven_days_ending_today_as_the_present_share_of_active_employees(): void
+    public function test_weekly_trend_is_seven_days_ending_today_as_the_attendance_rate_of_active_employees(): void
     {
         $this->travelTo(Carbon::parse('2026-03-11 12:00:00')); // a Wednesday: the window is Thu Mar 5 through Wed Mar 11
 
@@ -233,7 +233,7 @@ class DashboardTest extends TestCase
         $this->attendanceRow($a, AttendanceStatus::Present, ['work_date' => '2026-03-10']);
         $this->attendanceRow($b, AttendanceStatus::Present, ['work_date' => '2026-03-10', 'late_minutes' => 20]);
 
-        // Mar 11, today: one present; incomplete and absent don't count.
+        // Mar 11, today, closed (every row final): attended = present + incomplete (Phase 2.7); absent doesn't count.
         $this->attendanceRow($a, AttendanceStatus::Present);
         $this->attendanceRow($b, AttendanceStatus::Incomplete);
         $this->attendanceRow($c, AttendanceStatus::Absent);
@@ -245,12 +245,13 @@ class DashboardTest extends TestCase
             ->get(route('dashboard'))
             ->assertViewHas('attendance', fn ($attendance) => $attendance['trend'] === [
                 ['label' => 'Thu', 'date' => '2026-03-05', 'value' => 100.0, 'marker' => null, 'pending' => false],
-                ['label' => 'Fri', 'date' => '2026-03-06', 'value' => 0.0, 'marker' => null, 'pending' => false],
-                ['label' => 'Sat', 'date' => '2026-03-07', 'value' => 0.0, 'marker' => null, 'pending' => false],
-                ['label' => 'Sun', 'date' => '2026-03-08', 'value' => 0.0, 'marker' => null, 'pending' => false],
-                ['label' => 'Mon', 'date' => '2026-03-09', 'value' => 0.0, 'marker' => null, 'pending' => false],
+                // No rows at all: never a 0% bar, never absent.
+                ['label' => 'Fri', 'date' => '2026-03-06', 'value' => null, 'marker' => 'Not calculated', 'pending' => false],
+                ['label' => 'Sat', 'date' => '2026-03-07', 'value' => null, 'marker' => 'Not calculated', 'pending' => false],
+                ['label' => 'Sun', 'date' => '2026-03-08', 'value' => null, 'marker' => 'Not calculated', 'pending' => false],
+                ['label' => 'Mon', 'date' => '2026-03-09', 'value' => null, 'marker' => 'Not calculated', 'pending' => false],
                 ['label' => 'Tue', 'date' => '2026-03-10', 'value' => 66.7, 'marker' => null, 'pending' => false],
-                ['label' => 'Wed', 'date' => '2026-03-11', 'value' => 33.3, 'marker' => null, 'pending' => false],
+                ['label' => 'Wed', 'date' => '2026-03-11', 'value' => 66.7, 'marker' => null, 'pending' => false],
             ]);
     }
 
@@ -440,7 +441,7 @@ class DashboardTest extends TestCase
         $this->actingAs($admin)->get(route('dashboard'))
             ->assertSee('Today, '.today()->format('D j M'))
             // Live "who is here now" language, not end-of-day status counts.
-            ->assertSeeInOrder(['At work', '0', 'Left', '1', '1 early', 'Not in yet', '0'])
+            ->assertSeeInOrder(['At work', '0', 'Left', '1', '1 early', 'Not in', '0'])
             // No separate headcount cell (Phase 2.6): the total lives in the
             // strip's meta, and the three cells stay one row at every width.
             ->assertSee('1 active employee')
@@ -602,8 +603,8 @@ class DashboardTest extends TestCase
         $this->assertSame(2, $live['atWork']);
         $this->assertSame(2, $live['left']);
         $this->assertSame(1, $live['leftEarly']);
-        $this->assertSame(4, $live['notInYet']);
-        $this->assertSame($live['total'], $live['atWork'] + $live['left'] + $live['notInYet']);
+        $this->assertSame(4, $live['notIn']);
+        $this->assertSame($live['total'], $live['atWork'] + $live['left'] + $live['notIn']);
         // "Checked in" overlaps the partition: everyone with an in-punch,
         // whether still at work or already left.
         $this->assertSame(4, $live['checkedIn']);
@@ -693,7 +694,7 @@ class DashboardTest extends TestCase
         $this->actingAs($this->admin())->get(route('dashboard'))
             ->assertViewHas('attendance', fn ($attendance) => $attendance['needsAttention'] === []
                 // ...but the strip still counts them as not in yet (wider scope).
-                && $attendance['live']['notInYet'] === 1)
+                && $attendance['live']['notIn'] === 1)
             ->assertSee('Nothing needs attention today.');
     }
 
@@ -710,12 +711,12 @@ class DashboardTest extends TestCase
 
         $live = \App\Support\DashboardAttendance::liveToday(null);
 
-        $this->assertSame(['atWork' => 3, 'atWorkLate' => 2, 'left' => 1, 'leftLate' => 1, 'leftEarly' => 1, 'notInYet' => 1], array_intersect_key($live, array_flip(['atWork', 'atWorkLate', 'left', 'leftLate', 'leftEarly', 'notInYet'])));
+        $this->assertSame(['atWork' => 3, 'atWorkLate' => 2, 'left' => 1, 'leftLate' => 1, 'leftEarly' => 1, 'notIn' => 1], array_intersect_key($live, array_flip(['atWork', 'atWorkLate', 'left', 'leftLate', 'leftEarly', 'notIn'])));
         // Late is an annotation on a group, never a fourth group: the
         // partition still sums to active employees.
-        $this->assertSame($live['total'], $live['atWork'] + $live['left'] + $live['notInYet']);
+        $this->assertSame($live['total'], $live['atWork'] + $live['left'] + $live['notIn']);
 
         $this->actingAs($this->admin())->get(route('dashboard'))
-            ->assertSeeInOrder(['At work', '3', '2 late', 'Left', '1', '1 late · 1 early', 'Not in yet', '1']);
+            ->assertSeeInOrder(['At work', '3', '2 late', 'Left', '1', '1 late · 1 early', 'Not in', '1']);
     }
 }

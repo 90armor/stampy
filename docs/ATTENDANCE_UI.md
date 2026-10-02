@@ -54,65 +54,42 @@ Counts are not durations and keep their own wording: summary timing copy stays c
 
 ## Needs attention (dashboard)
 
-Today's list, worst-first: **Absent** and **Incomplete** (status badges — these only exist once the day's end time has passed), then **late arrivals** (name plus the amber duration, `1h 20m late`, longest first — including people still at work, since Phase 2.6 records late from the in-punch), then **Not in yet** (name plus muted `Not in yet · due 8:00 AM`, narrow scope above). Late and Not in yet carry no badge; neither is a status. The empty state is unchanged.
+Today's list follows the builder's statuses (Phase 2.7), worst-first: **Absent** and **Incomplete** (status badges — an Absent row is a punchless day whose schedule end has passed, exactly as the attendance table shows it), then **late arrivals** (name plus the amber duration, `1h 20m late`, longest first — including people still at work, since Phase 2.6 records late from the in-punch), then **Not in yet** (name plus muted `Not in yet · due 8:00 AM`: only a punchless In progress row past start + grace). Late and Not in yet carry no badge; neither is a status. The header meta is the **real total** (`35 today`); the list shows the 8 most urgent (`DashboardAttendance::needsAttentionTotal()`). The empty state is unchanged.
 
 ## Other attendance details
 
 - Raw punch badges in the day modal and table view are neutral (`slate`) for both In and Out. Green means Present; a punch direction is not a status.
 - Dashboard Recent activity is a neutral log ("Checked in" / "Checked out", no timing) and shows the date (compact, `Tue 29 Sep`) above the time for any entry that isn't from today, so an older punch can't read as this morning's.
 
-## Pending is never 0% or absent
+## The attendance rate, and pending days
 
-In-progress or not-yet-calculated attendance is **pending**. It must never render as 0% or as an absence. Today is pending while any row for today is In progress or any active employee in scope has no row yet (`DashboardAttendance::todayIsPending()`).
+The dashboard follows the builder's statuses — one source of truth with the attendance table (Phase 2.7). Its rate is **attended ÷ active employees, attended = present + incomplete**: an incomplete day was attended, a punch is just missing. The trend and the Department card both use it.
 
-- **Trend chart:** today's bar carries a muted `Today` marker (like `Off`/`Holiday`) until the day is calculated. If anyone has checked in, the checked-in share so far (in-punches over active employees — the same figure as the Department card's `Checked in N / M`, not the Present count) is drawn as a lighter, provisional bar (`primary-200`, dark `primary-800`) with the marker above it; with nobody checked in yet there is no bar, only the marker.
-- **Department attendance:** while today is pending, each department shows a so-far count (`Checked in 28 / 35`) with a lighter provisional bar instead of a percentage.
-- **Dashboard stat strip:** today uses the live strip (below), which has no percentages at all.
+In-progress or not-yet-calculated attendance is **pending**, and every trend day carries a value, a marker, or both — never a blank slot without a reason, never 0% for something unfinished, never Absent for someone who may still come in:
+
+| A trend day that is… | Shows |
+|---|---|
+| Off or Holiday (every scoped row) | no bar, a muted `Off` / `Holiday` marker |
+| Today, while pending (any In progress row, or an active employee with no row yet — `todayIsPending()`) | a lighter provisional bar (`primary-200`, dark `primary-800`) of **checked in so far** — anyone with an in-punch — and a `Today` marker; no bar while nobody has checked in |
+| An earlier day still open (an in-only row inside its pairing window — a 9:30 in-punch keeps yesterday open until 03:30) | the same provisional bar and a `Pending` marker |
+| A past day with no rows, or with In progress rows whose window has already closed (the builder didn't run) | no bar, a muted `Not calculated` marker |
+| Closed | the rate as a `primary-500` bar; a closed workday with 0 attended gets a `0%` marker |
+
+Markers too wide for their slot (`Not calculated` at phone width) wrap onto two lines. The **Department card** shows counts, never a bare percentage: `Checked in N / M` with the provisional bar while today is pending, `Attended N / M` once it has closed.
 
 ## Status counts vs. the live strip
 
 Two different questions, two strip forms:
 
 - **Status counts** (Present, Absent, Incomplete) answer *"did they attend"* — an end-of-day view. The Attendance strip uses them for any range that is not exactly today.
-- **The live strip** answers *"who is here now"* — today only. It reads `At work 32 (4 late) · Left 3 (1 late · 3 early) · Not in yet 3` and is a **partition of the active employees in scope: the three numbers never overlap and must always sum to active employees.** **At work** is everyone with an in-punch today who hasn't finished (any non-Present row with a first punch); **Left** is everyone Present today (both punches); **Not in yet** is everyone else — no in-punch yet. Late (Phase 2.6) is a **sub-line** on At work and Left, never a fourth group; early leave is a sub-line on Left. It is derived from today's existing rows (`DashboardAttendance::liveToday()` / `liveTodayCells()`), with no builder involvement. The Dashboard strip always uses it — three cells, with no separate headcount cell, since the total is already the strip's meta (`Today, Thu 1 Oct · 35 active employees`); the Attendance strip uses it whenever the range is exactly today, with the scope meta `Today, Wed 30 Sep · so far`.
-- **"Not in yet" has two scopes, and the narrower is always a subset of the wider** — never a different definition under the same label:
-  - **Strip:** every active employee with no in-punch yet today, at any time of day (before or after the shift starts).
-  - **Needs attention:** only those who are actionable — an In progress row with no punch at all whose schedule `start_time + grace_minutes` has passed (`DailyAttendance::isNotInYet()`), shown as `Not in yet · due 8:00 AM` (the scheduled start). Before start + grace the person is simply in progress and isn't listed.
+- **The live strip** answers *"who is here now"* — today only. It reads `At work 32 (4 late · 2 past end time) · Left 3 (1 late · 3 early) · Not in 3 (1 due · 2 absent)` and is a **partition of the active employees in scope: the three numbers never overlap and must always sum to active employees.** **At work** is everyone with an in-punch today who hasn't finished (any non-Present row with a first punch); **Left** is everyone Present today (both punches); **Not in** is everyone else — no in-punch today. Sub-lines annotate a group, never form a fourth one:
+  - At work: `{n} late` (Phase 2.6) and `{n} past end time` — In progress rows whose schedule end has passed (Phase 2.7: an in-only day stays open until its pairing window closes — overtime, or a missing out-punch).
+  - Left: `{n} late` and `{n} early`.
+  - Not in: `{n} due` (a punchless In progress row, or no row built yet) and `{n} absent` (Absent rows — the schedule end passed with no punch); both when mixed. Off, holiday, leave and out-only rows count in Not in without a sub-line.
 
-  "Not in yet" is a derived display fact, never an attendance status and never "absent": Off, Holiday, Leave and Absent rows never qualify. It uses muted text, not a status colour.
+  It is derived from today's existing rows (`DashboardAttendance::liveToday()` / `liveTodayCells()`), with no builder involvement. The Dashboard strip always uses it — three cells, with no separate headcount cell, since the total is already the strip's meta (`Today, Thu 1 Oct · 35 active employees`); the Attendance strip uses it whenever the range is exactly today, with the scope meta `Today, Wed 30 Sep · so far`.
+- **"Not in yet" lives only in Needs attention:** a punchless In progress row past `start_time + grace_minutes` (`DailyAttendance::isNotInYet()`), shown as `Not in yet · due 8:00 AM`. It is a derived display fact, never an attendance status. Every such person is also in the strip's `due` sub-line, which is wider (it also counts people before their start + grace, and anyone not built yet).
 - **"Checked in" is a different, overlapping figure** and is reserved for *has an in-punch today*, whether still at work or already left. It is used only by the Department card (`Checked in 30 / 35`) and the trend's pending bar (checked in ÷ active employees), never by the strip — so the strip's At work (27) and the Department card's Checked in (30) can differ by exactly the people who have left.
-
-## Date picker
-
-One component in two modes, sharing one calendar (`<x-date-picker.calendar>`) and one Alpine component (`datePicker` in `resources/js/app.js` — no date library): **range** for the Daily Attendance date control, and **single** (`<x-date-picker>`) for every other date field. Everything below applies to both modes unless it says otherwise.
-
-### Range mode
-
-The Daily Attendance date control is a trigger (showing the range in the `DisplayDate` range form) that opens a popover with **Quick ranges** — Today, Yesterday, Last 7 days, Last 30 days, This month, Last month, defined once in `Attendance\Index::presetRanges()` — and, under **Custom**, the calendar in range mode, with three views, like an ordinary calendar: **days**, where a range is picked, and — by clicking the heading — **months** (the 12 months of a year) and **years** (12 at a time, e.g. 2016–2027), for long ranges. Picking a year opens its months; picking a month opens its days. The arrows beside the heading step by a month, a year, or 12 years, matching the view.
-
-- **State and URL are unchanged.** The picker reads and writes the same Livewire `fromDate`/`toDate` properties, as `YYYY-MM-DD`, that the native inputs used, so the query and the `from`/`to` URL parameters are exactly as before. A completed range sets both properties in one request.
-- **Selection.** The first pick anchors a new range and the second completes it, in either order (the earlier day becomes From); picking the same day twice is a one-day range. The anchor survives zooming out, so a long range is: pick the start day, click the heading, choose the end's year and month, pick the end day. While a range is in progress the band previews from the anchor to the day under the pointer or keyboard focus, and a visible hint names the start, which may be off screen — `Select a start date`, then `From Mon 3 Feb 2025 · select an end date` (or `· choose the end date's month` / `year` while zoomed out; `DisplayDate::compact()` format). Completing a range closes the popover and returns focus to the trigger.
-- **Quick ranges show what is applied.** A preset carries the shared selected state (`aria-pressed="true"`) while the applied range — or the pending one, while a new range is in progress — equals it exactly. Two presets can match at once (on the 1st of a month, Today and This month are the same day), and both show.
-- **Treatments, and nothing else.** Days, Sunday first, neighbouring-month cells blank:
-  - **Endpoint** — the start, the end, and the single day of a one-day range — is **filled**: `bg-primary-600 text-white` semibold, dark `bg-primary-400 text-slate-900` (the employee calendar's today colours). A previewed end is filled too while it is under the pointer or focus.
-  - **In range** — the days between — is the shared selected tint as one continuous band (`bg-primary-50`, dark `bg-primary-600/35` — 1.25:1 against the popover; primary-200 text on it 6.63:1; the endpoint fill is 4.08:1 against the popover and 3.27:1 against the band), rounded where it meets a week row's or the month's edge, with primary text.
-  - **Today** is a **quiet marker**: a semibold primary number with a small dot beneath (white, dark `slate-900`, on a fill), and `aria-current="date"`. It is never a fill, because a fill now means "endpoint" — unlike the employee calendar, whose filled circle has no such competition.
-  - Months and years use the same three: a month or year **holding a chosen endpoint** is filled; one the range **reaches into** is tinted; the **current** one has the quiet marker. "Chosen" means the committed from/to, or only the anchor while a new range is in progress, compared on the full date — the anchor's month never looks selected in another year.
-  - **A ring is only ever keyboard focus** (`focus-visible`, `ring-2` with a 2px offset so it also reads on a fill). The keyboard cursor has no other styling.
-- **Keyboard.** Each grid is a single tab stop (roving `tabindex`); what is on screen follows the focused cell. Days: arrow keys move by day (Up/Down by week), Home/End to the start/end of the week, PageUp/PageDown by month (with Shift, by year). Months and years (3-wide grids): arrows move by one (Up/Down by a row), Home/End to the row's ends, PageUp/PageDown by a year or by 12 years. Enter or Space picks the focused day, opens the focused month, or opens the focused year; Enter on the heading zooms out and moves focus into the new grid. Escape closes the popover from any view and returns focus to the trigger; a click outside closes it without moving focus.
-- **ARIA.** The popover is a non-modal `role="dialog"` labelled "Choose a date range"; each view is a `role="grid"` table labelled by what it shows (`September 2026`, `Months of 2026`, `Years 2016 to 2027`), and a polite live region repeats that label so paging and zooming are announced; the day grid has full weekday names on its column headers. The heading button is named for what it does (`September 2026. Choose month and year`). Each day cell is a gridcell named by its long date (`Tuesday, 29 September 2026`), with `aria-selected` on the days of the committed range — or only on the anchor while a new range is in progress; a month or year cell is `aria-selected` when it holds a chosen endpoint. A polite status line outside the popover announces the anchor and the completed range.
-- **Below 640px (`sm`)** the grid is not shown; the popover keeps the native From/To date inputs, stacked, bound with `wire:model.live` as before.
-
-### Single mode
-
-`<x-date-picker id model label [min] [max]>` replaces the native date input in every date field: holiday date, join date, a schedule assignment's effective date, bulk reassignment's effective date, and a manual punch's date. Time inputs stay native. `DatePickerTest` fails on a bare `type="date"` input anywhere else.
-
-- **Trigger** looks like the text inputs beside it (`rounded-lg`, the control surface and border, `text-sm`), with a calendar icon and the date in the `DisplayDate` compact form (`Tue 29 Sep`; year only outside the current year), or a muted `Select a date`. It keeps the field's `id`, so the `<x-input-label for>` still points at it, and its accessible name is the label plus the date (`Date, Thursday, 15 October 2026`), since a label alone would hide the value.
-- **Picking** writes the property deferred, like the plain `wire:model` it replaces — the value travels with the form's next request — then closes the popover and returns focus to the trigger. A single date is a one-day range, so it is the filled endpoint; there is no band and no quick ranges. Zoomed out, the month or year holding the date is filled.
-- **Bounds.** `min`/`max` mirror the field's server-side rule, and days outside them are muted, `aria-disabled` and can't be picked: a punch from the employee's join date to today; an assignment's effective date from the join date; bulk reassignment at most 60 days back. Holiday and join dates are unbounded. The server rule stays the authority.
-- **Footer: Today and Clear.** **Today** sits on the right and picks today; it is shown only when today is inside the field's `min`/`max` (an employee who joins next month gets no Today on their punch or assignment date). **Clear** sits on the left and only on a field whose server rule is `nullable` (`clearable`): it empties the value, the trigger returns to its placeholder, the popover closes and focus returns to the trigger. A required field gets no Clear — picking again already replaces the value. Every date field today is required (holiday date, join date, both effective dates, punch date), so none shows Clear yet. Typing a date is not possible. The Daily Attendance range has neither button: Reset filters and the Today preset cover both.
-- **In a modal.** The popover is `position: fixed` and placed against the trigger — below it when it fits, otherwise above (the join date flips up in the employee form), with the panel scrolling within the space if neither fits — so a modal's scrolling body can't clip it. It stays inside the modal's DOM, so the modal's focus trap includes it. Escape closes only the picker while it is open; with the picker closed, Escape reaches the modal as before.
-- **Below 640px** a native date input on the same property, with the same `min`/`max`, takes the trigger's place.
 
 ## Filters are controls, not status badges
 

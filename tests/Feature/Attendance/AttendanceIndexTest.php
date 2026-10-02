@@ -600,14 +600,14 @@ class AttendanceIndexTest extends TestCase
 
         $component = Livewire::actingAs($admin)->test(Index::class);
 
-        $component->assertSeeInOrder(['At work', '1', 'Left', '1', '1 early', 'Not in yet', '1'])
+        $component->assertSeeInOrder(['At work', '1', 'Left', '1', '1 early', 'Not in', '1'])
             ->assertSee('Today, '.today()->format('D j M').' · so far')
             ->assertDontSee('Incomplete</dt>', false);
 
         // Any other range keeps the end-of-day status counts.
         $component->set('fromDate', today()->subDay()->format('Y-m-d'))
             ->assertSee('Absent')
-            ->assertDontSee('Not in yet');
+            ->assertDontSee('dark:text-slate-400">Not in</dt>', false);
     }
 
     public function test_incomplete_badge_and_stat_card_use_violet_not_amber(): void

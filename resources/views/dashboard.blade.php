@@ -90,7 +90,7 @@
                         @if ($trendMeta)<p class="{{ $cardMeta }}">{{ $trendMeta }}</p>@endif
                     </div>
                     @if ($trend->isNotEmpty())
-                        <div class="relative mt-5 h-64 min-w-0 w-full overflow-hidden" role="img" aria-label="Present share of active employees per day: {{ $trend->map(fn ($day) => $day['label'].' '.($day['marker'] ?? $day['value'].'%'))->implode(', ') }}">
+                        <div class="relative mt-5 h-64 min-w-0 w-full overflow-hidden" role="img" aria-label="Attendance rate (present and incomplete) per day: {{ $trend->map(fn ($day) => $day['label'].' '.($day['marker'] ?? $day['value'].'%'))->implode(', ') }}">
                             <canvas
                                 class="!h-full !w-full max-w-full"
                                 id="attendance-trend-chart"
@@ -115,21 +115,16 @@
                         <div class="mt-5 space-y-4">
                             @foreach ($attendance['departments'] as $department)
                                 <div>
-                                    {{-- While today is pending, a percentage would read people
-                                    still in progress as absent: show the so-far count instead,
-                                    with a lighter provisional bar. --}}
+                                    {{-- Counts, never a bare percentage (Phase 2.7): "Checked in
+                                    N / M" with a lighter provisional bar while today is pending,
+                                    "Attended N / M" (present + incomplete) once it has closed. --}}
                                     @php
-                                        $departmentShare = $department['pending']
-                                            ? ($department['employees'] > 0 ? round($department['checkedIn'] / $department['employees'] * 100, 1) : 0)
-                                            : $department['attendance'];
+                                        $departmentCount = $department['pending'] ? $department['checkedIn'] : $department['attended'];
+                                        $departmentShare = $department['employees'] > 0 ? round($departmentCount / $department['employees'] * 100, 1) : 0;
                                     @endphp
                                     <div class="flex items-baseline justify-between gap-2">
                                         <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $department['name'] }}</p>
-                                        @if ($department['pending'])
-                                            <p class="text-sm tabular-nums text-slate-600 dark:text-slate-300">Checked in <span class="font-semibold text-slate-900 dark:text-slate-100">{{ $department['checkedIn'] }}</span> / {{ $department['employees'] }}</p>
-                                        @else
-                                            <p class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ $department['attendance'] }}%</p>
-                                        @endif
+                                        <p class="text-sm tabular-nums text-slate-600 dark:text-slate-300">{{ $department['pending'] ? 'Checked in' : 'Attended' }} <span class="font-semibold text-slate-900 dark:text-slate-100">{{ $departmentCount }}</span> / {{ $department['employees'] }}</p>
                                     </div>
                                     <p class="text-xs text-slate-500 dark:text-slate-400">{{ $department['employees'] }} {{ $department['employees'] === 1 ? 'employee' : 'employees' }}</p>
                                     <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-750"><div @class(['h-full rounded-full', 'bg-primary-200 dark:bg-primary-800' => $department['pending'], 'bg-primary-500' => ! $department['pending']]) style="width: {{ $departmentShare }}%"></div></div>
@@ -146,7 +141,8 @@
                 <x-card class="order-1">
                     <div class="{{ $cardHeader }}">
                         <h2 class="{{ $cardTitle }}">Needs attention</h2>
-                        @if (count($attendance['needsAttention']))<p class="{{ $cardMeta }}">{{ count($attendance['needsAttention']) }} today</p>@endif
+                        {{-- The real total; the list shows the most urgent 8. --}}
+                        @if ($attendance['needsAttentionTotal'] > 0)<p class="{{ $cardMeta }}">{{ $attendance['needsAttentionTotal'] }} today</p>@endif
                     </div>
                     @if (count($attendance['needsAttention']))
                         <ul class="mt-4 divide-y divide-slate-divider">

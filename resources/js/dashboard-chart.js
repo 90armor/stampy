@@ -2,7 +2,7 @@
 // Vite entry point (see vite.config.js) so Chart.js is only loaded on the
 // page that needs it, and only registers the chart types it actually uses.
 //
-// One bar per day: the present share of active employees. A non-working day
+// One bar per day: the attendance rate (present + incomplete, Phase 2.7). A non-working day
 // (every scoped row Off or Holiday) has a null value and a marker instead,
 // drawn as a muted "Off"/"Holiday" label on the baseline — never a 0% bar,
 // which would read as "nobody came in". Bars use primary-500, the same green
@@ -45,8 +45,19 @@ const markerLabels = {
             const y = value === null || value === undefined
                 ? chartArea.bottom - 6
                 : Math.min(chartArea.bottom - 6, bars[index].y - 4);
+            const x = scales.x.getPixelForValue(index);
 
-            ctx.fillText(marker, scales.x.getPixelForValue(index), y);
+            // A marker wider than its slot ("Not calculated" at phone width)
+            // wraps onto two lines, bottom-aligned, rather than spilling into
+            // its neighbours.
+            const slot = chartArea.width / Math.max(1, markers.length) - 4;
+            const words = marker.split(' ');
+            if (ctx.measureText(marker).width > slot && words.length > 1) {
+                ctx.fillText(words.slice(1).join(' '), x, y);
+                ctx.fillText(words[0], x, y - 14);
+            } else {
+                ctx.fillText(marker, x, y);
+            }
         });
 
         ctx.restore();
