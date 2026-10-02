@@ -162,7 +162,7 @@ Keep touch targets at least 44px high for primary auth controls and small-screen
 - Use the established inset `slate-200/60` divider (dark: `slate-800/60`), omitting a trailing divider after the last row.
 - Row hover is `hover:bg-slate-50 dark:hover:bg-slate-800/60`.
 - Preserve selectable data when choosing between a cell link and a whole-row target.
-- Wrap wide tables in `overflow-x-auto`; do not compress data until it becomes unreadable. Below `xl`, a dense table may pin its Status and trailing action columns with `.table-pin` (opaque, row-matched surfaces; an edge shadow only while content passes under them) — never a leading column, and never above `xl`.
+- Wrap wide tables in `overflow-x-auto`; do not compress data until it becomes unreadable. From `sm` to below `xl` (640–1279px), a dense table may pin its Status and trailing action columns with `.table-pin` (opaque, row-matched surfaces; an edge shadow only while content passes under them) — never a leading column, never on a phone (below `sm` the pair would cover half the card), and never from `xl` up.
 - Place pagination within the same solid data surface, separated by a standard divider. Render the footer (and its divider) only when `hasPages()` is true; a one-page list ends at its last row, with no empty band.
 
 ## Navigation
@@ -199,7 +199,7 @@ Use `<x-empty-state>` inside the owning solid content surface. State what is mis
 
 ## Responsive behavior
 
-Design from the smallest supported width outward. The app switches from the sidebar to a drawer below `lg`; auth switches from split-screen to form-only below `lg`. Stack form and toolbar controls before they become cramped: a multi-column filter row switches on only at the breakpoint where its column minimums actually fit the card (the Employees filters use `xl`, since at `lg` the sidebar leaves a 718px card). Below `xl`, the dense tables pin their Status and trailing action columns to the right edge so those stay visible while the rest scrolls (see [Attendance UI](ATTENDANCE_UI.md#responsive-behavior)), and a scroll cue's breakpoint follows the table's measured width. Use wrapping and horizontal table scrolling intentionally. Test at narrow mobile, tablet, desktop, and zoomed desktop widths in both themes.
+Design from the smallest supported width outward. The app switches from the sidebar to a drawer below `lg`; auth switches from split-screen to form-only below `lg`. Stack form and toolbar controls before they become cramped: a multi-column filter row switches on only at the breakpoint where its column minimums actually fit the card (the Employees filters use `xl`, since at `lg` the sidebar leaves a 718px card). From `sm` to below `xl`, the dense tables pin their Status and trailing action columns to the right edge so those stay visible while the rest scrolls; below `sm` they scroll as one piece (see [Attendance UI](ATTENDANCE_UI.md#responsive-behavior)), and a scroll cue's breakpoint follows the table's measured width. Use wrapping and horizontal table scrolling intentionally. Test at narrow mobile, tablet, desktop, and zoomed desktop widths in both themes.
 
 ## Dark mode
 

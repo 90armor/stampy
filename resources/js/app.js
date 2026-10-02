@@ -81,9 +81,10 @@ const longDate = (iso) => {
 };
 
 document.addEventListener('alpine:init', () => {
-    window.Alpine.data('dateRangePicker', ({ today, from = 'fromDate', to = 'toDate' }) => ({
+    window.Alpine.data('dateRangePicker', ({ today, presets = {}, from = 'fromDate', to = 'toDate' }) => ({
         panelOpen: false,
         today,
+        presets, // { key: { label, from, to } } — Attendance\Index::presetRanges()
         // Which grid is on screen. 'days' is where a range is picked; the
         // heading zooms out to 'months' and then 'years' for long jumps, and
         // picking a year or a month zooms back in.
@@ -203,6 +204,35 @@ document.addEventListener('alpine:init', () => {
         touchesRange(cell) {
             const [start, end] = this.range;
             return start !== null && cell.first <= end && cell.last >= start;
+        },
+        // The days actually chosen: the committed from/to, or only the anchor
+        // while a new range is in progress (a previewed end isn't chosen).
+        get chosen() {
+            if (this.anchor) return [this.anchor];
+            return isValidIso(this.from) && isValidIso(this.to) ? [this.from, this.to] : [];
+        },
+        // Zoomed out, a month or year is "selected" only when it contains a
+        // chosen endpoint — compared on the full date, so the anchor's month
+        // never looks selected in another year.
+        holdsEndpoint(cell) {
+            return this.chosen.some((iso) => iso >= cell.first && iso <= cell.last);
+        },
+        isCurrentMonth(cell) {
+            return cell.key === this.today.slice(0, 7);
+        },
+        isCurrentYear(cell) {
+            return String(cell.year) === this.today.slice(0, 4);
+        },
+        // A quick range reads as selected while the applied range — or the
+        // pending one, while a new range is in progress — equals it.
+        presetActive(key) {
+            const preset = this.presets[key];
+            const [start, end] = this.range;
+            return Boolean(preset) && start === preset.from && end === preset.to;
+        },
+        applyPreset(key) {
+            this.$wire.setRange(key);
+            this.closePanel();
         },
         // aria-selected reflects only what is actually chosen: the committed
         // range, or just the anchor while a new range is in progress.

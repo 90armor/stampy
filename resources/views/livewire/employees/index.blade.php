@@ -109,7 +109,7 @@
                 <span>Scroll to view all columns</span>
                 <x-icon name="chevron-right" class="h-3.5 w-3.5" />
             </div>
-            {{-- Below xl the Status and Actions columns are pinned to the right
+            {{-- From sm to below xl the Status and Actions columns are pinned to the right
             edge (.table-pin in resources/css/app.css; pinnedColumns in
             resources/js/app.js keeps the offset and edge shadow in sync), so
             status and the row's actions stay on screen while the rest scrolls.

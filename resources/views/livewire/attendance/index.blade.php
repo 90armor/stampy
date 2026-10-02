@@ -126,7 +126,7 @@
             to the trigger. --}}
             <div
                 class="relative"
-                x-data="dateRangePicker({ today: '{{ today()->format('Y-m-d') }}' })"
+                x-data="dateRangePicker({ today: '{{ today()->format('Y-m-d') }}', presets: @js($presetRanges) })"
                 @click.outside="closePanel(false)"
                 @keydown.escape.stop="closePanel()"
                 @keydown.escape.window="closePanel(false)"
@@ -173,9 +173,21 @@
                     class="absolute left-0 z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl bg-white p-4 shadow-xl ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800"
                 >
                     <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Quick ranges</p>
-                    <div class="mt-2 grid grid-cols-2 gap-2">
-                        @foreach (['today' => 'Today', 'yesterday' => 'Yesterday', 'last7' => 'Last 7 days', 'last30' => 'Last 30 days', 'thisMonth' => 'This month'] as $preset => $label)
-                            <button type="button" wire:click="setRange('{{ $preset }}')" @click="closePanel()" class="rounded-lg px-2 py-1.5 text-left text-sm text-slate-600 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:bg-slate-800">{{ $label }}</button>
+                    {{-- A preset shows the shared selected state while the
+                    applied range — or the pending one — equals it
+                    (Index::presetRanges()). wire:ignore: Alpine owns the
+                    selected classes, so a re-render must not reset them. --}}
+                    <div class="mt-2 grid grid-cols-2 gap-2" wire:ignore>
+                        @foreach ($presetRanges as $preset => $range)
+                            <button
+                                type="button"
+                                @click="applyPreset('{{ $preset }}')"
+                                :aria-pressed="String(presetActive('{{ $preset }}'))"
+                                class="rounded-lg px-2 py-1.5 text-left text-sm ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                                :class="presetActive('{{ $preset }}')
+                                    ? 'bg-primary-50 font-semibold text-primary-700 ring-primary-600 dark:bg-primary-900/30 dark:text-primary-200 dark:ring-primary-500'
+                                    : 'font-normal text-slate-600 ring-transparent hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'"
+                            >{{ $range['label'] }}</button>
                         @endforeach
                     </div>
 
@@ -189,18 +201,31 @@
                         Three views, like an ordinary calendar: days (where the
                         range is picked), and — through the heading — months and
                         years, for long jumps. A start day picked before zooming
-                        out stays the anchor. Visual language is the employee
-                        calendar's: Sunday first, today a filled primary circle
-                        (aria-current="date"); the range is the shared selected
-                        tint as a continuous band, its endpoints with the full
-                        selected state (tint, primary border, semibold) — never a
-                        solid primary fill. Zoomed out, the month or year being
-                        opened carries the selected state and any month or year
-                        the range reaches into carries the tint. --}}
+                        out stays the anchor.
+
+                        Treatments (docs/ATTENDANCE_UI.md, Date range picker):
+                        endpoints — and a one-day range's day — are filled
+                        (primary-600 + white; dark primary-400 + slate-900, the
+                        employee calendar's today colours); the days between are
+                        the shared tint as one continuous band. Today is a quiet
+                        marker (primary semibold number and a dot beneath, with
+                        aria-current="date"), never a fill, since a fill now
+                        means "endpoint". Zoomed out: a month/year holding a
+                        chosen endpoint is filled, one the range reaches into is
+                        tinted, the current one has the quiet marker. A ring is
+                        only ever keyboard focus. --}}
                         @php
                             $pickerNavButton = 'inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100';
                             // Month and year cells: same states as a day, as a 3-wide grid of buttons-in-cells.
-                            $pickerZoomCell = 'flex h-10 w-full items-center justify-center rounded-lg text-sm transition group-focus-visible:ring-2 group-focus-visible:ring-primary-500 dark:group-focus-visible:ring-primary-400';
+                            // The only ring in the picker is keyboard focus, offset so it
+                            // also reads on a filled endpoint.
+                            $pickerFocus = 'group-focus-visible:ring-2 group-focus-visible:ring-primary-500 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-white dark:group-focus-visible:ring-primary-400 dark:group-focus-visible:ring-offset-slate-900';
+                            $pickerFill = 'bg-primary-600 font-semibold text-white dark:bg-primary-400 dark:text-slate-900';
+                            $pickerTint = 'bg-primary-50 font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-200';
+                            $pickerPlain = 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800';
+                            $pickerCurrent = 'font-semibold text-primary-700 hover:bg-slate-100 dark:text-primary-300 dark:hover:bg-slate-800';
+                            // Month and year cells: a 3-wide grid of buttons-in-cells.
+                            $pickerZoomCell = 'relative flex h-10 w-full items-center justify-center rounded-lg text-sm transition '.$pickerFocus;
                         @endphp
                         <div class="hidden sm:block" wire:ignore x-ref="picker" @keydown="onKeydown($event)">
                             <div class="mt-2 flex items-center justify-between">
@@ -260,16 +285,19 @@
                                                         <div aria-hidden="true">
                                                             <span class="pointer-events-none absolute inset-y-0.5 bg-primary-50 dark:bg-primary-900/30" :class="bandClass(cell)"></span>
                                                             <span
-                                                                class="relative mx-auto flex h-9 w-9 items-center justify-center rounded-lg text-sm tabular-nums transition group-focus-visible:ring-2 group-focus-visible:ring-primary-500 dark:group-focus-visible:ring-primary-400"
-                                                                :class="{
-                                                                    'date-range-endpoint bg-primary-50 font-semibold text-primary-700 ring-1 ring-inset ring-primary-600 dark:text-primary-200 dark:ring-primary-500': isStart(cell.iso) || isEnd(cell.iso),
-                                                                    'font-medium text-primary-700 dark:text-primary-200': inRange(cell.iso) && ! isStart(cell.iso) && ! isEnd(cell.iso),
-                                                                    'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800': ! inRange(cell.iso),
-                                                                }"
+                                                                class="relative mx-auto flex h-9 w-9 items-center justify-center rounded-lg text-sm tabular-nums transition {{ $pickerFocus }}"
+                                                                :class="isStart(cell.iso) || isEnd(cell.iso)
+                                                                    ? '{{ $pickerFill }}'
+                                                                    : (inRange(cell.iso)
+                                                                        ? 'font-medium text-primary-700 dark:text-primary-200'
+                                                                        : (cell.iso === today ? '{{ $pickerCurrent }}' : '{{ $pickerPlain }}'))"
                                                             >
+                                                                <span x-text="cell.day"></span>
+                                                                {{-- Today's quiet marker; white (dark: slate-900) on a fill. --}}
                                                                 <span
-                                                                    :class="cell.iso === today && 'inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary-600 font-bold text-white dark:bg-primary-400 dark:text-slate-900'"
-                                                                    x-text="cell.day"
+                                                                    x-show="cell.iso === today"
+                                                                    class="absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full"
+                                                                    :class="isStart(cell.iso) || isEnd(cell.iso) ? 'bg-white dark:bg-slate-900' : 'bg-primary-600 dark:bg-primary-400'"
                                                                 ></span>
                                                             </span>
                                                         </div>
@@ -291,7 +319,7 @@
                                                     class="group cursor-pointer p-0 focus:outline-none"
                                                     :data-month="cell.key"
                                                     :tabindex="cell.key === focusedMonthKey ? 0 : -1"
-                                                    :aria-selected="String(cell.key === focusedMonthKey)"
+                                                    :aria-selected="String(holdsEndpoint(cell))"
                                                     :aria-current="cell.key === today.slice(0, 7) ? 'date' : null"
                                                     :aria-label="cell.name"
                                                     @click="pickMonth(cell.key)"
@@ -300,14 +328,17 @@
                                                     <span
                                                         aria-hidden="true"
                                                         class="{{ $pickerZoomCell }}"
-                                                        :class="{
-                                                            'date-range-endpoint bg-primary-50 font-semibold text-primary-700 ring-1 ring-inset ring-primary-600 dark:text-primary-200 dark:ring-primary-500': cell.key === focusedMonthKey,
-                                                            'bg-primary-50 font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-200': cell.key !== focusedMonthKey && touchesRange(cell),
-                                                            'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800': cell.key !== focusedMonthKey && ! touchesRange(cell) && ! (cell.key === today.slice(0, 7)),
-                                                            'font-semibold text-primary-700 hover:bg-slate-100 dark:text-primary-300 dark:hover:bg-slate-800': cell.key !== focusedMonthKey && ! touchesRange(cell) && cell.key === today.slice(0, 7),
-                                                        }"
-                                                        x-text="cell.label"
-                                                    ></span>
+                                                        :class="holdsEndpoint(cell)
+                                                            ? '{{ $pickerFill }}'
+                                                            : (touchesRange(cell) ? '{{ $pickerTint }}' : (isCurrentMonth(cell) ? '{{ $pickerCurrent }}' : '{{ $pickerPlain }}'))"
+                                                    >
+                                                        <span x-text="cell.label"></span>
+                                                        <span
+                                                            x-show="isCurrentMonth(cell)"
+                                                            class="absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full"
+                                                            :class="holdsEndpoint(cell) ? 'bg-white dark:bg-slate-900' : 'bg-primary-600 dark:bg-primary-400'"
+                                                        ></span>
+                                                    </span>
                                                 </td>
                                             </template>
                                         </tr>
@@ -325,7 +356,7 @@
                                                     class="group cursor-pointer p-0 focus:outline-none"
                                                     :data-year="cell.year"
                                                     :tabindex="cell.year === focusedYear ? 0 : -1"
-                                                    :aria-selected="String(cell.year === focusedYear)"
+                                                    :aria-selected="String(holdsEndpoint(cell))"
                                                     :aria-current="String(cell.year) === today.slice(0, 4) ? 'date' : null"
                                                     :aria-label="String(cell.year)"
                                                     @click="pickYear(cell.year)"
@@ -334,14 +365,17 @@
                                                     <span
                                                         aria-hidden="true"
                                                         class="{{ $pickerZoomCell }} tabular-nums"
-                                                        :class="{
-                                                            'date-range-endpoint bg-primary-50 font-semibold text-primary-700 ring-1 ring-inset ring-primary-600 dark:text-primary-200 dark:ring-primary-500': cell.year === focusedYear,
-                                                            'bg-primary-50 font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-200': cell.year !== focusedYear && touchesRange(cell),
-                                                            'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800': cell.year !== focusedYear && ! touchesRange(cell) && ! (String(cell.year) === today.slice(0, 4)),
-                                                            'font-semibold text-primary-700 hover:bg-slate-100 dark:text-primary-300 dark:hover:bg-slate-800': cell.year !== focusedYear && ! touchesRange(cell) && String(cell.year) === today.slice(0, 4),
-                                                        }"
-                                                        x-text="cell.year"
-                                                    ></span>
+                                                        :class="holdsEndpoint(cell)
+                                                            ? '{{ $pickerFill }}'
+                                                            : (touchesRange(cell) ? '{{ $pickerTint }}' : (isCurrentYear(cell) ? '{{ $pickerCurrent }}' : '{{ $pickerPlain }}'))"
+                                                    >
+                                                        <span x-text="cell.year"></span>
+                                                        <span
+                                                            x-show="isCurrentYear(cell)"
+                                                            class="absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full"
+                                                            :class="holdsEndpoint(cell) ? 'bg-white dark:bg-slate-900' : 'bg-primary-600 dark:bg-primary-400'"
+                                                        ></span>
+                                                    </span>
                                                 </td>
                                             </template>
                                         </tr>
@@ -504,7 +538,7 @@
                     <x-icon name="chevron-right" class="h-3.5 w-3.5" />
                 </div>
 
-                {{-- Below xl the Status and chevron columns are pinned to the
+                {{-- From sm to below xl the Status and chevron columns are pinned to the
                 right edge (.table-pin in resources/css/app.css), so "did they
                 attend" and the way into the record stay on screen while the
                 times scroll beneath them. pinnedColumns (resources/js/app.js)

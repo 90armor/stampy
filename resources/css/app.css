@@ -85,9 +85,10 @@ input:-webkit-autofill:focus {
 }
 
 /* Pinned trailing table columns (docs/ATTENDANCE_UI.md, Responsive behavior).
-   Below xl, the dense tables pin their Status column and their trailing
-   chevron/actions column to the right edge of the scroll container; from xl up
-   nothing is pinned. A pinned cell is opaque — the card surface, or the row's
+   From sm to below xl (640–1279px), the dense tables pin their Status column
+   and their trailing chevron/actions column to the right edge of the scroll
+   container. Nothing is pinned below sm — on a phone the pinned pair would
+   cover about half the card — or from xl up. A pinned cell is opaque — the card surface, or the row's
    hover surface while the row is hovered — so scrolled content never shows
    through it. In dark mode the row hover is a translucent slate-800 over the
    card, so the pinned cell layers that same tint over the same card colour
@@ -96,7 +97,7 @@ input:-webkit-autofill:focus {
    (.table-pin-overflowing, set by pinnedColumns in resources/js/app.js). The
    row divider sits above pinned cells (z-[2] in the markup), so it runs
    unbroken beneath them. */
-@media (max-width: 1279.98px) {
+@media (min-width: 640px) and (max-width: 1279.98px) {
     .table-pin {
         position: sticky;
         z-index: 1;
@@ -133,14 +134,4 @@ input:-webkit-autofill:focus {
     .table-pin-overflowing .table-pin-start::before {
         opacity: 1;
     }
-}
-
-/* Date range picker endpoints (dateRangePicker, resources/js/app.js). An
-   endpoint sits over half of the range band. In dark mode the tint is
-   translucent, so a translucent endpoint over the band would double it; the
-   endpoint instead layers the same tint over the panel colour, which makes it
-   opaque and identical to the band beside it. */
-.dark .date-range-endpoint {
-    background-color: theme('colors.slate.900');
-    background-image: linear-gradient(theme('colors.primary.900 / 30%'), theme('colors.primary.900 / 30%'));
 }

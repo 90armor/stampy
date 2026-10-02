@@ -480,7 +480,7 @@ class AttendanceIndexTest extends TestCase
             $headers[] = trim(strip_tags(preg_replace('/<span class="sr-only">.*?<\/span>/s', '', $cell)));
         }
         $this->assertSame(['Date', 'Employee', 'Department', 'In', 'Out', 'Worked', 'Late', 'Early', 'Status', ''], $headers);
-        // Below xl, Status and the chevron are the pinned trailing columns.
+        // From sm to below xl, Status and the chevron are the pinned trailing columns.
         $this->assertStringContainsString('<th class="table-pin table-pin-start px-6 py-3">Status</th>', $html);
         $this->assertStringContainsString('<th class="table-pin table-pin-end py-3 pl-2 pr-6">', $html);
         $this->assertStringContainsString('x-data="pinnedColumns"', $html);
@@ -496,7 +496,7 @@ class AttendanceIndexTest extends TestCase
         $html = Livewire::actingAs($this->admin())->test(Index::class)->html();
 
         // The grid picker gets the app-timezone today from the server.
-        $this->assertStringContainsString('x-data="dateRangePicker({ today: \'2026-03-04\' })"', $html);
+        $this->assertStringContainsString('x-data="dateRangePicker({ today: \'2026-03-04\', presets: ', $html);
         $this->assertStringContainsString('role="dialog"', $html);
         $this->assertStringContainsString('aria-label="Choose a date range"', $html);
         $this->assertStringContainsString('<div class="hidden sm:block" wire:ignore x-ref="picker"', $html);
@@ -512,6 +512,46 @@ class AttendanceIndexTest extends TestCase
         $this->assertStringContainsString('<div class="mt-2 space-y-3 sm:hidden">', $html);
         $this->assertStringContainsString('wire:model.live="fromDate"', $html);
         $this->assertStringContainsString('wire:model.live="toDate"', $html);
+    }
+
+    public function test_quick_ranges_include_last_month_and_set_both_dates(): void
+    {
+        $this->travelTo('2026-10-02 10:00:00');
+
+        $component = Livewire::actingAs($this->admin())->test(Index::class);
+
+        $this->assertSame([
+            'today' => ['label' => 'Today', 'from' => '2026-10-02', 'to' => '2026-10-02'],
+            'yesterday' => ['label' => 'Yesterday', 'from' => '2026-10-01', 'to' => '2026-10-01'],
+            'last7' => ['label' => 'Last 7 days', 'from' => '2026-09-26', 'to' => '2026-10-02'],
+            'last30' => ['label' => 'Last 30 days', 'from' => '2026-09-03', 'to' => '2026-10-02'],
+            'thisMonth' => ['label' => 'This month', 'from' => '2026-10-01', 'to' => '2026-10-02'],
+            'lastMonth' => ['label' => 'Last month', 'from' => '2026-09-01', 'to' => '2026-09-30'],
+        ], $component->instance()->presetRanges());
+
+        $component->call('setRange', 'lastMonth')
+            ->assertSet('fromDate', '2026-09-01')
+            ->assertSet('toDate', '2026-09-30');
+
+        // The picker gets the same definitions, to show a matching preset as selected.
+        $this->assertStringContainsString('@click="applyPreset(\'lastMonth\')"', $component->html());
+    }
+
+    public function test_last_month_crosses_the_year_boundary_and_ignores_month_length(): void
+    {
+        $this->travelTo('2027-01-31 09:00:00');
+
+        Livewire::actingAs($this->admin())->test(Index::class)
+            ->call('setRange', 'lastMonth')
+            ->assertSet('fromDate', '2026-12-01')
+            ->assertSet('toDate', '2026-12-31');
+
+        $this->travelTo('2026-03-31 09:00:00');
+
+        Livewire::actingAs($this->admin())->test(Index::class)
+            ->call('setRange', 'lastMonth')
+            ->assertSet('fromDate', '2026-02-01')
+            ->assertSet('toDate', '2026-02-28');
     }
 
     public function test_the_date_range_picker_writes_the_same_properties_and_url(): void

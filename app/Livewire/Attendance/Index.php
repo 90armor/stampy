@@ -167,21 +167,41 @@ class Index extends Component
         $this->resetPage();
     }
 
-    public function setRange(string $preset): void
+    /**
+     * The date picker's quick ranges, in display order: label and the
+     * from/to dates (Y-m-d) each one sets. One definition for setRange() and
+     * for the picker, which shows a preset as selected while the applied or
+     * pending range equals it.
+     *
+     * @return array<string, array{label: string, from: string, to: string}>
+     */
+    public function presetRanges(): array
     {
         $today = today();
+        $lastMonth = $today->copy()->startOfMonth()->subMonthNoOverflow();
 
-        [$from, $to] = match ($preset) {
-            'today' => [$today, $today],
-            'yesterday' => [$today->copy()->subDay(), $today->copy()->subDay()],
-            'last7' => [$today->copy()->subDays(6), $today],
-            'last30' => [$today->copy()->subDays(29), $today],
-            'thisMonth' => [$today->copy()->startOfMonth(), $today],
-            default => [$today, $today],
-        };
+        $ranges = [
+            'today' => ['Today', $today, $today],
+            'yesterday' => ['Yesterday', $today->copy()->subDay(), $today->copy()->subDay()],
+            'last7' => ['Last 7 days', $today->copy()->subDays(6), $today],
+            'last30' => ['Last 30 days', $today->copy()->subDays(29), $today],
+            'thisMonth' => ['This month', $today->copy()->startOfMonth(), $today],
+            'lastMonth' => ['Last month', $lastMonth, $lastMonth->copy()->endOfMonth()],
+        ];
 
-        $this->fromDate = $from->format('Y-m-d');
-        $this->toDate = $to->format('Y-m-d');
+        return array_map(fn (array $range) => [
+            'label' => $range[0],
+            'from' => $range[1]->format('Y-m-d'),
+            'to' => $range[2]->format('Y-m-d'),
+        ], $ranges);
+    }
+
+    public function setRange(string $preset): void
+    {
+        $range = $this->presetRanges()[$preset] ?? $this->presetRanges()['today'];
+
+        $this->fromDate = $range['from'];
+        $this->toDate = $range['to'];
 
         // Setting these properties directly (not via wire:model) doesn't
         // trigger updatingFromDate()/updatingToDate(), so reset explicitly.
@@ -384,6 +404,7 @@ class Index extends Component
                 : null,
             'maxBuiltDate' => DailyAttendance::max('work_date'),
             'allStatuses' => AttendanceStatus::cases(),
+            'presetRanges' => $this->presetRanges(),
             'scopeHasNoEmployeeRecord' => $this->scope()->hasNoEmployeeRecord,
         ])->layout('layouts.app', ['header' => 'Attendance']);
     }
