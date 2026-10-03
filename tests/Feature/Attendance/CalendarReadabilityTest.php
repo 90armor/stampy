@@ -223,6 +223,8 @@ class CalendarReadabilityTest extends TestCase
 
     public function test_the_table_view_marks_timing_on_the_late_and_early_values_not_the_times(): void
     {
+        // Fixed clock: this test's data sits on fixed 2026 dates (see CLAUDE.md, pinned-instant check).
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $employee = Employee::factory()->create();
         DailyAttendance::factory()->create([
             'employee_id' => $employee->id,

@@ -359,6 +359,8 @@ class CalendarViewTest extends TestCase
 
     public function test_admin_can_add_and_void_a_punch_from_the_modal_and_the_summary_updates_immediately(): void
     {
+        // Fixed clock: this test's data sits on fixed 2026 dates (see CLAUDE.md, pinned-instant check).
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $employee = Employee::factory()->create();
 
         $component = Livewire::actingAs($this->admin())
@@ -398,6 +400,8 @@ class CalendarViewTest extends TestCase
      */
     public function test_the_modals_add_punch_path_triggers_the_same_three_day_rebuild_as_the_table(): void
     {
+        // Fixed clock: this test's data sits on fixed 2026 dates (see CLAUDE.md, pinned-instant check).
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $employee = Employee::factory()->create();
 
         // An out-punch just after midnight on 2026-03-03, with nothing yet

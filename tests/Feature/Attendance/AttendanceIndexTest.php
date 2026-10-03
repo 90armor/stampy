@@ -427,6 +427,8 @@ class AttendanceIndexTest extends TestCase
 
     public function test_the_chevron_is_the_rows_only_link_and_names_the_employee_and_date(): void
     {
+        // Fixed clock: this test's data sits on fixed 2026 dates (see CLAUDE.md, pinned-instant check).
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-04-15 12:00:00'));
         $admin = $this->admin();
         $employee = Employee::factory()->create(['full_name' => 'Chevron Chan']);
 
@@ -574,6 +576,8 @@ class AttendanceIndexTest extends TestCase
 
     public function test_the_summary_strip_states_its_range_wide_scope(): void
     {
+        // Fixed clock: this test's data sits on fixed 2026 dates (see CLAUDE.md, pinned-instant check).
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-04-15 12:00:00'));
         $component = Livewire::actingAs($this->admin())
             ->test(Index::class)
             ->set('fromDate', '2026-09-01')

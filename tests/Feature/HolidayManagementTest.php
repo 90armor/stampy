@@ -188,6 +188,8 @@ class HolidayManagementTest extends TestCase
 
     public function test_creating_a_holiday_rebuilds_that_date_for_all_active_employees(): void
     {
+        // Fixed clock: this test's data sits on fixed 2026 dates (see CLAUDE.md, pinned-instant check).
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $admin = $this->admin();
         $active = Employee::factory()->create(['status' => 'active']);
         $inactive = Employee::factory()->create(['status' => 'inactive']);
@@ -218,6 +220,8 @@ class HolidayManagementTest extends TestCase
 
     public function test_deleting_a_holiday_reverts_the_rebuilt_days(): void
     {
+        // Fixed clock: this test's data sits on fixed 2026 dates (see CLAUDE.md, pinned-instant check).
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $admin = $this->admin();
         $employee = Employee::factory()->create(['status' => 'active']);
         $holiday = Holiday::factory()->create(['date' => self::WORKDAY, 'name' => 'Test Holiday']);
@@ -240,6 +244,8 @@ class HolidayManagementTest extends TestCase
 
     public function test_editing_a_holidays_date_rebuilds_both_the_old_and_new_dates(): void
     {
+        // Fixed clock: this test's data sits on fixed 2026 dates (see CLAUDE.md, pinned-instant check).
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $admin = $this->admin();
         $employee = Employee::factory()->create(['status' => 'active']);
         $oldDate = self::WORKDAY;

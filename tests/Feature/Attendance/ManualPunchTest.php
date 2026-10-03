@@ -30,6 +30,13 @@ class ManualPunchTest extends TestCase
     {
         parent::setUp();
 
+        // A fixed clock: this class's data sits on fixed Feb–Mar 2026 dates that
+        // must read as the past (not today, not the future) and as this year,
+        // so DisplayDate omits the year. Without it the class only passed while
+        // the real clock was later in 2026 (CLAUDE.md, pinned-instant check).
+        // A test that travels itself still overrides this.
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
+
         foreach (['admin', 'manager', 'employee'] as $role) {
             Role::firstOrCreate(['name' => $role]);
         }
