@@ -314,6 +314,8 @@ document.addEventListener('alpine:init', () => {
             const panel = this.$refs.panel, trigger = this.$refs.trigger;
             if (!this.panelOpen || !panel || !trigger) return;
             const gap = 8, margin = 16;
+            // Clearing max-height resets the panel's own scroll; keep it.
+            const scrolled = panel.scrollTop;
             panel.style.maxHeight = '';
             panel.style.top = '0px';
             panel.style.left = '0px';
@@ -333,9 +335,14 @@ document.addEventListener('alpine:init', () => {
             const left = Math.min(Math.max(t.left, margin), window.innerWidth - margin - w);
             panel.style.top = `${top - origin.top}px`;
             panel.style.left = `${left - origin.left}px`;
+            panel.scrollTop = scrolled;
         },
         init() {
-            this.reflow = () => this.panelOpen && this.place();
+            // Follow the trigger when the page or a container scrolls, but not
+            // when the panel scrolls itself: place() would reset that scroll,
+            // and a panel taller than the space left could never be scrolled
+            // (a short page — no records — has nothing else to scroll).
+            this.reflow = (event) => this.panelOpen && ! (event?.target instanceof Node && this.$refs.panel?.contains(event.target)) && this.place();
             window.addEventListener('scroll', this.reflow, true);
             window.addEventListener('resize', this.reflow);
         },
@@ -506,7 +513,8 @@ document.addEventListener('alpine:init', () => {
         init() {
             // Follow the property whenever it changes (a modal opened for another record, a reset).
             window.Alpine.effect(() => this.load(this.$wire[model]));
-            this.reflow = () => this.popoverOpen && this.place();
+            // As the date picker: not for the popover's own listboxes scrolling.
+            this.reflow = (event) => this.popoverOpen && ! (event?.target instanceof Node && this.$refs.popover?.contains(event.target)) && this.place();
             window.addEventListener('scroll', this.reflow, true);
             window.addEventListener('resize', this.reflow);
         },
