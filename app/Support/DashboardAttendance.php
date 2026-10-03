@@ -252,7 +252,7 @@ class DashboardAttendance
         $start = today()->copy()->subDays($days - 1);
         $range = [$start->format('Y-m-d'), today()->format('Y-m-d')];
 
-        $countsByDate = self::scopedDailyAttendanceQuery($employeeIds)
+        $countsByDate = self::scopedActiveDailyAttendanceQuery($employeeIds)
             ->whereBetween('work_date', $range)
             ->selectRaw('work_date, status, count(*) as total, sum('.self::CHECKED_IN.') as checked_in')
             ->groupBy('work_date', 'status')
@@ -262,7 +262,7 @@ class DashboardAttendance
         // An In progress row on an earlier day is either still open (an
         // in-only row inside its pairing window) or stale (the builder hasn't
         // run since it should have closed).
-        $staleOpenDays = self::scopedDailyAttendanceQuery($employeeIds)
+        $staleOpenDays = self::scopedActiveDailyAttendanceQuery($employeeIds)
             ->whereBetween('work_date', $range)
             ->where('status', AttendanceStatus::InProgress->value)
             ->get(['work_date', 'first_in', 'last_out'])
@@ -474,7 +474,7 @@ class DashboardAttendance
     public static function todayIsPending(?array $employeeIds): bool
     {
         $today = today()->format('Y-m-d');
-        $rows = self::scopedDailyAttendanceQuery($employeeIds)->whereDate('work_date', $today);
+        $rows = self::scopedActiveDailyAttendanceQuery($employeeIds)->whereDate('work_date', $today);
 
         return (clone $rows)->where('status', AttendanceStatus::InProgress->value)->exists()
             || $rows->count() < self::scopedActiveEmployeeQuery($employeeIds)->count();
@@ -539,6 +539,20 @@ class DashboardAttendance
     private static function scopedDailyAttendanceQuery(?array $employeeIds)
     {
         return self::applyEmployeeScope(DailyAttendance::query(), $employeeIds, 'employee_id');
+    }
+
+    /**
+     * Rows of employees who are active **now** — the numerator to match an
+     * active-employee denominator (the trend, todayIsPending()). A deactivated
+     * employee's past days drop out with them: there is no deactivation date
+     * to keep them until (CLAUDE.md, Open questions for Phase 3).
+     *
+     * @param  int[]|null  $employeeIds
+     */
+    private static function scopedActiveDailyAttendanceQuery(?array $employeeIds)
+    {
+        return self::scopedDailyAttendanceQuery($employeeIds)
+            ->whereIn('employee_id', Employee::query()->select('id')->where('status', 'active'));
     }
 
     /**

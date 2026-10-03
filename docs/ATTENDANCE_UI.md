@@ -63,7 +63,7 @@ Today's list follows the builder's statuses (Phase 2.7), worst-first: **Absent**
 
 ## The attendance rate, and pending days
 
-The dashboard follows the builder's statuses — one source of truth with the attendance table (Phase 2.7). Its rate is **attended ÷ active employees, attended = present + incomplete**: an incomplete day was attended, a punch is just missing. The trend and the Department card both use it.
+The dashboard follows the builder's statuses — one source of truth with the attendance table (Phase 2.7). Its rate is **attended ÷ active employees, attended = present + incomplete**: an incomplete day was attended, a punch is just missing. The trend and the Department card both use it. Both sides count employees who are **active now**: a deactivated employee's rows leave the numerator along with the headcount, so their past days drop out of the 7-day trend (no deactivation date exists to keep them — a Phase 3 scoping question).
 
 In-progress or not-yet-calculated attendance is **pending**, and every trend day carries a value, a marker, or both — never a blank slot without a reason, never 0% for something unfinished, never Absent for someone who may still come in:
 

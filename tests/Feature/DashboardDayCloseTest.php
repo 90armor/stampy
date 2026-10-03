@@ -181,6 +181,33 @@ class DashboardDayCloseTest extends TestCase
         $this->assertSame($live['atWork'] + $live['left'], $live['checkedIn']);
     }
 
+    public function test_the_trend_counts_only_employees_active_now_matching_its_denominator(): void
+    {
+        $this->travelTo(Carbon::parse(self::TODAY.' 13:00:00'));
+        [$present, $absent1, $absent2, $fourth] = Employee::factory()->count(4)->create()->all();
+        $inactive = Employee::factory()->create(['status' => 'inactive']);
+
+        // Tuesday, closed: 1 present + 3 absent of the 4 active → 25%.
+        $this->row($present, AttendanceStatus::Present, ['work_date' => '2026-09-29', 'first_in' => '2026-09-29 08:00:00', 'last_out' => '2026-09-29 17:00:00']);
+        $this->row($absent1, AttendanceStatus::Absent, ['work_date' => '2026-09-29']);
+        $this->row($absent2, AttendanceStatus::Absent, ['work_date' => '2026-09-29']);
+        $this->row($fourth, AttendanceStatus::Absent, ['work_date' => '2026-09-29']);
+        // Deactivated since: their Present day drops out of the numerator rather than lifting it to 50%.
+        $this->row($inactive, AttendanceStatus::Present, ['work_date' => '2026-09-29', 'first_in' => '2026-09-29 08:00:00', 'last_out' => '2026-09-29 17:00:00']);
+
+        $this->assertSame(25.0, $this->trendDay('2026-09-29')['value']);
+
+        // Today: three active employees built, the fourth not yet; the inactive row
+        // must not fill that gap and make today look closed.
+        $this->row($present, AttendanceStatus::Present, ['first_in' => self::TODAY.' 08:00:00', 'last_out' => self::TODAY.' 12:00:00']);
+        $this->row($absent1, AttendanceStatus::Present, ['first_in' => self::TODAY.' 08:00:00', 'last_out' => self::TODAY.' 12:00:00']);
+        $this->row($absent2, AttendanceStatus::Absent);
+        $this->row($inactive, AttendanceStatus::Present, ['first_in' => self::TODAY.' 08:00:00', 'last_out' => self::TODAY.' 12:00:00']);
+
+        $this->assertTrue(DashboardAttendance::todayIsPending(null));
+        $this->assertSame(['value' => 50.0, 'marker' => 'Today', 'pending' => true], array_intersect_key($this->trendDay(self::TODAY), array_flip(['value', 'marker', 'pending'])));
+    }
+
     public function test_yesterday_still_inside_a_pairing_window_at_one_in_the_morning_is_pending(): void
     {
         $employees = Employee::factory()->count(2)->create();
