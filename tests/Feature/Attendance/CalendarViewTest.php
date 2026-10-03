@@ -271,7 +271,7 @@ class CalendarViewTest extends TestCase
             ->html();
 
         $this->assertSame(1, substr_count($html, 'aria-current="date"'));
-        $this->assertMatchesRegularExpression('/rounded-full bg-primary-600 px-1 text-sm font-bold text-white[^"]*dark:bg-primary-400 dark:text-slate-900">15</', $html);
+        $this->assertMatchesRegularExpression('/rounded-full bg-primary-600 px-1 text-sm font-bold text-white[^"]*dark:bg-primary-500">15</', $html);
         $this->assertStringNotContainsString('ring-2 ring-primary-500 dark:ring-primary-400', $html);
     }
 

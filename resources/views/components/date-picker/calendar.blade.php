@@ -9,7 +9,7 @@ in wire:ignore. Rules: docs/ATTENDANCE_UI.md, Date picker. --}}
     // The only ring in the picker is keyboard focus, offset so it also reads
     // on a filled endpoint.
     $pickerFocus = 'group-focus-visible:ring-2 group-focus-visible:ring-primary-500 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-white dark:group-focus-visible:ring-primary-400 dark:group-focus-visible:ring-offset-slate-750';
-    $pickerFill = 'bg-primary-600 font-semibold text-white dark:bg-primary-400 dark:text-slate-900';
+    $pickerFill = 'bg-primary-600 font-semibold text-white dark:bg-primary-500';
     $pickerTint = 'bg-primary-50 font-medium text-primary-700 dark:bg-primary-600/35 dark:text-primary-200';
     $pickerPlain = 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-600/30';
     $pickerCurrent = 'font-semibold text-primary-700 hover:bg-slate-100 dark:text-primary-300 dark:hover:bg-slate-600/30';
@@ -91,7 +91,7 @@ in wire:ignore. Rules: docs/ATTENDANCE_UI.md, Date picker. --}}
                                         <span
                                             x-show="cell.iso === today"
                                             class="absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full"
-                                            :class="isStart(cell.iso) || isEnd(cell.iso) ? 'bg-white dark:bg-slate-900' : 'bg-primary-600 dark:bg-primary-400'"
+                                            :class="isStart(cell.iso) || isEnd(cell.iso) ? 'bg-white' : 'bg-primary-600 dark:bg-primary-400'"
                                         ></span>
                                     </span>
                                 </div>
@@ -130,7 +130,7 @@ in wire:ignore. Rules: docs/ATTENDANCE_UI.md, Date picker. --}}
                                 <span
                                     x-show="isCurrentMonth(cell)"
                                     class="absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full"
-                                    :class="holdsEndpoint(cell) ? 'bg-white dark:bg-slate-900' : 'bg-primary-600 dark:bg-primary-400'"
+                                    :class="holdsEndpoint(cell) ? 'bg-white' : 'bg-primary-600 dark:bg-primary-400'"
                                 ></span>
                             </span>
                         </td>
@@ -167,7 +167,7 @@ in wire:ignore. Rules: docs/ATTENDANCE_UI.md, Date picker. --}}
                                 <span
                                     x-show="isCurrentYear(cell)"
                                     class="absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full"
-                                    :class="holdsEndpoint(cell) ? 'bg-white dark:bg-slate-900' : 'bg-primary-600 dark:bg-primary-400'"
+                                    :class="holdsEndpoint(cell) ? 'bg-white' : 'bg-primary-600 dark:bg-primary-400'"
                                 ></span>
                             </span>
                         </td>

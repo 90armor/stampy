@@ -23,7 +23,7 @@ property. The server rule stays the authority. --}}
 @php
     $segment = 'rounded px-0.5 tabular-nums outline-none focus:bg-primary-100 focus:text-primary-900 dark:focus:bg-primary-600/35 dark:focus:text-primary-100';
     $option = 'flex h-9 w-full items-center justify-center rounded-lg text-sm tabular-nums transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-primary-400 dark:focus-visible:ring-offset-slate-750';
-    $optionChosen = 'bg-primary-600 font-semibold text-white dark:bg-primary-400 dark:text-slate-900';
+    $optionChosen = 'bg-primary-600 font-semibold text-white dark:bg-primary-500';
     $optionPlain = 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-600/30';
     $optionDisabled = 'cursor-not-allowed text-slate-300 dark:text-slate-600';
 @endphp

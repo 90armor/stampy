@@ -310,11 +310,10 @@
                                     smaller and muted so the status icon — not the
                                     times — stays the primary signal. --}}
                                     @if ($cell['date']->isToday())
-                                        {{-- primary-600 + white (6.53:1) in light mode; dark mode
-                                        inverts to primary-400 + slate-900, 5.68:1 for the digits
-                                        and 5.68:1 for the circle against the dark card (primary-500
-                                        + white measured 4.57:1 / 3.83:1). --}}
-                                        <span class="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-primary-600 px-1 text-sm font-bold text-white sm:h-7 sm:min-w-7 sm:text-base dark:bg-primary-400 dark:text-slate-900">{{ $cell['date']->day }}</span>
+                                        {{-- The shared filled selected state: primary-600 + white
+                                        (6.53:1) in light mode; dark primary-500 + white (4.57:1
+                                        for the digits, 3.26:1 for the circle against the card). --}}
+                                        <span class="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-primary-600 px-1 text-sm font-bold text-white sm:h-7 sm:min-w-7 sm:text-base dark:bg-primary-500">{{ $cell['date']->day }}</span>
                                     @else
                                         <span class="text-sm sm:text-base {{ $style['weight'] ?? 'font-bold' }} {{ $style['text'] }}">{{ $cell['date']->day }}</span>
                                     @endif
