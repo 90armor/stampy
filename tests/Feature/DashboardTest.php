@@ -599,12 +599,16 @@ class DashboardTest extends TestCase
 
         $live = \App\Support\DashboardAttendance::liveToday(null);
 
+        // Partitioned by punches: an out-punch means Left, even with no in-punch.
         $this->assertSame(8, $live['total']);
         $this->assertSame(2, $live['atWork']);
-        $this->assertSame(2, $live['left']);
+        $this->assertSame(3, $live['left']);
         $this->assertSame(1, $live['leftEarly']);
-        $this->assertSame(4, $live['notIn']);
+        $this->assertSame(3, $live['notIn']);
         $this->assertSame($live['total'], $live['atWork'] + $live['left'] + $live['notIn']);
+        // Not in's sub-counts are its exact breakdown: no punch yet + not built (due), absent.
+        $this->assertSame(['notInDue' => 2, 'notInAbsent' => 1], array_intersect_key($live, array_flip(['notInDue', 'notInAbsent'])));
+        $this->assertSame($live['notIn'], $live['notInDue'] + $live['notInAbsent'] + $live['notInOff'] + $live['notInHoliday'] + $live['notInLeave']);
         // "Checked in" overlaps the partition: everyone with an in-punch,
         // whether still at work or already left.
         $this->assertSame(4, $live['checkedIn']);

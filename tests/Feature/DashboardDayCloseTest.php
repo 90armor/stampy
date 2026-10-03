@@ -124,6 +124,30 @@ class DashboardDayCloseTest extends TestCase
             ->assertSee('35 today');
     }
 
+    public function test_an_out_only_day_counts_as_left_and_not_in_sub_lines_sum_to_their_cell(): void
+    {
+        $this->travelTo(Carbon::parse(self::TODAY.' 20:40:00'));
+        [$present, $outOnly, $atWork, $absent1, $absent2, $off] = Employee::factory()->count(6)->create()->all();
+        $this->row($present, AttendanceStatus::Present, ['first_in' => self::TODAY.' 07:55:00', 'last_out' => self::TODAY.' 17:05:00']);
+        // An out-punch with no in-punch: incomplete, but they did leave — Left, not "Not in".
+        $this->row($outOnly, AttendanceStatus::Incomplete, ['last_out' => self::TODAY.' 17:02:00']);
+        $this->row($atWork, AttendanceStatus::InProgress, ['first_in' => self::TODAY.' 08:30:00', 'late_minutes' => 30]);
+        $this->row($absent1, AttendanceStatus::Absent);
+        $this->row($absent2, AttendanceStatus::Absent);
+        $this->row($off, AttendanceStatus::Off);
+
+        $live = DashboardAttendance::liveToday(null);
+        $this->assertSame(['atWork' => 1, 'left' => 2, 'notIn' => 3], array_intersect_key($live, array_flip(['atWork', 'left', 'notIn'])));
+        $this->assertSame($live['total'], $live['atWork'] + $live['left'] + $live['notIn']);
+        // Every state sub-line sums to its cell: 2 absent + 1 off = Not in 3.
+        $this->assertSame($live['notIn'], $live['notInDue'] + $live['notInAbsent'] + $live['notInOff'] + $live['notInHoliday'] + $live['notInLeave']);
+
+        $cells = collect(DashboardAttendance::liveTodayCells($live))->keyBy('label');
+        $this->assertSame(['3', '2 absent · 1 off'], [$cells['Not in']['value'], $cells['Not in']['subtext']]);
+        $this->assertSame(['1', '1 late · 1 past end time'], [$cells['At work']['value'], $cells['At work']['subtext']]);
+        $this->assertSame('2', $cells['Left']['value']);
+    }
+
     public function test_yesterday_still_inside_a_pairing_window_at_one_in_the_morning_is_pending(): void
     {
         $employees = Employee::factory()->count(2)->create();

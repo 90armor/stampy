@@ -345,32 +345,31 @@ class DashboardAttendance
     /**
      * The live "who is here now" view of today, derived from today's
      * existing rows (no builder involvement), as a partition of the active
-     * employees in scope — the three groups never overlap and always sum to
-     * 'total':
+     * employees in scope **by punches** — the three groups never overlap and
+     * always sum to 'total':
      *
-     * - atWork: has an in-punch today and hasn't finished (any non-Present
-     *   row with a first_in); 'atWorkPastEnd' of them are In progress past
-     *   their schedule's end (Phase 2.7: an in-only day stays open until its
-     *   pairing window closes — overtime, or a missing out-punch);
-     * - left: Present today (both punches);
-     * - notIn: everyone else — no in-punch today. 'notInDue' of them are
-     *   still due (a punchless In progress row, or no row built yet) and
-     *   'notInAbsent' are Absent (a punchless day whose schedule end has
-     *   passed); the rest are off, on holiday or leave, or out-only.
+     * - atWork: an in-punch and no out-punch yet (an open day, or an in-only
+     *   day whose window closed). 'atWorkPastEnd' of them are past their
+     *   schedule's end (Phase 2.7 — overtime, or a missing out-punch).
+     * - left: has an out-punch — Present, or an out-only Incomplete day.
+     * - notIn: no punches today. Its state sub-counts partition it exactly
+     *   (they always sum to notIn): 'notInDue' (a punchless In progress row,
+     *   or no row built yet), 'notInAbsent', 'notInOff', 'notInHoliday' and
+     *   'notInLeave' — a row with no punches can only be one of those.
      *
-     * 'atWorkLate' and 'leftLate'/'leftEarly' annotate those groups with
-     * timing — never a fourth group. 'checkedIn' is a different, overlapping
-     * figure (everyone with an in-punch, at work or left) used by the
+     * Timing counts — 'atWorkLate', 'leftLate', 'leftEarly' — annotate their
+     * group (a subset of it), never a fourth group. 'checkedIn' is a
+     * different, overlapping figure (everyone with an in-punch) used by the
      * Department card and the trend's pending bar, never by the strip.
      *
      * @param  int[]|null  $employeeIds
-     * @return array{atWork: int, atWorkLate: int, atWorkPastEnd: int, left: int, leftLate: int, leftEarly: int, notIn: int, notInDue: int, notInAbsent: int, checkedIn: int, total: int}
+     * @return array{atWork: int, atWorkLate: int, atWorkPastEnd: int, left: int, leftLate: int, leftEarly: int, notIn: int, notInDue: int, notInAbsent: int, notInOff: int, notInHoliday: int, notInLeave: int, checkedIn: int, total: int}
      */
     public static function liveToday(?array $employeeIds): array
     {
         $today = today()->format('Y-m-d');
-        $present = AttendanceStatus::Present->value;
-        $inProgress = AttendanceStatus::InProgress->value;
+        $punchless = 'daily_attendances.first_in is null and daily_attendances.last_out is null';
+        $atWork = 'daily_attendances.first_in is not null and daily_attendances.last_out is null';
 
         // "Past end time" compares against a PHP-supplied now(), never MySQL's
         // own clock (CLAUDE.md, Local environment: Timezone).
@@ -380,34 +379,40 @@ class DashboardAttendance
             ->where('employees.status', 'active')
             ->whereDate('daily_attendances.work_date', $today)
             ->selectRaw('count(*) as rows_built')
-            ->selectRaw('sum(daily_attendances.status <> ? and daily_attendances.first_in is not null) as at_work', [$present])
-            ->selectRaw('sum(daily_attendances.status <> ? and daily_attendances.first_in is not null and daily_attendances.late_minutes > 0) as at_work_late', [$present])
-            ->selectRaw('sum(daily_attendances.status = ? and daily_attendances.first_in is not null and timestamp(daily_attendances.work_date, work_schedules.end_time) <= ?) as at_work_past_end', [$inProgress, now()->format('Y-m-d H:i:s')])
-            ->selectRaw('sum(daily_attendances.status = ?) as left_count', [$present])
-            ->selectRaw('sum(daily_attendances.status = ? and daily_attendances.late_minutes > 0) as left_late', [$present])
-            ->selectRaw('sum(daily_attendances.status = ? and daily_attendances.early_leave_minutes > 0) as left_early', [$present])
-            ->selectRaw('sum(daily_attendances.status = ? and daily_attendances.first_in is null and daily_attendances.last_out is null) as due', [$inProgress])
-            ->selectRaw('sum(daily_attendances.status = ?) as absent', [AttendanceStatus::Absent->value])
+            ->selectRaw("sum({$atWork}) as at_work")
+            ->selectRaw("sum({$atWork} and daily_attendances.late_minutes > 0) as at_work_late")
+            ->selectRaw("sum({$atWork} and timestamp(daily_attendances.work_date, work_schedules.end_time) <= ?) as at_work_past_end", [now()->format('Y-m-d H:i:s')])
+            ->selectRaw('sum(daily_attendances.last_out is not null) as left_count')
+            ->selectRaw('sum(daily_attendances.last_out is not null and daily_attendances.late_minutes > 0) as left_late')
+            ->selectRaw('sum(daily_attendances.last_out is not null and daily_attendances.early_leave_minutes > 0) as left_early')
+            ->selectRaw("sum({$punchless} and daily_attendances.status = ?) as due", [AttendanceStatus::InProgress->value])
+            ->selectRaw("sum({$punchless} and daily_attendances.status = ?) as absent", [AttendanceStatus::Absent->value])
+            ->selectRaw("sum({$punchless} and daily_attendances.status = ?) as off_count", [AttendanceStatus::Off->value])
+            ->selectRaw("sum({$punchless} and daily_attendances.status = ?) as holiday", [AttendanceStatus::Holiday->value])
+            ->selectRaw("sum({$punchless} and daily_attendances.status = ?) as on_leave", [AttendanceStatus::Leave->value])
             ->selectRaw('sum(daily_attendances.first_in is not null) as checked_in')
             ->toBase()
             ->first();
 
         $total = self::scopedActiveEmployeeQuery($employeeIds)->count();
-        $atWork = (int) ($row->at_work ?? 0);
+        $atWorkCount = (int) ($row->at_work ?? 0);
         $left = (int) ($row->left_count ?? 0);
         $notBuilt = max(0, $total - (int) ($row->rows_built ?? 0));
 
         return [
-            'atWork' => $atWork,
+            'atWork' => $atWorkCount,
             'atWorkLate' => (int) ($row->at_work_late ?? 0),
             'atWorkPastEnd' => (int) ($row->at_work_past_end ?? 0),
             'left' => $left,
             'leftLate' => (int) ($row->left_late ?? 0),
             'leftEarly' => (int) ($row->left_early ?? 0),
-            'notIn' => max(0, $total - $atWork - $left),
+            'notIn' => max(0, $total - $atWorkCount - $left),
             // Not built yet reads as "due", like a punchless In progress row: today's build simply hasn't reached them.
             'notInDue' => (int) ($row->due ?? 0) + $notBuilt,
             'notInAbsent' => (int) ($row->absent ?? 0),
+            'notInOff' => (int) ($row->off_count ?? 0),
+            'notInHoliday' => (int) ($row->holiday ?? 0),
+            'notInLeave' => (int) ($row->on_leave ?? 0),
             'checkedIn' => (int) ($row->checked_in ?? 0),
             'total' => $total,
         ];
@@ -420,7 +425,7 @@ class DashboardAttendance
      * Not in 5 (3 due · 2 absent)" — a partition that sums to active
      * employees, with each annotation as a sub-line.
      *
-     * @param  array{atWork: int, atWorkLate: int, atWorkPastEnd: int, left: int, leftLate: int, leftEarly: int, notIn: int, notInDue: int, notInAbsent: int, checkedIn: int, total: int}  $live
+     * @param  array{atWork: int, atWorkLate: int, atWorkPastEnd: int, left: int, leftLate: int, leftEarly: int, notIn: int, notInDue: int, notInAbsent: int, notInOff: int, notInHoliday: int, notInLeave: int, checkedIn: int, total: int}  $live
      * @return list<array{icon: string, label: string, value: string, subtext: ?string}>
      */
     public static function liveTodayCells(array $live): array
@@ -436,9 +441,13 @@ class DashboardAttendance
                 $live['leftLate'] > 0 ? $live['leftLate'].' late' : null,
                 $live['leftEarly'] > 0 ? $live['leftEarly'].' early' : null,
             ])],
+            // Not in's sub-line is its exact breakdown by state: the parts always sum to the cell.
             ['icon' => 'clock', 'label' => 'Not in', 'value' => (string) $live['notIn'], 'subtext' => $subline([
                 $live['notInDue'] > 0 ? $live['notInDue'].' due' : null,
                 $live['notInAbsent'] > 0 ? $live['notInAbsent'].' absent' : null,
+                $live['notInOff'] > 0 ? $live['notInOff'].' off' : null,
+                $live['notInHoliday'] > 0 ? $live['notInHoliday'].' on holiday' : null,
+                $live['notInLeave'] > 0 ? $live['notInLeave'].' on leave' : null,
             ])],
         ];
     }
