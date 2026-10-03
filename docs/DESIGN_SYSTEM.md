@@ -151,7 +151,13 @@ The modal backdrop may use transparency and `backdrop-blur-sm`. This is an overl
 - `<x-empty-state>` provides an icon, title, optional description, and optional action.
 - `<x-time-input>` is every time field (manual punch time, schedule start and end): see Time input, under Forms. Never use a bare `type="time"` input.
 - `<x-date-picker>` is every date field: the shared date picker in single mode, with a native date input below 640px. Never use a bare `type="date"` input. Its calendar (`<x-date-picker.calendar>`) is also the Daily Attendance range picker's. In pickers, today is a quiet marker rather than the employee calendar's filled circle, because a fill marks a chosen date. Rules in [Attendance UI](ATTENDANCE_UI.md#date-picker).
-- `<x-icon>` is the only Heroicons entry point. Add icons there rather than embedding a second icon system. It defaults to 20px (`w-5 h-5`) **only when the caller sets no size**: a caller's `h-4 w-4` replaces the default rather than joining it. They used to be merged, and since Tailwind emits `h-5` after `h-4`/`h-3.5`, every smaller icon in the app rendered at 20px (`IconTest`).
+- `<x-icon>` is the only Heroicons entry point. Add icons there rather than embedding a second icon system.
+- **Icon size.** One size for interface icons: **20px** (`h-5 w-5`, also the component's default when no size is given) — buttons, inputs, navigation, row actions, stat cards, alerts, the calendar's arrows. Exceptions, and only these:
+  - **14px (`h-3.5 w-3.5`) inside a status pill or filter chip** — the day modal's status pill and the check in a selected filter chip. A 20px glyph crowds a 28px pill; the chips' fixed size (docs/ATTENDANCE_UI.md, Filters) is built on the 14px check.
+  - **The calendar cell's status icon: 20px, 16px from `sm`** (`h-5 w-5 sm:h-4 sm:w-4`), where the cell also carries the times.
+  - Larger decorative icons (`h-6 w-6`, empty-state badges and the like).
+
+  Write the size at the call site (`h-5 w-5`) when in doubt; never a smaller size outside the exceptions. A caller's size replaces the 20px default rather than joining it — they used to be merged, and since Tailwind emits `h-5` after `h-4`/`h-3.5`, every icon that asked for 16px quietly rendered at 20px, so the code said one size and the screen showed another. `IconTest` checks both the component and every call site.
 
 Prefer composition over adding props that expose implementation choices. Props should express genuine behavior or content, not optional design-system rules.
 

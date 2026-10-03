@@ -188,7 +188,7 @@
                                 @if ($editing?->user_id)
                                     <div class="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between">
                                         <div class="flex items-start gap-2">
-                                            <x-icon name="info" class="mt-0.5 h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
+                                            <x-icon name="info" class="mt-0.5 h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" />
                                             <p class="text-sm text-slate-500 dark:text-slate-400">This employee already has a linked login account.</p>
                                         </div>
                                         {{-- Native <button>, not <x-button>: @js() doesn't compile when

@@ -111,7 +111,7 @@
                         wire:click="resetFilters"
                         class="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-600/30 dark:hover:text-primary-300"
                     >
-                        <x-icon name="x-mark" class="h-3.5 w-3.5" />
+                        <x-icon name="x-mark" class="h-5 w-5" />
                         Reset filters
                     </button>
                 @endif
@@ -141,8 +141,8 @@
                     aria-controls="attendance-date-panel"
                     class="inline-flex h-control w-full items-center justify-between gap-2 rounded-lg border border-slate-border bg-white px-3 text-sm text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:bg-slate-750 dark:text-slate-200 dark:hover:bg-slate-600 lg:w-auto"
                 >
-                    <span class="inline-flex items-center gap-2"><x-icon name="calendar-days" class="h-4 w-4 text-slate-400 dark:text-slate-500" />{{ $rangeLabel }}</span>
-                    <x-icon name="chevron-down" class="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                    <span class="inline-flex items-center gap-2"><x-icon name="calendar-days" class="h-5 w-5 text-slate-400 dark:text-slate-500" />{{ $rangeLabel }}</span>
+                    <x-icon name="chevron-down" class="h-5 w-5 text-slate-400 dark:text-slate-500" />
                 </button>
                 {{-- Outside the panel, so a completed range is still announced
                 after the panel closes. --}}
@@ -219,7 +219,7 @@
 
             <div class="relative min-w-0 sm:col-span-2 lg:col-span-1">
                 <label for="attendance-search" class="sr-only">Search by employee name or code</label>
-                <x-icon name="search" class="pointer-events-none absolute left-3 top-2.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
+                <x-icon name="search" class="pointer-events-none absolute left-3 top-2.5 w-5 h-5 text-slate-400 dark:text-slate-500" />
                 <input
                     id="attendance-search"
                     type="text"
@@ -322,7 +322,7 @@
 
         @if ($maxBuiltDate && $toDate > $maxBuiltDate)
             <div class="mx-6 mb-6 flex items-start gap-2 rounded-lg bg-amber-50 p-4 text-sm text-amber-800 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-500/30">
-                <x-icon name="exclamation-triangle" class="mt-0.5 h-4 w-4 shrink-0" />
+                <x-icon name="exclamation-triangle" class="mt-0.5 h-5 w-5 shrink-0" />
                 <span>
                     Attendance has only been calculated up to <strong>{{ \App\Support\DisplayDate::compact(\Illuminate\Support\Carbon::parse($maxBuiltDate)) }}</strong>.
                     Dates after that aren't missing punches — they simply haven't been processed yet.
@@ -346,7 +346,7 @@
                 still scrolled. --}}
                 <div class="flex items-center justify-end gap-1.5 px-5 py-2 text-xs text-slate-500 dark:text-slate-400 min-[1440px]:hidden" aria-hidden="true">
                     <span>Scroll to view all columns</span>
-                    <x-icon name="chevron-right" class="h-3.5 w-3.5" />
+                    <x-icon name="chevron-right" class="h-5 w-5" />
                 </div>
 
                 {{-- From sm to below xl the Status and chevron columns are pinned to the
@@ -454,7 +454,7 @@
                                             aria-label="View attendance for {{ $attendance->employee->full_name }}, {{ $workDateLabel }}"
                                             class="-my-1 ml-auto inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover:text-primary-600 dark:text-slate-400 dark:hover:bg-primary-600/35 dark:hover:text-primary-300 dark:group-hover:text-primary-400"
                                         >
-                                            <x-icon name="chevron-right" class="h-4 w-4" />
+                                            <x-icon name="chevron-right" class="h-5 w-5" />
                                         </a>
                                         <span role="tooltip" class="pointer-events-none absolute bottom-full right-0 z-10 mb-2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-sm transition-opacity group-hover/action:opacity-100 group-focus-within/action:opacity-100 dark:bg-slate-100 dark:text-slate-900">View attendance details</span>
                                     </span>

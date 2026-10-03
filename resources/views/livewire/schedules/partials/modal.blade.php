@@ -22,7 +22,7 @@
 
             @if ($editingIsLocked)
                 <div id="schedule-lock-help" class="mt-4 flex items-start gap-2.5 rounded-lg bg-amber-50 p-3 text-amber-900 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-200 dark:ring-amber-500/30">
-                    <x-icon name="info" class="mt-0.5 h-4 w-4 shrink-0" />
+                    <x-icon name="info" class="mt-0.5 h-5 w-5 shrink-0" />
                     <div>
                         <p class="text-sm font-semibold">Schedule configuration is locked</p>
                         <p class="mt-0.5 text-xs leading-[1.125rem]">This schedule has assignment or attendance history. Hours, attendance rules, and workdays are locked; name and default remain editable. To change locked settings, create a replacement schedule and reassign employees.</p>

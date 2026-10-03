@@ -77,12 +77,12 @@ $current = 'z-10 cursor-default font-semibold border-primary-600 bg-primary-50 t
                             @if ($paginator->onFirstPage())
                                 <span aria-disabled="true" aria-label="{{ __('pagination.previous') }}">
                                     <span class="{{ $item }} {{ $disabled }} w-9 rounded-l-lg" aria-hidden="true">
-                                        <x-icon name="chevron-left" class="h-4 w-4" />
+                                        <x-icon name="chevron-left" class="h-5 w-5" />
                                     </span>
                                 </span>
                             @else
                                 <button type="button" wire:click="previousPage('{{ $paginator->getPageName() }}')" x-on:click="{{ $scrollIntoViewJsSnippet }}" dusk="previousPage{{ $paginator->getPageName() == 'page' ? '' : '.' . $paginator->getPageName() }}.after" class="{{ $item }} {{ $enabled }} w-9 rounded-l-lg" aria-label="{{ __('pagination.previous') }}">
-                                    <x-icon name="chevron-left" class="h-4 w-4" />
+                                    <x-icon name="chevron-left" class="h-5 w-5" />
                                 </button>
                             @endif
                         </span>
@@ -116,12 +116,12 @@ $current = 'z-10 cursor-default font-semibold border-primary-600 bg-primary-50 t
                             {{-- Next Page Link --}}
                             @if ($paginator->hasMorePages())
                                 <button type="button" wire:click="nextPage('{{ $paginator->getPageName() }}')" x-on:click="{{ $scrollIntoViewJsSnippet }}" dusk="nextPage{{ $paginator->getPageName() == 'page' ? '' : '.' . $paginator->getPageName() }}.after" class="{{ $item }} {{ $enabled }} -ml-px w-9 rounded-r-lg" aria-label="{{ __('pagination.next') }}">
-                                    <x-icon name="chevron-right" class="h-4 w-4" />
+                                    <x-icon name="chevron-right" class="h-5 w-5" />
                                 </button>
                             @else
                                 <span aria-disabled="true" aria-label="{{ __('pagination.next') }}">
                                     <span class="{{ $item }} {{ $disabled }} -ml-px w-9 rounded-r-lg" aria-hidden="true">
-                                        <x-icon name="chevron-right" class="h-4 w-4" />
+                                        <x-icon name="chevron-right" class="h-5 w-5" />
                                     </span>
                                 </span>
                             @endif

@@ -42,7 +42,7 @@ property. The server rule stays the authority. --}}
             class="flex h-control w-full items-center gap-2 rounded-lg border bg-white px-3 text-sm leading-5 text-slate-900 shadow-sm focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-500 dark:bg-slate-750 dark:text-slate-100"
             :class="[invalid ? 'border-red-500' : 'border-slate-border', disabled ? 'bg-slate-50 dark:bg-slate-800' : '']"
         >
-            <x-icon name="clock" class="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
+            <x-icon name="clock" class="h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" />
             <div
                 x-ref="segments"
                 role="group"
@@ -106,7 +106,7 @@ property. The server rule stays the authority. --}}
                 :aria-label="'Choose a time' + (display ? ', ' + display : '')"
                 class="-my-1 -mr-1.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed dark:text-slate-500 dark:hover:bg-slate-600/30 dark:hover:text-slate-300"
             >
-                <x-icon name="chevron-down" class="h-4 w-4" />
+                <x-icon name="chevron-down" class="h-5 w-5" />
             </button>
         </div>
 

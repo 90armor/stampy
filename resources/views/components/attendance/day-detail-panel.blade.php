@@ -40,7 +40,7 @@ divergence here would be a real correctness bug, not just a style one. --}}
         </h4>
         @if ($canEdit && ! $isAdding)
             <x-button type="button" variant="secondary" wire:click="startAddingPunch('{{ $dayKey }}')">
-                <x-icon name="plus" class="h-4 w-4" />
+                <x-icon name="plus" class="h-5 w-5" />
                 Add punch
             </x-button>
         @endif

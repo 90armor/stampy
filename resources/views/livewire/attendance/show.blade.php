@@ -95,7 +95,7 @@
         @unless ($viaSelfView)
             <div>
                 <a href="{{ route('attendance.index') }}" wire:navigate class="inline-flex items-center gap-x-1 text-sm font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100">
-                    <x-icon name="chevron-left" class="h-4 w-4" />
+                    <x-icon name="chevron-left" class="h-5 w-5" />
                     Back to attendance
                 </a>
             </div>
@@ -173,7 +173,7 @@
 
             @unless ($monthFullyBuilt)
                 <div class="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-800 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-500/30">
-                    <x-icon name="exclamation-triangle" class="mt-0.5 h-4 w-4 shrink-0" />
+                    <x-icon name="exclamation-triangle" class="mt-0.5 h-5 w-5 shrink-0" />
                     @if ($lastBuiltInMonth)
                         <span>
                             Attendance has only been calculated up to <strong>{{ \App\Support\DisplayDate::compact(\Illuminate\Support\Carbon::parse($lastBuiltInMonth)) }}</strong>.
@@ -200,7 +200,7 @@
                         class="rounded-lg border border-slate-border bg-white p-1.5 text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700 dark:bg-slate-750 dark:text-slate-400 dark:hover:bg-slate-600"
                         aria-label="Previous month"
                     >
-                        <x-icon name="chevron-left" class="h-4 w-4" />
+                        <x-icon name="chevron-left" class="h-5 w-5" />
                     </button>
                     <span class="min-w-[9rem] text-center text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $monthLabel }}</span>
                     <button
@@ -209,7 +209,7 @@
                         class="rounded-lg border border-slate-border bg-white p-1.5 text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700 dark:bg-slate-750 dark:text-slate-400 dark:hover:bg-slate-600"
                         aria-label="Next month"
                     >
-                        <x-icon name="chevron-right" class="h-4 w-4" />
+                        <x-icon name="chevron-right" class="h-5 w-5" />
                     </button>
                     @unless ($isCurrentMonth)
                         <button type="button" wire:click="$set('month', '{{ today()->format('Y-m') }}')" class="ml-1 text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300">
@@ -317,7 +317,7 @@
                                     @else
                                         <span class="text-sm sm:text-base {{ $style['weight'] ?? 'font-bold' }} {{ $style['text'] }}">{{ $cell['date']->day }}</span>
                                     @endif
-                                    <x-icon :name="$style['icon']" class="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4 {{ $style['iconText'] ?? $style['text'] }}" />
+                                    <x-icon :name="$style['icon']" class="h-5 w-5 shrink-0 sm:h-4 sm:w-4 {{ $style['iconText'] ?? $style['text'] }}" />
                                 </div>
                                 {{-- A holiday cell shows its name whatever the attendance
                                 status is (or isn't, yet) — read from $holiday, not from
@@ -347,7 +347,7 @@
                                         {{ $holiday->name }}
                                     </span>
                                     @unless ($style['icon'] === 'flag')
-                                        <x-icon name="flag" class="h-3 w-3 shrink-0 text-fuchsia-700 dark:text-fuchsia-300 sm:hidden" />
+                                        <x-icon name="flag" class="h-5 w-5 shrink-0 text-fuchsia-700 dark:text-fuchsia-300 sm:hidden" />
                                     @endunless
                                 @endif
                                 {{-- Off and an unworked Holiday both show nothing below the
@@ -407,7 +407,7 @@
                 <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-divider pt-3 text-xs text-slate-500 dark:text-slate-400">
                     @foreach ($legendItems as $item)
                         <span class="inline-flex items-center gap-1.5">
-                            <x-icon :name="$item['icon']" class="h-3.5 w-3.5 shrink-0 {{ $item['text'] }}" />
+                            <x-icon :name="$item['icon']" class="h-5 w-5 shrink-0 {{ $item['text'] }}" />
                             {{ $item['label'] }}
                         </span>
                     @endforeach
@@ -542,7 +542,7 @@
                                             aria-label="Show raw punches for {{ $dayLabel }}"
                                             class="-my-1 ml-auto inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-primary-600/35 dark:hover:text-primary-300"
                                         >
-                                            <x-icon name="chevron-right" class="h-4 w-4 transition" x-bind:class="open ? 'rotate-90' : ''" />
+                                            <x-icon name="chevron-right" class="h-5 w-5 transition" x-bind:class="open ? 'rotate-90' : ''" />
                                         </button>
                                         @unless ($loop->last)
                                             <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-divider"></span>
@@ -614,7 +614,7 @@
                             <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{{ $employee->full_name }}</p>
                             @if ($modalHoliday)
                                 <p class="mt-0.5 flex items-center gap-1 text-sm font-medium text-fuchsia-700 dark:text-fuchsia-300">
-                                    <x-icon name="flag" class="h-3.5 w-3.5 shrink-0" />
+                                    <x-icon name="flag" class="h-5 w-5 shrink-0" />
                                     {{ $modalHoliday->name }}
                                 </p>
                             @endif

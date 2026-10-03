@@ -10,7 +10,7 @@
                 @if ($breadcrumbs ?? null)
                     @foreach ($breadcrumbs as $crumb)
                         @unless ($loop->first)
-                            <x-icon name="chevron-right" class="hidden sm:inline w-4 h-4 text-slate-300 dark:text-slate-600" />
+                            <x-icon name="chevron-right" class="hidden sm:inline w-5 h-5 text-slate-300 dark:text-slate-600" />
                         @endunless
                         @if (! $loop->last)
                             <a href="{{ $crumb['route'] }}" wire:navigate class="hidden rounded hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:inline dark:hover:text-slate-100">
@@ -22,7 +22,7 @@
                     @endforeach
                 @else
                     <span class="hidden sm:inline">{{ config('app.name') }}</span>
-                    <x-icon name="chevron-right" class="hidden sm:inline w-4 h-4 text-slate-300 dark:text-slate-600" />
+                    <x-icon name="chevron-right" class="hidden sm:inline w-5 h-5 text-slate-300 dark:text-slate-600" />
                     <span class="font-semibold text-slate-900 dark:text-slate-100">
                         {{ $header ?? '' }}
                     </span>
@@ -60,7 +60,7 @@
                                 {{ auth()->user()->getRoleNames()->first() ? ucfirst(auth()->user()->getRoleNames()->first()) : 'No role' }}
                             </span>
                         </span>
-                        <x-icon name="chevron-down" class="w-4 h-4 shrink-0 text-slate-400" />
+                        <x-icon name="chevron-down" class="w-5 h-5 shrink-0 text-slate-400" />
                     </button>
                 </x-slot>
 

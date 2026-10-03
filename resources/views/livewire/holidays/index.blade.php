@@ -16,7 +16,7 @@
             </div>
 
             <x-button variant="primary" wire:click="create" wire:loading.attr="disabled" wire:target="create">
-                <x-icon name="plus" class="w-4 h-4" />
+                <x-icon name="plus" class="w-5 h-5" />
                 New Holiday
             </x-button>
         </div>
@@ -68,7 +68,7 @@
                                     class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-600 active:bg-primary-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-400 dark:hover:bg-primary-600/35 dark:hover:text-primary-400 dark:active:bg-primary-900/50"
                                     aria-label="Edit {{ $holiday->name }} holiday on {{ \App\Support\DisplayDate::long($holiday->date) }}"
                                 >
-                                    <x-icon name="pencil" class="w-4 h-4" />
+                                    <x-icon name="pencil" class="w-5 h-5" />
                                 </button>
                                 <span role="tooltip" class="pointer-events-none absolute bottom-full right-0 z-10 mb-2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-sm transition-opacity group-hover/action:opacity-100 group-focus-within/action:opacity-100 dark:bg-slate-100 dark:text-slate-900">Edit holiday</span>
                             </span>
@@ -85,7 +85,7 @@
                                     class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-600 active:bg-red-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-red-900/30 dark:hover:text-red-400 dark:active:bg-red-900/50"
                                     aria-label="Delete {{ $holiday->name }} holiday on {{ \App\Support\DisplayDate::long($holiday->date) }}"
                                 >
-                                    <x-icon name="trash" class="w-4 h-4" />
+                                    <x-icon name="trash" class="w-5 h-5" />
                                 </button>
                                 <span role="tooltip" class="pointer-events-none absolute bottom-full right-0 z-10 mb-2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-sm transition-opacity group-hover/action:opacity-100 group-focus-within/action:opacity-100 dark:bg-slate-100 dark:text-slate-900">Delete holiday</span>
                             </span>

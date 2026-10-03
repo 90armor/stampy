@@ -24,7 +24,7 @@ in wire:ignore. Rules: docs/ATTENDANCE_UI.md, Date picker. --}}
 <div x-ref="picker" @keydown="onKeydown($event)" {{ $attributes }}>
     <div class="mt-2 flex items-center justify-between">
         <button type="button" @click="step(-1)" :aria-label="stepLabels[0]" class="{{ $pickerNavButton }}">
-            <x-icon name="chevron-left" class="h-4 w-4" />
+            <x-icon name="chevron-left" class="h-5 w-5" />
         </button>
         <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
             <button
@@ -35,12 +35,12 @@ in wire:ignore. Rules: docs/ATTENDANCE_UI.md, Date picker. --}}
                 class="inline-flex items-center gap-1 rounded-lg px-2 py-1 transition hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-slate-600/30"
             >
                 <span x-text="heading"></span>
-                <x-icon name="chevron-down" class="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                <x-icon name="chevron-down" class="h-5 w-5 text-slate-400 dark:text-slate-500" />
             </button>
             <span x-show="view === 'years'" class="inline-block px-2 py-1 tabular-nums" x-text="heading"></span>
         </h3>
         <button type="button" @click="step(1)" :aria-label="stepLabels[1]" class="{{ $pickerNavButton }}">
-            <x-icon name="chevron-right" class="h-4 w-4" />
+            <x-icon name="chevron-right" class="h-5 w-5" />
         </button>
     </div>
     {{-- The grid's label, announced politely as it changes

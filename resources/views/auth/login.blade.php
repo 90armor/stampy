@@ -20,7 +20,7 @@
                 class="flex items-start gap-x-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400"
                 role="alert"
             >
-                <x-icon name="exclamation-triangle" class="mt-0.5 h-4 w-4 shrink-0" />
+                <x-icon name="exclamation-triangle" class="mt-0.5 h-5 w-5 shrink-0" />
                 <span>{{ $errors->first('auth') }}</span>
             </div>
         @endif
@@ -96,7 +96,7 @@
                 <path class="opacity-90" fill="currentColor" d="M21 12a9 9 0 0 0-9-9v3a6 6 0 0 1 6 6h3Z" />
             </svg>
             <span x-text="submitting ? 'Signing in…' : 'Sign in'">{{ __('Sign in') }}</span>
-            <x-icon name="chevron-right" class="h-4 w-4" x-show="!submitting" />
+            <x-icon name="chevron-right" class="h-5 w-5" x-show="!submitting" />
         </x-button>
 
         <p class="text-center text-xs text-slate-600 dark:text-slate-400">

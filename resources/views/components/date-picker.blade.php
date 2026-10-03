@@ -50,10 +50,10 @@ split as the Daily Attendance range. --}}
             {{ $attributes->merge(['class' => 'inline-flex h-control w-full items-center justify-between gap-2 rounded-lg border border-slate-border bg-white px-3 text-left text-sm leading-5 text-slate-900 shadow-sm transition hover:bg-slate-50 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 dark:bg-slate-750 dark:text-slate-100 dark:hover:bg-slate-600/30 dark:disabled:bg-slate-800 dark:disabled:text-slate-600']) }}
         >
             <span class="inline-flex min-w-0 items-center gap-2">
-                <x-icon name="calendar-days" class="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
+                <x-icon name="calendar-days" class="h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" />
                 <span class="truncate tabular-nums" :class="display ? '' : 'text-slate-500 dark:text-slate-400'" x-text="display || @js($placeholder)"></span>
             </span>
-            <x-icon name="chevron-down" class="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
+            <x-icon name="chevron-down" class="h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" />
         </button>
         <p class="sr-only" aria-live="polite" x-text="announcement"></p>
 

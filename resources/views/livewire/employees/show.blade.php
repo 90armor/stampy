@@ -1,7 +1,7 @@
 <div class="space-y-6">
     <div>
         <a href="{{ route('employees.index') }}" wire:navigate class="inline-flex items-center gap-x-1 rounded text-sm font-medium text-slate-500 transition hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:text-primary-300">
-            <x-icon name="chevron-right" class="h-4 w-4 rotate-180" />
+            <x-icon name="chevron-right" class="h-5 w-5 rotate-180" />
             Back to employees
         </a>
     </div>
@@ -24,7 +24,7 @@
 
         @can('update', $employee)
             <x-button type="button" variant="secondary" wire:click="$dispatch('edit-employee', { id: {{ $employee->id }} })" class="self-start sm:self-auto">
-                <x-icon name="pencil" class="w-4 h-4" />
+                <x-icon name="pencil" class="w-5 h-5" />
                 Edit employee
             </x-button>
         @endcan
@@ -72,7 +72,7 @@
                 <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">Review this employee’s monthly attendance record.</p>
                 <a href="{{ route('attendance.show', $employee) }}" wire:navigate class="mt-4 inline-flex items-center gap-1 rounded text-sm font-medium text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-2 transition hover:decoration-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:decoration-primary-700 dark:hover:decoration-primary-400">
                     View monthly attendance
-                    <x-icon name="chevron-right" class="h-4 w-4" />
+                    <x-icon name="chevron-right" class="h-5 w-5" />
                 </a>
             </x-card>
         @endcan

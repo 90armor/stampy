@@ -60,7 +60,7 @@
 
                 <div class="flex items-center gap-3" aria-hidden="true">
                     <span class="h-px flex-1 bg-slate-divider"></span>
-                    <x-icon name="chevron-down" class="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                    <x-icon name="chevron-down" class="h-5 w-5 text-slate-400 dark:text-slate-500" />
                     <span class="h-px flex-1 bg-slate-divider"></span>
                 </div>
 

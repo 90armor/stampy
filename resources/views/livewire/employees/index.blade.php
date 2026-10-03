@@ -6,7 +6,7 @@
 
         @can('create', \App\Models\Employee::class)
             <x-button type="button" variant="primary" wire:click="$dispatch('create-employee')">
-                <x-icon name="plus" class="w-4 h-4" />
+                <x-icon name="plus" class="w-5 h-5" />
                 Add Employee
             </x-button>
         @endcan
@@ -36,7 +36,7 @@
             <span wire:loading.delay class="text-xs text-slate-500 dark:text-slate-400" role="status">Updating…</span>
             @if ($filtersActive)
                 <button type="button" wire:click="resetFilters" class="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-slate-500 transition hover:bg-slate-100 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-600/30 dark:hover:text-primary-300">
-                    <x-icon name="x-mark" class="h-3.5 w-3.5" />
+                    <x-icon name="x-mark" class="h-5 w-5" />
                     Reset filters
                 </button>
             @endif
@@ -49,7 +49,7 @@
     <div class="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 sm:p-6 xl:grid-cols-[minmax(18rem,1fr)_14rem_11rem]">
         <div class="relative min-w-0 sm:col-span-2 xl:col-span-1">
             <label for="employee-search" class="sr-only">Search employees by name or code</label>
-            <x-icon name="search" class="pointer-events-none absolute left-3 top-2.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
+            <x-icon name="search" class="pointer-events-none absolute left-3 top-2.5 w-5 h-5 text-slate-400 dark:text-slate-500" />
             <input
                 id="employee-search"
                 type="text"
@@ -94,7 +94,7 @@
                 @can('create', \App\Models\Employee::class)
                     <x-slot name="action">
                         <x-button type="button" variant="primary" wire:click="$dispatch('create-employee')">
-                            <x-icon name="plus" class="w-4 h-4" />
+                            <x-icon name="plus" class="w-5 h-5" />
                             Add your first employee
                         </x-button>
                     </x-slot>
@@ -107,7 +107,7 @@
             card from xl (974px) up, so the cue shows exactly while it scrolls. --}}
             <div class="flex items-center justify-end gap-1.5 px-5 py-2 text-xs text-slate-500 dark:text-slate-400 xl:hidden" aria-hidden="true">
                 <span>Scroll to view all columns</span>
-                <x-icon name="chevron-right" class="h-3.5 w-3.5" />
+                <x-icon name="chevron-right" class="h-5 w-5" />
             </div>
             {{-- From sm to below xl the Status and Actions columns are pinned to the right
             edge (.table-pin in resources/css/app.css; pinnedColumns in
@@ -170,7 +170,7 @@
                                                 class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-primary-600/35 dark:hover:text-primary-400"
                                                 aria-label="Edit {{ $employee->full_name }}"
                                             >
-                                                <x-icon name="pencil" class="w-4 h-4" />
+                                                <x-icon name="pencil" class="w-5 h-5" />
                                             </button>
                                             <span role="tooltip" class="pointer-events-none absolute bottom-full right-0 z-10 mb-2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-sm transition-opacity group-hover/action:opacity-100 group-focus-within/action:opacity-100 dark:bg-slate-100 dark:text-slate-900">Edit employee</span>
                                         </span>
@@ -190,7 +190,7 @@
                                                     class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-red-900/30 dark:hover:text-red-400"
                                                     aria-label="Deactivate {{ $employee->full_name }}"
                                                 >
-                                                    <x-icon name="user-x" class="w-4 h-4" />
+                                                    <x-icon name="user-x" class="w-5 h-5" />
                                                 </button>
                                                 <span role="tooltip" class="pointer-events-none absolute bottom-full right-0 z-10 mb-2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-sm transition-opacity group-hover/action:opacity-100 group-focus-within/action:opacity-100 dark:bg-slate-100 dark:text-slate-900">Deactivate employee</span>
                                             </span>
@@ -208,7 +208,7 @@
                                                     class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-primary-600/35 dark:hover:text-primary-400"
                                                     aria-label="Reactivate {{ $employee->full_name }}"
                                                 >
-                                                    <x-icon name="check" class="w-4 h-4" />
+                                                    <x-icon name="check" class="w-5 h-5" />
                                                 </button>
                                                 <span role="tooltip" class="pointer-events-none absolute bottom-full right-0 z-10 mb-2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-sm transition-opacity group-hover/action:opacity-100 group-focus-within/action:opacity-100 dark:bg-slate-100 dark:text-slate-900">Reactivate employee</span>
                                             </span>

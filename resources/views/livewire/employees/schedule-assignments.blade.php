@@ -37,7 +37,7 @@
                         title="Delete assignment"
                         aria-label="Delete {{ $currentAssignment->workSchedule->name }} schedule assignment effective {{ \App\Support\DisplayDate::compact($currentAssignment->effective_from) }}"
                     >
-                        <x-icon name="trash" class="h-3.5 w-3.5" />
+                        <x-icon name="trash" class="h-5 w-5" />
                     </button>
                 @endif
             @endcan
@@ -52,7 +52,7 @@
                 wire:loading.attr="disabled"
                 class="inline-flex items-center gap-1 rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-none ring-1 ring-inset ring-slate-border transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-750 dark:text-slate-200 dark:hover:bg-slate-600"
             >
-                <x-icon name="plus" class="h-4 w-4" />
+                <x-icon name="plus" class="h-5 w-5" />
                 Assign schedule
             </button>
         @endcan
@@ -117,7 +117,7 @@
                                 title="Delete assignment"
                                 aria-label="Delete {{ $assignment->workSchedule->name }} schedule assignment effective {{ \App\Support\DisplayDate::compact($assignment->effective_from) }}"
                             >
-                                <x-icon name="trash" class="h-3.5 w-3.5" />
+                                <x-icon name="trash" class="h-5 w-5" />
                             </button>
                         @endcan
                     </li>

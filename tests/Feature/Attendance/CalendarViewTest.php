@@ -319,7 +319,7 @@ class CalendarViewTest extends TestCase
             ->assertSee('Company Anniversary (demo)')
             // Below sm the name would clip, so a small flag marks the holiday
             // instead, and the day number and icon stack rather than collide.
-            ->assertSeeHtml('h-3 w-3 shrink-0 text-fuchsia-700 dark:text-fuchsia-300 sm:hidden')
+            ->assertSeeHtml('h-5 w-5 shrink-0 text-fuchsia-700 dark:text-fuchsia-300 sm:hidden')
             ->assertSeeHtml('flex w-full flex-col items-start gap-0.5 sm:flex-row');
     }
 
