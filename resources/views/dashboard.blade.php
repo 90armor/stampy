@@ -116,7 +116,8 @@
                             @foreach ($attendance['departments'] as $department)
                                 <div>
                                     {{-- Counts, never a bare percentage (Phase 2.7): "Checked in
-                                    N / M" with a lighter provisional bar while today is pending,
+                                    N / M" (any punch today, so the departments total the strip's
+                                    At work + Left) with a lighter provisional bar while today is pending,
                                     "Attended N / M" (present + incomplete) once it has closed. --}}
                                     @php
                                         $departmentCount = $department['pending'] ? $department['checkedIn'] : $department['attended'];

@@ -148,6 +148,39 @@ class DashboardDayCloseTest extends TestCase
         $this->assertSame('2', $cells['Left']['value']);
     }
 
+    public function test_department_checked_in_counts_any_punch_and_totals_the_strips_at_work_plus_left(): void
+    {
+        $this->travelTo(Carbon::parse(self::TODAY.' 13:00:00'));
+        $engineering = Department::factory()->create();
+        $operations = Department::factory()->create();
+        [$atWork, $outOnly, $notIn] = Employee::factory()->count(3)->create(['department_id' => $engineering->id])->all();
+        [$present, $due] = Employee::factory()->count(2)->create(['department_id' => $operations->id])->all();
+        $this->row($atWork, AttendanceStatus::InProgress, ['first_in' => self::TODAY.' 07:58:00']);
+        // Out-only, still open today: no in-punch, but they came in — Left on the strip, checked in on the card.
+        $this->row($outOnly, AttendanceStatus::InProgress, ['last_out' => self::TODAY.' 12:10:00']);
+        $this->row($notIn, AttendanceStatus::InProgress);
+        $this->row($present, AttendanceStatus::Present, ['first_in' => self::TODAY.' 07:50:00', 'last_out' => self::TODAY.' 12:30:00']);
+        $this->row($due, AttendanceStatus::InProgress);
+
+        // The trend's pending bar is the same figure: 3 of 5 active employees.
+        $this->assertSame(['value' => 60.0, 'pending' => true], array_intersect_key($this->trendDay(self::TODAY), array_flip(['value', 'pending'])));
+
+        // An inactive employee's row is in neither the strip nor the card.
+        $inactive = Employee::factory()->create(['department_id' => $operations->id, 'status' => 'inactive']);
+        $this->row($inactive, AttendanceStatus::Present, ['first_in' => self::TODAY.' 08:00:00', 'last_out' => self::TODAY.' 12:00:00']);
+
+        $live = DashboardAttendance::liveToday(null);
+        $this->assertSame(['atWork' => 1, 'left' => 2, 'notIn' => 2], array_intersect_key($live, array_flip(['atWork', 'left', 'notIn'])));
+
+        $departments = collect(DashboardAttendance::departmentAttendance(
+            Department::withCount(['employees' => fn ($query) => $query->where('status', 'active')])->orderBy('id')->get(),
+            null,
+        ));
+        $this->assertSame([2, 1], $departments->pluck('checkedIn')->all());
+        $this->assertSame($live['atWork'] + $live['left'], $departments->sum('checkedIn'));
+        $this->assertSame($live['atWork'] + $live['left'], $live['checkedIn']);
+    }
+
     public function test_yesterday_still_inside_a_pairing_window_at_one_in_the_morning_is_pending(): void
     {
         $employees = Employee::factory()->count(2)->create();

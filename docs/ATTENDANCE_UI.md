@@ -70,7 +70,7 @@ In-progress or not-yet-calculated attendance is **pending**, and every trend day
 | A trend day that is… | Shows |
 |---|---|
 | Off or Holiday (every scoped row) | no bar, a muted `Off` / `Holiday` marker |
-| Today, while pending (any In progress row, or an active employee with no row yet — `todayIsPending()`) | a lighter provisional bar (`primary-200`, dark `primary-800`) of **checked in so far** — anyone with an in-punch — and a `Today` marker; no bar while nobody has checked in |
+| Today, while pending (any In progress row, or an active employee with no row yet — `todayIsPending()`) | a lighter provisional bar (`primary-200`, dark `primary-800`) of **checked in so far** — anyone with a punch, in or out — and a `Today` marker; no bar while nobody has checked in |
 | An earlier day still open (an in-only row inside its pairing window — a 9:30 in-punch keeps yesterday open until 03:30) | the same provisional bar and a `Pending` marker |
 | A past day with no rows, or with In progress rows whose window has already closed (the builder didn't run) | no bar, a muted `Not calculated` marker |
 | Closed | the rate as a `primary-500` bar; a closed workday with 0 attended gets a `0%` marker |
@@ -90,7 +90,7 @@ Two different questions, two strip forms:
 
   It is derived from today's existing rows (`DashboardAttendance::liveToday()` / `liveTodayCells()`), with no builder involvement. The Dashboard strip always uses it — three cells, with no separate headcount cell, since the total is already the strip's meta (`Today, Thu 1 Oct · 35 active employees`); the Attendance strip uses it whenever the range is exactly today, with the scope meta `Today, Wed 30 Sep · so far`.
 - **"Not in yet" lives only in Needs attention:** a punchless In progress row past `start_time + grace_minutes` (`DailyAttendance::isNotInYet()`), shown as `Not in yet · due 8:00 AM`. It is a derived display fact, never an attendance status. Every such person is also in the strip's `due` sub-line, which is wider (it also counts people before their start + grace, and anyone not built yet).
-- **"Checked in" is a different, overlapping figure** and is reserved for *has an in-punch today*, whether still at work or already left. It is used only by the Department card (`Checked in 30 / 35`) and the trend's pending bar (checked in ÷ active employees), never by the strip — so the strip's At work (27) and the Department card's Checked in (30) can differ by exactly the people who have left.
+- **"Checked in" is a different, overlapping figure** and is reserved for *has any punch today* — an in-punch or an out-punch, whether still at work or already left. An out-only Incomplete day counts: the person came in, the in-punch is what's missing. It is used only by the Department card (`Checked in 33 / 35`) and the trend's pending bar (checked in ÷ active employees), never by the strip. Because it counts exactly the strip's first two groups, the departments' Checked in figures always total the strip's **At work + Left**; it differs from At work alone by exactly the people who have left.
 
 ## Date picker
 

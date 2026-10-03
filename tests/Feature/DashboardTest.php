@@ -609,9 +609,10 @@ class DashboardTest extends TestCase
         // Not in's sub-counts are its exact breakdown: no punch yet + not built (due), absent.
         $this->assertSame(['notInDue' => 2, 'notInAbsent' => 1], array_intersect_key($live, array_flip(['notInDue', 'notInAbsent'])));
         $this->assertSame($live['notIn'], $live['notInDue'] + $live['notInAbsent'] + $live['notInOff'] + $live['notInHoliday'] + $live['notInLeave']);
-        // "Checked in" overlaps the partition: everyone with an in-punch,
-        // whether still at work or already left.
-        $this->assertSame(4, $live['checkedIn']);
+        // "Checked in" is anyone with a punch, in or out — the out-only row
+        // too — so it always equals At work + Left.
+        $this->assertSame(5, $live['checkedIn']);
+        $this->assertSame($live['atWork'] + $live['left'], $live['checkedIn']);
     }
 
     private function onSchedule(Employee $employee, array $overrides = []): WorkSchedule

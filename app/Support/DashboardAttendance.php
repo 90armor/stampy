@@ -24,6 +24,13 @@ use Illuminate\Support\Collection;
 class DashboardAttendance
 {
     /**
+     * "Checked in" on the dashboard: any punch today, in or out. An out-only
+     * day (Incomplete) still means the person came in, and counting it keeps
+     * the Department card's total equal to the strip's At work + Left.
+     */
+    private const CHECKED_IN = '(daily_attendances.first_in is not null or daily_attendances.last_out is not null)';
+
+    /**
      * @param  int[]|null  $employeeIds
      * @return array{
      *     total: int,
@@ -223,7 +230,7 @@ class DashboardAttendance
      *   earlier day with an In progress row still inside its pairing window
      *   (an in-only row; a late in-punch can keep yesterday open past
      *   midnight). A lighter provisional bar of attended so far (anyone with
-     *   an in-punch), with a "Today" or "Pending" marker; no bar while nobody
+     *   a punch, CHECKED_IN), with a "Today" or "Pending" marker; no bar while nobody
      *   has checked in.
      * - Not calculated: a past day with no rows, or with In progress rows
      *   whose window has already closed (the builder didn't run). Never 0%,
@@ -247,7 +254,7 @@ class DashboardAttendance
 
         $countsByDate = self::scopedDailyAttendanceQuery($employeeIds)
             ->whereBetween('work_date', $range)
-            ->selectRaw('work_date, status, count(*) as total, sum(first_in is not null) as checked_in')
+            ->selectRaw('work_date, status, count(*) as total, sum('.self::CHECKED_IN.') as checked_in')
             ->groupBy('work_date', 'status')
             ->get()
             ->groupBy(fn (DailyAttendance $row) => $row->work_date->format('Y-m-d'));
@@ -305,7 +312,8 @@ class DashboardAttendance
 
     /**
      * Today's attendance per department, as counts, never a bare percentage:
-     * "Checked in N / M" (anyone with an in-punch) while today is pending
+     * "Checked in N / M" (anyone with a punch today, in or out — so the
+     * departments' total is the strip's At work + Left) while today is pending
      * (todayIsPending()), "Attended N / M" once it is closed — attended =
      * present + incomplete, the same rate as the trend.
      *
@@ -321,10 +329,12 @@ class DashboardAttendance
 
         $byDepartment = self::scopedDailyAttendanceQuery($employeeIds)
             ->join('employees', 'employees.id', '=', 'daily_attendances.employee_id')
+            // Active only, like the strip and each department's employee count.
+            ->where('employees.status', 'active')
             ->whereDate('daily_attendances.work_date', $today)
             ->selectRaw('employees.department_id')
             ->selectRaw('sum(daily_attendances.status in (?, ?)) as attended', [AttendanceStatus::Present->value, AttendanceStatus::Incomplete->value])
-            ->selectRaw('sum(daily_attendances.first_in is not null) as checked_in')
+            ->selectRaw('sum('.self::CHECKED_IN.') as checked_in')
             ->groupBy('employees.department_id')
             ->get()
             ->keyBy('department_id');
@@ -358,9 +368,10 @@ class DashboardAttendance
      *   'notInLeave' — a row with no punches can only be one of those.
      *
      * Timing counts — 'atWorkLate', 'leftLate', 'leftEarly' — annotate their
-     * group (a subset of it), never a fourth group. 'checkedIn' is a
-     * different, overlapping figure (everyone with an in-punch) used by the
-     * Department card and the trend's pending bar, never by the strip.
+     * group (a subset of it), never a fourth group. 'checkedIn' (anyone with a
+     * punch today, CHECKED_IN) is the Department card's and the trend's
+     * pending-bar figure; it always equals atWork + left, and the strip itself
+     * never shows it.
      *
      * @param  int[]|null  $employeeIds
      * @return array{atWork: int, atWorkLate: int, atWorkPastEnd: int, left: int, leftLate: int, leftEarly: int, notIn: int, notInDue: int, notInAbsent: int, notInOff: int, notInHoliday: int, notInLeave: int, checkedIn: int, total: int}
@@ -390,7 +401,7 @@ class DashboardAttendance
             ->selectRaw("sum({$punchless} and daily_attendances.status = ?) as off_count", [AttendanceStatus::Off->value])
             ->selectRaw("sum({$punchless} and daily_attendances.status = ?) as holiday", [AttendanceStatus::Holiday->value])
             ->selectRaw("sum({$punchless} and daily_attendances.status = ?) as on_leave", [AttendanceStatus::Leave->value])
-            ->selectRaw('sum(daily_attendances.first_in is not null) as checked_in')
+            ->selectRaw('sum('.self::CHECKED_IN.') as checked_in')
             ->toBase()
             ->first();
 
