@@ -252,11 +252,19 @@
         narrow rather than enumerate — while every working status is in the
         set (the default), none of them reads as selected, so the default
         state looks like what it is: no filter. Off is its own "Show off
-        days" toggle. See Index::toggleStatus() for the mapping. --}}
+        days" toggle. See Index::toggleStatus() for the mapping.
+
+        Selecting a chip never changes its size, so its neighbours don't
+        shift: a fixed h-7, the check's room (14px icon + 6px gap) carried
+        as extra padding while unselected (22px each side = 12 + 14 + 6 +
+        12 in total), and the label sized for its semibold weight. --}}
         @php
-            $chipBase = 'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-slate-800';
-            $chipSelected = 'font-semibold bg-primary-50 text-primary-700 ring-primary-600 hover:bg-primary-100 dark:bg-primary-600/35 dark:text-primary-200 dark:ring-primary-500 dark:hover:bg-primary-600/45';
-            $chipUnselected = 'font-medium bg-white text-slate-600 ring-slate-border hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 dark:bg-slate-750 dark:text-slate-300 dark:hover:bg-slate-600 dark:hover:text-white dark:active:bg-slate-500';
+            $chipBase = 'inline-flex h-7 items-center gap-1.5 rounded-lg text-xs ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:focus-visible:ring-offset-slate-800';
+            $chipSelected = 'px-3 font-semibold bg-primary-50 text-primary-700 ring-primary-600 hover:bg-primary-100 dark:bg-primary-600/35 dark:text-primary-200 dark:ring-primary-500 dark:hover:bg-primary-600/45';
+            $chipUnselected = 'px-[1.375rem] font-medium bg-white text-slate-600 ring-slate-border hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 dark:bg-slate-750 dark:text-slate-300 dark:hover:bg-slate-600 dark:hover:text-white dark:active:bg-slate-500';
+            // The visible label plus an invisible semibold copy in the same
+            // grid cell, so the chip is as wide in both weights.
+            $chipLabel = fn (string $text) => new \Illuminate\Support\HtmlString('<span class="inline-grid"><span class="[grid-area:1/1]">'.e($text).'</span><span class="invisible [grid-area:1/1] font-semibold" aria-hidden="true">'.e($text).'</span></span>');
             $workingStatuses = collect($allStatuses)->reject(fn ($status) => $status === \App\Enums\AttendanceStatus::Off);
             $allWorkingSelected = $workingStatuses->every(fn ($status) => in_array($status->value, $statuses, true));
             $showsOffDays = in_array(\App\Enums\AttendanceStatus::Off->value, $statuses, true);
@@ -274,7 +282,7 @@
                     @class([$chipBase, $chipSelected => $selected, $chipUnselected => ! $selected])
                 >
                     @if ($selected)<x-icon name="check" class="h-3.5 w-3.5" />@endif
-                    {{ $status->label() }}
+                    {{ $chipLabel($status->label()) }}
                 </button>
             @endforeach
             <button
@@ -284,7 +292,7 @@
                 @class([$chipBase, $chipSelected => $showsOffDays, $chipUnselected => ! $showsOffDays])
             >
                 @if ($showsOffDays)<x-icon name="check" class="h-3.5 w-3.5" />@endif
-                Show off days
+                {{ $chipLabel('Show off days') }}
             </button>
         </div>
         </fieldset>
@@ -305,7 +313,7 @@
                     @class([$chipBase, $chipSelected => $selected, $chipUnselected => ! $selected])
                 >
                     @if ($selected)<x-icon name="check" class="h-3.5 w-3.5" />@endif
-                    {{ $label }}
+                    {{ $chipLabel($label) }}
                 </button>
             @endforeach
         </div>

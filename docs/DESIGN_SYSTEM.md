@@ -151,7 +151,7 @@ The modal backdrop may use transparency and `backdrop-blur-sm`. This is an overl
 - `<x-empty-state>` provides an icon, title, optional description, and optional action.
 - `<x-time-input>` is every time field (manual punch time, schedule start and end): see Time input, under Forms. Never use a bare `type="time"` input.
 - `<x-date-picker>` is every date field: the shared date picker in single mode, with a native date input below 640px. Never use a bare `type="date"` input. Its calendar (`<x-date-picker.calendar>`) is also the Daily Attendance range picker's. In pickers, today is a quiet marker rather than the employee calendar's filled circle, because a fill marks a chosen date. Rules in [Attendance UI](ATTENDANCE_UI.md#date-picker).
-- `<x-icon>` is the only Heroicons entry point. Add icons there rather than embedding a second icon system.
+- `<x-icon>` is the only Heroicons entry point. Add icons there rather than embedding a second icon system. It defaults to 20px (`w-5 h-5`) **only when the caller sets no size**: a caller's `h-4 w-4` replaces the default rather than joining it. They used to be merged, and since Tailwind emits `h-5` after `h-4`/`h-3.5`, every smaller icon in the app rendered at 20px (`IconTest`).
 
 Prefer composition over adding props that expose implementation choices. Props should express genuine behavior or content, not optional design-system rules.
 

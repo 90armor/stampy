@@ -938,4 +938,16 @@ class AttendanceIndexTest extends TestCase
         $this->assertSame(2, $filtered->instance()->render()->getData()['attendances']->total());
         $this->assertStringContainsString('font-medium text-amber-700 dark:text-amber-300">35m<', $filtered->html());
     }
+
+    public function test_a_filter_chip_is_the_same_size_selected_or_not(): void
+    {
+        $view = file_get_contents(resource_path('views/livewire/attendance/index.blade.php'));
+
+        // Fixed height; unselected padding = selected padding + the check's 14px + 6px gap.
+        $this->assertStringContainsString("\$chipBase = 'inline-flex h-7 ", $view);
+        $this->assertStringContainsString("\$chipSelected = 'px-3 ", $view);
+        $this->assertStringContainsString("\$chipUnselected = 'px-[1.375rem] ", $view);
+        // The label reserves its semibold width.
+        $this->assertStringContainsString('invisible [grid-area:1/1] font-semibold', $view);
+    }
 }

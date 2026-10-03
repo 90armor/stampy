@@ -604,6 +604,8 @@
                     // modal is opened from a cell, so it should never say
                     // less about the day than the cell it came from.
                     $modalHoliday = $holidaysByDate->get($viewingDay);
+                    // The table's empty-value dash: muted, not the value colour.
+                    $modalDash = '<span class="text-slate-300 dark:text-slate-600">—</span>';
                 @endphp
                 <div class="p-6">
                     <div class="flex items-start justify-between gap-4">
@@ -636,7 +638,7 @@
                                 @if ($modalSchedule)
                                     <x-time :time="\Carbon\Carbon::parse($modalSchedule->start_time)" />&nbsp;&ndash;&nbsp;<x-time :time="\Carbon\Carbon::parse($modalSchedule->end_time)" />
                                 @else
-                                    —
+                                    {!! $modalDash !!}
                                 @endif
                             </dd>
                         </div>
@@ -650,7 +652,7 @@
                                         <x-time :time="$modalRecord->first_in" />
                                     @endif
                                 @else
-                                    —
+                                    {!! $modalDash !!}
                                 @endif
                             </dd>
                         </div>
@@ -667,21 +669,21 @@
                                         <span class="text-slate-400 dark:text-slate-400">(+1)</span>
                                     @endif
                                 @else
-                                    —
+                                    {!! $modalDash !!}
                                 @endif
                             </dd>
                         </div>
                         <div>
                             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Worked</dt>
-                            <dd class="mt-0.5 text-sm text-slate-900 dark:text-slate-100">{{ $modalRecord?->formattedWorkedMinutes() ?? '—' }}</dd>
+                            <dd class="mt-0.5 text-sm text-slate-900 dark:text-slate-100">{!! e($modalRecord?->formattedWorkedMinutes()) ?: $modalDash !!}</dd>
                         </div>
                         <div>
                             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Late</dt>
-                            <dd @class(['mt-0.5 text-sm', 'font-medium text-amber-700 dark:text-amber-300' => $modalMarkedLate, 'text-slate-900 dark:text-slate-100' => ! $modalMarkedLate])>{{ $modalRecord?->formattedLateMinutes() ?? '—' }}</dd>
+                            <dd @class(['mt-0.5 text-sm', 'font-medium text-amber-700 dark:text-amber-300' => $modalMarkedLate, 'text-slate-900 dark:text-slate-100' => ! $modalMarkedLate])>{!! e($modalRecord?->formattedLateMinutes()) ?: $modalDash !!}</dd>
                         </div>
                         <div>
                             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Early leave</dt>
-                            <dd @class(['mt-0.5 text-sm', 'font-medium text-amber-700 dark:text-amber-300' => $modalMarkedEarly, 'text-slate-900 dark:text-slate-100' => ! $modalMarkedEarly])>{{ $modalRecord?->formattedEarlyLeaveMinutes() ?? '—' }}</dd>
+                            <dd @class(['mt-0.5 text-sm', 'font-medium text-amber-700 dark:text-amber-300' => $modalMarkedEarly, 'text-slate-900 dark:text-slate-100' => ! $modalMarkedEarly])>{!! e($modalRecord?->formattedEarlyLeaveMinutes()) ?: $modalDash !!}</dd>
                         </div>
                         {{-- Only when there is one: an em-dash row says nothing. --}}
                         @if (filled($modalRecord?->note))

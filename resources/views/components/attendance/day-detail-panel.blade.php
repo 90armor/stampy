@@ -107,7 +107,7 @@ divergence here would be a real correctness bug, not just a style one. --}}
             {{-- A well, so the form reads as one new punch, not another row. --}}
             {{-- Date, time and type on one row; the actions under them, right-aligned. --}}
             <form wire:submit="addPunch" class="mt-3 rounded-xl bg-slate-50 p-4 ring-1 ring-inset ring-slate-divider dark:bg-slate-800">
-                <div class="grid grid-cols-1 gap-3 sm:max-w-xl sm:grid-cols-[minmax(0,1fr)_minmax(10rem,1fr)_auto]">
+                <div class="grid grid-cols-1 gap-3 sm:max-w-xl sm:grid-cols-[minmax(10.5rem,1fr)_minmax(10rem,1fr)_5rem]">
                 <div>
                     <x-input-label for="new_punch_date_{{ $dayKey }}" value="Date" class="!mb-1 !text-xs" />
                     {{-- min/max mirror addPunch()'s rule: from the join date to today. --}}
@@ -120,7 +120,7 @@ divergence here would be a real correctness bug, not just a style one. --}}
                 </div>
                 <div>
                     <x-input-label for="new_punch_type_{{ $dayKey }}" value="Type" class="!mb-1 !text-xs" />
-                    <x-select id="new_punch_type_{{ $dayKey }}" wire:model="newPunchType" class="sm:!w-24">
+                    <x-select id="new_punch_type_{{ $dayKey }}" wire:model="newPunchType" >
                         <option value="in">In</option>
                         <option value="out">Out</option>
                     </x-select>
