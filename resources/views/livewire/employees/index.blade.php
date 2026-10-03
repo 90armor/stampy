@@ -55,7 +55,7 @@
                 type="text"
                 wire:model.live.debounce.300ms="search"
                 placeholder="Search by name or employee code…"
-                class="block w-full rounded-lg border-slate-border bg-white pl-9 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-750 dark:text-slate-100 dark:placeholder-slate-400"
+                class="block h-control w-full rounded-lg border-slate-border bg-white pl-9 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-750 dark:text-slate-100 dark:placeholder-slate-400"
             >
         </div>
 

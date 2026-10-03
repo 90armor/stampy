@@ -139,7 +139,7 @@
                     :aria-expanded="panelOpen"
                     aria-haspopup="dialog"
                     aria-controls="attendance-date-panel"
-                    class="inline-flex w-full items-center justify-between gap-2 rounded-lg border border-slate-border bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:bg-slate-750 dark:text-slate-200 dark:hover:bg-slate-600 lg:w-auto"
+                    class="inline-flex h-control w-full items-center justify-between gap-2 rounded-lg border border-slate-border bg-white px-3 text-sm text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:bg-slate-750 dark:text-slate-200 dark:hover:bg-slate-600 lg:w-auto"
                 >
                     <span class="inline-flex items-center gap-2"><x-icon name="calendar-days" class="h-4 w-4 text-slate-400 dark:text-slate-500" />{{ $rangeLabel }}</span>
                     <x-icon name="chevron-down" class="h-4 w-4 text-slate-400 dark:text-slate-500" />
@@ -200,7 +200,7 @@
                                     id="attendance-from"
                                     type="date"
                                     wire:model.live="fromDate"
-                                    class="block w-full min-w-0 rounded-lg border-slate-border bg-white text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-750 dark:text-slate-100"
+                                    class="block h-control w-full min-w-0 rounded-lg border-slate-border bg-white text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-750 dark:text-slate-100"
                                 >
                             </div>
                             <div class="min-w-0">
@@ -209,7 +209,7 @@
                                     id="attendance-to"
                                     type="date"
                                     wire:model.live="toDate"
-                                    class="block w-full min-w-0 rounded-lg border-slate-border bg-white text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-750 dark:text-slate-100"
+                                    class="block h-control w-full min-w-0 rounded-lg border-slate-border bg-white text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-750 dark:text-slate-100"
                                 >
                             </div>
                         </div>
@@ -225,7 +225,7 @@
                     type="text"
                     wire:model.live.debounce.300ms="employeeFilter"
                     placeholder="Name or employee code…"
-                    class="block w-full rounded-lg border-slate-border bg-white pl-9 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-750 dark:text-slate-100 dark:placeholder-slate-400"
+                    class="block h-control w-full rounded-lg border-slate-border bg-white pl-9 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-slate-750 dark:text-slate-100 dark:placeholder-slate-400"
                 >
             </div>
 

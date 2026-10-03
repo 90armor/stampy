@@ -18,6 +18,12 @@ export default {
                 sans: ['Inter', ...defaultTheme.fontFamily.sans],
                 serif: ['"DM Serif Display"', 'Georgia', 'serif'],
             },
+            // The one control height (docs/DESIGN_SYSTEM.md, Control height):
+            // every text input, select, date/time field and button is h-control,
+            // so a button sits level with the inputs beside it.
+            height: {
+                control: '2.375rem',
+            },
             colors: {
                 // The neutral scale, as CSS variables (resources/css/app.css):
                 // warm stone in light mode, matching the warm cream of the

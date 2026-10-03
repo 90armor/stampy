@@ -38,7 +38,7 @@ property. The server rule stays the authority. --}}
     >
         <div
             x-ref="field"
-            class="flex w-full items-center gap-2 rounded-lg border bg-white px-3 py-2 text-sm leading-5 text-slate-900 shadow-sm focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-500 dark:bg-slate-750 dark:text-slate-100"
+            class="flex h-control w-full items-center gap-2 rounded-lg border bg-white px-3 text-sm leading-5 text-slate-900 shadow-sm focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-500 dark:bg-slate-750 dark:text-slate-100"
             :class="[invalid ? 'border-red-500' : 'border-slate-border', disabled ? 'bg-slate-50 dark:bg-slate-800' : '']"
         >
             <x-icon name="clock" class="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500" />
@@ -48,7 +48,7 @@ property. The server rule stays the authority. --}}
                 aria-labelledby="{{ $id }}-label"
                 :aria-invalid="String(invalid)"
                 :aria-description="boundsText || null"
-                class="flex min-w-0 flex-1 items-center"
+                class="flex min-w-0 flex-1 items-center whitespace-nowrap"
             >
                 <span
                     role="spinbutton"
@@ -154,6 +154,6 @@ property. The server rule stays the authority. --}}
         @if ($min) min="{{ $min }}" @endif
         @if ($max) max="{{ $max }}" @endif
         @disabled($disabled)
-        class="block w-full min-w-0 rounded-lg border-slate-border bg-white text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:bg-slate-50 disabled:text-slate-500 dark:bg-slate-750 dark:text-slate-100 sm:hidden"
+        class="block h-control w-full min-w-0 rounded-lg border-slate-border bg-white text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 disabled:bg-slate-50 disabled:text-slate-500 dark:bg-slate-750 dark:text-slate-100 sm:hidden"
     >
 </div>

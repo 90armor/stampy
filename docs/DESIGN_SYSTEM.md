@@ -192,6 +192,14 @@ Entity detail pages are operational records, not dashboards or profile heroes. L
 
 Labels sit above controls and are programmatically associated with them. Controls use a solid surface, `rounded-lg`, a default border, `text-sm`, and primary focus rings. Validation errors appear directly below the field in red and fields expose `aria-invalid`/`aria-describedby` when applicable.
 
+### Control height
+
+One height for every control that sits in a row with others: `h-control` (`2.375rem`, 38px — `tailwind.config.js`, `theme.extend.height.control`). `<x-text-input>`, `<x-select>`, `<x-button>` (every variant, `<button>` and `<a>`), the date picker's single and range triggers, the time input's segmented field and every native fallback (`type="date"`/`type="time"` below 640px) carry it, as do the raw search and date inputs in the Attendance and Employees filter bars. The v1 audit found 36px buttons beside 38px inputs; with one token a filter bar, the manual-punch row and a modal footer line up without per-call fixes. `ControlHeightTest` renders each component and scans every view's raw `<input>`/`<select>` for it.
+
+- A control never grows a second line: content is single-line (`whitespace-nowrap` on buttons and on the time input's segments, including the empty `--:-- --` placeholder), and a call site that's too narrow for its content gets a wider width class, not a taller box. The manual-punch time field is `sm:w-40` for this reason.
+- Set the height, not vertical padding: a control with `h-control` keeps its horizontal padding and centres its content (`items-center` or the form plugin's own line box).
+- Not controls, so not `h-control`: `<x-textarea>` (multi-line by nature), compact chips such as the date picker's presets, 36px pagination items, and square icon buttons in rows and fields (`h-9 w-9`, the 40px row chevron, the time input's 28px popover toggle). The auth pages keep their 44px touch targets by adding `min-h-11` on top, which wins over the token.
+
 ### Time input
 
 `<x-time-input id model label [min] [max] [after] [cap-at-now-when] [disabled]>` (`timeInput` in `resources/js/app.js`) looks like the date picker's trigger — the control surface, `border` line token, `rounded-lg`, `text-sm`, a leading clock icon — and shows the app's time format (`8:02 AM`, `config('attendance.time_format')`). The stored value and its validation are unchanged: one Livewire property as `H:i`, written deferred like the plain `wire:model` it replaces.
@@ -268,4 +276,4 @@ The principal inconsistency was content glass: cards, form controls, dropdowns, 
 
 The semantic roles in this document are guidance mapped to existing Tailwind classes, not new utilities. The `slate` CSS variables (Neutral scale) are not semantic tokens either: they keep the scale's step names and only let the theme choose the hue. Do not add utilities such as `text-muted`, `bg-surface`, or `border-default`, and do not add a semantic palette to `tailwind.config.js` in v1.
 
-After multiple representative screens have been redesigned and these roles have proven stable, implementation-level semantic tokens may be evaluated. Any proposal should demonstrate that it reduces drift without obscuring Tailwind behavior, preserves status semantics, and works in both themes. Until then, use the mappings above.
+After multiple representative screens have been redesigned and these roles have proven stable, implementation-level semantic tokens may be evaluated. Any proposal should demonstrate that it reduces drift without obscuring Tailwind behavior, preserves status semantics, and works in both themes. Until then, use the mappings above. The two line tokens (Lines) and `h-control` (Control height) are the deliberate exceptions: each replaced values that had already drifted apart, not a role that was merely stable.

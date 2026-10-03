@@ -71,7 +71,7 @@ divergence here would be a real correctness bug, not just a style one. --}}
                 <div>
                     <x-input-label id="new_punch_time_{{ $dayKey }}-label" for="new_punch_time_{{ $dayKey }}" value="Time" class="!mb-1 !text-xs" />
                     {{-- No later than now while the punch date is today, as addPunch() rules. --}}
-                    <x-time-input id="new_punch_time_{{ $dayKey }}" model="newPunchTime" label="Time" cap-at-now-when="newPunchDate" class="sm:w-36" />
+                    <x-time-input id="new_punch_time_{{ $dayKey }}" model="newPunchTime" label="Time" cap-at-now-when="newPunchDate" class="sm:w-40" />
                 </div>
                 <div>
                     <x-input-label for="new_punch_type_{{ $dayKey }}" value="Type" class="!mb-1 !text-xs" />
