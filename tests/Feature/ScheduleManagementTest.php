@@ -215,8 +215,10 @@ class ScheduleManagementTest extends TestCase
             ->assertSee('Schedule configuration is locked')
             ->assertSee('name and default remain editable')
             ->assertSee('id="schedule-lock-help"', false)
-            ->assertSee('id="schedule_start_time" type="time"', false)
-            ->assertSee('disabled', false);
+            // The time field is shown but locked: the segmented field and its native fallback.
+            ->assertSee("timeInput({ model: 'start_time'", false)
+            ->assertSee("disabled: true })", false)
+            ->assertSeeHtml('id="schedule_start_time-native"');
     }
 
     public function test_admin_can_delete_an_unreferenced_non_default_schedule(): void

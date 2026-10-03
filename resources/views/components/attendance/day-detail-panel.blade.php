@@ -69,8 +69,9 @@ divergence here would be a real correctness bug, not just a style one. --}}
                     <x-date-picker id="new_punch_date_{{ $dayKey }}" model="newPunchDate" label="Date" :min="$employee->join_date->format('Y-m-d')" :max="today()->format('Y-m-d')" class="sm:w-44" />
                 </div>
                 <div>
-                    <x-input-label for="new_punch_time_{{ $dayKey }}" value="Time" class="!mb-1 !text-xs" />
-                    <x-text-input id="new_punch_time_{{ $dayKey }}" type="time" wire:model="newPunchTime" class="!w-auto" />
+                    <x-input-label id="new_punch_time_{{ $dayKey }}-label" for="new_punch_time_{{ $dayKey }}" value="Time" class="!mb-1 !text-xs" />
+                    {{-- No later than now while the punch date is today, as addPunch() rules. --}}
+                    <x-time-input id="new_punch_time_{{ $dayKey }}" model="newPunchTime" label="Time" cap-at-now-when="newPunchDate" class="sm:w-36" />
                 </div>
                 <div>
                     <x-input-label for="new_punch_type_{{ $dayKey }}" value="Type" class="!mb-1 !text-xs" />

@@ -44,13 +44,14 @@
                     <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Working hours</h4>
                     <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
-                            <x-input-label for="schedule_start_time" value="Start time" />
-                            <x-text-input id="schedule_start_time" type="time" wire:model="start_time" :disabled="$editingIsLocked" class="disabled:!text-slate-700 dark:disabled:!text-slate-300" />
+                            <x-input-label id="schedule_start_time-label" for="schedule_start_time" value="Start time" />
+                            <x-time-input id="schedule_start_time" model="start_time" label="Start time" :disabled="$editingIsLocked" />
                             <x-input-error :messages="$errors->get('start_time')" class="mt-1" />
                         </div>
                         <div>
-                            <x-input-label for="schedule_end_time" value="End time" />
-                            <x-text-input id="schedule_end_time" type="time" wire:model="end_time" :disabled="$editingIsLocked" class="disabled:!text-slate-700 dark:disabled:!text-slate-300" />
+                            <x-input-label id="schedule_end_time-label" for="schedule_end_time" value="End time" />
+                            {{-- after: the end must be later than the start (WorkSchedule's own rule). --}}
+                            <x-time-input id="schedule_end_time" model="end_time" label="End time" after="start_time" :disabled="$editingIsLocked" />
                             <x-input-error :messages="$errors->get('end_time')" class="mt-1" />
                         </div>
                     </div>

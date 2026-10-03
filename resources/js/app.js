@@ -471,3 +471,207 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 });
+
+// Time input (docs/DESIGN_SYSTEM.md, "Time input"; <x-time-input>). Typed
+// segments — hour, minute, AM/PM — each an accessible spinbutton, plus a
+// popover of hour / minute (5-minute steps) / AM-PM columns. Bound to one
+// Livewire property as 'HH:MM' (24-hour), written deferred like the plain
+// wire:model it replaces; displays the app's 12-hour time format. Below 640px
+// the markup shows a native time input instead.
+//
+// Bounds are 'HH:MM' strings, compared lexically: `min`/`max`, `after` (the
+// name of another property this time must be later than, e.g. end after
+// start) and `capDate` + `nowCap` (no later than now while that date
+// property is today — a manual punch). The server rule stays the authority:
+// an out-of-range typed time is kept and flagged aria-invalid.
+const pad2 = (n) => String(n).padStart(2, '0');
+const to24 = (hour, minute, meridiem) => `${pad2((hour % 12) + (meridiem === 'PM' ? 12 : 0))}:${pad2(minute)}`;
+const plusMinute = (hhmm) => {
+    const [h, m] = hhmm.split(':').map(Number);
+    const total = Math.min(h * 60 + m + 1, 23 * 60 + 59);
+    return `${pad2(Math.floor(total / 60))}:${pad2(total % 60)}`;
+};
+
+document.addEventListener('alpine:init', () => {
+    window.Alpine.data('timeInput', ({ model, min = null, max = null, after = null, capDate = null, nowCap = null, today = null, disabled = false }) => ({
+        hour: null, // 1–12
+        minute: null, // 0–59
+        meridiem: null, // 'AM' | 'PM'
+        disabled,
+        popoverOpen: false,
+        buffer: '', // digits typed so far into the focused segment
+        hours: [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+        minutes: Array.from({ length: 12 }, (_, i) => i * 5),
+
+        init() {
+            // Follow the property whenever it changes (a modal opened for another record, a reset).
+            window.Alpine.effect(() => this.load(this.$wire[model]));
+            this.reflow = () => this.popoverOpen && this.place();
+            window.addEventListener('scroll', this.reflow, true);
+            window.addEventListener('resize', this.reflow);
+        },
+        destroy() {
+            window.removeEventListener('scroll', this.reflow, true);
+            window.removeEventListener('resize', this.reflow);
+        },
+        load(value) {
+            if (typeof value !== 'string' || !/^\d{2}:\d{2}/.test(value)) {
+                if (!value) [this.hour, this.minute, this.meridiem] = [null, null, null];
+                return;
+            }
+            const [h, m] = value.slice(0, 5).split(':').map(Number);
+            if (this.value === value.slice(0, 5)) return;
+            this.hour = h % 12 === 0 ? 12 : h % 12;
+            this.minute = m;
+            this.meridiem = h < 12 ? 'AM' : 'PM';
+        },
+
+        get value() {
+            return this.hour !== null && this.minute !== null && this.meridiem !== null ? to24(this.hour, this.minute, this.meridiem) : null;
+        },
+        get minTime() {
+            const fromAfter = after && typeof this.$wire[after] === 'string' && this.$wire[after].length >= 5 ? plusMinute(this.$wire[after].slice(0, 5)) : null;
+            return [min, fromAfter].filter(Boolean).sort().pop() ?? null;
+        },
+        get maxTime() {
+            const fromNow = capDate && this.$wire[capDate] === today ? nowCap : null;
+            return [max, fromNow].filter(Boolean).sort()[0] ?? null;
+        },
+        allowed(hhmm) {
+            return (this.minTime === null || hhmm >= this.minTime) && (this.maxTime === null || hhmm <= this.maxTime);
+        },
+        get invalid() {
+            return this.value !== null && !this.allowed(this.value);
+        },
+        // Bounds as words, for the group's description.
+        get boundsText() {
+            const fmt = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return `${h % 12 === 0 ? 12 : h % 12}:${pad2(m)} ${h < 12 ? 'AM' : 'PM'}`; };
+            return [this.minTime && `from ${fmt(this.minTime)}`, this.maxTime && `until ${fmt(this.maxTime)}`].filter(Boolean).join(', ');
+        },
+        get display() {
+            return this.value === null ? '' : `${this.hour}:${pad2(this.minute)} ${this.meridiem}`;
+        },
+
+        commit() {
+            // Only a whole time is written; an emptied field writes ''.
+            if (this.value !== null) this.$wire.$set(model, this.value, false);
+            else if (this.hour === null && this.minute === null && this.meridiem === null) this.$wire.$set(model, '', false);
+        },
+        segments() {
+            return [...this.$refs.segments.querySelectorAll('[role="spinbutton"]')];
+        },
+        focusSegment(index) {
+            this.buffer = '';
+            this.segments()[Math.max(0, Math.min(2, index))]?.focus();
+        },
+        onSegmentKeydown(event, segment) {
+            if (this.disabled) return;
+            const index = ['hour', 'minute', 'meridiem'].indexOf(segment);
+            const key = event.key;
+            if (key === 'Tab') return;
+            if (key === 'ArrowLeft') { event.preventDefault(); return this.focusSegment(index - 1); }
+            if (key === 'ArrowRight') { event.preventDefault(); return this.focusSegment(index + 1); }
+            if (key === 'ArrowUp' || key === 'ArrowDown') {
+                event.preventDefault();
+                this.stepSegment(segment, key === 'ArrowUp' ? 1 : -1);
+                return this.commit();
+            }
+            if (key === 'Backspace' || key === 'Delete') {
+                event.preventDefault();
+                this[segment] = null;
+                this.buffer = '';
+                return this.commit();
+            }
+            if (segment === 'meridiem') {
+                if (/^[aA]$/.test(key)) { event.preventDefault(); this.meridiem = 'AM'; return this.commit(); }
+                if (/^[pP]$/.test(key)) { event.preventDefault(); this.meridiem = 'PM'; return this.commit(); }
+                return;
+            }
+            if (!/^\d$/.test(key)) return;
+            event.preventDefault();
+            const digit = Number(key);
+            if (segment === 'hour') {
+                if (this.buffer === '1' && digit <= 2) { this.hour = 10 + digit; this.focusSegment(1); }
+                else if (this.buffer === '0' && digit >= 1) { this.hour = digit; this.focusSegment(1); }
+                else if (digit >= 2) { this.hour = digit; this.focusSegment(1); }
+                else { this.buffer = String(digit); if (digit === 1) this.hour = 1; }
+            } else {
+                if (this.buffer !== '') { this.minute = Number(this.buffer) * 10 + digit; this.focusSegment(2); }
+                else if (digit >= 6) { this.minute = digit; this.focusSegment(2); }
+                else { this.buffer = String(digit); this.minute = digit; }
+            }
+            // A new time typed into an empty field defaults to AM, as a native input does.
+            if (this.meridiem === null && this.hour !== null && this.minute !== null) this.meridiem = 'AM';
+            this.commit();
+        },
+        stepSegment(segment, n) {
+            if (segment === 'hour') this.hour = this.hour === null ? (n > 0 ? 1 : 12) : ((this.hour - 1 + n + 12) % 12) + 1;
+            if (segment === 'minute') this.minute = this.minute === null ? 0 : (this.minute + n + 60) % 60;
+            if (segment === 'meridiem') this.meridiem = this.meridiem === 'AM' ? 'PM' : 'AM';
+        },
+
+        // Popover: three listboxes. Picking a minute completes a time and closes it.
+        togglePopover() {
+            if (this.disabled) return;
+            this.popoverOpen ? this.closePopover() : this.openPopover();
+        },
+        openPopover() {
+            this.popoverOpen = true;
+            this.$nextTick(() => {
+                this.place();
+                (this.$refs.popover.querySelector('[aria-selected="true"]') ?? this.$refs.popover.querySelector('[role="option"]'))?.focus();
+            });
+        },
+        closePopover(restoreFocus = true) {
+            if (!this.popoverOpen) return;
+            this.popoverOpen = false;
+            if (restoreFocus) this.$nextTick(() => this.$refs.toggle.focus());
+        },
+        optionAllowed(column, option) {
+            const h = column === 'hour' ? option : (this.hour ?? 12);
+            const m = column === 'minute' ? option : (this.minute ?? 0);
+            const mer = column === 'meridiem' ? option : (this.meridiem ?? 'AM');
+            if (column === 'hour') return this.minutes.some((mm) => this.allowed(to24(h, mm, mer))) || this.allowed(to24(h, m, mer));
+            if (column === 'meridiem') return this.hours.some((hh) => this.allowed(to24(hh, 0, mer)) || this.allowed(to24(hh, 59, mer)));
+            return this.allowed(to24(h, m, mer));
+        },
+        choose(column, option) {
+            if (!this.optionAllowed(column, option)) return;
+            this[column] = option;
+            if (this.hour === null) this.hour = 12;
+            if (this.minute === null && column !== 'minute') this.minute = 0;
+            if (this.meridiem === null) this.meridiem = 'AM';
+            this.commit();
+            if (column === 'minute') this.closePopover();
+        },
+        onOptionKeydown(event, column, option) {
+            const cols = [...this.$refs.popover.querySelectorAll('[role="listbox"]')];
+            const col = event.target.closest('[role="listbox"]');
+            const options = [...col.querySelectorAll('[role="option"]')];
+            const i = options.indexOf(event.target);
+            const moves = { ArrowDown: () => options[Math.min(i + 1, options.length - 1)], ArrowUp: () => options[Math.max(i - 1, 0)], Home: () => options[0], End: () => options[options.length - 1] };
+            if (moves[event.key]) { event.preventDefault(); return moves[event.key]().focus(); }
+            if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+                event.preventDefault();
+                const next = cols[cols.indexOf(col) + (event.key === 'ArrowRight' ? 1 : -1)];
+                return (next?.querySelector('[aria-selected="true"]') ?? next?.querySelector('[role="option"]'))?.focus();
+            }
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); this.choose(column, option); }
+        },
+        // Fixed, placed against the field like the date picker's popover, so a modal's scrolling body can't clip it.
+        place() {
+            const panel = this.$refs.popover, anchor = this.$refs.field;
+            if (!this.popoverOpen || !panel || !anchor) return;
+            const gap = 8, margin = 16;
+            panel.style.top = '0px';
+            panel.style.left = '0px';
+            const origin = panel.getBoundingClientRect(), a = anchor.getBoundingClientRect();
+            const h = panel.offsetHeight, w = panel.offsetWidth;
+            const below = window.innerHeight - a.bottom - gap - margin, above = a.top - gap - margin;
+            const top = h <= below || below >= above ? a.bottom + gap : a.top - gap - Math.min(h, above);
+            const left = Math.min(Math.max(a.left, margin), window.innerWidth - margin - w);
+            panel.style.top = `${top - origin.top}px`;
+            panel.style.left = `${left - origin.left}px`;
+        },
+    }));
+});
