@@ -9,7 +9,10 @@ in wire:ignore. Rules: docs/ATTENDANCE_UI.md, Date picker. --}}
     // The only ring in the picker is keyboard focus, offset so it also reads
     // on a filled endpoint.
     $pickerFocus = 'group-focus-visible:ring-2 group-focus-visible:ring-primary-500 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-white dark:group-focus-visible:ring-primary-400 dark:group-focus-visible:ring-offset-slate-750';
-    $pickerFill = 'bg-primary-600 font-semibold text-white dark:bg-primary-500';
+    // Dark mode: primary-500 is 2.75:1 against the popover and 2.20:1 against
+    // the range band, so a 1px inset primary-400 edge (4.08:1 / 3.27:1) draws
+    // the boundary. A shadow, not ring-inset, so the focus ring stays outside.
+    $pickerFill = 'bg-primary-600 font-semibold text-white dark:bg-primary-500 dark:shadow-[inset_0_0_0_1px_theme(colors.primary.400)]';
     $pickerTint = 'bg-primary-50 font-medium text-primary-700 dark:bg-primary-600/35 dark:text-primary-200';
     $pickerPlain = 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-600/30';
     $pickerCurrent = 'font-semibold text-primary-700 hover:bg-slate-100 dark:text-primary-300 dark:hover:bg-slate-600/30';

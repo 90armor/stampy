@@ -118,4 +118,15 @@ class DatePickerTest extends TestCase
 
         $this->assertStringContainsString("model: 'newPunchDate', today: '2026-03-04', min: '2026-02-10', max: '2026-03-04'", $html);
     }
+
+    public function test_a_filled_value_inside_a_dark_popover_has_an_inset_edge_and_the_calendar_today_circle_does_not(): void
+    {
+        // primary-500 is under 3:1 against the dark popover and range band; a primary-400 edge reaches 3:1 on both.
+        $edge = 'dark:shadow-[inset_0_0_0_1px_theme(colors.primary.400)]';
+
+        $this->assertStringContainsString($edge, File::get(resource_path('views/components/date-picker/calendar.blade.php')));
+        $this->assertStringContainsString($edge, File::get(resource_path('views/components/time-input.blade.php')));
+        // The employee calendar sits on the card, where the fill alone is 3.26:1.
+        $this->assertStringNotContainsString($edge, File::get(resource_path('views/livewire/attendance/show.blade.php')));
+    }
 }
