@@ -495,7 +495,7 @@ class CalendarViewTest extends TestCase
             // yet) — that alone wouldn't prove the controls are actually
             // gated, so open a day (allowed — this is their own record)
             // and confirm the raw punch shows but no add/void controls do.
-            ->assertDontSee('+ Add punch');
+            ->assertDontSee('Add punch');
 
         Livewire::actingAs($user)
             ->test(Show::class)
@@ -506,7 +506,7 @@ class CalendarViewTest extends TestCase
             // own span for muted styling, so "7:55 AM" isn't one contiguous
             // string in the raw markup even though it reads that way.
             ->assertSee('7:55')
-            ->assertDontSee('+ Add punch')
+            ->assertDontSee('Add punch')
             ->assertDontSee('Void');
     }
 }

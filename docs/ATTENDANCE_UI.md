@@ -59,6 +59,9 @@ Today's list follows the builder's statuses (Phase 2.7), worst-first: **Absent**
 ## Other attendance details
 
 - Raw punch badges in the day modal and table view are neutral (`slate`) for both In and Out. Green means Present; a punch direction is not a status.
+- **Raw punches** (`<x-attendance.day-detail-panel>`, shared by the day modal and the table's expanded row): a `Raw punches N` heading with **Add punch** as a secondary button on the right (admins only); one row per punch — time, In/Out badge, source and any note — divided by the `divider` line, with a red **Void** ghost button (32px, visible at rest, `aria-label` naming the punch). The add form is a tinted well: date, time and type on one row, Cancel / Save punch right-aligned under them. The day modal shows a **Note** only when the day has one, and the employee's name under the date.
+- **Overnight out-punches** are listed on both days, so neither day reads as missing or extra: on the shift's day, after its own punches, as `12:42 AM (+1)` · `recorded Thu 1 Oct`; on the day it was punched, in time order, as `ends Wed 30 Sep's shift`. Both rows are the same punch (`Attendance\Show::overnightPunches()`, which also covers the last day of the previous month) and either Void voids it.
+- **Void confirmation** opens above the day modal: `<x-confirm-dialog>` is teleported to `<body>` at `z-[60]`, one layer above modals, and Escape closes only the confirmation.
 - Dashboard Recent activity is a neutral log ("Checked in" / "Checked out", no timing) and shows the date (compact, `Tue 29 Sep`) above the time for any entry that isn't from today, so an older punch can't read as this morning's.
 
 ## The attendance rate, and pending days

@@ -561,6 +561,8 @@
                                             :employee="$employee"
                                             :date="$day['date']"
                                             :punches="$punchesByDate->get($dayKey, collect())"
+                                            :overnight-out="$overnightPunches['outs']->get($dayKey)"
+                                            :overnight-shifts="$overnightPunches['shifts']"
                                             :adding-punch-for="$addingPunchFor"
                                             :new-punch-date="$newPunchDate"
                                             :new-punch-time="$newPunchTime"
@@ -607,6 +609,7 @@
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100">{{ \App\Support\DisplayDate::long($modalDate) }}</h3>
+                            <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{{ $employee->full_name }}</p>
                             @if ($modalHoliday)
                                 <p class="mt-0.5 flex items-center gap-1 text-sm font-medium text-fuchsia-700 dark:text-fuchsia-300">
                                     <x-icon name="flag" class="h-3.5 w-3.5 shrink-0" />
@@ -626,7 +629,7 @@
                         </div>
                     </div>
 
-                    <dl class="mt-4 grid grid-cols-2 gap-4 border-t border-slate-divider pt-4 sm:grid-cols-3">
+                    <dl class="mt-5 grid grid-cols-2 gap-x-4 gap-y-5 border-t border-slate-divider pt-5 sm:grid-cols-3">
                         <div>
                             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Schedule</dt>
                             <dd class="mt-0.5 text-sm text-slate-900 dark:text-slate-100">
@@ -680,17 +683,22 @@
                             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Early leave</dt>
                             <dd @class(['mt-0.5 text-sm', 'font-medium text-amber-700 dark:text-amber-300' => $modalMarkedEarly, 'text-slate-900 dark:text-slate-100' => ! $modalMarkedEarly])>{{ $modalRecord?->formattedEarlyLeaveMinutes() ?? '—' }}</dd>
                         </div>
-                        <div>
-                            <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Note</dt>
-                            <dd class="mt-0.5 text-sm text-slate-900 dark:text-slate-100">{{ $modalRecord?->note ?? '—' }}</dd>
-                        </div>
+                        {{-- Only when there is one: an em-dash row says nothing. --}}
+                        @if (filled($modalRecord?->note))
+                            <div class="col-span-full">
+                                <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Note</dt>
+                                <dd class="mt-0.5 text-sm text-slate-900 dark:text-slate-100">{{ $modalRecord->note }}</dd>
+                            </div>
+                        @endif
                     </dl>
 
-                    <div class="mt-4 border-t border-slate-divider pt-4">
+                    <div class="mt-5 border-t border-slate-divider pt-4">
                         <x-attendance.day-detail-panel
                             :employee="$employee"
                             :date="$modalDate"
                             :punches="$punchesByDate->get($viewingDay, collect())"
+                            :overnight-out="$overnightPunches['outs']->get($viewingDay)"
+                            :overnight-shifts="$overnightPunches['shifts']"
                             :adding-punch-for="$addingPunchFor"
                             :new-punch-date="$newPunchDate"
                             :new-punch-time="$newPunchTime"
@@ -698,7 +706,7 @@
                         />
                     </div>
 
-                    <div class="mt-4 flex justify-end">
+                    <div class="mt-5 flex justify-end border-t border-slate-divider pt-4">
                         <x-button type="button" variant="secondary" wire:click="closeDayModal">Close</x-button>
                     </div>
                 </div>

@@ -1,7 +1,10 @@
 {{-- Single shared alert dialog per page, opened by dispatching a `confirm-dialog` browser
-event (see x-confirm-trigger below). Deliberately NOT nested inside an <x-card> or any other
-backdrop-blur/transform ancestor — those establish a CSS containing block for `position: fixed`
-descendants, which traps the overlay inside that ancestor's box instead of the viewport.
+event (see x-confirm-trigger below). Teleported to <body>, like <x-modal>, so no
+backdrop-blur/transform ancestor can become the containing block of its `position: fixed`
+overlay, and one layer above modals (z-[60]): a confirmation opened from inside a modal (the
+day modal's Void) must sit on top of it — at the same z-50 the modal, teleported later, won.
+While open, Escape is caught on window in the capture phase and stopped, so it closes the
+confirmation only — the modal underneath listens on window too, in the bubble phase.
 
 Pass a distinct `event` name when more than one instance of this dialog is mounted on the same
 page at once (e.g. two nested Livewire components tab-switched with Alpine `x-show`, both staying
@@ -13,6 +16,7 @@ delete click in one tab silently arms the other tab's (hidden) dialog too. --}}
     $dialogId = Str::slug($event);
 @endphp
 
+<template x-teleport="body">
 <div
     x-data="{
         open: false,
@@ -72,8 +76,8 @@ delete click in one tab silently arms the other tab's (hidden) dialog too. --}}
     <div
         x-show="open"
         x-cloak
-        @keydown.escape.window="close()"
-        class="fixed inset-0 z-50 flex items-center justify-center px-4"
+        @keydown.escape.window.capture="if (open) { $event.stopPropagation(); close(); }"
+        class="fixed inset-0 z-[60] flex items-center justify-center px-4"
     >
         <div class="fixed inset-0 bg-slate-900/50" @click="close()" x-show="open" x-transition.opacity></div>
 
@@ -111,3 +115,4 @@ delete click in one tab silently arms the other tab's (hidden) dialog too. --}}
         </div>
     </div>
 </div>
+</template>
