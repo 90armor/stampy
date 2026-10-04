@@ -82,7 +82,7 @@
                 <h3 class="mt-3 text-sm font-medium text-slate-900 dark:text-slate-100">No employees found</h3>
                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Try adjusting your search or filters.</p>
                 @if ($filtersActive)
-                    <button type="button" wire:click="resetFilters" class="mt-3 rounded-lg px-2 py-1 text-sm font-medium text-primary-700 underline decoration-primary-300 underline-offset-2 transition hover:decoration-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:decoration-primary-700 dark:hover:decoration-primary-400">Reset filters</button>
+                    <button type="button" wire:click="resetFilters" class="mt-3 inline-flex min-h-7 items-center rounded-lg px-2 text-sm font-medium text-primary-700 transition hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:hover:bg-primary-600/35">Reset filters</button>
                 @endif
             </div>
         @else
