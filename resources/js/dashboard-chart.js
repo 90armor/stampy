@@ -78,10 +78,13 @@ function initAttendanceTrendChart() {
     // classes use, so the chart never keeps a hard-coded warm grey.
     const slateVars = getComputedStyle(document.documentElement);
     const slate = (step, alpha = 1) => `rgb(${slateVars.getPropertyValue(`--slate-${step}`).trim()} / ${alpha})`;
+    // The bars use the primary scale's CSS variables (tailwind.config.js
+    // publishes them), never repeated hexes.
+    const primary = (step) => slateVars.getPropertyValue(`--primary-${step}`).trim();
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const markers = JSON.parse(canvas.dataset.markers || '[]');
     const pending = JSON.parse(canvas.dataset.pending || '[]');
-    const barColor = (index) => (pending[index] ? (dark ? '#1e4232' : '#b9d9c8') : '#3f8266');
+    const barColor = (index) => (pending[index] ? (dark ? primary(800) : primary(200)) : primary(500));
     const muted = dark ? slate(400) : slate(500);
 
     new Chart(canvas, {
@@ -91,7 +94,7 @@ function initAttendanceTrendChart() {
             datasets: [{
                 data: JSON.parse(canvas.dataset.values),
                 backgroundColor: (ctx) => barColor(ctx.dataIndex),
-                hoverBackgroundColor: (ctx) => (pending[ctx.dataIndex] ? barColor(ctx.dataIndex) : '#2f6850'),
+                hoverBackgroundColor: (ctx) => (pending[ctx.dataIndex] ? barColor(ctx.dataIndex) : primary(600)),
                 borderRadius: 4,
                 maxBarThickness: 40,
             }],

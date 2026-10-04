@@ -1,5 +1,22 @@
 import defaultTheme from 'tailwindcss/defaultTheme';
 import forms from '@tailwindcss/forms';
+import plugin from 'tailwindcss/plugin';
+
+// Deep evergreen — primary brand color for buttons, links, active states.
+// Also published as --primary-N CSS variables (below) for scripts that draw
+// outside Tailwind classes — the dashboard chart — so the hexes live here only.
+const primary = {
+    50: '#f1f7f4',
+    100: '#dcece2',
+    200: '#b9d9c8',
+    300: '#8fc0a7',
+    400: '#5fa07f',
+    500: '#3f8266',
+    600: '#2f6850',
+    700: '#26543f',
+    800: '#1e4232',
+    900: '#173327',
+};
 
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -46,19 +63,7 @@ export default {
                     divider: 'rgb(var(--slate-divider))',
                     border: 'rgb(var(--slate-border))',
                 },
-                // Deep evergreen — primary brand color for buttons, links, active states.
-                primary: {
-                    50: '#f1f7f4',
-                    100: '#dcece2',
-                    200: '#b9d9c8',
-                    300: '#8fc0a7',
-                    400: '#5fa07f',
-                    500: '#3f8266',
-                    600: '#2f6850',
-                    700: '#26543f',
-                    800: '#1e4232',
-                    900: '#173327',
-                },
+                primary,
                 // Mint — accent for icon badges, brand mark, chart bars, hero highlights.
                 accent: {
                     50: '#effcf6',
@@ -76,5 +81,10 @@ export default {
         },
     },
 
-    plugins: [forms],
+    plugins: [
+        forms,
+        plugin(({ addBase }) => addBase({
+            ':root': Object.fromEntries(Object.entries(primary).map(([step, hex]) => [`--primary-${step}`, hex])),
+        })),
+    ],
 };

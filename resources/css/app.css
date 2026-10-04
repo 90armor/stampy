@@ -101,7 +101,7 @@ input:where([type='radio'])[aria-invalid='true'] {
    box-shadow trick paints our own surface color over it instead. */
 :root {
     --input-bg: #ffffff;
-    --input-text: #1c1917;
+    --input-text: rgb(var(--slate-900));
 }
 .dark {
     --input-bg: rgb(var(--slate-750));
