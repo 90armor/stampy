@@ -425,13 +425,111 @@ Scope: `DailySummaryBuilder::calculate()`/`isInProgress()` and its precedence co
 - **v1.2, the UI polish series:** dark mode moved to a neutral zinc scale through CSS variables on `slate` (option C), with no glow; `divider`/`border` line tokens; the shared selected and filled-selected states, with a popover-only edge on dark filled cells; the date picker (range and single-date modes of one component, month/year views, presets, Today, Clear built but off) and the segmented time input, both native below 640px; one control height (`h-control`, plus `w-control` for square icon controls); the icon size rule (20px, 14px only in status pills and filter chips); fixed-size filter chips; modal focus moved in on open and restored on close; the confirm dialog layered above modals; overnight (+1) punches labelled on both days; the muted-text rule (`slate-500` on cards, `slate-600` on the page and tinted fills, dark `slate-400`; light `slate-400` for icons only; the AM/PM suffix coloured, not faded); "Punched in/out" in the activity log so "Checked in" means only the any-punch aggregate; the dashboard's two columns only from `xl`; the month as a fourth `DisplayDate` form.
 - **Closed by a final review (4 Oct 2026):** the full suite, three random orders and all 20 pinned instants passing; each design guard test shown to fail on a deliberate violation; must-fix findings fixed; the rest deferred to Phase 5 (listed under the roadmap's item 5) or kept as intentional — icons restored to 20px everywhere outside the pill exceptions (including the fresh-install checklist's check and the mobile calendar's holiday flag), and the employee table view's single-line 48px rows (the 52px target is for the two-line Daily Attendance rows). Screenshots are in the gitignored `storage/app/visual-audit/`.
 
-## Open questions for Phase 3
+## Phase 3 — Leave management (scope, not yet built)
 
-Surfaced during Phase 2's closeout review. Not decided — recorded so Phase 3's actual scoping pass (see the roadmap above: scope goes in this file before building) starts from these instead of rediscovering them.
+Scoped 4 Oct 2026 from the "Open questions for Phase 3" section. Owner decisions are marked **(owner)**; the rest are recommendations the owner accepted. Items still waiting on HR are listed at the end — they change seed data, not the design.
 
-- **Leave days vs. "Calculated workdays".** `Attendance\Show::summary()`'s `workdays` count is `present + absent + incomplete` only (see the Database schema section's `daily_attendances` status precedence) — `off`, `holiday`, and the not-yet-built `leave` status are all excluded identically. That's consistent today, but once `leaves` exists and a day can actually resolve to `leave`, an approved leave day won't count as a workday either, which breaks the obvious phrasing ("3 of 22 workdays taken as leave" implies leave days ARE workdays, just ones not worked). Needs an explicit decision once leave exists, not an assumption either way.
-- **Where attendance-rule settings live.** Organization currently holds Departments, Positions, Holidays and Schedules — four tabs of org structure. Leave types and overtime rules are a different kind of thing (attendance *policy*, not org *structure*); adding them as two more tabs would get to six and start blurring that distinction. Worth splitting into a separate settings area once Phase 3/4 need somewhere to put them — not worth restructuring Organization now, before there's a second thing to put there.
-- **The employee dashboard is empty.** A non-admin, non-manager user sees a greeting and nothing else (`routes/web.php`'s dashboard route only builds `$stats`/`$attendance` for `admin`/`manager`). The data to show them their own summary already exists — it's the same shape `Attendance\Show`'s own `summary()` produces for `/my-attendance` — this just hasn't been wired to the dashboard yet.
-- **A deactivation/termination date.** `employees.status` is a flag with no date, so every attendance figure scoped to "active" means *active now*: the dashboard's 7-day trend drops a deactivated employee's past days entirely (Phase 2.7, item 6), rather than counting them for the days they were still employed. Leave balances, accruals and pro-rating will need to know when employment ended, so whether to add an effective deactivation date (and backfill it) belongs in Phase 3's scoping, not a silent workaround now.
-- **How payroll treats `late_minutes` on incomplete days.** Since Phase 2.6 a late arrival is recorded on an `incomplete` day too (the in-punch exists, the out-punch doesn't). The fact is recorded; whether payroll deducts for it when the day itself is a device-defect `incomplete` is undecided.
-- **One approval engine, not three.** Leave requests, overtime requests, and (eventually, maybe) punch-correction requests are the same shape: an employee requests something, their manager approves or rejects it, a record changes as a result. Building each as its own bespoke request/approval flow would produce three inconsistent implementations of the same rule. `employees.manager_id` and `EmployeePolicy`'s transitive subordinate scoping (`isManagerOf()`/`subordinateIds()`, see Roles & authorization footnote ¹) already exist and are exactly the primitive a shared approval engine would be built on — worth designing one engine when Phase 3 starts, not bolting leave approval on ad hoc and rebuilding for overtime in Phase 4.
+### Policy
+
+1. **Leave year is the calendar year (Jan–Dec)** **(owner)**. Each year's balance is granted **upfront, once** **(owner)** — no monthly accrual.
+2. **Leave types** (seeded; admin-editable under Policies). Annual, Unpaid and Medical are company policy **(owner)**; Special and Maternity follow the Cambodian Labour Law (Art. 166, 169/171, 182–183). HR still has to confirm the final list.
+
+   | Type | Allowance | Counts | Carry-over | Half-day | Paid | Notes |
+   |---|---|---|---|---|---|---|
+   | Annual | 18 / year, +1 day per 3 completed years of service | workdays | yes, cap 6 | yes | yes | usable only after 12 months of service (rule 5) |
+   | Medical | 30 / year | workdays | no | yes | yes | company policy; no certificate upload in Phase 3 |
+   | Special | max 7 per request, **deducted from Annual** | workdays | — | yes | yes | family events (marriage, birth, illness/death of spouse, child or parent); needs Annual eligibility — before it, use Unpaid |
+   | Maternity | 90 per request | **calendar days** (weekends and holidays included) | — | no | yes (50% — payroll's concern, not this app's) | no balance; no gender field exists, so eligibility is the approver's call |
+   | Unpaid | no limit | workdays | — | yes | no | no balance |
+
+3. **Carry-over is capped per type** **(owner)** (`carry_over_cap`, null = no carry). There is no "use carried days by date X" rule at this company **(owner)**. **Carried days are consumed first (FIFO).** With FIFO and a cap no larger than the yearly grant, a carried day is always used or dropped within one year, which already satisfies the law's limit on postponing leave (only days above 12/year, at most 3 consecutive years) — so no expiry field is needed. If a future type needs an explicit expiry, add it as a leave-type option then.
+4. **Seniority bonus** (Annual only): +1 day per 3 completed years of continuous service, counted as of **31 Dec** of the grant year — the employee-favouring reading, same principle as minute truncation.
+5. **Service requirement and mid-year joiners.** A leave type can require a minimum length of service (`min_service_months`). Annual requires **12 months**, per the Labour Law **(owner)**. The leave earned during that first year isn't lost; it becomes usable all at once on the **eligibility date** (`join_date` + 12 months; a 29 Feb joiner becomes eligible on 28 Feb, the employee-favouring reading).
+   - **Nothing is granted before eligibility**, and an Annual request (or a Special one, which deducts from Annual) dated before the eligibility date is rejected.
+   - **On the eligibility date**, a single entitlement row is created for that year. It holds the join year pro-rated plus every full year up to and including the eligibility year. Example: joined 1 Mar 2026 → eligible 1 Mar 2027 → the 2027 row is 18 × 306/365 = 15.09 → 15.5, plus 18 = **33.5 days**.
+   - **Pro-rating:** `days_per_year × (days from join_date to 31 Dec, inclusive) ÷ days in that year`, **rounded up to the next 0.5**.
+   - **First eligible year carry-over:** because a late-year joiner would otherwise get a large grant with only weeks left to use it, the **whole** unused balance of the first eligible year carries into the next year (the cap applies from then on). This is the default pending HR confirmation. FIFO still keeps every carried day under the law's 3-year limit.
+   - **Types without a service requirement** (Medical, Unpaid, Maternity — subject to HR) are pro-rated in the join year and usable from `join_date`.
+6. **Half-day leave is morning or afternoon** **(owner)**: AM 8:00–12:00, PM 13:00–17:00 on the default schedule **(owner)**. A half-day request is always a **single-day** request (`start_date = end_date`); a span that starts or ends on a half day is two requests. Counts as 0.5.
+7. **Days are counted per employee per date**: a workday is a date that is a workday of `scheduleOn(date)` and not a holiday. Off days and holidays inside a leave never cost balance (except Maternity, which counts calendar days by law). The count is **derived, never stored**, so adding a holiday inside an approved leave refunds the day with no extra step.
+
+### Approval
+
+8. **Two steps: manager → admin** **(owner)**. "HR" is the existing `admin` role — no new role **(owner)**.
+   - **Step 1:** the requester's manager. Anyone `isManagerOf()` the requester (the transitive chain, so a skip-level manager can act when the direct one is away) — never a second definition of "reports".
+   - **Step 2:** any admin.
+   - A requester with **no manager** skips step 1 (recorded as `skipped`).
+   - A step-1 **rejection ends the request**.
+   - An admin may **act at step 1** (manager unavailable): one decision completes both steps, recorded as such.
+   - An approver who is **both the manager and an admin** completes both steps with one decision.
+   - **Nobody approves their own request.** The one exception: if the requester is the **only** admin, their step 2 is recorded as `self_approved`, so a one-admin company can still take leave.
+9. **An admin can file leave on behalf of any employee**, including employees with no login (Phase 1 requirement). It is recorded as entered by that admin and is final on submit.
+10. **Pending requests reserve balance**: available = entitlement + carried in + adjustments − approved − pending. A request beyond available is rejected at submit (Unpaid and Maternity have no balance).
+11. **No overlapping requests**: pending or approved requests for the same employee can't overlap at half-day granularity (an AM and a PM request on the same date are allowed).
+12. **Cancel:** the requester may cancel a pending or approved request **before its start date**; after that only an admin can. Cancelling refunds the balance (derived — nothing to undo) and rebuilds the affected days.
+13. **Retroactive requests:** allowed up to **30 days back** **(owner)** for employees and managers; admins may go back to `join_date`. Never before `join_date` or after `left_on`. Forward: only into years that already have entitlements (the grant command can grant next year early with `--year`).
+14. **Notifications are in-app only** in Phase 3: a pending-count badge on the sidebar's Time off item for approvers. No email (many employees have none) and no Telegram.
+
+### Attendance integration
+
+15. **`leave` comes only from `DailySummaryBuilder`.** Approved leaves become an input to the builder; nothing writes `leave` into `daily_attendances` directly, so the table stays fully recomputable. Final approval and cancellation **write first, then rebuild** the leave's dates (via `buildRange()`, clamped to `join_date`/today), with the same `rebuildError` reporting and logging as `EmployeeScheduleAssigner`. Pending requests never touch attendance.
+16. **Precedence for a full-day approved leave:** `off` → `holiday` → `present` → **`leave`** → `in_progress` → `incomplete` → `absent`. So an off day or holiday inside a leave still shows as off/holiday (and costs nothing), and a full-day leave with no punches is `leave` from the start of the day — never "Not in yet", never absent.
+17. **Punches on a full-day leave day:** both punches → `present` (the existing "both punches → present on any day" rule). Any punch on an approved full-day leave day is listed in the dashboard's Needs attention as **"Worked on approved leave"**. The balance is **not** refunded automatically — an admin decides whether to cancel the leave.
+18. **A half-day leave day keeps its attendance status** (`present`/`incomplete`/`absent`/`in_progress`), with "AM leave"/"PM leave" as an **annotation**, never the cell colour — exactly as the Design system's status-vs-timing principle already anticipates ("partial leave later"). The expected window shrinks to the half worked:
+    - AM leave: the day starts at the afternoon start — late is measured from 13:00 (+ grace).
+    - PM leave: the day ends at the morning end — early leave is measured against 12:00; a punchless day is `in_progress` until 12:00.
+    - Break minutes are subtracted only when the worked span covers the break.
+19. **Half-day boundaries come from the schedule.** New column `work_schedules.break_start` (time, nullable): AM = `start_time`–`break_start`, PM = `break_start + break_minutes`–`end_time`. A half-day request on a schedule without `break_start` is rejected with a clear message. It is locked once referenced, like the other calculation fields. The migration backfills existing schedules (12:00 for the seeded 8:00–17:00); this is safe for locked schedules because the field is only read on half-day leave days, of which none exist yet — verify with a before/after hash of `daily_attendances`, as Phase 2.5c did.
+20. **"Calculated workdays" includes leave**: `present + absent + incomplete + leave`, so "3 of 22 workdays taken as leave" is true. A summary's leave figure counts half days as 0.5.
+
+### Employee end date
+
+21. **`employees.left_on`** (date, nullable) — an alter-migration. Deactivating requires it (defaults to today); reactivating clears it. "Active on date D" becomes `join_date ≤ D` and (`left_on` is null or `D ≤ left_on`). The dashboard's 7-day trend switches to this rule, closing the Phase 2.7 open question. For a leaver, the balance view shows entitlement pro-rated to `left_on` against days used (including earned-but-not-yet-usable days for someone leaving inside their first year — the law owes them payment for those), so HR can see untaken or overused leave; the app takes no action on it. Existing inactive rows are seed data — backfill with their `updated_at` date.
+
+### Schema (all new tables are create-migrations; changes to existing tables are alter-migrations)
+
+**`leave_types`** — `name` (unique), `days_per_year` decimal(4,1) nullable (null = no balance), `min_service_months` smallint nullable (null = usable from `join_date`), `seniority_bonus` bool, `carry_over_cap` decimal(4,1) nullable, `counts` enum(`workdays`, `calendar_days`), `max_days_per_request` decimal(4,1) nullable, `deducts_from_leave_type_id` FK → leave_types nullable, `allows_half_day` bool, `is_paid` bool, `is_active` bool, timestamps. A referenced type can't be deleted (deactivate instead); `counts`, `deducts_from_leave_type_id` and `allows_half_day` lock once referenced. Changing `days_per_year` affects future grants only.
+
+**`leave_entitlements`** — `employee_id`, `leave_type_id`, `year` smallint, `days` decimal(4,1), `granted_by` FK → users nullable (null = automatic), timestamps. Unique on `(employee_id, leave_type_id, year)`. The grant is a stored fact; usage and carry-over are derived.
+
+**`leave_adjustments`** — append-only admin corrections: `employee_id`, `leave_type_id`, `year`, `days` decimal(5,1) signed, `note` (required), `created_by`, timestamps. Never edited or deleted — a wrong adjustment is fixed with a reversing one, the same rule as `attendance_logs`.
+
+**`leaves`** — replaces the skeleton above: `employee_id`, `leave_type_id`, `start_date`, `end_date`, `half` enum(`am`, `pm`) nullable, `reason` text nullable, `status` (`pending`/`approved`/`rejected`/`cancelled`), `current_step` tinyint nullable, `requested_by` FK → users, `cancelled_by` FK → users nullable, `cancelled_at` nullable, timestamps. Indexed on `(employee_id, start_date, end_date)` and `(status, current_step)`.
+
+**`approval_steps`** — the shared half of the approval engine; Phase 4's `overtime_requests` reuses it. `approvable_type`/`approvable_id`, `step` tinyint, `outcome` (`approved`/`rejected`/`skipped`/`self_approved`), `decided_by` FK → users nullable (null for an automatic skip), `note` nullable, `decided_at`, timestamps. Unique on `(approvable_type, approvable_id, step)`. The request data stays in typed tables; only steps are shared. One service owns the state machine and approver resolution; `leaves` doesn't implement its own.
+
+### Grants
+
+- **`leave:grant {--year=}`** is idempotent (it skips existing rows) and runs **daily** at 00:05 (app timezone), not only on 1 Jan, because eligibility dates fall throughout the year. On 1 Jan it creates the regular grants; on any other day it creates first-eligibility grants (rule 5). An admin can also run it early for next year; employees not yet eligible are skipped.
+- **A new employee gets this year's pro-rated grant at creation** for types without a service requirement, in the same transaction — the `Employee::booted()` pattern the schedule assignment already uses.
+- **The balance view shows the eligibility date** before an employee reaches it: "Annual: X days earned, usable from 1 Mar 2027".
+
+### UI
+
+- **Time off** (sidebar item goes live, everyone with an employee record): balances per type (entitled / carried / used / pending / available), my requests, and a new-request modal using `x-date-picker` (range, or single date with an AM/PM/Full choice).
+- **Approvals** (managers and admins): a queue scoped through `EmployeeScope`, approve/reject with an optional note, the request's step history.
+- **Policies** — a new admin area, separate from Organization (structure vs. policy); Leave types is its first tab, and OT rules join in Phase 4.
+- **Employee profile:** a Leave card with balances, history and admin adjustments.
+- **Calendar/tables:** leave days use the existing `accent` variant; a half-day annotation in the cell and the day modal. The exact visual is settled by screenshot review, not up front.
+- **Dashboard:** the employee dashboard gets their balances, this month's summary and their pending requests; approvers get a pending-approvals card gated on the approval ability, not a role list.
+
+### Authorization
+
+`LeavePolicy`: `view` mirrors `EmployeePolicy::view` (self, managers of the employee, admin); `create` is self, or admin on behalf of anyone; `approve` follows rule 8; `cancel` follows rule 12. Same four layers as every other feature — route middleware, `authorize()` in `mount()`/actions/`render()`, `EmployeeScope` for lists, UI hiding as presentation only.
+
+### Build order (one reviewable slice each; the suite passes at every commit)
+
+- **3a — Schema:** `left_on`, `break_start` (with a hash check), the five tables, models, and the leave-type seeder.
+- **3b — Balances:** the day counter, the balance calculator (carry-over, FIFO, seniority, pro-rating, service eligibility), `leave:grant` and the new-hire grant. Heavy on year-boundary and eligibility-date tests: 1 Jan joiner, 29 Feb joiner, eligibility falling on 1 Jan, a leaver before eligibility.
+- **3c — Approval engine and request lifecycle:** submit, approve, reject, cancel, on-behalf, overlap and balance checks, and the rebuild hook.
+- **3d — Builder:** `leave` precedence, half-day timing, "Worked on approved leave".
+- **3e — UI:** Time off, Approvals, Policies, the profile card, calendar/table annotations, dashboards. Screenshots at 1440/1024/390, light and dark.
+- **3f — Closeout:** docs (this section becomes "built"; `ATTENDANCE_UI.md` gets the half-day annotation), the full suite in random order, and **all 20 pinned instants**. Balances depend on year boundaries, so add instants on 31 Dec / 1 Jan if the existing ones don't exercise a grant.
+
+### Still open
+
+- **HR to confirm the leave-type list** — Medical's 30 days and pay, whether Special is paid or made up, anything company-specific. This is a seed-data change only.
+- **HR to confirm the first-eligible-year carry-over** (rule 5: uncapped once, then the cap). It's a single rule in the balance calculator.
+- **HR to confirm whether Medical (and the others) also need a service period.** If so, it's just a `min_service_months` value.
+- **Payroll and `late_minutes` on incomplete days** — carried to Phase 5 (exports); it only matters once payroll is in scope.
+- **Medical certificate upload** — deferred; the reason text only for now.
