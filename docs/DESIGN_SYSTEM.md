@@ -206,6 +206,8 @@ One height for every control that sits in a row with others: `h-control` (`2.375
 
 - A control never grows a second line: content is single-line (`whitespace-nowrap` on buttons and on the time input's segments, including the empty `--:-- --` placeholder), and a call site that's too narrow for its content gets a wider width class, not a taller box. The manual-punch form's time column is at least `10rem` for this reason.
 - Set the height, not vertical padding: a control with `h-control` keeps its horizontal padding and centres its content (`items-center` or the form plugin's own line box).
+- A square icon control that sits beside controls is `h-control w-control` (the calendar's previous/next month arrows), and a segmented control is one control: its container is `h-control rounded-lg` with a 2px inset, and its segments are `rounded-lg` too (the calendar's Calendar/Table toggle).
+- **Text buttons are not controls:** an inline action set as text — "Reset filters", "Jump to this month" — carries no border or fill and no `h-control`; its padding gives at least a 28px target, it stays out of a control row's alignment, and it is never underlined (underline is for links).
 - Not controls, so not `h-control`: `<x-textarea>` (multi-line by nature), compact chips such as the date picker's presets, 36px pagination items, and square icon buttons in rows and fields (`h-9 w-9`, the 40px row chevron, the time input's 28px popover toggle). The auth pages keep their 44px touch targets by adding `min-h-11` on top, which wins over the token.
 
 ### Time input

@@ -71,4 +71,18 @@ class ControlHeightTest extends TestCase
 
         $this->assertSame([], $offenders);
     }
+
+    public function test_the_calendar_header_controls_are_control_height_on_the_radius_scale(): void
+    {
+        $view = File::get(resource_path('views/livewire/attendance/show.blade.php'));
+
+        // Month arrows: square controls.
+        $this->assertSame(2, preg_match_all('/aria-label="(?:Previous|Next) month"/', $view));
+        $this->assertSame(2, substr_count($view, 'inline-flex h-control w-control items-center justify-center rounded-lg border'));
+        // Calendar/Table: one h-control container, rounded-lg segments, no rounded-md.
+        $this->assertStringContainsString('inline-flex h-control items-stretch rounded-lg border border-slate-border bg-white p-0.5', $view);
+        $this->assertSame(2, substr_count($view, 'class="inline-flex items-center rounded-lg px-3 text-sm ring-1 ring-inset'));
+        $this->assertStringNotContainsString('rounded-md px-3 py-1.5', $view);
+    }
 }
+

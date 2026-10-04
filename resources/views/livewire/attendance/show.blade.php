@@ -196,7 +196,7 @@
                     <button
                         type="button"
                         wire:click="previousMonth"
-                        class="rounded-lg border border-slate-border bg-white p-1.5 text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700 dark:bg-slate-750 dark:text-slate-400 dark:hover:bg-slate-600"
+                        class="inline-flex h-control w-control items-center justify-center rounded-lg border border-slate-border bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:bg-slate-750 dark:text-slate-400 dark:hover:bg-slate-600"
                         aria-label="Previous month"
                     >
                         <x-icon name="chevron-left" class="h-5 w-5" />
@@ -205,23 +205,25 @@
                     <button
                         type="button"
                         wire:click="nextMonth"
-                        class="rounded-lg border border-slate-border bg-white p-1.5 text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-700 dark:bg-slate-750 dark:text-slate-400 dark:hover:bg-slate-600"
+                        class="inline-flex h-control w-control items-center justify-center rounded-lg border border-slate-border bg-white text-slate-500 shadow-sm transition hover:bg-slate-50 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:bg-slate-750 dark:text-slate-400 dark:hover:bg-slate-600"
                         aria-label="Next month"
                     >
                         <x-icon name="chevron-right" class="h-5 w-5" />
                     </button>
                     @unless ($isCurrentMonth)
-                        <button type="button" wire:click="$set('month', '{{ today()->format('Y-m') }}')" class="ml-1 text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300">
+                        <button type="button" wire:click="$set('month', '{{ today()->format('Y-m') }}')" class="ml-1 inline-flex min-h-7 items-center rounded-lg px-2 text-xs font-medium text-primary-600 transition hover:bg-primary-50 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:hover:bg-primary-600/35 dark:hover:text-primary-300">
                             Jump to this month
                         </button>
                     @endunless
                 </div>
 
-                <div class="inline-flex rounded-lg border border-slate-border bg-white p-0.5 dark:bg-slate-750" role="group" aria-label="View">
+                {{-- One control: the container is h-control and rounded-lg; its two segments
+                are rounded-lg too, on the radius scale (docs/DESIGN_SYSTEM.md, Control height). --}}
+                <div class="inline-flex h-control items-stretch rounded-lg border border-slate-border bg-white p-0.5 dark:bg-slate-750" role="group" aria-label="View">
                     <button
                         type="button"
                         wire:click="$set('view', 'calendar')"
-                        class="rounded-md px-3 py-1.5 text-sm ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 {{ $view === 'calendar' ? 'font-semibold bg-primary-50 text-primary-700 ring-primary-600 dark:bg-primary-600/35 dark:text-primary-200 dark:ring-primary-500' : 'font-medium ring-transparent text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}"
+                        class="inline-flex items-center rounded-lg px-3 text-sm ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 {{ $view === 'calendar' ? 'font-semibold bg-primary-50 text-primary-700 ring-primary-600 dark:bg-primary-600/35 dark:text-primary-200 dark:ring-primary-500' : 'font-medium ring-transparent text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}"
                         aria-pressed="{{ $view === 'calendar' ? 'true' : 'false' }}"
                     >
                         Calendar
@@ -229,7 +231,7 @@
                     <button
                         type="button"
                         wire:click="$set('view', 'table')"
-                        class="rounded-md px-3 py-1.5 text-sm ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 {{ $view === 'table' ? 'font-semibold bg-primary-50 text-primary-700 ring-primary-600 dark:bg-primary-600/35 dark:text-primary-200 dark:ring-primary-500' : 'font-medium ring-transparent text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}"
+                        class="inline-flex items-center rounded-lg px-3 text-sm ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 {{ $view === 'table' ? 'font-semibold bg-primary-50 text-primary-700 ring-primary-600 dark:bg-primary-600/35 dark:text-primary-200 dark:ring-primary-500' : 'font-medium ring-transparent text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}"
                         aria-pressed="{{ $view === 'table' ? 'true' : 'false' }}"
                     >
                         Table

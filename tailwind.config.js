@@ -24,6 +24,10 @@ export default {
             height: {
                 control: '2.375rem',
             },
+            // A square icon control beside other controls (month arrows).
+            width: {
+                control: '2.375rem',
+            },
             colors: {
                 // The neutral scale, as CSS variables (resources/css/app.css):
                 // warm stone in light mode, matching the warm cream of the
