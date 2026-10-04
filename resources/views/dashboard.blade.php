@@ -65,8 +65,11 @@
 
         {{-- Two independent column stacks, not a row-based grid: each column
         flows at its own height, so a short card never leaves a hole beside a
-        tall one. Below lg the wrappers dissolve (`contents`) and the cards
-        interleave by `order-*` into one reading order, needs-attention first.
+        tall one. Two columns only from xl, with the side column at least 21rem:
+        at lg its 4-of-12 share was about 224px and cut Needs attention's names
+        to a few characters. Below xl the wrappers dissolve (`contents`) and the
+        cards interleave by `order-*` into one reading order, needs-attention
+        first.
 
         Card header pattern (docs/DESIGN_SYSTEM.md): title on the left,
         optional right-aligned muted meta on the right, no eyebrows. Time
@@ -82,8 +85,8 @@
             $cardMeta = 'shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400';
             $avatar = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600 dark:bg-slate-750 dark:text-slate-300';
         @endphp
-        <div class="flex flex-col gap-6 lg:grid lg:grid-cols-12 lg:items-start">
-            <div class="contents lg:col-span-8 lg:flex lg:min-w-0 lg:flex-col lg:gap-6">
+        <div class="flex flex-col gap-6 xl:grid xl:grid-cols-[minmax(0,2fr)_minmax(21rem,1fr)] xl:items-start">
+            <div class="contents xl:flex xl:min-w-0 xl:flex-col xl:gap-6">
                 <x-card class="order-2 min-w-0">
                     <div class="{{ $cardHeader }}">
                         <h2 class="{{ $cardTitle }}">Attendance trend</h2>
@@ -138,7 +141,7 @@
                 </x-card>
             </div>
 
-            <div class="contents lg:col-span-4 lg:flex lg:min-w-0 lg:flex-col lg:gap-6">
+            <div class="contents xl:flex xl:min-w-0 xl:flex-col xl:gap-6">
                 <x-card class="order-1">
                     <div class="{{ $cardHeader }}">
                         <h2 class="{{ $cardTitle }}">Needs attention</h2>
