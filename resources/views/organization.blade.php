@@ -17,7 +17,7 @@
     >
         <div>
             <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Organization</h1>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Manage the workforce structure, holidays, and work schedules.</p>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">Manage the workforce structure, holidays, and work schedules.</p>
         </div>
 
         <div class="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
@@ -29,7 +29,7 @@
                         :aria-current="tab === '{{ $section }}' ? 'page' : null"
                         :class="tab === '{{ $section }}'
                             ? 'border-primary-600 font-semibold text-primary-700 dark:border-primary-400 dark:text-primary-300'
-                            : 'border-transparent font-medium text-slate-500 hover:border-slate-border hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'"
+                            : 'border-transparent font-medium text-slate-600 hover:border-slate-border hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'"
                         class="-mb-px whitespace-nowrap border-b-2 px-4 py-3 text-sm transition focus:outline-none focus-visible:relative focus-visible:z-10 focus-visible:rounded-t-lg focus-visible:ring-2 focus-visible:ring-primary-500"
                     >
                         {{ $label }}

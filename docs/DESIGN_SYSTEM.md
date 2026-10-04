@@ -38,7 +38,7 @@ This document is the source of truth for Stampy's visual interface. It records c
 |---|---|---|---|
 | Text / Primary | `text-slate-900` | `dark:text-slate-100` | Headings and primary readable content |
 | Text / Secondary | `text-slate-700` | `dark:text-slate-300` | Supporting body content and controls |
-| Text / Muted | `text-slate-500` | `dark:text-slate-400` | **All readable muted text**: metadata, hints, helper text, summary notes, column and weekday headers, role labels, voided rows |
+| Text / Muted | `text-slate-500` on cards; `text-slate-600` on the page background and tinted fills | `dark:text-slate-400` | **All readable muted text**: metadata, hints, helper text, summary notes, column and weekday headers, role labels, voided rows, the AM/PM suffix (see the Muted text rule) |
 | Icon / Subtle | `text-slate-400` | `dark:text-slate-500` | **Decorative icons only** — never text. Light `slate-400` is 2.52:1 on white and dark `slate-500` 3.08:1 on the card, both under 4.5:1 |
 | Surface / Page | `bg-slate-100` | `dark:bg-slate-900` | Application and authentication background |
 | Surface / Card | `bg-white` | `dark:bg-slate-800` | Cards, table containers, information panels |
@@ -51,7 +51,12 @@ This document is the source of truth for Stampy's visual interface. It records c
 | Action / Danger | `text-red-600` with red boundary/tint | `dark:text-red-400` | Destructive actions |
 | Focus / Interactive | `ring-primary-500` | `dark:ring-primary-500` | Keyboard focus and focused controls |
 
-**Muted text rule, measured.** Readable muted text is `slate-500` in light mode and `slate-400` in dark mode; light `slate-400` (and dark `slate-500`) are for decorative icons only. Light `slate-500`: 4.80:1 on white cards, 4.59:1 on a `slate-50` row hover, **4.40:1 on the `slate-100` page** — just under AA, where page subtitles, "Back to …" links and inactive Organization tabs sit (recorded for Phase 5). Dark `slate-400`: 5.81:1 on the card, 4.90:1 on overlays and controls (`slate-750`), 5.28:1 on a hovered row, 6.91:1 on the page. Disabled controls (the sidebar's "Soon" items, a disabled button) are exempt from the contrast minimum and keep their quieter tones; they are a Phase 5 item too. Decorative marks that carry no information — the table em-dash, a day outside the shown month, a disabled picker option — may use `slate-300`.
+**Muted text rule, measured.** Readable muted text depends on what it sits on; light `slate-400` (and dark `slate-500`) are for decorative icons only.
+- **Light, on a white card:** `text-slate-500` — 4.80:1 on white, 4.59:1 on a `slate-50` row hover.
+- **Light, on the `slate-100` page background or a tinted fill:** `text-slate-600` — 6.99:1 on the page (page subtitles, "Back to …" links, inactive Organization tabs, section intros, the employee header line), at least 6.96:1 on the calendar's exception fills (`red`/`violet`/`blue`/`fuchsia`/`accent-50`), where `slate-500` measured 4.37–4.47:1 and `slate-500` on the page 4.40:1.
+- **Dark, everywhere:** `text-slate-400` — 5.81:1 on the card, 4.90:1 on overlays and controls (`slate-750`), 5.28:1 on a hovered row, 6.91:1 on the page, at least 4.90:1 on the calendar's `900/20` fills.
+- **The time's AM/PM suffix** (`<x-time>`) is readable text too: it takes these colours, not a lowered opacity — `text-slate-600 dark:text-slate-400` (the light value works on cards, tints and the page alike), while a marked time's suffix keeps its amber (at least 4.58:1 / 8.71:1). At 70% opacity it measured 2.6–4.3:1.
+- Disabled controls (the sidebar's "Soon" items, a disabled button) are exempt from the contrast minimum and keep their quieter tones (a Phase 5 item). Decorative marks that carry no information — the table em-dash, a day outside the shown month, a disabled picker option — may use `slate-300`.
 
 Attendance color is model-driven. `DailyAttendance::displayVariant()` is the source of truth and is status-only: present green, incomplete violet, absent red, off slate, leave accent, in progress blue, and holiday fuchsia. Views must not independently derive these buckets. Status is reinforced with text or shape, never color alone.
 

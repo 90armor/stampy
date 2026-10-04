@@ -2,7 +2,7 @@
     <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
             <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Holidays</h2>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Configure company-wide dates that affect attendance.</p>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">Configure company-wide dates that affect attendance.</p>
         </div>
 
         <div class="flex flex-wrap items-end gap-3">

@@ -93,7 +93,7 @@
     @else
         @unless ($viaSelfView)
             <div>
-                <a href="{{ route('attendance.index') }}" wire:navigate class="inline-flex items-center gap-x-1 text-sm font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100">
+                <a href="{{ route('attendance.index') }}" wire:navigate class="inline-flex items-center gap-x-1 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100">
                     <x-icon name="chevron-left" class="h-5 w-5" />
                     Back to attendance
                 </a>
@@ -107,7 +107,7 @@
                 </span>
                 <div>
                     <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{{ $employee->full_name }}</h1>
-                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $employee->employee_code }} &middot; {{ $employee->department->name }} &middot; {{ $employee->position->name }}</p>
+                    <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">{{ $employee->employee_code }} &middot; {{ $employee->department->name }} &middot; {{ $employee->position->name }}</p>
                 </div>
             </div>
         </div>
@@ -363,7 +363,9 @@
                                     the one signal that matters; a marked time (amber, see
                                     <x-time marked>) points at the specific in/out value that's
                                     out of range instead of adding a second glyph. --}}
-                                    <div class="hidden flex-wrap items-center gap-x-1 text-xs leading-4 text-slate-500 dark:text-slate-400 sm:flex">
+                                    {{-- slate-600, not the card's slate-500: on the tinted exception fills
+                                    slate-500 measures 4.37–4.47:1 (docs/DESIGN_SYSTEM.md, Muted text rule). --}}
+                                    <div class="hidden flex-wrap items-center gap-x-1 text-xs leading-4 text-slate-600 dark:text-slate-400 sm:flex">
                                         @if ($record->first_in)
                                             @if ($lateArrival)
                                                 <x-time :time="$record->first_in" marked aria-label="Arrived {{ $lateMinutesLabel }} late" />
@@ -380,7 +382,7 @@
                                             @else
                                                 <x-time :time="$record->last_out" />
                                             @endif
-                                            @if ($record->isOvernightOut())<span class="opacity-70">(+1)</span>@endif
+                                            @if ($record->isOvernightOut())<span>(+1)</span>@endif
                                         @else
                                             <span>—</span>
                                         @endif

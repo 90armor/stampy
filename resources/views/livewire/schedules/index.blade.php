@@ -5,7 +5,7 @@
     <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
             <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Schedules</h2>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Define the working hours and workdays used for employee attendance.</p>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">Define the working hours and workdays used for employee attendance.</p>
         </div>
 
         <div class="flex flex-wrap items-center gap-3">

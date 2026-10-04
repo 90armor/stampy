@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\File;
 use Tests\TestCase;
 
@@ -119,6 +120,55 @@ class NeutralScaleTest extends TestCase
         }
 
         $this->assertSame([], $offenders, 'Readable muted text is text-slate-500 dark:text-slate-400.');
+    }
+
+    public function test_the_am_pm_suffix_is_a_muted_colour_never_a_lowered_opacity(): void
+    {
+        $plain = Blade::render('<x-time :time="$t" />', ['t' => \Carbon\Carbon::parse('2026-09-28 08:40')]);
+        $marked = Blade::render('<x-time :time="$t" marked />', ['t' => \Carbon\Carbon::parse('2026-09-28 08:40')]);
+
+        // 70% opacity measured 2.6–4.3:1; slate-600 / dark slate-400 reach 4.5:1 on every fill.
+        $this->assertMatchesRegularExpression('/<span class="ml-0\.5 text-\[max\(10px,0\.8em\)\] font-normal text-slate-600 dark:text-slate-400">AM<\/span>/', $plain);
+        // A marked time's suffix keeps its number's amber.
+        $this->assertMatchesRegularExpression('/<span class="ml-0\.5 text-\[max\(10px,0\.8em\)\] font-normal">AM<\/span>/', $marked);
+        $this->assertStringNotContainsString('opacity-', $plain.$marked);
+    }
+
+    public function test_muted_text_on_the_page_background_is_slate_600_not_slate_500(): void
+    {
+        // slate-500 measures 4.40:1 on the slate-100 page; slate-600 6.99:1.
+        $offenders = [];
+        foreach (File::allFiles(resource_path('views')) as $file) {
+            $relative = str_replace(base_path().'/', '', $file->getPathname());
+            $source = $file->getContents();
+            // A page header: the subtitle right after the page's <h1>.
+            if (preg_match_all('/<h1\b[^>]*>.*?<\/h1>\s*<p class="([^"]*)"/s', $source, $subtitles)) {
+                foreach ($subtitles[1] as $classes) {
+                    if (str_contains($classes, 'text-slate-500')) {
+                        $offenders[] = "{$relative}: page subtitle";
+                    }
+                }
+            }
+            // "Back to …" links sit on the page above the header.
+            if (preg_match_all('/<a\b[^>]*class="([^"]*)"[^>]*>\s*<x-icon[^>]*\/>\s*Back to/s', $source, $backLinks)) {
+                foreach ($backLinks[1] as $classes) {
+                    if (str_contains($classes, 'text-slate-500')) {
+                        $offenders[] = "{$relative}: back link";
+                    }
+                }
+            }
+        }
+        // Sections laid directly on the page: Organization's tabs and each tab's intro.
+        $organization = File::get(resource_path('views/organization.blade.php'));
+        $this->assertStringNotContainsString("font-medium text-slate-500 hover:border-slate-border", $organization);
+        foreach (['departments', 'positions', 'holidays', 'schedules'] as $tab) {
+            $view = File::get(resource_path("views/livewire/{$tab}/index.blade.php"));
+            $this->assertMatchesRegularExpression('/<h2\b[^>]*>.*?<\/h2>\s*<p class="mt-1 text-sm text-slate-600 dark:text-slate-400">/s', $view, "{$tab} intro");
+        }
+        // The calendar's time row sits on tinted fills.
+        $this->assertStringContainsString('gap-x-1 text-xs leading-4 text-slate-600 dark:text-slate-400 sm:flex', File::get(resource_path('views/livewire/attendance/show.blade.php')));
+
+        $this->assertSame([], $offenders);
     }
 }
 

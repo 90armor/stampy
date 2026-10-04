@@ -1,6 +1,6 @@
 <div class="space-y-6">
     <div>
-        <a href="{{ route('employees.index') }}" wire:navigate class="inline-flex items-center gap-x-1 rounded text-sm font-medium text-slate-500 transition hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:text-primary-300">
+        <a href="{{ route('employees.index') }}" wire:navigate class="inline-flex items-center gap-x-1 rounded text-sm font-medium text-slate-600 transition hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:text-primary-300">
             <x-icon name="chevron-right" class="h-5 w-5 rotate-180" />
             Back to employees
         </a>
@@ -14,7 +14,7 @@
             <div class="min-w-0">
                 <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{{ $employee->full_name }}</h1>
                 <div class="mt-1 flex flex-wrap items-center gap-2">
-                    <p class="text-sm text-slate-500 dark:text-slate-400">{{ $employee->employee_code }}</p>
+                    <p class="text-sm text-slate-600 dark:text-slate-400">{{ $employee->employee_code }}</p>
                     <x-badge :color="$employee->status === 'active' ? 'green' : 'slate'">
                         {{ ucfirst($employee->status) }}
                     </x-badge>

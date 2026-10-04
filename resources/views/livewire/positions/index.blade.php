@@ -2,7 +2,7 @@
     <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
             <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Positions</h2>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Manage the organization-wide job titles assigned to employees.</p>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">Manage the organization-wide job titles assigned to employees.</p>
         </div>
         <x-button variant="primary" wire:click="create" wire:loading.attr="disabled" wire:target="create" class="self-start sm:self-auto">
             <x-icon name="plus" class="w-5 h-5" />
