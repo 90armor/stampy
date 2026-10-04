@@ -371,7 +371,7 @@ class DashboardTest extends TestCase
             return $activity !== null && $activity['action'] === 'Punched in' && ! array_key_exists('tone', $activity);
         });
         $response->assertDontSee('Punched in 8m late')
-            ->assertSee('<p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Checked in</p>', false);
+            ->assertSee('<p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Punched in</p>', false);
     }
 
     public function test_employee_role_does_not_see_attendance_stats_on_the_dashboard(): void
