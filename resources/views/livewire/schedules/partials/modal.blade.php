@@ -76,6 +76,20 @@
                             </div>
                             <x-input-error :messages="$errors->get('break_minutes')" class="mt-1" />
                         </div>
+                        <div>
+                            <x-input-label id="schedule_break_start-label" for="schedule_break_start" value="Break starts" />
+                            {{-- Editable while unlocked, and on a locked schedule until it is first set
+                            (WorkSchedule::LOCKED_FIELDS) — nothing built can depend on it being empty. --}}
+                            <x-time-input id="schedule_break_start" model="break_start" label="Break starts" after="start_time" :disabled="$breakStartIsLocked" />
+                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                                @if ($editingIsLocked && ! $breakStartIsLocked)
+                                    Optional. Splits the day into morning and afternoon for half-day leave. Can be set once on a locked schedule.
+                                @else
+                                    Optional. Splits the day into morning and afternoon for half-day leave.
+                                @endif
+                            </p>
+                            <x-input-error :messages="$errors->get('break_start')" class="mt-1" />
+                        </div>
                     </div>
                 </section>
 

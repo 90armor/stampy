@@ -18,6 +18,9 @@ use InvalidArgumentException;
  *   never a useful schedule.
  * - break_minutes >= the shift length: would make worked_minutes negative
  *   before DailySummaryBuilder's max(0, ...) floor silently hides it.
+ * - break_start (the morning/afternoon boundary half-day leave uses) set
+ *   with no break, or a break that doesn't fit inside the shift:
+ *   start_time < break_start and break_start + break_minutes <= end_time.
  */
 class InvalidWorkScheduleException extends InvalidArgumentException
 {
@@ -34,5 +37,15 @@ class InvalidWorkScheduleException extends InvalidArgumentException
     public static function breakTooLong(): self
     {
         return new self('Break minutes must be shorter than the shift itself (end time minus start time).');
+    }
+
+    public static function breakStartWithoutBreak(): self
+    {
+        return new self('A break start needs a break duration — set the break minutes, or leave the break start empty.');
+    }
+
+    public static function breakOutsideShift(): self
+    {
+        return new self('The break must start after the start time and end by the end time (break start plus break minutes).');
     }
 }
