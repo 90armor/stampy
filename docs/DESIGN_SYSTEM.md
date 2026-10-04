@@ -1,4 +1,6 @@
-# Stampy Design System v1
+# Stampy Design System v1.2
+
+v1 set the surface, component and table conventions; v1.1 made colour status-only (timing became an annotation); v1.2 is the UI polish series — the dark-mode neutral scale, line tokens, control height, the date picker and time input, the icon size rule, modal focus and the muted-text rule. The history is in CLAUDE.md's roadmap; this document holds only the current rules.
 
 Attendance-specific presentation and responsive-table guidance lives in [Attendance UI](ATTENDANCE_UI.md).
 
@@ -15,7 +17,7 @@ This document is the source of truth for Stampy's visual interface. It records c
 
 ## Color system
 
-`tailwind.config.js` retains the existing palettes. Design System v1 does not add semantic Tailwind utility names.
+`tailwind.config.js` retains the existing palettes. The design system does not add semantic Tailwind utility names (the line tokens and `h-control`/`w-control` are the deliberate exceptions — see Future tokenization).
 
 - `primary-*`: deep evergreen. Primary actions, active navigation, links, and focus emphasis.
 - `accent-*`: mint. Brand marks, restrained highlights, and the Leave status; not a primary-action substitute.
