@@ -104,7 +104,7 @@ Don't swap this for Livewire's own `@teleport`/`@endteleport` either, expecting 
 ## Coding conventions
 
 - **Validation:** Livewire components validate server-side, via a `rules()` method or an inline `$this->validate([...], [messages])` (as `Attendance\Show::addPunch()` and `Holidays\Index::save()` do) — never trust unvalidated `wire:model` input. The plain controllers are Breeze's auth/profile ones plus `/password/change` (`ForcePasswordChangeController`); they validate inline with `$request->validate([...])` / `validateWithBag()`. Only `LoginRequest` and `ProfileUpdateRequest` are Form Requests, and both are Breeze scaffolding — no feature of ours uses one. Introduce a Form Request only when a plain controller of ours starts handling substantial validated input (e.g. a future API).
-- **Authorization:** every Livewire component that manages a resource calls `$this->authorize(...)` in `mount()` for page-level checks and again in the specific action method (e.g. `deactivate()`, `save()`, `delete()`) before mutating. Route groups also carry `role:` middleware as a second layer of defense (see `routes/web.php`). A component that holds the record as a typed model property and has read-only actions (paging, opening a modal) must **also authorize in `render()`**, which every request ends in — `Attendance\Show`, `Employees\Show` and `Employees\ScheduleAssignments` do. Why: those actions are safe today only because Livewire's `ModelSynth` re-derives a typed model property from the signed snapshot and ignores whatever the client sends; that protection is framework behaviour, not this component's, and storing the id as a plain `int` (an ordinary-looking refactor) would silently remove it. It also stops a page opened while authorised from serving data after access is revoked (an employee moved out of a manager's team, say). This applies with no exception to a component nested inside another authorized one, too: `Employees\ScheduleAssignments` is embedded on `Employees\Show`, but it's still its own Livewire component with its own signed snapshot, and an update request aimed at it never routes through the parent's `render()` — so it authorizes in its own `mount()`, its own mutating actions, and its own `render()`, exactly like any standalone component (see the Roles & authorization section, footnote ³, for what each of those three checks).
+- **Authorization:** every Livewire component that manages a resource calls `$this->authorize(...)` in `mount()` for page-level checks and again in the specific action method (e.g. `deactivate()`, `save()`, `delete()`) before mutating. Route groups also carry `role:` middleware as a second layer of defense (see `routes/web.php`). A component that holds the record as a typed model property and has read-only actions (paging, opening a modal) must **also authorize in `render()`**, which every request ends in — `Attendance\Show`, `Employees\Show`, `Employees\ScheduleAssignments` and `Employees\StatusModal` do. Why: those actions are safe today only because Livewire's `ModelSynth` re-derives a typed model property from the signed snapshot and ignores whatever the client sends; that protection is framework behaviour, not this component's, and storing the id as a plain `int` (an ordinary-looking refactor) would silently remove it. It also stops a page opened while authorised from serving data after access is revoked (an employee moved out of a manager's team, say). This applies with no exception to a component nested inside another authorized one, too: `Employees\ScheduleAssignments` is embedded on `Employees\Show`, but it's still its own Livewire component with its own signed snapshot, and an update request aimed at it never routes through the parent's `render()` — so it authorizes in its own `mount()`, its own mutating actions, and its own `render()`, exactly like any standalone component (see the Roles & authorization section, footnote ³, for what each of those three checks).
 - **Employee lifecycle:** no soft deletes anywhere — deactivating sets `employees.status = inactive` plus `left_on`, their last day (Phase 3a), and the employee row and their attendance up to `left_on` are never removed by the app. **Deactivation and reactivation happen only through `Employees\StatusModal`** — the directory's row actions and the profile header open it; the employee form has no Status field, and creating an employee always makes an active one. `Employee::booted()` enforces the period on every write (`InvalidEmploymentPeriodException`: inactive ⇔ `left_on` set, `join_date ≤ left_on ≤ today`), and `Employee::scopeActiveOn()`/`isActiveOn()` is the one definition of "employed on date D" (`join_date ≤ D` and (`left_on` null or `D ≤ left_on`)). Both actions go through `App\Services\EmployeeLifecycle`, which writes first and then rebuilds from `left_on + 1` to today, the same way as `EmployeeScheduleAssigner` (a rebuild failure is a non-blocking amber warning, logged with the `attendance:build-daily … --employee=…` command that heals it). `DailySummaryBuilder::build()` removes the row for a date the employee wasn't employed on, so a backdated deactivation leaves no stale rows after `left_on`; every build (`attendance:build-daily`, an import's rebuild, a holiday's rebuild) selects employees by employment period, not by today's `status`, so a mid-day deactivation with `left_on` = today still has that day finalised. **Reactivation means "the deactivation was a mistake":** `left_on` is cleared, the gap days become ordinary days again (absent if punchless). A real rehire — a second employment period — is not supported; that is a known limitation, not a Phase 3 item. Departments/positions with employees assigned cannot be hard-deleted either (guarded in `Departments\Index::delete()` / `Positions\Index::delete()`).
 - **User/HR data split:** `users` is auth-only (name, email, password). All HR data lives on `employees`, linked via nullable `employees.user_id` — an employee may exist with no login (not yet onboarded to self-service), and a `User` always optionally has one `Employee` profile. `users.name` is the one exception to "auth-only, independently editable": for a linked user it mirrors `employees.full_name` rather than standing on its own — the name is HR data, and admins own it. The profile page shows it read-only (sourced from the employee record) and `ProfileController::update()` enforces that server-side by dropping any submitted `name` for a linked user, not just hiding the input; `Employees\FormModal::save()` is the other half, copying an admin's changed `full_name` onto the linked user in the same save so the topbar and anywhere else `users.name` appears can't drift from the HR record. An unlinked user (no `Employee` profile) still edits their own name freely.
 - **Tests:** `tests/Feature` uses Livewire's `Livewire::test()` harness against components directly (mount/call/assert) for business logic, and plain HTTP tests (`$this->get(...)->assertForbidden()`) for route-level role gating, since Livewire's test harness converts `AuthorizationException` into a response rather than letting it bubble as a PHP exception.
@@ -116,6 +116,7 @@ Don't swap this for Livewire's own `@teleport`/`@endteleport` either, expecting 
 - **Every `Employee::factory()->create()` needs a default `WorkSchedule` to already exist** (Phase 2.5b) — creation now always assigns one (`Employee::booted()`), and with none, it throws instead of silently succeeding. A test that doesn't otherwise care about schedules still needs `WorkSchedule::factory()->create(['is_default' => true]);` somewhere in its `setUp()` before any employee gets created; deliberately not a global fixture in `Tests\TestCase` (this codebase seeds roles per-file the same way, not globally, and a global default would also break the one test that specifically wants zero schedules to exist, `EmployeeScheduleAssignmentTest::test_creating_an_employee_with_no_default_schedule_creates_nothing_and_throws`).
 - **A `scheduleAssignments`/`scheduleOn()` result cached on an `Employee` instance goes stale the moment something *else* writes a new assignment row for that same employee** — `EmployeeScheduleAssigner::assign()` calls `$employee->unsetRelation('scheduleAssignments')` before rebuilding for exactly this reason (see the Database schema section above). The same staleness bites test code: asserting `scheduleOn()` on an `$employee` variable that was already used earlier in the test (including implicitly, e.g. by a component's own `render()` during `Livewire::test()`'s initial mount) needs `->refresh()` first, or it reads the pre-write answer. Several tests in `EmployeeScheduleAssignmentsComponentTest`/`EmployeeScheduleAssignerTest` do this deliberately — it's not defensive paranoia, it reproduces a real failure without it.
 - **`DatabaseSeederTest` runs the real `DatabaseSeeder`** (`$this->seed()`, ~3s) and asserts every resulting employee has at least one schedule assignment — a regression test for the exact bug `DatabaseSeeder`'s `WithoutModelEvents` caused (see Roles & authorization's Authorization convention and the Database schema section above): it silently suppressed `Employee::booted()`'s listener, seeding 35 employees with zero assignments and no error anywhere. Confirmed to actually catch it (not just superficially): temporarily reintroducing the trait fails this test, listing all 35 employees by code. If this test ever needs `WorkSchedule::factory()` or similar test setup added ahead of it, that's a sign something *else* now also depends on seed order — don't just silence the assertion.
+- **Factory defaults that keep the Phase 3a invariants out of the way** (both deliberate): `EmployeeFactory` gives an `['status' => 'inactive']` employee `left_on = join_date` — valid, and outside every recent date, so they behave like the "gone" employees older tests meant; use `->inactive('Y-m-d')` for a real last day. `WorkScheduleFactory` leaves `break_start` null, because a default of 12:00 would fail break_start's own rule on any test schedule with other hours or no break; use `->withBreakStart()` when a test needs one.
 - **`php artisan make:seeder` generates a class with `use WithoutModelEvents;` by default.** That trait is exactly what caused the bug `DatabaseSeederTest` (above) now guards against — any *new* seeder that creates `Employee` rows and keeps the generated trait will silently skip `Employee::booted()`'s auto-assignment listener the same way, and `DatabaseSeederTest` only covers `DatabaseSeeder` itself, not a seeder added later. Delete the `use WithoutModelEvents;` line (and its `use Illuminate\Database\Console\Seeds\WithoutModelEvents;` import) from any new seeder that touches `employees`, or write that seeder's own regression test the way `DatabaseSeederTest` does.
 
 ## Database schema
@@ -151,6 +152,7 @@ Don't swap this for Livewire's own `@teleport`/`@endteleport` either, expecting 
 | device_user_id | string, unique, nullable | maps to the user ID on the ZKTeco fingerprint device |
 | manager_id | bigint FK → employees, nullable | `nullOnDelete`; self-referencing, added in Phase 2.4c for row-level attendance scoping (a manager sees themself plus transitive subordinates) |
 | status | enum(active, inactive) | default `active`, indexed |
+| left_on | date, nullable | Phase 3a, alter-migration: the last day of employment. Required while `inactive`, null while `active`, `join_date ≤ left_on ≤ today` (`Employee::booted()`, `InvalidEmploymentPeriodException`); set and cleared only through `Employees\StatusModal`. "Employed on D" is `Employee::scopeActiveOn()` — see Employee lifecycle above. Rows already inactive were backfilled with the date of their `updated_at` (`EmployeeLeftOnBackfill`) |
 | timestamps | | no soft deletes — see Employee lifecycle above |
 
 **`users`** — not just Laravel's defaults; Phase 2.4d added password-reset columns for accounts without email:
@@ -180,6 +182,7 @@ Plus `cache`, `jobs`, `sessions`, `password_reset_tokens` (Laravel defaults) and
 | start_time / end_time | time | locked once referenced; `end_time` must be after `start_time` — an overnight schedule is rejected outright (`InvalidWorkScheduleException`), a known, unsupported limitation, see the 18h overnight-pairing note under `daily_attendances` below |
 | grace_minutes | unsigned smallint | default `0`; minutes after `start_time` before a late arrival counts as late at all — once past grace, `late_minutes` is the full gap from `start_time`, not the remainder past grace. Locked once referenced |
 | break_minutes | unsigned smallint | default `0`; subtracted from worked time. Locked once referenced; must be shorter than the shift itself (`end_time - start_time`) |
+| break_start | time, nullable | Phase 3a, alter-migration: when the break begins — the morning/afternoon boundary for half-day leave (AM = `start_time`–`break_start`, PM = `break_start + break_minutes`–`end_time`). Needs `break_minutes > 0` and must fit inside the shift. Locked once referenced, except that a locked schedule may go from null to a value once (below). Not read by `DailySummaryBuilder` until Phase 3d |
 | workdays | json | array of ISO weekday numbers (1=Monday); at least one required. Locked once referenced |
 | is_default | bool | default `false`; the schedule a **newly created** employee is assigned to (`Employee::booted()`) — it no longer affects any existing employee's history the way a "no row → current default" fallback once would have (Phase 2.5b's whole reason for existing, see below) |
 | timestamps | | |
@@ -291,28 +294,91 @@ Three model decisions here aren't obvious from the schema alone, and have alread
 - **Known, accepted limitation: a same-day in/out pair more than 18h apart shows as `incomplete`.** `MAX_SHIFT_HOURS` (18) bounds how far after an in-punch an out-punch may be and still pair with it. An in at 00:00:00 and an out at 23:59:00 on the same day are 23h59m apart, so the out is never paired: `last_out` is null, `worked_minutes` is 0, status is `incomplete` — and nothing on the row records that an out-punch existed and was excluded. This is the window working as designed, not a bug. The punch itself is intact in `attendance_logs` and listed in the day's raw punches on `Attendance\Show`, so if you're debugging an inexplicable `incomplete`, look there for an out-punch more than 18h after the in-punch. Deliberately no "excluded punch" indicator for now; revisit only if genuine ~24h shifts turn up.
 - **Known, accepted limitation: no overnight schedules.** `WorkSchedule` rejects `end_time <= start_time` outright (`InvalidWorkScheduleException`) — `DailySummaryBuilder`'s late/early-leave arithmetic (`calculate()`) assumes a shift starts and ends within the same calendar day; a genuinely overnight schedule (say 22:00–06:00) would compute silently wrong numbers rather than fail loudly. Like the 18h limitation above, this is a deliberate boundary of what the builder supports today, not an oversight — revisit only if a real night-shift schedule is needed, and treat it as a builder change, not just a validation relaxation.
 
+### Phase 3a (built) — leave tables
+
+Five create-migrations (Phase 3a); the rules behind them are in the Phase 3 section below. Status-like columns are strings backed by PHP enums (`LeaveCounting`, `LeaveStatus`, `LeaveHalf`, `ApprovalOutcome`), like `daily_attendances.status`. Decimal day counts cast as `decimal:1` (they read back as strings such as `"18.0"`).
+
+**`leave_types`** — the leave policy, per type. Seeded by `LeaveTypeSeeder` (real configuration, not demo data; idempotent by name; HR has yet to confirm the list).
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint PK | |
+| name | string, unique | |
+| days_per_year | decimal(4,1), nullable | null = no balance (Special, Maternity, Unpaid). Editing it affects future grants only |
+| min_service_months | unsigned smallint, nullable | null = usable from `join_date`; Annual is 12 |
+| seniority_bonus | bool | default `false`; needs a balance |
+| carry_over_cap | decimal(4,1), nullable | null = no carry-over; needs a balance |
+| counts | string (`LeaveCounting`) | `workdays` / `calendar_days`. Locked once a leave uses the type |
+| max_days_per_request | decimal(4,1), nullable | |
+| deducts_from_leave_type_id | bigint FK → leave_types, nullable | `restrictOnDelete`; Special → Annual. One level only: not itself, not a type that deducts, and not while another type deducts from this one. Locked once a leave uses the type |
+| allows_half_day | bool | default `true`. Locked once a leave uses the type |
+| is_paid / is_active | bool | default `true`; deactivate rather than delete |
+| timestamps | | |
+
+**Two different "referenced" tests on `LeaveType`, on purpose** (unlike `WorkSchedule`, which uses one for both). The **lock** (`counts`, `deducts_from_leave_type_id`, `allows_half_day` — `LeaveTypeLockedException`) asks only whether a **leave** uses the type (`isUsedByLeaves()`): those fields change computed results only through leave rows, and an entitlement alone doesn't depend on them. `WorkSchedule` locks on assignments because the builder reads the schedule through them; `LeaveType` has no equivalent, and locking on entitlements would lock Annual and Medical as soon as 3b grants them — before anyone has taken leave, while the type list is still waiting on HR. **Deletion** is blocked by anything that points at the type — a leave, an entitlement, an adjustment, or a type deducting from it (`isReferenced()`, `LeaveTypeInUseException`) — so it fails with a named exception instead of a raw foreign-key error; deactivate instead. Other rules (`InvalidLeaveTypeException`): carry-over and the seniority bonus need a balance; deductions are one level deep.
+
+**`leave_entitlements`** — one leave year's grant (the calendar year): a stored fact; usage and carry-over are derived.
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint PK | |
+| employee_id | bigint FK → employees | `cascadeOnDelete` |
+| leave_type_id | bigint FK → leave_types | `restrictOnDelete` |
+| year | unsigned smallint | |
+| days | decimal(4,1) | |
+| granted_by | bigint FK → users, nullable | `nullOnDelete`; null = granted automatically (`leave:grant`, 3b) |
+| timestamps | | |
+
+Unique on `(employee_id, leave_type_id, year)`.
+
+**`leave_adjustments`** — an admin's correction to a balance. **Append-only, enforced in the model**: `LeaveAdjustment::booted()` throws `AppendOnlyRecordException` on any update or delete; a wrong adjustment is fixed with a reversing one.
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint PK | |
+| employee_id | bigint FK → employees | `cascadeOnDelete` |
+| leave_type_id | bigint FK → leave_types | `restrictOnDelete` |
+| year | unsigned smallint | |
+| days | decimal(5,1) | signed |
+| note | string | required |
+| created_by | bigint FK → users, nullable | `nullOnDelete` |
+| timestamps | | |
+
+Indexed on `(employee_id, leave_type_id, year)`.
+
+**`leaves`** — leave requests. Shape rules on the model (`InvalidLeaveException`): `end_date ≥ start_date`; a half day is a single date (`start_date = end_date`) of a type that allows half days. Overlap, balance and approval rules belong to the request lifecycle (3c).
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint PK | |
+| employee_id | bigint FK → employees | `cascadeOnDelete` |
+| leave_type_id | bigint FK → leave_types | `restrictOnDelete` |
+| start_date / end_date | date | |
+| half | string (`LeaveHalf`), nullable | `am` / `pm`; null = whole days |
+| reason | text, nullable | |
+| status | string (`LeaveStatus`) | default `pending`; `pending`/`approved`/`rejected`/`cancelled` |
+| current_step | unsigned tinyint, nullable | the step waiting for a decision; null once none is |
+| requested_by / cancelled_by | bigint FK → users, nullable | `nullOnDelete` |
+| cancelled_at | timestamp, nullable | |
+| timestamps | | |
+
+Indexed on `(employee_id, start_date, end_date)` and `(status, current_step)`.
+
+**`approval_steps`** — the shared half of the approval engine: one row per decided step of any approvable request (`leaves` now; Phase 4's `overtime_requests` reuses it). The request data stays in its own typed table. **Append-only, enforced in the model**, like `leave_adjustments` (`ApprovalStep::booted()`).
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint PK | |
+| approvable_type / approvable_id | morphs | the type is a morph-map alias — `'leave'` — not a class name (`Relation::morphMap()` in `AppServiceProvider`). Deliberately the non-enforced `morphMap()`: `enforceMorphMap()` would require mapping every morph model, including `User` for spatie/permission's `model_has_roles`, whose rows store `App\Models\User` |
+| step | unsigned tinyint | |
+| outcome | string (`ApprovalOutcome`) | `approved`/`rejected`/`skipped`/`self_approved` |
+| decided_by | bigint FK → users, nullable | `nullOnDelete`; null for an automatic skip |
+| note | text, nullable | |
+| decided_at | timestamp | |
+| timestamps | | |
+
+Unique on `(approvable_type, approvable_id, step)`.
+
+**Append-only: two different enforcements, recorded so they aren't confused.** `attendance_logs` is append-only **by convention**: a correction is a void plus a new row, and voiding is itself an update (`voided_at`/`voided_by`), so the model can't forbid updates — nothing in the app edits a punch otherwise. `leave_adjustments` and `approval_steps` are append-only **in the model** (`AppendOnlyRecordException` from `updating`/`deleting`). Known bypasses: a database cascade (deleting an employee removes their adjustments) and a query-builder mass update/delete skip model events; nothing in the app uses either on these tables.
+
 ### Future phases (not yet migrated — kept here so later migrations stay consistent with this plan)
 
-**`leave_types`** (Phase 3)
-| Column | Type | Notes |
-|---|---|---|
-| id | bigint PK | |
-| name | string | e.g. Annual, Sick, Unpaid |
-| default_days_per_year | integer, nullable | |
-| timestamps | | |
-
-**`leaves`** (Phase 3)
-| Column | Type | Notes |
-|---|---|---|
-| id | bigint PK | |
-| employee_id | bigint FK → employees | |
-| leave_type_id | bigint FK → leave_types | |
-| start_date / end_date | date | |
-| status | enum | pending/approved/rejected |
-| approved_by | bigint FK → users, nullable | |
-| timestamps | | |
-
-**`overtime_requests`** (Phase 4)
+**`overtime_requests`** (Phase 4) — its approval history goes in `approval_steps` (above), under a new morph alias; it needs no `approved_by` of its own.
 | Column | Type | Notes |
 |---|---|---|
 | id | bigint PK | |
@@ -323,7 +389,7 @@ Three model decisions here aren't obvious from the schema alone, and have alread
 | approved_by | bigint FK → users, nullable | |
 | timestamps | | |
 
-Exact columns for Phase 3–4 tables will be refined when those phases are scoped in detail — this is a planning skeleton, not a final spec.
+Exact columns for Phase 4 will be refined when it is scoped in detail — this is a planning skeleton, not a final spec.
 
 ## Roles & authorization
 
@@ -368,7 +434,7 @@ Enforced in four places, none of which is optional:
 
 1. **Foundation** (complete) — project setup, auth, roles/permissions, departments, positions, employees, layout/navigation. Closed out with a full codebase audit (see `AUDIT.md`) — all Critical/High/Medium findings fixed.
 2. **Attendance & device integration** (complete) — `attendance_logs` ingestion (CSV import for now — see "ZKTeco device ingestion" below), processing into `daily_attendances`, attendance dashboards/reports, effective-dated schedules, holidays, row-level manager scoping.
-3. **Leave management** (next — **scope not yet written**; see "Open questions for Phase 3" below) — `leave_types`, `leaves`, request/approval workflow, balances.
+3. **Leave management** (in progress — scoped in "Phase 3 — Leave management" below; 3a built) — `leave_types`, `leaves`, request/approval workflow, balances.
 4. **Overtime** — `overtime_requests`, request/approval workflow, integration with processed attendance.
 5. **Reporting & polish** — cross-cutting reports (attendance/leave/overtime), exports, UX polish, performance pass. Carried in from the final design review (4 Oct 2026), deliberately deferred to here:
    - Pending chart bars below a 3:1 floor: the trend's pending bar is 1.33:1 (dark) / 1.52:1 (light) against the card, the Department card's 1.13:1 (dark) against its track.
@@ -426,9 +492,9 @@ Scope: `DailySummaryBuilder::calculate()`/`isInProgress()` and its precedence co
 - **v1.2, the UI polish series:** dark mode moved to a neutral zinc scale through CSS variables on `slate` (option C), with no glow; `divider`/`border` line tokens; the shared selected and filled-selected states, with a popover-only edge on dark filled cells; the date picker (range and single-date modes of one component, month/year views, presets, Today, Clear built but off) and the segmented time input, both native below 640px; one control height (`h-control`, plus `w-control` for square icon controls); the icon size rule (20px, 14px only in status pills and filter chips); fixed-size filter chips; modal focus moved in on open and restored on close; the confirm dialog layered above modals; overnight (+1) punches labelled on both days; the muted-text rule (`slate-500` on cards, `slate-600` on the page and tinted fills, dark `slate-400`; light `slate-400` for icons only; the AM/PM suffix coloured, not faded); "Punched in/out" in the activity log so "Checked in" means only the any-punch aggregate; the dashboard's two columns only from `xl`; the month as a fourth `DisplayDate` form.
 - **Closed by a final review (4 Oct 2026):** the full suite, three random orders and all 20 pinned instants passing; each design guard test shown to fail on a deliberate violation; must-fix findings fixed; the rest deferred to Phase 5 (listed under the roadmap's item 5) or kept as intentional — icons restored to 20px everywhere outside the pill exceptions (including the fresh-install checklist's check and the mobile calendar's holiday flag), and the employee table view's single-line 48px rows (the 52px target is for the two-line Daily Attendance rows). Screenshots are in the gitignored `storage/app/visual-audit/`.
 
-## Phase 3 — Leave management (scope, not yet built)
+## Phase 3 — Leave management (scope; 3a built)
 
-Scoped 4 Oct 2026 from the "Open questions for Phase 3" section. Owner decisions are marked **(owner)**; the rest are recommendations the owner accepted. Items still waiting on HR are listed at the end — they change seed data, not the design.
+Scoped 4 Oct 2026 from the "Open questions for Phase 3" section, which this one replaced. Owner decisions are marked **(owner)**; the rest are recommendations the owner accepted. Items still waiting on HR are listed at the end — they change seed data, not the design.
 
 ### Policy
 
@@ -489,13 +555,13 @@ Scoped 4 Oct 2026 from the "Open questions for Phase 3" section. Owner decisions
 
 ### Schema (all new tables are create-migrations; changes to existing tables are alter-migrations)
 
-**`leave_types`** — `name` (unique), `days_per_year` decimal(4,1) nullable (null = no balance), `min_service_months` smallint nullable (null = usable from `join_date`), `seniority_bonus` bool, `carry_over_cap` decimal(4,1) nullable, `counts` enum(`workdays`, `calendar_days`), `max_days_per_request` decimal(4,1) nullable, `deducts_from_leave_type_id` FK → leave_types nullable, `allows_half_day` bool, `is_paid` bool, `is_active` bool, timestamps. A referenced type can't be deleted (deactivate instead); `counts`, `deducts_from_leave_type_id` and `allows_half_day` lock once referenced. Changing `days_per_year` affects future grants only.
+**`leave_types`** — `name` (unique), `days_per_year` decimal(4,1) nullable (null = no balance), `min_service_months` smallint nullable (null = usable from `join_date`), `seniority_bonus` bool, `carry_over_cap` decimal(4,1) nullable, `counts` enum(`workdays`, `calendar_days`), `max_days_per_request` decimal(4,1) nullable, `deducts_from_leave_type_id` FK → leave_types nullable, `allows_half_day` bool, `is_paid` bool, `is_active` bool, timestamps. A type anything points at — a leave, an entitlement, an adjustment, a type deducting from it — can't be deleted (deactivate instead); `counts`, `deducts_from_leave_type_id` and `allows_half_day` lock once a **leave** uses the type (two different tests, on purpose — see the Database schema section, Phase 3a). Changing `days_per_year` affects future grants only.
 
 **`leave_entitlements`** — `employee_id`, `leave_type_id`, `year` smallint, `days` decimal(4,1), `granted_by` FK → users nullable (null = automatic), timestamps. Unique on `(employee_id, leave_type_id, year)`. The grant is a stored fact; usage and carry-over are derived.
 
-**`leave_adjustments`** — append-only admin corrections: `employee_id`, `leave_type_id`, `year`, `days` decimal(5,1) signed, `note` (required), `created_by`, timestamps. Never edited or deleted — a wrong adjustment is fixed with a reversing one, the same rule as `attendance_logs`.
+**`leave_adjustments`** — append-only admin corrections: `employee_id`, `leave_type_id`, `year`, `days` decimal(5,1) signed, `note` (required), `created_by`, timestamps. Never edited or deleted — a wrong adjustment is fixed with a reversing one. Enforced in the model; `attendance_logs`, by contrast, is append-only by convention (see the Database schema section, Phase 3a).
 
-**`leaves`** — replaces the skeleton above: `employee_id`, `leave_type_id`, `start_date`, `end_date`, `half` enum(`am`, `pm`) nullable, `reason` text nullable, `status` (`pending`/`approved`/`rejected`/`cancelled`), `current_step` tinyint nullable, `requested_by` FK → users, `cancelled_by` FK → users nullable, `cancelled_at` nullable, timestamps. Indexed on `(employee_id, start_date, end_date)` and `(status, current_step)`.
+**`leaves`** — replaced the old planning skeleton: `employee_id`, `leave_type_id`, `start_date`, `end_date`, `half` enum(`am`, `pm`) nullable, `reason` text nullable, `status` (`pending`/`approved`/`rejected`/`cancelled`), `current_step` tinyint nullable, `requested_by` FK → users, `cancelled_by` FK → users nullable, `cancelled_at` nullable, timestamps. Indexed on `(employee_id, start_date, end_date)` and `(status, current_step)`.
 
 **`approval_steps`** — the shared half of the approval engine; Phase 4's `overtime_requests` reuses it. `approvable_type`/`approvable_id`, `step` tinyint, `outcome` (`approved`/`rejected`/`skipped`/`self_approved`), `decided_by` FK → users nullable (null for an automatic skip), `note` nullable, `decided_at`, timestamps. Unique on `(approvable_type, approvable_id, step)`. The request data stays in typed tables; only steps are shared. One service owns the state machine and approver resolution; `leaves` doesn't implement its own.
 
@@ -520,12 +586,27 @@ Scoped 4 Oct 2026 from the "Open questions for Phase 3" section. Owner decisions
 
 ### Build order (one reviewable slice each; the suite passes at every commit)
 
-- **3a — Schema:** `left_on`, `break_start` (with a hash check), the five tables, models, and the leave-type seeder.
+- **3a — Schema (built):** `left_on`, `break_start` (with a hash check), the five tables, models, and the leave-type seeder.
 - **3b — Balances:** the day counter, the balance calculator (carry-over, FIFO, seniority, pro-rating, service eligibility), `leave:grant` and the new-hire grant. Heavy on year-boundary and eligibility-date tests: 1 Jan joiner, 29 Feb joiner, eligibility falling on 1 Jan, a leaver before eligibility.
 - **3c — Approval engine and request lifecycle:** submit, approve, reject, cancel, on-behalf, overlap and balance checks, and the rebuild hook.
 - **3d — Builder:** `leave` precedence, half-day timing, "Worked on approved leave".
 - **3e — UI:** Time off, Approvals, Policies, the profile card, calendar/table annotations, dashboards. Screenshots at 1440/1024/390, light and dark.
 - **3f — Closeout:** docs (this section becomes "built"; `ATTENDANCE_UI.md` gets the half-day annotation), the full suite in random order, and **all 20 pinned instants**. Balances depend on year boundaries, so add instants on 31 Dec / 1 Jan if the existing ones don't exercise a grant.
+
+**Phase 3a, built:** the schema slice, in three commits plus this documentation pass.
+- **`employees.left_on`:** status and the employment period are enforced on the model, and `Employee::scopeActiveOn()`/`isActiveOn()` is the one definition of "employed on a date".
+  - Deactivation and reactivation moved to `Employees\StatusModal`, a modal of its own: `<x-confirm-dialog>` closes before the server answers, so it could show neither a last-day error nor a rebuild warning. The employee form lost its Status field.
+  - Every build now selects employees by employment period, and the builder removes rows after `left_on`.
+  - The dashboard trend and `todayIsPending()` measure each day against the employees active on it (see Employee lifecycle and Phase 2.7 item 6).
+- **`work_schedules.break_start`:** the column, with its shape rule and its lock, including the one null → value exception. The Schedules form gains "Break starts".
+- **The five leave tables:** models, the four enums, factories with states, and `LeaveTypeSeeder`. The lock and deletion on `LeaveType` use two different tests on purpose, and adjustments and approval steps are append-only in the model (see Database schema, Phase 3a).
+
+Verified as Phase 2.5c was, with one change: the dev database was seeded with the clock pinned to Fri 2 Oct 2026 12:00 (`Carbon::setTestNow()` around `migrate:fresh --seed`). That makes the before/after comparison independent of the day it runs; two baseline seeds hashed identically.
+- **Schema dump diff against the pre-3a baseline:** only additions — the five tables, `left_on` and `break_start`.
+- **SHA-256 of every pre-existing table's substantive data** (timestamps, `users.password` and `remember_token` excluded; the two new columns excluded): identical for all 15 tables, `daily_attendances` included. The only seeded additions were the five leave types.
+- **Rollback:** rolling back the seven new migrations restored the baseline schema and data exactly. Migrating forward over existing data matched a fresh run's schema, and it backfilled `break_start` = 12:00 on the already-locked Default schedule.
+- **Tests:** 631 pass in fixed order and in three random orders (seeds 1105, 4242, 90210). All 20 pinned instants pass: every day of 2–8 Feb 2026 at the shift and midnight edges; 28 Feb/1 Mar; 31 Mar/1 Apr; 31 Dec 2026/1 Jan 2027; 29 Feb/1 Mar 2028; mid-2026; mid-2030.
+- **Screenshots** (1440 light/dark, 390): the deactivate modal, the profile's header actions, and the locked schedule's read-only Break starts.
 
 ### Still open
 
