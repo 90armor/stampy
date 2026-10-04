@@ -452,7 +452,9 @@ class CalendarReadabilityTest extends TestCase
         // fainter icon than the day number.
         $this->assertStringContainsString('bg-transparent ring-transparent border border-dashed border-slate-divider', $html);
         $this->assertStringNotContainsString('bg-slate-100 dark:bg-slate-750 ring-slate-500/10', $html);
-        $this->assertStringContainsString('text-slate-400 dark:text-slate-400', $html);
+        // The fainter icon: decorative slate-400 (dark slate-500), against
+        // the day number's readable slate-500 (dark slate-400).
+        $this->assertStringContainsString('text-slate-400 dark:text-slate-500', $html);
     }
 
     public function test_off_cells_show_no_time_placeholder(): void
