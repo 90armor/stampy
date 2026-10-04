@@ -109,6 +109,13 @@ class NeutralScaleTest extends TestCase
                 }
                 $offenders[] = $relative.': '.preg_replace('/\s+/', ' ', substr($tag, 0, 100));
             }
+            // Text colours kept in PHP style arrays (the calendar's variants).
+            preg_match_all("/'text' => '([^']*)'/", $file->getContents(), $styles);
+            foreach ($styles[1] as $classes) {
+                if (preg_match('/(?<![:\w-])text-slate-400\b/', $classes)) {
+                    $offenders[] = $relative.": 'text' => '{$classes}'";
+                }
+            }
         }
 
         $this->assertSame([], $offenders, 'Readable muted text is text-slate-500 dark:text-slate-400.');

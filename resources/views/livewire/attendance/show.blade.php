@@ -61,7 +61,7 @@
     // — deliberately not sharing 'off's calendar-days icon or 'absent's
     // x-mark: a flat dash has no shape overlap with either, so it can't be
     // mistaken for "did not work" or "day off" at a glance.
-    $notCalculatedStyle = ['icon' => 'minus', 'bg' => 'bg-slate-50 dark:bg-slate-750/40', 'text' => 'text-slate-400 dark:text-slate-600', 'ring' => 'ring-slate-divider'];
+    $notCalculatedStyle = ['icon' => 'minus', 'bg' => 'bg-slate-50 dark:bg-slate-750/40', 'text' => 'text-slate-500 dark:text-slate-400', 'ring' => 'ring-slate-divider'];
 
     $weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
