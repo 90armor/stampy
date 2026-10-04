@@ -79,4 +79,39 @@ class NeutralScaleTest extends TestCase
         $this->assertMatchesRegularExpression('/:root \{[^}]*--slate-800: 41 37 36;/s', $css);
         $this->assertMatchesRegularExpression('/\.dark \{[^}]*--slate-800: 39 39 42;/s', $css);
     }
+
+    public function test_readable_text_never_uses_light_slate_400_which_is_for_decorative_icons(): void
+    {
+        // Light slate-400 is 2.52:1 on white (docs/DESIGN_SYSTEM.md, Muted text
+        // rule): icons and icon-only containers may use it, text may not. The
+        // sidebar's disabled "Soon" items are a recorded Phase 5 item.
+        $iconOnly = [
+            'resources/views/components/empty-state.blade.php' => 'rounded-full bg-slate-100 text-slate-400',
+            'resources/views/livewire/attendance/index.blade.php' => 'rounded-full bg-slate-100 text-slate-400',
+            'resources/views/livewire/employees/index.blade.php' => 'rounded-full bg-slate-100 text-slate-400',
+            'resources/views/components/time-input.blade.php' => 'rounded-md text-slate-400 transition',
+            'resources/views/layouts/partials/sidebar.blade.php' => 'text-slate-400 dark:',
+        ];
+        $offenders = [];
+
+        foreach (File::allFiles(resource_path('views')) as $file) {
+            $relative = str_replace(base_path().'/', '', $file->getPathname());
+            if (in_array($relative, self::IGNORED, true)) {
+                continue;
+            }
+            preg_match_all('/<([\w.:-]+)\b([^>]*?)>/s', $file->getContents(), $tags, PREG_SET_ORDER);
+            foreach ($tags as [$tag, $name, $attributes]) {
+                if (in_array($name, ['x-icon', 'svg', 'path'], true) || ! preg_match('/(?<![:\w-])text-slate-400\b/', $attributes)) {
+                    continue;
+                }
+                if (isset($iconOnly[$relative]) && str_contains($attributes, $iconOnly[$relative])) {
+                    continue;
+                }
+                $offenders[] = $relative.': '.preg_replace('/\s+/', ' ', substr($tag, 0, 100));
+            }
+        }
+
+        $this->assertSame([], $offenders, 'Readable muted text is text-slate-500 dark:text-slate-400.');
+    }
 }
+

@@ -36,8 +36,8 @@ This document is the source of truth for Stampy's visual interface. It records c
 |---|---|---|---|
 | Text / Primary | `text-slate-900` | `dark:text-slate-100` | Headings and primary readable content |
 | Text / Secondary | `text-slate-700` | `dark:text-slate-300` | Supporting body content and controls |
-| Text / Muted | `text-slate-500` | `dark:text-slate-400` | Metadata, hints, and secondary labels |
-| Text / Subtle | `text-slate-400` | `dark:text-slate-500` (icons only) | Low-emphasis decoration; never critical copy. In dark mode `slate-500` is never used for text — it measures under 4.5:1 on the card; muted text is `slate-400` |
+| Text / Muted | `text-slate-500` | `dark:text-slate-400` | **All readable muted text**: metadata, hints, helper text, summary notes, column and weekday headers, role labels, voided rows |
+| Icon / Subtle | `text-slate-400` | `dark:text-slate-500` | **Decorative icons only** — never text. Light `slate-400` is 2.52:1 on white and dark `slate-500` 3.08:1 on the card, both under 4.5:1 |
 | Surface / Page | `bg-slate-100` | `dark:bg-slate-900` | Application and authentication background |
 | Surface / Card | `bg-white` | `dark:bg-slate-800` | Cards, table containers, information panels |
 | Surface / Control | `bg-white` | `dark:bg-slate-750` | Inputs, selects, textareas, compact controls |
@@ -48,6 +48,8 @@ This document is the source of truth for Stampy's visual interface. It records c
 | Action / Secondary | `bg-white text-slate-700` | `dark:bg-slate-800 dark:text-slate-200` | Supporting actions |
 | Action / Danger | `text-red-600` with red boundary/tint | `dark:text-red-400` | Destructive actions |
 | Focus / Interactive | `ring-primary-500` | `dark:ring-primary-500` | Keyboard focus and focused controls |
+
+**Muted text rule, measured.** Readable muted text is `slate-500` in light mode and `slate-400` in dark mode; light `slate-400` (and dark `slate-500`) are for decorative icons only. Light `slate-500`: 4.80:1 on white cards, 4.59:1 on a `slate-50` row hover, **4.40:1 on the `slate-100` page** — just under AA, where page subtitles, "Back to …" links and inactive Organization tabs sit (recorded for Phase 5). Dark `slate-400`: 5.81:1 on the card, 4.90:1 on overlays and controls (`slate-750`), 5.28:1 on a hovered row, 6.91:1 on the page. Disabled controls (the sidebar's "Soon" items, a disabled button) are exempt from the contrast minimum and keep their quieter tones; they are a Phase 5 item too. Decorative marks that carry no information — the table em-dash, a day outside the shown month, a disabled picker option — may use `slate-300`.
 
 Attendance color is model-driven. `DailyAttendance::displayVariant()` is the source of truth and is status-only: present green, incomplete violet, absent red, off slate, leave accent, in progress blue, and holiday fuchsia. Views must not independently derive these buckets. Status is reinforced with text or shape, never color alone.
 

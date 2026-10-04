@@ -155,7 +155,7 @@
                     <x-input-label for="assign_effective_from" value="Effective from" />
                     {{-- min mirrors the rule: not before this employee's join date. --}}
                     <x-date-picker id="assign_effective_from" model="effective_from" label="Effective from" :min="$employee->join_date->format('Y-m-d')" />
-                    <p class="mt-1 text-xs text-slate-400 dark:text-slate-400">Past dates correct a wrong assignment; future dates schedule a change ahead. Rebuilds this employee's attendance from this date through today — never a future date.</p>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Past dates correct a wrong assignment; future dates schedule a change ahead. Rebuilds this employee's attendance from this date through today — never a future date.</p>
                     <x-input-error :messages="$errors->get('effective_from')" class="mt-1" />
                 </div>
 

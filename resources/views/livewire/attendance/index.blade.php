@@ -421,7 +421,7 @@
                                     @if ($attendance->last_out)
                                         <x-time :time="$attendance->last_out" />
                                         @if ($attendance->isOvernightOut())
-                                            <span class="text-slate-400 dark:text-slate-400">(+1)</span>
+                                            <span class="text-slate-500 dark:text-slate-400">(+1)</span>
                                         @endif
                                     @else
                                         {!! $emDash !!}

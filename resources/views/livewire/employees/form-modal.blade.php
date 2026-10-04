@@ -78,7 +78,7 @@
                                     <div class="sm:max-w-[240px]">
                                         <x-input-label for="emp_employee_code" value="Employee code" class="!mb-0" />
                                         @if ($editing)
-                                            <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-400">Can't be changed after creation.</p>
+                                            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Can't be changed after creation.</p>
                                         @endif
                                     </div>
                                     <div class="sm:w-[320px] sm:shrink-0">
@@ -131,7 +131,7 @@
                                 <div class="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
                                     <div class="sm:max-w-[240px]">
                                         <x-input-label for="emp_manager_id" value="Manager" class="!mb-0" />
-                                        <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-400">Leave blank for a top-level employee.</p>
+                                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Leave blank for a top-level employee.</p>
                                     </div>
                                     <div class="sm:w-[320px] sm:shrink-0">
                                         <x-select id="emp_manager_id" wire:model="manager_id">
@@ -164,7 +164,7 @@
                                 <div class="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
                                     <div class="sm:max-w-[240px]">
                                         <x-input-label for="emp_device_user_id" value="Device user ID" class="!mb-0" />
-                                        <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-400">Must match the user ID enrolled on the fingerprint device.</p>
+                                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Must match the user ID enrolled on the fingerprint device.</p>
                                     </div>
                                     <div class="sm:w-[320px] sm:shrink-0">
                                         <x-text-input id="emp_device_user_id" type="text" wire:model="device_user_id" placeholder="ZKTeco device user ID" />
@@ -226,7 +226,7 @@
                                                 <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
                                                     <div class="sm:max-w-[240px]">
                                                         <x-input-label for="emp_username" value="Username" class="!mb-0" />
-                                                        <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-400">Login identifier. Defaults to the employee code.</p>
+                                                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Login identifier. Defaults to the employee code.</p>
                                                     </div>
                                                     <div class="sm:w-[320px] sm:shrink-0">
                                                         <x-text-input id="emp_username" type="text" wire:model="username" />

@@ -28,7 +28,7 @@
                 <div class="grid grid-cols-1 gap-2 py-4 sm:grid-cols-[110px_1fr] sm:items-start sm:gap-6">
                     <div>
                         <x-input-label for="pos_description" value="Description" class="!mb-0" />
-                        <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-400">Optional.</p>
+                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Optional.</p>
                     </div>
                     <div class="min-w-0">
                         <x-textarea id="pos_description" rows="3" wire:model="description">{{ $description }}</x-textarea>

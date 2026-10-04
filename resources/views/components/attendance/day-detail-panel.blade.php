@@ -58,7 +58,7 @@ divergence here would be a real correctness bug, not just a style one. --}}
                     $voided = $punch->voided_at !== null;
                 @endphp
                 <li class="flex min-h-12 items-center gap-3 border-t border-slate-divider py-2 first:border-t-0">
-                    <div @class(['flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-0.5 text-sm', 'text-slate-400 dark:text-slate-500' => $voided, 'text-slate-900 dark:text-slate-100' => ! $voided])>
+                    <div @class(['flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-0.5 text-sm', 'text-slate-500 dark:text-slate-400' => $voided, 'text-slate-900 dark:text-slate-100' => ! $voided])>
                         <span @class(['w-24 shrink-0 font-medium tabular-nums', 'line-through' => $voided])>
                             <x-time :time="$punch->punched_at" />
                             @if ($isNextDay)

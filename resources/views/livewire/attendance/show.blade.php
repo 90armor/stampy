@@ -151,7 +151,7 @@
                                 $summary['early_leave_days'] > 0 ? $summary['early_leave_days'].' left early' : null,
                             ]);
                         @endphp
-                        <span class="text-xs text-slate-400 dark:text-slate-400">(of which {{ implode(' · ', $timingParts) }})</span>
+                        <span class="text-xs text-slate-500 dark:text-slate-400">(of which {{ implode(' · ', $timingParts) }})</span>
                     @endif
                 </span>
                 <span class="text-slate-500 dark:text-slate-400">Absent <strong class="font-semibold text-slate-900 dark:text-slate-100">{{ $summary['absent'] }}</strong></span>
@@ -160,13 +160,13 @@
                     {{-- Late annotates its own status group, the same way as
                     Present's "(of which …)" (docs/ATTENDANCE_UI.md). --}}
                     @if ($summary['incomplete_late'] > 0)
-                        <span class="text-xs text-slate-400 dark:text-slate-400">({{ $summary['incomplete_late'] }} late)</span>
+                        <span class="text-xs text-slate-500 dark:text-slate-400">({{ $summary['incomplete_late'] }} late)</span>
                     @endif
                 </span>
             </div>
 
             @if ($summary['total_worked_minutes'] > 0)
-                <p class="mt-3 border-t border-slate-divider pt-3 text-xs text-slate-400 dark:text-slate-400">
+                <p class="mt-3 border-t border-slate-divider pt-3 text-xs text-slate-500 dark:text-slate-400">
                     Total worked this month: {{ \App\Support\Duration::format($summary['total_worked_minutes']) }}
                 </p>
             @endif
@@ -242,7 +242,7 @@
             <div class="px-6 pb-6">
                 <div class="grid grid-cols-7 gap-1.5 sm:gap-2">
                     @foreach ($weekdayLabels as $label)
-                        <div class="pb-1 text-center text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">
+                        <div class="pb-1 text-center text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                             {{ $label }}
                         </div>
                     @endforeach
@@ -497,7 +497,7 @@
                                         @if ($record->last_out)
                                             <x-time :time="$record->last_out" />
                                             @if ($record->isOvernightOut())
-                                                <span class="text-slate-400 dark:text-slate-400">(+1)</span>
+                                                <span class="text-slate-500 dark:text-slate-400">(+1)</span>
                                             @endif
                                         @else
                                             {!! $emDash !!}
@@ -666,7 +666,7 @@
                                         <x-time :time="$modalRecord->last_out" />
                                     @endif
                                     @if ($modalRecord->isOvernightOut())
-                                        <span class="text-slate-400 dark:text-slate-400">(+1)</span>
+                                        <span class="text-slate-500 dark:text-slate-400">(+1)</span>
                                     @endif
                                 @else
                                     {!! $modalDash !!}

@@ -56,7 +56,7 @@
                         </span>
                         <span class="hidden sm:flex sm:flex-col sm:items-start sm:leading-tight">
                             <span class="font-medium text-slate-900 dark:text-slate-100">{{ auth()->user()->name }}</span>
-                            <span class="text-xs text-slate-400 dark:text-slate-400">
+                            <span class="text-xs text-slate-500 dark:text-slate-400">
                                 {{ auth()->user()->getRoleNames()->first() ? ucfirst(auth()->user()->getRoleNames()->first()) : 'No role' }}
                             </span>
                         </span>

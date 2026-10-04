@@ -38,7 +38,7 @@
                 <div class="grid grid-cols-1 gap-2 py-4 sm:grid-cols-[110px_1fr] sm:items-start sm:gap-6">
                     <div>
                         <x-input-label for="holiday_note" value="Note" class="!mb-0" />
-                        <p class="mt-0.5 text-xs text-slate-400 dark:text-slate-400">Optional.</p>
+                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Optional.</p>
                     </div>
                     <div class="min-w-0">
                         <x-textarea id="holiday_note" rows="2" maxlength="255" wire:model="note">{{ $note }}</x-textarea>
