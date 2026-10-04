@@ -4,6 +4,16 @@
 // to detect "multiple instances of Alpine running" and silently stops wire:click /
 // wire:model directives from binding on any page with a Livewire component.
 
+// Where <x-modal> returns focus on close when its trigger lost focus before
+// the modal opened (wire:loading disables the trigger during the round trip):
+// the last element focused outside any modal dialog. Page-wide, because a
+// modal can be rendered only once it opens, with no history of its own.
+document.addEventListener('focusin', (event) => {
+    if (! event.target.closest('[role="dialog"][aria-modal="true"]')) {
+        window.stampyLastFocusOutsideModal = event.target;
+    }
+});
+
 document.addEventListener('alpine:init', () => {
     // Pinned trailing table columns (.table-pin in resources/css/app.css). Put on
     // a table's overflow-x-auto container. Keeps two facts in sync with layout

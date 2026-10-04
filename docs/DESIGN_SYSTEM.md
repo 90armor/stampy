@@ -240,7 +240,7 @@ Navigation visibility must match destination authorization. UI hiding is present
 
 ## Overlays
 
-Dropdowns and popovers are opaque, elevated content surfaces. Modals use `<x-modal>` and remain teleported to `<body>`; do not nest a hand-built fixed overlay in page content. Escape and backdrop click close dismissible overlays. Modal focus is trapped while open and restored to the trigger when closed. Confirmation dialogs follow the same visual surface rules.
+Dropdowns and popovers are opaque, elevated content surfaces. Modals use `<x-modal>` and remain teleported to `<body>`; do not nest a hand-built fixed overlay in page content. Escape and backdrop click close dismissible overlays. Opening a modal always moves focus into it — the visible field marked `autofocus`, else the first focusable element (the calendar's day modal lands on **Add punch**, or **Close** for a viewer who can't add punches) — focus is trapped while it is open, and closing returns it to the trigger, or, when the trigger lost focus before the modal opened (`wire:loading` disables it during the round trip), to the last element focused outside any modal (`ModalFocusTest`). Confirmation dialogs follow the same visual surface rules.
 
 ## Loading states
 
