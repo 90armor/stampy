@@ -39,4 +39,10 @@ class DisplayDateTest extends TestCase
     {
         $this->assertSame('Tuesday, 29 September 2026', DisplayDate::long(Carbon::parse('2026-09-29')));
     }
+
+    public function test_month_names_a_whole_month_and_always_includes_the_year(): void
+    {
+        $this->assertSame('October 2026', DisplayDate::month(Carbon::parse('2026-10-31')));
+        $this->assertSame('January 2027', DisplayDate::month(Carbon::parse('2027-01-01')));
+    }
 }

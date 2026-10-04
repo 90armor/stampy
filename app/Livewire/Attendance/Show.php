@@ -10,6 +10,7 @@ use App\Models\Employee;
 use App\Models\Holiday;
 use App\Services\Attendance\DailySummaryBuilder;
 use App\Support\AttendanceTime;
+use App\Support\DisplayDate;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
@@ -544,7 +545,7 @@ class Show extends Component
             'gridDays' => $this->gridDays($existing),
             'recordsByDate' => $existing,
             'summary' => $this->summary($days),
-            'monthLabel' => $this->monthStart()->format('F Y'),
+            'monthLabel' => DisplayDate::month($this->monthStart()),
             'isCurrentMonth' => $this->month === today()->format('Y-m'),
             'punchesByDate' => $this->punchesByDate(),
             'overnightPunches' => $this->overnightPunches($existing),

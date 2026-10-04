@@ -7,15 +7,17 @@ use Carbon\CarbonInterface;
 /**
  * The single formatter for every date shown in the UI, so dates can't drift
  * into different orders and styles (the same job App\Support\Duration does
- * for durations). Day-month order everywhere, and only three forms:
+ * for durations). Day-month order everywhere, and only four forms:
  *
  * - compact: "Tue 29 Sep" — tables, stat strip and card meta, lists
  * - range:   "23–29 Sep", "28 Sep – 3 Oct" — date ranges
  * - long:    "Tuesday, 29 September 2026" — page subtitles, modal titles,
  *            accessible labels
+ * - month:   "October 2026" — a month as a whole: the calendar's heading
+ *            (the date picker's heading, in resources/js/app.js, matches it)
  *
  * compact and range add the year only when it isn't the current year; long
- * always includes it.
+ * and month always include it.
  */
 class DisplayDate
 {
@@ -44,6 +46,11 @@ class DisplayDate
     public static function long(CarbonInterface $date): string
     {
         return $date->format('l, j F Y');
+    }
+
+    public static function month(CarbonInterface $date): string
+    {
+        return $date->format('F Y');
     }
 
     private static function yearSuffix(CarbonInterface $date): string

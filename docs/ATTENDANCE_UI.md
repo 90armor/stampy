@@ -44,7 +44,7 @@ Why `amber-700` in light mode: an earlier perception that amber timing text read
 
 ### Dates
 
-Attendance dates use the three `App\Support\DisplayDate` forms (see [Design System](DESIGN_SYSTEM.md#typography)): compact `Tue 29 Sep` in table Date columns, the employee table view, card meta and notices; range `23–29 Sep` for the date picker trigger and the summary strip scope; long `Monday, 21 September 2026` for the day-modal title (no weekday eyebrow) and every calendar cell's accessible label.
+Attendance dates use the four `App\Support\DisplayDate` forms (the month form is the calendar heading) (see [Design System](DESIGN_SYSTEM.md#typography)): compact `Tue 29 Sep` in table Date columns, the employee table view, card meta and notices; range `23–29 Sep` for the date picker trigger and the summary strip scope; long `Monday, 21 September 2026` for the day-modal title (no weekday eyebrow) and every calendar cell's accessible label.
 
 ### Durations and counts
 

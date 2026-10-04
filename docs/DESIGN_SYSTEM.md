@@ -61,11 +61,12 @@ Attendance color is model-driven. `DailyAttendance::displayVariant()` is the sou
 - DM Serif Display is limited to the auth hero's editorial accent through `font-serif`.
 - Default body and control copy is `text-sm`; supporting metadata is `text-xs` or `text-sm`.
 - Page titles use `text-2xl font-semibold tracking-tight` on every page, the dashboard included. Section and card headings use sentence case ("Quick actions", not "Quick Actions").
-- Dates go through `App\Support\DisplayDate`, in day-month order, in exactly three forms:
+- Dates go through `App\Support\DisplayDate`, in day-month order, in exactly four forms:
   - **compact** `Tue 29 Sep` — tables, stat strip and card meta, lists, detail fields, and inline dates in notices and messages;
   - **range** `23–29 Sep`, `28 Sep – 3 Oct` — the date picker trigger, strip scope and card meta for a span (a one-day range is compact);
-  - **long** `Tuesday, 29 September 2026` — page subtitles, modal titles, and accessible labels.
-  Compact and range show the year only when it isn't the current year (`Mon 20 May 2024`, `28 Dec 2025 – 3 Jan 2026`); long always includes it. Do not call `->format()` for display elsewhere, and do not pair a weekday eyebrow with a date — compact already carries the weekday. A month heading such as `September 2026` names a month, not a date, and stays as is.
+  - **long** `Tuesday, 29 September 2026` — page subtitles, modal titles, and accessible labels;
+  - **month** `October 2026` — a month as a whole: the employee calendar's heading (`DisplayDate::month()`), matched by the date picker's own heading in `resources/js/app.js`.
+  Compact and range show the year only when it isn't the current year (`Mon 20 May 2024`, `28 Dec 2025 – 3 Jan 2026`); long and month always include it. Do not call `->format()` for display elsewhere, and do not pair a weekday eyebrow with a date — compact already carries the weekday.
 - Numeric attendance values use `tabular-nums` when alignment helps comparison. Durations use the single compact format from `App\Support\Duration` (`21m`, `1h 20m`); see [Attendance UI](ATTENDANCE_UI.md).
 - Avoid introducing arbitrary font families, tiny critical copy, or long uppercase labels.
 
