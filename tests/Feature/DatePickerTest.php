@@ -129,4 +129,15 @@ class DatePickerTest extends TestCase
         // The employee calendar sits on the card, where the fill alone is 3.26:1.
         $this->assertStringNotContainsString($edge, File::get(resource_path('views/livewire/attendance/show.blade.php')));
     }
+
+    public function test_opening_moves_focus_into_the_grid_on_the_selected_date_else_today_else_the_first_enabled_day(): void
+    {
+        $js = File::get(resource_path('js/app.js'));
+
+        // The order the docs promise (docs/ATTENDANCE_UI.md, Date picker, Keyboard).
+        $this->assertMatchesRegularExpression('/initialFocus\(\) \{\s*if \(isValidIso\(this\.to\) && !this\.isDisabled\(this\.to\)\) return this\.to;\s*if \(!this\.isDisabled\(this\.today\)\) return this\.today;\s*return this\.min \?\? this\.max;/', $js);
+        // openPanel() focuses that cell once the grid has rendered.
+        $this->assertMatchesRegularExpression('/this\.focused = this\.initialFocus\(\);[\s\S]{0,600}querySelector\(`\[data-date="\$\{this\.focused\}"\]`\)[\s\S]{0,120}cell\.focus\(\)/', $js);
+    }
 }
+

@@ -296,12 +296,29 @@ document.addEventListener('alpine:init', () => {
             this.preview = null;
             this.announcement = '';
             this.view = 'days';
-            let start = isValidIso(this.to) ? this.to : this.today;
-            if (this.min !== null && start < this.min) start = this.min;
-            if (this.max !== null && start > this.max) start = this.max;
-            this.focused = start;
+            this.focused = this.initialFocus();
             this.panelOpen = true;
-            this.$nextTick(() => this.place());
+            // Open straight into the grid (the WAI-ARIA date picker pattern):
+            // the arrow keys work at once, no tabbing past the presets. Below
+            // 640px the range picker's calendar is hidden, so focus goes to
+            // the panel's first control instead.
+            this.$nextTick(() => {
+                this.place();
+                const cell = this.$refs.picker?.querySelector(`[data-date="${this.focused}"]`);
+                if (cell && cell.offsetParent !== null) {
+                    cell.focus();
+                } else {
+                    [...(this.$refs.panel?.querySelectorAll('button, input, select') ?? [])].find((el) => !el.disabled && el.offsetParent !== null)?.focus();
+                }
+            });
+        },
+        // The day the grid opens on: the selected date (a range's end, the
+        // month the picker shows), else today, else the first enabled day —
+        // whichever is first within the field's limits.
+        initialFocus() {
+            if (isValidIso(this.to) && !this.isDisabled(this.to)) return this.to;
+            if (!this.isDisabled(this.today)) return this.today;
+            return this.min ?? this.max;
         },
         // Escape and the presets return focus to the trigger; a click outside
         // leaves focus wherever the click put it.
