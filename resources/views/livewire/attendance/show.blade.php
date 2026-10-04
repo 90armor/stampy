@@ -17,18 +17,17 @@
         // displayVariant() colour table. Incomplete (a device defect — the
         // person worked, nothing recorded it) must never read as amber, which
         // is reserved for the timing annotation. text-violet-700/violet-300 measured
-        // 6.48:1 (light, on violet-50) and 9.43:1 (dark, on violet-900/20
+        // 6.48:1 (light, on violet-50) and 7.83:1 (dark, on violet-900/20
         // over the card background) — -300, not -400, for the same reason
         // 'absent' uses red-300: picked against the actual measured ratio,
         // not assumed from the number.
         'incomplete' => ['badge' => 'violet', 'icon' => 'exclamation-triangle', 'bg' => 'bg-violet-50 dark:bg-violet-900/20', 'text' => 'text-violet-700 dark:text-violet-300', 'ring' => 'ring-violet-600/20 dark:ring-violet-500/40'],
         // dark:text-red-300, not -400: computed against this cell's actual
-        // composited background (red-900/20 over the card's slate-900/60
-        // over the page's slate-950), red-400 measured 6.23:1 — technically
-        // AA-passing but well below green-400's 9.62:1 and amber-400's
-        // 10.03:1 in the exact same recipe, which is why red alone read as
-        // harder to see. red-300 measures 9.07:1 in the same computation,
-        // back in line with its siblings.
+        // composited background (red-900/20 over the slate-800 card), red-400
+        // measures 5.17:1 — AA-passing but well below green-400's 7.88:1 and
+        // amber-400's 8.27:1 in the same recipe, which is why red alone read
+        // as harder to see. red-300 measures 7.54:1, back in line with its
+        // siblings.
         'absent' => ['badge' => 'red', 'icon' => 'x-mark', 'bg' => 'bg-red-50 dark:bg-red-900/20', 'text' => 'text-red-700 dark:text-red-300', 'ring' => 'ring-red-600/20 dark:ring-red-500/40'],
         // Off is the quietest cell in the grid, quieter than Present: no fill
         // (a grey fill was the heaviest surface in dark mode), a muted number
@@ -43,13 +42,13 @@
         // amber/violet confusability problem this app has already fixed
         // twice. Must not read as red or amber either — it means "not yet",
         // not a failure. text-blue-700/blue-300
-        // measured 6.16:1 (light, on blue-50) and 9.51:1 (dark, on
+        // measured 6.16:1 (light, on blue-50) and 7.81:1 (dark, on
         // blue-900/20 over the card background).
         'in_progress' => ['badge' => 'blue', 'icon' => 'clock', 'bg' => 'bg-blue-50 dark:bg-blue-900/20', 'text' => 'text-blue-700 dark:text-blue-300', 'ring' => 'ring-blue-600/20 dark:ring-blue-500/30'],
         // fuchsia: doesn't collide with any hue already in use (green/amber/
         // violet/red/slate/blue, plus primary/accent's own green family).
         // text-fuchsia-700/fuchsia-300 measured 5.89:1 (light, on
-        // fuchsia-50) and 9.79:1 (dark, on fuchsia-900/20 over the card
+        // fuchsia-50) and 8.13:1 (dark, on fuchsia-900/20 over the card
         // background).
         'holiday' => ['badge' => 'fuchsia', 'icon' => 'flag', 'bg' => 'bg-fuchsia-50 dark:bg-fuchsia-900/20', 'text' => 'text-fuchsia-700 dark:text-fuchsia-300', 'ring' => 'ring-fuchsia-600/20 dark:ring-fuchsia-500/30'],
         // Doesn't occur yet — nothing assigns Leave until Phase 3 — defined

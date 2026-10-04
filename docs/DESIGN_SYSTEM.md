@@ -45,7 +45,7 @@ This document is the source of truth for Stampy's visual interface. It records c
 | Line / Border | `ring-slate-border` or `border-slate-border` | same (the token switches with the theme) | Surface edges and controls (see Lines) |
 | Line / Divider | `border-slate-divider`, `divide-slate-divider` or `bg-slate-divider` | same | Every line inside a surface (see Lines) |
 | Action / Primary | `bg-primary-600 text-white` | same | Main action on a page or flow |
-| Action / Secondary | `bg-white text-slate-700` | `dark:bg-slate-800 dark:text-slate-200` | Supporting actions |
+| Action / Secondary | `bg-white text-slate-700` | `dark:bg-slate-750 dark:text-slate-200` | Supporting actions (a control, one step above the card) |
 | Action / Danger | `text-red-600` with red boundary/tint | `dark:text-red-400` | Destructive actions |
 | Focus / Interactive | `ring-primary-500` | `dark:ring-primary-500` | Keyboard focus and focused controls |
 

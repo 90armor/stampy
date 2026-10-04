@@ -18,9 +18,9 @@ $colors = [
     // background, matching the other entries' actual-not-assumed contrast.
     'blue' => 'bg-blue-50 text-blue-700 ring-blue-600/20 dark:bg-blue-900/30 dark:text-blue-300 dark:ring-blue-500/30',
     // Added for Attendance's Holiday status. dark:text-fuchsia-300 (not
-    // -400): 9.33:1 measured the same way.
+    // -400): 7.89:1 measured the same way.
     'fuchsia' => 'bg-fuchsia-50 text-fuchsia-700 ring-fuchsia-600/20 dark:bg-fuchsia-900/30 dark:text-fuchsia-300 dark:ring-fuchsia-500/30',
-    // Leave (Phase 3) — must not read as off/a weekend. Measured: 5.05:1 light (700 on 50), 10.30:1 dark (300 on 900/30 over the card).
+    // Leave (Phase 3) — must not read as off/a weekend. Measured: 5.05:1 light (700 on 50), 8.59:1 dark (300 on 900/30 over the card).
     'accent' => 'bg-accent-50 text-accent-700 ring-accent-600/20 dark:bg-accent-900/30 dark:text-accent-300 dark:ring-accent-500/30',
 ];
 @endphp
