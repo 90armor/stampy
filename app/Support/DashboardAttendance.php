@@ -482,7 +482,9 @@ class DashboardAttendance
 
     /**
      * The most recent real punches, not a fabricated activity feed. This is
-     * a log: "Checked in" / "Checked out" in neutral text, with no timing.
+     * a log: "Punched in" / "Punched out" in neutral text, with no timing.
+     * Event-log language on purpose: "Checked in" is reserved for the
+     * any-punch aggregate on the Department card and the trend.
      * The late fact is shown once, in Needs attention, not repeated here.
      *
      * @param  int[]|null  $employeeIds
@@ -499,7 +501,7 @@ class DashboardAttendance
             ->get()
             ->map(fn (AttendanceLog $log) => [
                 'name' => $log->employee->full_name,
-                'action' => $log->punch_type->value === 'in' ? 'Checked in' : 'Checked out',
+                'action' => $log->punch_type->value === 'in' ? 'Punched in' : 'Punched out',
                 'time' => AttendanceTime::format($log->punched_at),
                 // Only for an entry that isn't from today, so an older punch
                 // can't read as this morning's.

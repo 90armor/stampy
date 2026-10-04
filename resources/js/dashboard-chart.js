@@ -112,7 +112,7 @@ function initAttendanceTrendChart() {
                     displayColors: false,
                     filter: (item) => item.raw !== null,
                     callbacks: {
-                        label: (ctx) => (pending[ctx.dataIndex] ? `${ctx.parsed.y}% checked in so far` : `${ctx.parsed.y}% present`),
+                        label: (ctx) => (pending[ctx.dataIndex] ? `${ctx.parsed.y}% checked in so far` : `${ctx.parsed.y}% attended`),
                     },
                 },
             },

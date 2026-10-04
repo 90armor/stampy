@@ -362,14 +362,15 @@ class DashboardTest extends TestCase
 
         $response = $this->actingAs($admin)->get(route('dashboard'));
 
-        // A log: plain "Checked in", no late minutes and no amber — the late
-        // fact is shown once, in Needs attention.
+        // A log: plain "Punched in" (event language; "Checked in" is the
+        // any-punch aggregate), no late minutes and no amber — the late fact
+        // is shown once, in Needs attention.
         $response->assertViewHas('attendance', function ($attendance) {
             $activity = collect($attendance['recent'])->firstWhere('name', 'Punchy Person');
 
-            return $activity !== null && $activity['action'] === 'Checked in' && ! array_key_exists('tone', $activity);
+            return $activity !== null && $activity['action'] === 'Punched in' && ! array_key_exists('tone', $activity);
         });
-        $response->assertDontSee('Checked in 8m late')
+        $response->assertDontSee('Punched in 8m late')
             ->assertSee('<p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Checked in</p>', false);
     }
 
@@ -724,4 +725,15 @@ class DashboardTest extends TestCase
         $this->actingAs($this->admin())->get(route('dashboard'))
             ->assertSeeInOrder(['At work', '3', '2 late', 'Left', '1', '1 late · 1 early', 'Not in', '1']);
     }
+
+    public function test_the_trend_tooltip_says_attended_not_present(): void
+    {
+        $chart = file_get_contents(resource_path('js/dashboard-chart.js'));
+
+        // The rate is attended (present + incomplete); "present" would misstate it.
+        $this->assertStringContainsString('% attended`', $chart);
+        $this->assertStringNotContainsString('% present`', $chart);
+        $this->assertStringContainsString('% checked in so far`', $chart);
+    }
 }
+
