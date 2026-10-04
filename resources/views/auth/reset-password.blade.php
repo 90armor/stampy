@@ -1,5 +1,4 @@
 <x-guest-layout>
-    <p class="mb-1.5 text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Account recovery</p>
     <h2 class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Choose a new password</h2>
     <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Make it something you haven't used before.</p>
 

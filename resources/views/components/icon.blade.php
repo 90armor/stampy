@@ -41,8 +41,13 @@ $paths = match ($name) {
     'lock-closed' => 'M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z',
     default => '',
 };
+
+// 20px only when the caller sets no size of its own. Merging 'w-5 h-5' in
+// front of a caller's 'h-4 w-4' kept both classes, and Tailwind emits h-5
+// after h-4, so every smaller icon rendered at 20px.
+$sized = preg_match('/(?:^|\s)(?:w|h|size)-/', (string) $attributes->get('class'));
 @endphp
 
-<svg {{ $attributes->merge(['class' => 'w-5 h-5']) }} fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+<svg {{ $attributes->merge(['class' => $sized ? '' : 'w-5 h-5']) }} fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
     <path stroke-linecap="round" stroke-linejoin="round" d="{{ $paths }}" />
 </svg>

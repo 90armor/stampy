@@ -65,7 +65,7 @@ class Index extends Component
         $this->validate([
             'date' => ['required', 'date'],
             'name' => ['required', 'string', 'max:255'],
-            'note' => ['nullable', 'string', 'max:1000'],
+            'note' => ['nullable', 'string', 'max:255'],
         ]);
 
         // A plain 'unique' rule would surface as "The date has already been

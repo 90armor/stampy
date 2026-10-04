@@ -20,6 +20,18 @@ class HolidayAttendanceTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // A fixed clock: this class's data sits on fixed Feb–Mar 2026 dates that
+        // must read as the past (not today, not the future) and as this year,
+        // so DisplayDate omits the year. Without it the class only passed while
+        // the real clock was later in 2026 (CLAUDE.md, pinned-instant check).
+        // A test that travels itself still overrides this.
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
+    }
+
     // A Monday — a scheduled workday under the schedule below.
     private const WORKDAY = '2026-02-02';
 
@@ -80,9 +92,8 @@ class HolidayAttendanceTest extends TestCase
         $this->assertSame(0, $row->late_minutes);
         $this->assertSame(0, $row->early_leave_minutes);
         $this->assertFalse($row->hasTimingException());
-        // Falls out of the existing code with no special case: Present with
-        // both timing fields at 0 already resolves to 'present', not
-        // 'timing', via hasTimingException().
+        // displayVariant() is status-only, so a worked holiday is 'present';
+        // the zeroed timing fields also mean it carries no amber annotation.
         $this->assertSame('present', $row->displayVariant());
     }
 

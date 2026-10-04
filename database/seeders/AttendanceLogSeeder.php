@@ -68,6 +68,18 @@ class AttendanceLogSeeder extends Seeder
             $date = $date->copy()->addDay();
         }
 
+        // Never write a punch that hasn't happened yet. Every day is still
+        // generated in full first, so the mt_rand() sequence (and therefore
+        // every past punch) is identical whenever this runs; only punches
+        // later than now are dropped. Seeding during working hours therefore
+        // gives a real "today so far": some employees punched in, some not
+        // yet, nobody punched out in the future.
+        $now = Carbon::now();
+        $records = array_values(array_filter(
+            $records,
+            fn (PunchRecord $record) => $record->punchedAt->lte($now),
+        ));
+
         $source = new SampleAttendanceSource($records);
 
         // +1 day on the range end to catch overnight punches from the last day.
@@ -133,8 +145,20 @@ class AttendanceLogSeeder extends Seeder
                 ['time' => $start->copy()->subMinutes(mt_rand(1, 10)), 'type' => PunchType::In],
                 ['time' => $end->copy()->subMinutes(mt_rand(30, 120)), 'type' => PunchType::Out],
             ],
+            // About half of the in-only days punch in late, so dev data has
+            // late incomplete days (Phase 2.6 records late from the in-punch).
+            // Chosen by a fixed rule, and still exactly one mt_rand() draw
+            // reused for the minutes, so every other seeded punch is unchanged:
+            // 15 + 6..60 minutes after start, which stays past the 10-minute
+            // grace even after the ±8 minute jitter below.
             'missing_out' => [
-                ['time' => $start->copy()->subMinutes(mt_rand(1, 10)), 'type' => PunchType::In],
+                ['time' => (function () use ($start, $employee, $date) {
+                    $offset = mt_rand(1, 10);
+
+                    return ($employee->id + $date->day) % 2 === 1
+                        ? $start->copy()->addMinutes(15 + $offset * 6)
+                        : $start->copy()->subMinutes($offset);
+                })(), 'type' => PunchType::In],
             ],
             'absent' => [],
             'missing_in' => [

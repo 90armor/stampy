@@ -85,7 +85,7 @@ class Index extends Component
             'name' => ['required', 'string', 'max:255'],
             'start_time' => ['required', 'date_format:H:i'],
             'end_time' => ['required', 'date_format:H:i'],
-            'grace_minutes' => ['required', 'integer', 'min:0'],
+            'grace_minutes' => ['required', 'integer', 'min:0', 'max:65535'],
             'break_minutes' => ['required', 'integer', 'min:0'],
             'workdays' => ['required', 'array', 'min:1'],
             'workdays.*' => ['integer', 'between:1,7'],

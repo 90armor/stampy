@@ -30,7 +30,7 @@ class DailySummaryBuilder
      * it — the shift is left incomplete rather than pairing punches that are
      * probably unrelated (e.g. the start of the *next* shift).
      */
-    private const MAX_SHIFT_HOURS = 18;
+    public const MAX_SHIFT_HOURS = 18;
 
     public function build(Employee $employee, CarbonInterface $date): DailyAttendance
     {
@@ -237,28 +237,41 @@ class DailySummaryBuilder
         if ($hasBoth) {
             $workedSeconds = $lastOut->punched_at->getTimestamp() - $firstIn->punched_at->getTimestamp();
             $workedMinutes = max(0, intdiv($workedSeconds, 60) - $schedule->break_minutes);
+        }
 
-            // Working a holiday is never late or early-leaving, regardless of
-            // when they clocked in/out — matters for OT later, where a
-            // holiday's worked hours must not also register as a timing
-            // exception. isWorkday is deliberately still checked alongside
-            // isHoliday: a holiday landing on a weekend is caught by the
-            // status match() below (-> Off) before this is ever reached with
-            // hasBoth true, but the guard here is the one that actually
-            // stops late/early from being computed either way.
-            if ($isWorkday && ! $isHoliday) {
-                $scheduledStart = Carbon::parse($workDate->format('Y-m-d').' '.$schedule->start_time);
+        // Timing (Phase 2.6). Late is a fact about the in-punch alone, so it
+        // is computed whenever the day HAS an in-punch — the same $firstIn the
+        // pairing above already chose, never a second pairing rule — whatever
+        // the status turns out to be: in_progress (late while the day is
+        // still open), incomplete (the out-punch never came) or present. A
+        // late fact therefore never disappears when an in_progress day later
+        // becomes incomplete: both builds read the same in-punch. An out-only
+        // day has no in-punch, so no late. Early leave is a fact about the
+        // out-punch measured against a shift that was actually worked, so it
+        // still needs both punches — before the out-punch it isn't knowable.
+        //
+        // Working a holiday is never late or early-leaving, regardless of
+        // when they clocked in/out — matters for OT later, where a holiday's
+        // worked hours must not also register as a timing exception. That
+        // now covers in_progress and incomplete holiday days too. isWorkday is
+        // checked alongside isHoliday: an ordinary weekend someone came in on
+        // isn't measured against a schedule they weren't on. The zeroing
+        // after the status match() below enforces both for every status.
+        if ($hasIn && $isWorkday && ! $isHoliday) {
+            $scheduledStart = Carbon::parse($workDate->format('Y-m-d').' '.$schedule->start_time);
+
+            // Grace only decides WHETHER first_in counts as late, not how
+            // much: once outside grace, late_minutes is the full gap from
+            // start_time, not the remainder past the grace period. intdiv,
+            // never round: seconds never count against the employee.
+            $minutesAfterStart = intdiv($firstIn->punched_at->getTimestamp() - $scheduledStart->getTimestamp(), 60);
+
+            if ($minutesAfterStart > $schedule->grace_minutes) {
+                $lateMinutes = $minutesAfterStart;
+            }
+
+            if ($hasBoth) {
                 $scheduledEnd = Carbon::parse($workDate->format('Y-m-d').' '.$schedule->end_time);
-
-                // Grace only decides WHETHER first_in counts as late, not how
-                // much: once outside grace, late_minutes is the full gap from
-                // start_time, not the remainder past the grace period.
-                $minutesAfterStart = intdiv($firstIn->punched_at->getTimestamp() - $scheduledStart->getTimestamp(), 60);
-
-                if ($minutesAfterStart > $schedule->grace_minutes) {
-                    $lateMinutes = $minutesAfterStart;
-                }
-
                 $minutesBeforeEnd = intdiv($scheduledEnd->getTimestamp() - $lastOut->punched_at->getTimestamp(), 60);
                 $earlyLeaveMinutes = max(0, $minutesBeforeEnd);
             }
@@ -284,15 +297,22 @@ class DailySummaryBuilder
         //   3. present      — both punches exist, on any day (workday,
         //                    holiday, or an ordinary weekend someone came in
         //                    on). A holiday doesn't need to override this —
-        //                    it already zeroed late/early above — and a
+        //                    timing is zeroed for it below — and a
         //                    fully-punched day is never "in progress"
         //                    regardless of the time of day.
-        //   4. in_progress  — today, the schedule's end_time hasn't passed
-        //                    yet, and punches so far would otherwise resolve
-        //                    to incomplete or absent below. Only ever
-        //                    applies to today (see isInProgress()); not
-        //                    conditioned on isWorkday, matching rule 5's own
-        //                    workday-agnostic incomplete rule.
+        //   4. in_progress  — the day is still open, and punches so far would
+        //                    otherwise resolve to incomplete or absent below.
+        //                    "Open" depends on the punches (Phase 2.7, see
+        //                    isInProgress()): an in-only day stays open until
+        //                    its pairing window closes (first in-punch +
+        //                    MAX_SHIFT_HOURS) — past the schedule's end and
+        //                    past midnight, so someone on overtime is still
+        //                    "at work" and a (+1) out-punch turns the day
+        //                    present with no incomplete in between. A day
+        //                    with no punches, or only an out-punch, is open
+        //                    while it is today and the schedule's end_time
+        //                    hasn't passed. Not conditioned on isWorkday,
+        //                    matching rule 5's own workday-agnostic rule.
         //   5. incomplete   — exactly one of {in, out}, on any day. This
         //                    includes a one-sided punch on a holiday: the
         //                    punch being incomplete is a device-defect fact
@@ -300,16 +320,21 @@ class DailySummaryBuilder
         //                    so holiday does not suppress it the way it does
         //                    for "no punches at all" in rule 2.
         //   6. absent       — a workday, no punches, not a holiday, and not
-        //                    (today and still before end_time).
+        //                    (today and still before end_time) — unchanged
+        //                    by Phase 2.7: no punches still closes at the
+        //                    schedule's end.
         //
         // Timing is a separate dimension from all of this — see
         // AttendanceStatus's doc comment for why a `Late` status doesn't
-        // exist here.
+        // exist here. Since Phase 2.6 late_minutes may be non-zero on
+        // in_progress, incomplete and present rows (any row with an
+        // in-punch on a non-holiday workday); early_leave_minutes only ever
+        // on present rows.
         $status = match (true) {
             ! $hasIn && ! $hasOut && ! $isWorkday => AttendanceStatus::Off,
             ! $hasIn && ! $hasOut && $isHoliday => AttendanceStatus::Holiday,
             $hasBoth => AttendanceStatus::Present,
-            $this->isInProgress($workDate, $schedule) => AttendanceStatus::InProgress,
+            $this->isInProgress($workDate, $schedule, $firstIn, $lastOut) => AttendanceStatus::InProgress,
             $hasIn xor $hasOut => AttendanceStatus::Incomplete,
             default => AttendanceStatus::Absent,
         };
@@ -339,16 +364,30 @@ class DailySummaryBuilder
     }
 
     /**
-     * Only ever true for today: a day already in the past is either fully
-     * resolved (present/incomplete) or definitively absent by now, and a
-     * future date is never built at all. Rebuilding today after end_time has
-     * passed must downgrade this to absent/incomplete on its own — there is
-     * no separate "un-in-progress" step, it's simply that this returns false
-     * once now() has caught up, and the match() above falls through to
-     * whichever of those two the punches actually resolve to.
+     * Whether the day is still open (Phase 2.7). Only asked when the day
+     * doesn't already have both punches (rule 3 claims those as present).
+     *
+     * - An in-only day is open until its pairing window closes: first
+     *   in-punch + MAX_SHIFT_HOURS, the same bound build() uses to pair an
+     *   out-punch (inclusive, so the instant an out could still pair, the day
+     *   is still open). Past the schedule's end and past midnight: until
+     *   then an out-punch can still arrive and pair, so calling the day
+     *   incomplete would be premature — and someone on overtime would read
+     *   as gone. Rebuilding after the window closes turns it incomplete; the
+     *   scheduler rebuilds yesterday while it has open rows for exactly that.
+     * - A day with no punches, or only an out-punch, is open only while it is
+     *   today and the schedule's end_time hasn't passed — unchanged.
+     *
+     * A future date is never built at all. Nothing here un-opens a day by
+     * itself: a rebuild after the relevant moment simply falls through to
+     * incomplete or absent in calculate()'s match().
      */
-    private function isInProgress(Carbon $workDate, WorkSchedule $schedule): bool
+    private function isInProgress(Carbon $workDate, WorkSchedule $schedule, ?AttendanceLog $firstIn, ?AttendanceLog $lastOut): bool
     {
+        if ($firstIn !== null && $lastOut === null) {
+            return now()->lte($firstIn->punched_at->copy()->addHours(self::MAX_SHIFT_HOURS));
+        }
+
         if (! $workDate->isToday()) {
             return false;
         }

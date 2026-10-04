@@ -100,7 +100,7 @@ class CalendarViewTest extends TestCase
             ->html();
 
         $leaveBadge = 'bg-accent-50 text-accent-700 ring-accent-600/20 dark:bg-accent-900/30';
-        $offBadge = 'bg-slate-100 text-slate-600 ring-slate-500/10 dark:bg-slate-800';
+        $offBadge = 'bg-slate-100 text-slate-600 ring-slate-500/10 dark:bg-slate-750';
 
         $this->assertSame(1, substr_count($html, $leaveBadge), 'exactly one accent (leave) badge');
         $this->assertGreaterThanOrEqual(1, substr_count($html, $offBadge), 'the off day keeps the slate badge');
@@ -203,7 +203,7 @@ class CalendarViewTest extends TestCase
         $day = $grid->first(fn (array $cell) => $cell['inMonth'] && $cell['date']->format('Y-m-d') === '2026-03-05');
 
         $this->assertNull($day['record']);
-        $component->assertSee('March 5, 2026, Not calculated');
+        $component->assertSee('Thursday, 5 March 2026, Not calculated');
         // The dash icon's distinguishing path, not the clock/x-mark/etc used
         // by real statuses — "not calculated" must not borrow another
         // status's icon.
@@ -241,9 +241,9 @@ class CalendarViewTest extends TestCase
     public function test_a_timing_exception_day_shares_the_present_check_icon(): void
     {
         // The icon reflects attendance (they showed up), not timing — see
-        // AttendanceStatus's doc comment and the calendar's 'timing' variant
-        // style. The amber colour and the marked time are what distinguish
-        // a late/early day from a clean one, not the icon shape.
+        // AttendanceStatus's doc comment. displayVariant() is status-only, so
+        // a late day is an ordinary Present cell; only the amber marked time
+        // distinguishes it from a clean one.
         $employee = Employee::factory()->create();
         DailyAttendance::factory()->create([
             'employee_id' => $employee->id,
@@ -260,25 +260,40 @@ class CalendarViewTest extends TestCase
             ->assertSeeHtml('M4.5 12.75l6 6 9-13.5');
     }
 
-    public function test_todays_cell_ring_has_a_dark_mode_variant(): void
+    public function test_today_is_a_filled_circle_on_the_day_number_not_a_cell_border(): void
     {
-        // ring-primary-500 (the isToday() ring) with no dark: variant loses
-        // the cascade in dark mode to the cell's own status ring, which DOES
-        // have one (dark:ring-{color}-500/30, by design — that's what dark:
-        // is for) — "today" then reads as an ordinary status-coloured cell,
-        // 1px wider and otherwise indistinguishable. Confirmed in a real
-        // browser: computed box-shadow was rgb(63,130,102) — primary-500 —
-        // in light mode, but the cell's own amber dark ring once .dark was
-        // added, before dark:ring-primary-400 was added here. This only
-        // pins the class is present; the cascade behaviour itself isn't
-        // something a server-rendered-HTML assertion can check.
         $this->travelTo(Carbon::parse('2026-03-15 12:00:00'));
         $employee = Employee::factory()->create();
 
-        Livewire::actingAs($this->admin())
+        $html = Livewire::actingAs($this->admin())
             ->test(Show::class, ['employee' => $employee])
             ->set('month', self::SUNDAY_START_MONTH)
-            ->assertSeeHtml('ring-2 ring-primary-500 dark:ring-primary-400');
+            ->html();
+
+        $this->assertSame(1, substr_count($html, 'aria-current="date"'));
+        $this->assertMatchesRegularExpression('/rounded-full bg-primary-600 px-1 text-sm font-bold text-white[^"]*dark:bg-primary-500">15</', $html);
+        $this->assertStringNotContainsString('ring-2 ring-primary-500 dark:ring-primary-400', $html);
+    }
+
+    public function test_in_cell_times_are_at_least_12px_with_a_10px_meridiem(): void
+    {
+        $employee = Employee::factory()->create();
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => '2026-03-03',
+            'status' => AttendanceStatus::Present,
+            'first_in' => Carbon::parse('2026-03-03 08:00:00'),
+            'last_out' => Carbon::parse('2026-03-03 17:00:00'),
+        ]);
+
+        $html = Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', self::SUNDAY_START_MONTH)
+            ->html();
+
+        $this->assertStringContainsString('hidden flex-wrap items-center gap-x-1 text-xs leading-4', $html);
+        $this->assertStringNotContainsString('text-[10px] leading-tight text-slate-500', $html);
+        $this->assertStringContainsString('text-[max(10px,0.8em)]', $html);
     }
 
     public function test_a_long_holiday_name_wraps_instead_of_truncating_to_one_line(): void
@@ -299,9 +314,13 @@ class CalendarViewTest extends TestCase
             ->test(Show::class, ['employee' => $employee])
             ->set('month', self::SUNDAY_START_MONTH)
             ->assertDontSeeHtml('class="w-full truncate')
-            ->assertSeeHtml('class="w-full line-clamp-2')
+            ->assertSeeHtml('class="hidden w-full line-clamp-2')
             ->assertSeeHtml('title="Company Anniversary (demo)"')
-            ->assertSee('Company Anniversary (demo)');
+            ->assertSee('Company Anniversary (demo)')
+            // Below sm the name would clip, so a small flag marks the holiday
+            // instead, and the day number and icon stack rather than collide.
+            ->assertSeeHtml('h-5 w-5 shrink-0 text-fuchsia-700 dark:text-fuchsia-300 sm:hidden')
+            ->assertSeeHtml('flex w-full flex-col items-start gap-0.5 sm:flex-row');
     }
 
     public function test_every_cell_carries_an_accessible_label(): void
@@ -316,8 +335,8 @@ class CalendarViewTest extends TestCase
         Livewire::actingAs($this->admin())
             ->test(Show::class, ['employee' => $employee])
             ->set('month', self::SUNDAY_START_MONTH)
-            ->assertSee('March 10, 2026, Present')
-            ->assertSee('March 5, 2026, Not calculated');
+            ->assertSee('Tuesday, 10 March 2026, Present')
+            ->assertSee('Thursday, 5 March 2026, Not calculated');
     }
 
     public function test_clicking_a_day_opens_the_modal_with_that_days_punches(): void
@@ -340,6 +359,8 @@ class CalendarViewTest extends TestCase
 
     public function test_admin_can_add_and_void_a_punch_from_the_modal_and_the_summary_updates_immediately(): void
     {
+        // Fixed clock: this test's data sits on fixed 2026 dates (see CLAUDE.md, pinned-instant check).
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $employee = Employee::factory()->create();
 
         $component = Livewire::actingAs($this->admin())
@@ -379,6 +400,8 @@ class CalendarViewTest extends TestCase
      */
     public function test_the_modals_add_punch_path_triggers_the_same_three_day_rebuild_as_the_table(): void
     {
+        // Fixed clock: this test's data sits on fixed 2026 dates (see CLAUDE.md, pinned-instant check).
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $employee = Employee::factory()->create();
 
         // An out-punch just after midnight on 2026-03-03, with nothing yet
@@ -472,7 +495,7 @@ class CalendarViewTest extends TestCase
             // yet) — that alone wouldn't prove the controls are actually
             // gated, so open a day (allowed — this is their own record)
             // and confirm the raw punch shows but no add/void controls do.
-            ->assertDontSee('+ Add punch');
+            ->assertDontSee('Add punch');
 
         Livewire::actingAs($user)
             ->test(Show::class)
@@ -483,7 +506,7 @@ class CalendarViewTest extends TestCase
             // own span for muted styling, so "7:55 AM" isn't one contiguous
             // string in the raw markup even though it reads that way.
             ->assertSee('7:55')
-            ->assertDontSee('+ Add punch')
+            ->assertDontSee('Add punch')
             ->assertDontSee('Void');
     }
 }

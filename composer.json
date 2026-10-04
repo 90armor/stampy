@@ -51,6 +51,9 @@
             "@php artisan config:clear --ansi @no_additional_args",
             "@php artisan test"
         ],
+        "hooks": [
+            "@php -r \"if (! is_dir('.git')) { echo 'No .git directory: git hooks not installed.'.PHP_EOL; exit(0); } passthru('git config core.hooksPath .githooks', \\$code); exit(\\$code);\""
+        ],
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"
@@ -68,6 +71,9 @@
         ],
         "pre-package-uninstall": [
             "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
+        ],
+        "post-install-cmd": [
+            "@hooks"
         ]
     },
     "extra": {
@@ -85,5 +91,8 @@
         }
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "scripts-descriptions": {
+        "hooks": "Point git at .githooks so the pre-commit hook runs the test suite."
+    }
 }

@@ -2,16 +2,94 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Geist Sans (self-hosted variable font) — primary UI typeface. Inter (linked
-   in layouts/app.blade.php) and the system stack stay as fallbacks in
-   tailwind.config.js if this fails to load. */
-@font-face {
-    font-family: 'Geist';
-    src: url('../../node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2') format('woff2-variations'),
-         url('../../node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2') format('woff2');
-    font-weight: 100 900;
-    font-style: normal;
-    font-display: swap;
+/* The neutral (`slate`) scale, as RGB channels for tailwind.config.js. Light
+   mode is warm stone, unchanged. Dark mode is zinc: a neutral, slightly cool
+   gray (hue ~240°, ~4–6% saturation) at the same lightness steps — stone's
+   red-orange cast (hue ~12–30°) made dark surfaces read as brown. 750 is not
+   a stock step: it is the OKLab midpoint of 800 and 700 in each family. Every
+   colour that should follow the neutral scale reads these variables (classes,
+   @apply, theme() below, and the dashboard chart), so nothing warm is left in
+   dark mode.
+
+   The two line tokens, `divider` (lines inside a surface: rows, sections,
+   strip dividers, chart grid) and `border` (surface edges and controls), are
+   translucent ink — warm stone in light mode, cool zinc in dark — so one
+   value reads the same on a card, the page or an overlay. Measured against
+   the card: divider 1.25:1 light / 1.27:1 dark, border 1.49:1 / 1.51:1. */
+:root {
+    --slate-divider: 28 25 23 / 0.11;
+    --slate-border: 28 25 23 / 0.19;
+    --slate-50: 250 250 249;
+    --slate-100: 245 245 244;
+    --slate-200: 231 229 228;
+    --slate-300: 214 211 209;
+    --slate-400: 168 162 158;
+    --slate-500: 120 113 108;
+    --slate-600: 87 83 78;
+    --slate-700: 68 64 60;
+    --slate-750: 54 50 48;
+    --slate-800: 41 37 36;
+    --slate-900: 28 25 23;
+    --slate-950: 12 10 9;
+}
+.dark {
+    --slate-divider: 228 228 231 / 0.09;
+    --slate-border: 228 228 231 / 0.15;
+    --slate-50: 250 250 250;
+    --slate-100: 244 244 245;
+    --slate-200: 228 228 231;
+    --slate-300: 212 212 216;
+    --slate-400: 161 161 170;
+    --slate-500: 113 113 122;
+    --slate-600: 82 82 91;
+    --slate-700: 63 63 70;
+    --slate-750: 51 51 56;
+    --slate-800: 39 39 42;
+    --slate-900: 24 24 27;
+    --slate-950: 9 9 11;
+}
+
+/* Native selection controls extend Tailwind Forms as one shared control
+   family. Evergreen communicates an enabled selection; neutral surfaces
+   communicate disabled controls. The native checkmark/dot continues to
+   distinguish checked from unchecked when interaction is unavailable. */
+input:where([type='checkbox']),
+input:where([type='radio']) {
+    @apply cursor-pointer border-slate-border bg-white text-primary-600 focus:ring-0 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed dark:bg-slate-750 dark:focus-visible:ring-offset-slate-800;
+}
+
+input:where([type='checkbox']) {
+    @apply rounded;
+}
+
+input:where([type='checkbox']):not(:disabled):not(:checked):hover,
+input:where([type='radio']):not(:disabled):not(:checked):hover {
+    @apply border-primary-400;
+}
+
+input:where([type='checkbox']):checked,
+input:where([type='radio']):checked {
+    @apply border-primary-600 bg-primary-600 dark:border-primary-500 dark:bg-primary-500;
+}
+
+input:where([type='checkbox']):checked:not(:disabled):hover,
+input:where([type='radio']):checked:not(:disabled):hover {
+    @apply border-primary-700 bg-primary-700 dark:border-primary-400 dark:bg-primary-400;
+}
+
+input:where([type='checkbox']):disabled:not(:checked),
+input:where([type='radio']):disabled:not(:checked) {
+    @apply border-slate-border bg-slate-100 dark:bg-slate-800;
+}
+
+input:where([type='checkbox']):disabled:checked,
+input:where([type='radio']):disabled:checked {
+    @apply border-slate-500 bg-slate-500 text-slate-500 dark:border-slate-500 dark:bg-slate-500 dark:text-slate-600;
+}
+
+input:where([type='checkbox'])[aria-invalid='true'],
+input:where([type='radio'])[aria-invalid='true'] {
+    @apply border-red-500 focus-visible:ring-red-500;
 }
 
 [x-cloak] {
@@ -23,11 +101,11 @@
    box-shadow trick paints our own surface color over it instead. */
 :root {
     --input-bg: #ffffff;
-    --input-text: #1c1917;
+    --input-text: rgb(var(--slate-900));
 }
 .dark {
-    --input-bg: #292524;
-    --input-text: #f5f5f4;
+    --input-bg: rgb(var(--slate-750));
+    --input-text: rgb(var(--slate-100));
 }
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
@@ -38,8 +116,12 @@ input:-webkit-autofill:focus {
     transition: background-color 9999s ease-in-out 0s;
 }
 
-/* Soft decorative backdrop behind the app shell / auth screen — pairs with the
-   glass (translucent + backdrop-blur) surfaces on cards, sidebar, and topbar. */
+/* Soft decorative backdrop behind the application and authentication shells.
+   Only shell surfaces use glass; content surfaces stay opaque. Light mode
+   only: dark mode has no glow at all. It was first confined to the top-left
+   corner (a haze behind the content tinted the page between cards), then
+   removed, so the neutral zinc surfaces stay clean — even a corner of green
+   behind the glass sidebar and topbar tinted them. */
 .bg-shell {
     background-image:
         radial-gradient(circle at 12% 8%, rgba(175, 240, 209, 0.35), transparent 32%),
@@ -47,7 +129,57 @@ input:-webkit-autofill:focus {
     background-attachment: fixed;
 }
 .dark .bg-shell {
-    background-image:
-        radial-gradient(circle at 12% 8%, rgba(20, 97, 68, 0.25), transparent 32%),
-        radial-gradient(circle at 88% 18%, rgba(30, 66, 50, 0.35), transparent 28%);
+    background-image: none;
+}
+
+/* Pinned trailing table columns (docs/ATTENDANCE_UI.md, Responsive behavior).
+   From sm to below xl (640–1279px), the dense tables pin their Status column
+   and their trailing chevron/actions column to the right edge of the scroll
+   container. Nothing is pinned below sm — on a phone the pinned pair would
+   cover about half the card — or from xl up. A pinned cell is opaque — the card surface, or the row's
+   hover surface while the row is hovered — so scrolled content never shows
+   through it. In dark mode the row hover is a translucent slate-800 over the
+   card, so the pinned cell layers that same tint over the same card colour
+   rather than approximating it with a solid shade. The left edge shadow shows
+   only while content is actually passing under the pinned columns
+   (.table-pin-overflowing, set by pinnedColumns in resources/js/app.js). The
+   row divider sits above pinned cells (z-[2] in the markup), so it runs
+   unbroken beneath them. */
+@media (min-width: 640px) and (max-width: 1279.98px) {
+    .table-pin {
+        position: sticky;
+        z-index: 1;
+        transition: inherit;
+        @apply bg-white dark:bg-slate-800;
+    }
+    tr:hover > .table-pin {
+        @apply bg-slate-50 dark:bg-slate-800;
+    }
+    .dark tr:hover > .table-pin {
+        background-image: linear-gradient(theme('colors.slate.750 / 60%'), theme('colors.slate.750 / 60%'));
+    }
+    .table-pin-end {
+        right: 0;
+    }
+    .table-pin-start {
+        right: var(--pin-end-width, 4.5rem);
+    }
+    .table-pin-start::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: -0.75rem;
+        width: 0.75rem;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 150ms ease-out;
+        background-image: linear-gradient(to left, rgb(28 25 23 / 0.07), transparent);
+    }
+    .dark .table-pin-start::before {
+        background-image: linear-gradient(to left, rgb(0 0 0 / 0.4), transparent);
+    }
+    .table-pin-overflowing .table-pin-start::before {
+        opacity: 1;
+    }
 }

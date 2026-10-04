@@ -10,6 +10,7 @@ use App\Models\Employee;
 use App\Models\Holiday;
 use App\Services\Attendance\DailySummaryBuilder;
 use App\Support\AttendanceTime;
+use App\Support\DisplayDate;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
@@ -156,7 +157,7 @@ class Show extends Component
             'newPunchTime' => ['required', 'date_format:H:i'],
             'newPunchType' => ['required', 'in:in,out'],
         ], [
-            'newPunchDate.after_or_equal' => "A punch can't be dated before this employee's start date ({$joinDate->format('M j, Y')}).",
+            'newPunchDate.after_or_equal' => "A punch can't be dated before this employee's start date (".\App\Support\DisplayDate::compact($joinDate).").",
             'newPunchDate.before_or_equal' => "A punch can't be dated in the future.",
         ], [
             'newPunchDate' => 'punch date',
@@ -360,6 +361,59 @@ class Show extends Component
      *
      * @return Collection<string, Collection<int, AttendanceLog>>
      */
+    /**
+     * Overnight shifts, so a day's punch list can say which shift a punch
+     * belongs to. A (+1) out-punch is grouped under the date it was punched,
+     * not the shift it closed: without this, the next day's list opens with
+     * an unexplained 12:42 AM Out and the shift's own day never shows it.
+     *
+     * - 'outs': shift work_date ('Y-m-d') => the AttendanceLog that closed it
+     *   the next day, listed on the shift's day with "(+1)".
+     * - 'shifts': AttendanceLog id => the shift's work_date (Carbon), noted
+     *   on the day the punch was recorded.
+     *
+     * Covers the day before the month too: the 1st's list can hold the
+     * previous month's last overnight out. Two queries at most, the same in
+     * both views (their query counts stay equal).
+     *
+     * @param  Collection<string, DailyAttendance>  $existing
+     * @return array{outs: Collection<string, AttendanceLog>, shifts: Collection<int, Carbon>}
+     */
+    private function overnightPunches(Collection $existing): array
+    {
+        $dayBefore = $this->monthStart()->subDay();
+        $rows = $existing->values()->push(
+            DailyAttendance::query()
+                ->where('employee_id', $this->employee->id)
+                ->whereDate('work_date', $dayBefore)
+                ->first(),
+        )->filter(fn (?DailyAttendance $row) => $row?->isOvernightOut());
+
+        if ($rows->isEmpty()) {
+            return ['outs' => collect(), 'shifts' => collect()];
+        }
+
+        $logs = AttendanceLog::query()
+            ->where('employee_id', $this->employee->id)
+            ->where('punch_type', 'out')
+            ->whereNull('voided_at')
+            ->whereIn('punched_at', $rows->map(fn (DailyAttendance $row) => $row->last_out->format('Y-m-d H:i:s'))->all())
+            ->with('createdBy', 'voidedBy')
+            ->get()
+            ->keyBy(fn (AttendanceLog $log) => $log->punched_at->format('Y-m-d H:i:s'));
+
+        $outs = collect();
+        $shifts = collect();
+        foreach ($rows as $row) {
+            if ($log = $logs->get($row->last_out->format('Y-m-d H:i:s'))) {
+                $outs->put($row->work_date->format('Y-m-d'), $log);
+                $shifts->put($log->id, $row->work_date);
+            }
+        }
+
+        return ['outs' => $outs, 'shifts' => $shifts];
+    }
+
     private function punchesByDate(): Collection
     {
         $start = $this->monthStart();
@@ -427,9 +481,15 @@ class Show extends Component
                 $workdayStatuses
             ))->count(),
             'present' => $counts->get(AttendanceStatus::Present->value, 0),
-            'late' => $records->filter(fn (DailyAttendance $row) => $row->isLate())->count(),
+            // "of which N late" is a breakdown of Present, so only Present
+            // days count here, even though since Phase 2.6 an incomplete day
+            // can carry late minutes too (it is still shown in its own row).
+            'late' => $records->filter(fn (DailyAttendance $row) => $row->status === AttendanceStatus::Present && $row->isLate())->count(),
             'absent' => $counts->get(AttendanceStatus::Absent->value, 0),
             'incomplete' => $counts->get(AttendanceStatus::Incomplete->value, 0),
+            // Late annotates its own status group: an incomplete day with a
+            // late in-punch is counted here, under Incomplete.
+            'incomplete_late' => $records->filter(fn (DailyAttendance $row) => $row->status === AttendanceStatus::Incomplete && $row->isLate())->count(),
             'early_leave_days' => $records->filter(fn (DailyAttendance $row) => $row->leftEarly())->count(),
             'total_worked_minutes' => (int) $records->sum('worked_minutes'),
         ];
@@ -485,9 +545,10 @@ class Show extends Component
             'gridDays' => $this->gridDays($existing),
             'recordsByDate' => $existing,
             'summary' => $this->summary($days),
-            'monthLabel' => $this->monthStart()->format('F Y'),
+            'monthLabel' => DisplayDate::month($this->monthStart()),
             'isCurrentMonth' => $this->month === today()->format('Y-m'),
             'punchesByDate' => $this->punchesByDate(),
+            'overnightPunches' => $this->overnightPunches($existing),
             'holidaysByDate' => $this->holidaysByDate(),
             'lastBuiltInMonth' => $lastBuiltInMonth,
             'monthFullyBuilt' => $lastBuiltInMonth === $days->last()['date']->format('Y-m-d'),

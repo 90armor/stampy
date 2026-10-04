@@ -150,7 +150,7 @@ class ProfileTest extends TestCase
         // back to plain text for them, same as it does on Employees\Show.
         $response->assertSee('Manager Person');
         $response->assertDontSee(route('employees.show', $manager));
-        $response->assertSee('Mar 15, 2024');
+        $response->assertSee('Fri 15 Mar 2024');
     }
 
     public function test_an_unlinked_users_profile_shows_no_employee_summary(): void

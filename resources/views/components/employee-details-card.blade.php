@@ -9,18 +9,18 @@
     is the one place that markup lives.
 --}}
 <x-card {{ $attributes }}>
-    <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Details</p>
+    <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Details</h2>
 
-    <dl class="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2">
-        <div>
+    <dl class="mt-4 grid grid-cols-1 gap-[1.3125rem] sm:grid-cols-[max-content_minmax(0,1fr)_max-content_minmax(0,1fr)] sm:gap-x-6 sm:gap-y-4">
+        <div class="sm:col-span-2 sm:grid sm:grid-cols-subgrid sm:items-baseline">
             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Department</dt>
             <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">{{ $employee->department->name }}</dd>
         </div>
-        <div>
+        <div class="sm:col-span-2 sm:grid sm:grid-cols-subgrid sm:items-baseline">
             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Position</dt>
             <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">{{ $employee->position->name }}</dd>
         </div>
-        <div>
+        <div class="sm:col-span-2 sm:grid sm:grid-cols-subgrid sm:items-baseline">
             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Manager</dt>
             <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">
                 @if ($employee->manager)
@@ -40,11 +40,11 @@
                 @endif
             </dd>
         </div>
-        <div>
+        <div class="sm:col-span-2 sm:grid sm:grid-cols-subgrid sm:items-baseline">
             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Start date</dt>
-            <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">{{ $employee->join_date->format('M j, Y') }}</dd>
+            <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">{{ \App\Support\DisplayDate::compact($employee->join_date) }}</dd>
         </div>
-        <div>
+        <div class="sm:col-span-2 sm:grid sm:grid-cols-subgrid sm:items-baseline">
             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Device user ID</dt>
             <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">{{ $employee->device_user_id ?? '—' }}</dd>
         </div>

@@ -8,8 +8,8 @@
              summarize. --}}
         @if ($user->employee)
             <div>
-                <p class="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Employee record</p>
-                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Employee record</h2>
+                <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
                     {{ $user->employee->employee_code }}
                 </p>
             </div>

@@ -47,8 +47,28 @@ class ScheduleManagementTest extends TestCase
 
         Livewire::actingAs($this->admin())
             ->test(Index::class)
+            ->assertSee('Define the working hours and workdays used for employee attendance.')
+            ->assertSee('aria-label="Work schedules"', false)
             ->assertSee('Morning shift')
-            ->assertSee('Default');
+            ->assertSee('Default')
+            ->assertSee('Grace 10 min')
+            ->assertSee('Break 60 min')
+            ->assertSee('aria-label="Edit Morning shift schedule"', false)
+            ->assertSee('aria-label="Delete Morning shift schedule"', false)
+            ->assertSee('role="tooltip"', false);
+    }
+
+    public function test_schedule_form_exposes_grouping_and_loading_states(): void
+    {
+        Livewire::actingAs($this->admin())
+            ->test(Index::class)
+            ->call('create')
+            ->assertSeeInOrder(['Identity', 'Working hours', 'Attendance rules', 'Workdays', 'Default behavior'])
+            ->assertSee('id="schedule_start_time"', false)
+            ->assertSee('id="schedule_end_time"', false)
+            ->assertSee('max="65535"', false)
+            ->assertSee('wire:loading.attr="disabled"', false)
+            ->assertSee('Saving&hellip;', false);
     }
 
     public function test_the_list_shows_how_many_employees_are_currently_assigned_to_each_schedule(): void
@@ -91,6 +111,34 @@ class ScheduleManagementTest extends TestCase
             ->set('workdays', [])
             ->call('save')
             ->assertHasErrors(['name', 'workdays']);
+    }
+
+    public function test_grace_minutes_match_the_unsigned_small_integer_limit(): void
+    {
+        $admin = $this->admin();
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->call('create')
+            ->set('name', 'Maximum Grace')
+            ->set('grace_minutes', 65535)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('work_schedules', [
+            'name' => 'Maximum Grace',
+            'grace_minutes' => 65535,
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->call('create')
+            ->set('name', 'Excessive Grace')
+            ->set('grace_minutes', 65536)
+            ->call('save')
+            ->assertHasErrors(['grace_minutes' => 'max']);
+
+        $this->assertDatabaseMissing('work_schedules', ['name' => 'Excessive Grace']);
     }
 
     public function test_end_time_at_or_before_start_time_is_rejected_through_the_form(): void
@@ -164,7 +212,13 @@ class ScheduleManagementTest extends TestCase
         Livewire::actingAs($this->admin())
             ->test(Index::class)
             ->call('edit', $schedule->id)
-            ->assertSee("can't be changed", false);
+            ->assertSee('Schedule configuration is locked')
+            ->assertSee('name and default remain editable')
+            ->assertSee('id="schedule-lock-help"', false)
+            // The time field is shown but locked: the segmented field and its native fallback.
+            ->assertSee("timeInput({ model: 'start_time'", false)
+            ->assertSee("disabled: true })", false)
+            ->assertSeeHtml('id="schedule_start_time-native"');
     }
 
     public function test_admin_can_delete_an_unreferenced_non_default_schedule(): void
@@ -362,6 +416,20 @@ class ScheduleManagementTest extends TestCase
             ->assertDontSee('nothing to move');
     }
 
+    public function test_bulk_reassign_presents_direction_consequence_and_loading_state(): void
+    {
+        $this->schedule(['name' => 'A', 'is_default' => true]);
+        $this->schedule(['name' => 'B']);
+
+        Livewire::actingAs($this->admin())
+            ->test(Index::class)
+            ->call('openBulkReassign')
+            ->assertSeeInOrder(['From', 'Current schedule', 'To', 'New schedule', 'Effective from'])
+            ->assertSee('Attendance from then through today is recalculated; a future date does not change past attendance.')
+            ->assertSee('Reassigning&hellip;', false)
+            ->assertSee('wire:loading.attr="disabled"', false);
+    }
+
     public function test_bulk_reassign_previews_the_count_and_names_of_who_would_move(): void
     {
         $a = $this->schedule(['name' => 'A', 'is_default' => true]);
@@ -375,6 +443,7 @@ class ScheduleManagementTest extends TestCase
             ->test(Index::class)
             ->call('openBulkReassign')
             ->set('bulk_from_id', (string) $a->id)
+            ->assertSeeInOrder(['Effective from', '2 employees will move'])
             ->assertSee('2 employees will move')
             ->assertSee('Preview One')
             ->assertSee('Preview Two')

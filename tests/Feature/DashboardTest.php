@@ -63,6 +63,21 @@ class DashboardTest extends TestCase
         ]);
     }
 
+    public function test_application_shell_mobile_navigation_has_dialog_and_keyboard_support(): void
+    {
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('role="dialog" aria-modal="true" aria-label="Navigation"', false)
+            ->assertSee('@keydown.escape.window="if (sidebarOpen) closeSidebar()"', false)
+            ->assertSee('@keydown.tab="trapSidebarTab($event)"', false)
+            ->assertSee('x-ref="sidebarClose"', false)
+            ->assertSee('Close navigation')
+            ->assertSee('aria-haspopup="true"', false)
+            ->assertSee(':aria-expanded="open.toString()"', false)
+            ->assertSee('@keydown.escape.stop.prevent="close(true)"', false);
+    }
+
     public function test_admin_sees_the_company_wide_employee_total(): void
     {
         Employee::factory()->count(3)->create();
@@ -183,7 +198,7 @@ class DashboardTest extends TestCase
         $this->attendanceRow($incomplete, AttendanceStatus::Incomplete);
 
         $late = Employee::factory()->create(['full_name' => 'Late Larry']);
-        $this->attendanceRow($late, AttendanceStatus::Present, ['late_minutes' => 12]);
+        $this->attendanceRow($late, AttendanceStatus::Present, ['late_minutes' => 80]);
 
         $onTime = Employee::factory()->create(['full_name' => 'On Time Otto']);
         $this->attendanceRow($onTime, AttendanceStatus::Present);
@@ -195,12 +210,14 @@ class DashboardTest extends TestCase
 
             return $byName->has('Absent Ann') && $byName['Absent Ann']['badge'] === 'red'
                 && $byName->has('Incomplete Ian') && $byName['Incomplete Ian']['badge'] === 'violet'
-                && $byName->has('Late Larry') && $byName['Late Larry']['badge'] === 'amber'
+                // Late is timing, not a status: no badge, just the duration.
+                && $byName->has('Late Larry') && $byName['Late Larry']['badge'] === null
+                && $byName['Late Larry']['detail'] === '1h 20m late'
                 && ! $byName->has('On Time Otto');
         });
     }
 
-    public function test_weekly_trend_is_seven_days_ending_today_as_the_present_share_of_active_employees(): void
+    public function test_weekly_trend_is_seven_days_ending_today_as_the_attendance_rate_of_active_employees(): void
     {
         $this->travelTo(Carbon::parse('2026-03-11 12:00:00')); // a Wednesday: the window is Thu Mar 5 through Wed Mar 11
 
@@ -216,7 +233,7 @@ class DashboardTest extends TestCase
         $this->attendanceRow($a, AttendanceStatus::Present, ['work_date' => '2026-03-10']);
         $this->attendanceRow($b, AttendanceStatus::Present, ['work_date' => '2026-03-10', 'late_minutes' => 20]);
 
-        // Mar 11, today: one present; incomplete and absent don't count.
+        // Mar 11, today, closed (every row final): attended = present + incomplete (Phase 2.7); absent doesn't count.
         $this->attendanceRow($a, AttendanceStatus::Present);
         $this->attendanceRow($b, AttendanceStatus::Incomplete);
         $this->attendanceRow($c, AttendanceStatus::Absent);
@@ -227,13 +244,14 @@ class DashboardTest extends TestCase
         $this->actingAs($this->admin())
             ->get(route('dashboard'))
             ->assertViewHas('attendance', fn ($attendance) => $attendance['trend'] === [
-                ['label' => 'Thu', 'value' => 100.0],
-                ['label' => 'Fri', 'value' => 0.0],
-                ['label' => 'Sat', 'value' => 0.0],
-                ['label' => 'Sun', 'value' => 0.0],
-                ['label' => 'Mon', 'value' => 0.0],
-                ['label' => 'Tue', 'value' => 66.7],
-                ['label' => 'Wed', 'value' => 33.3],
+                ['label' => 'Thu', 'date' => '2026-03-05', 'value' => 100.0, 'marker' => null, 'pending' => false],
+                // No rows at all: never a 0% bar, never absent.
+                ['label' => 'Fri', 'date' => '2026-03-06', 'value' => null, 'marker' => 'Not calculated', 'pending' => false],
+                ['label' => 'Sat', 'date' => '2026-03-07', 'value' => null, 'marker' => 'Not calculated', 'pending' => false],
+                ['label' => 'Sun', 'date' => '2026-03-08', 'value' => null, 'marker' => 'Not calculated', 'pending' => false],
+                ['label' => 'Mon', 'date' => '2026-03-09', 'value' => null, 'marker' => 'Not calculated', 'pending' => false],
+                ['label' => 'Tue', 'date' => '2026-03-10', 'value' => 66.7, 'marker' => null, 'pending' => false],
+                ['label' => 'Wed', 'date' => '2026-03-11', 'value' => 66.7, 'marker' => null, 'pending' => false],
             ]);
     }
 
@@ -329,7 +347,7 @@ class DashboardTest extends TestCase
         });
     }
 
-    public function test_recent_activity_shows_a_late_check_in_with_its_minutes(): void
+    public function test_recent_activity_is_a_neutral_log_without_timing(): void
     {
         $admin = $this->admin();
 
@@ -344,11 +362,16 @@ class DashboardTest extends TestCase
 
         $response = $this->actingAs($admin)->get(route('dashboard'));
 
+        // A log: plain "Punched in" (event language; "Checked in" is the
+        // any-punch aggregate), no late minutes and no amber — the late fact
+        // is shown once, in Needs attention.
         $response->assertViewHas('attendance', function ($attendance) {
             $activity = collect($attendance['recent'])->firstWhere('name', 'Punchy Person');
 
-            return $activity !== null && $activity['tone'] === 'late' && str_contains($activity['action'], '8m late');
+            return $activity !== null && $activity['action'] === 'Punched in' && ! array_key_exists('tone', $activity);
         });
+        $response->assertDontSee('Punched in 8m late')
+            ->assertSee('<p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Punched in</p>', false);
     }
 
     public function test_employee_role_does_not_see_attendance_stats_on_the_dashboard(): void
@@ -374,7 +397,7 @@ class DashboardTest extends TestCase
         $this->actingAs($this->admin())
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertSee('Quick Actions')
+            ->assertSee('Quick actions')
             ->assertSee('Add employee')
             ->assertSee('Add department')
             ->assertSee('View employees')
@@ -394,7 +417,7 @@ class DashboardTest extends TestCase
         $this->actingAs($manager)
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertDontSee('Quick Actions')
+            ->assertDontSee('Quick actions')
             ->assertDontSee('Add employee')
             ->assertDontSee('Add department')
             ->assertDontSee('Organization settings');
@@ -407,6 +430,310 @@ class DashboardTest extends TestCase
         $this->actingAs($employee)
             ->get(route('dashboard'))
             ->assertOk()
-            ->assertDontSee('Quick Actions');
+            ->assertDontSee('Quick actions');
+    }
+
+    public function test_the_dashboard_uses_the_shared_three_cell_stat_strip(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        $employee = Employee::factory()->create();
+        $this->attendanceRow($employee, AttendanceStatus::Present, ['first_in' => today()->setTime(7, 50), 'last_out' => today()->setTime(16, 0), 'early_leave_minutes' => 60]);
+
+        $this->actingAs($admin)->get(route('dashboard'))
+            ->assertSee('Today, '.today()->format('D j M'))
+            // Live "who is here now" language, not end-of-day status counts.
+            ->assertSeeInOrder(['At work', '0', 'Left', '1', '1 early', 'Not in', '0'])
+            // No separate headcount cell (Phase 2.6): the total lives in the
+            // strip's meta, and the three cells stay one row at every width.
+            ->assertSee('1 active employee')
+            ->assertDontSee('added this month')
+            ->assertSee('grid grid-cols-3 divide-x', false)
+            ->assertSee('text-xl font-semibold leading-7 tabular-nums', false)
+            // The nested tinted tiles and the separate Employee summary card are gone.
+            ->assertDontSee('rounded-xl bg-slate-50 p-4', false)
+            ->assertDontSee('Employee summary');
+    }
+
+    public function test_an_off_day_in_the_trend_is_a_marker_not_a_zero_percent_bar(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 12:00:00'));
+        $a = Employee::factory()->create();
+        $b = Employee::factory()->create();
+
+        foreach ([$a, $b] as $employee) {
+            $this->attendanceRow($employee, AttendanceStatus::Off, ['work_date' => '2026-03-07']);
+            $this->attendanceRow($employee, AttendanceStatus::Holiday, ['work_date' => '2026-03-09']);
+        }
+        $this->attendanceRow($a, AttendanceStatus::Present, ['work_date' => '2026-03-10']);
+        $this->attendanceRow($b, AttendanceStatus::Absent, ['work_date' => '2026-03-10']);
+
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertViewHas('attendance', function ($attendance) {
+                $byDate = collect($attendance['trend'])->keyBy('date');
+
+                return $byDate['2026-03-07']['value'] === null && $byDate['2026-03-07']['marker'] === 'Off'
+                    && $byDate['2026-03-09']['value'] === null && $byDate['2026-03-09']['marker'] === 'Holiday'
+                    && $byDate['2026-03-10']['value'] === 50.0 && $byDate['2026-03-10']['marker'] === null;
+            })
+            // Time scope lives in the card header's meta slot as real dates.
+            ->assertSee('5–11 Mar')
+            ->assertSee('Sat Off', false);
+    }
+
+    public function test_dashboard_cards_use_title_and_meta_headers_without_eyebrows(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 12:00:00'));
+        $late = Employee::factory()->create(['full_name' => 'Late Larry']);
+        $this->attendanceRow($late, AttendanceStatus::Present, ['late_minutes' => 80]);
+
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertSee('Needs attention')
+            ->assertSee('1 today')
+            ->assertSee('Wed 11 Mar')
+            ->assertSee('1h 20m late')
+            ->assertDontSee('tracking-widest', false)
+            ->assertDontSee('Action required')
+            ->assertDontSee('Last seven days')
+            // No "Late" badge and no amber avatar on the late row.
+            ->assertDontSee('bg-amber-50 text-amber-600', false)
+            ->assertDontSee('>Late<', false);
+    }
+
+    public function test_a_pending_today_is_marked_never_zero_percent_or_absent(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 11:00:00'));
+        $department = Department::factory()->create(['name' => 'Pending Dept']);
+        $in = Employee::factory()->create(['department_id' => $department->id]);
+        $alsoIn = Employee::factory()->create(['department_id' => $department->id]);
+        $notYet = Employee::factory()->create(['department_id' => $department->id]);
+
+        $this->attendanceRow($in, AttendanceStatus::InProgress, ['first_in' => Carbon::parse('2026-03-11 07:55:00')]);
+        $this->attendanceRow($alsoIn, AttendanceStatus::InProgress, ['first_in' => Carbon::parse('2026-03-11 08:02:00')]);
+        $this->attendanceRow($notYet, AttendanceStatus::InProgress);
+
+        $response = $this->actingAs($this->admin())->get(route('dashboard'));
+
+        $response->assertViewHas('attendance', function ($attendance) {
+            $today = end($attendance['trend']);
+            $dept = collect($attendance['departments'])->firstWhere('name', 'Pending Dept');
+
+            // Two of three checked in: a provisional bar of the checked-in
+            // share, never 0% for the one not in yet.
+            return $today['pending'] === true && $today['marker'] === 'Today' && $today['value'] === 66.7
+                && $dept['pending'] === true && $dept['checkedIn'] === 2;
+        });
+
+        $response->assertSee('Checked in', false)
+            ->assertSee('Today', false)
+            // In progress carries no percentage in the stat strip.
+            ->assertDontSee('>100%<', false)
+            ->assertDontSee('>0%<', false);
+    }
+
+    public function test_todays_provisional_bar_is_the_checked_in_share_with_the_today_marker(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 16:30:00'));
+        $early = Employee::factory()->create();
+        $working = Employee::factory()->create();
+
+        $notYet = Employee::factory()->create();
+
+        $this->attendanceRow($early, AttendanceStatus::Present, ['first_in' => Carbon::parse('2026-03-11 07:52:00'), 'last_out' => Carbon::parse('2026-03-11 15:00:00')]);
+        $this->attendanceRow($working, AttendanceStatus::InProgress, ['first_in' => Carbon::parse('2026-03-11 07:58:00')]);
+        $this->attendanceRow($notYet, AttendanceStatus::InProgress);
+
+        // The provisional bar is checked in so far (2 of 3), not present (1 of 3).
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertViewHas('attendance', function ($attendance) {
+                $today = end($attendance['trend']);
+
+                return $today['pending'] === true && $today['marker'] === 'Today' && $today['value'] === 66.7;
+            });
+    }
+
+    public function test_recent_activity_dates_only_entries_that_are_not_from_today(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 12:00:00'));
+        $employee = Employee::factory()->create(['full_name' => 'Yesterday Yan']);
+        $other = Employee::factory()->create(['full_name' => 'Today Tess']);
+
+        AttendanceLog::factory()->create(['employee_id' => $employee->id, 'punch_type' => PunchType::Out, 'punched_at' => Carbon::parse('2026-03-10 17:05:00')]);
+        AttendanceLog::factory()->create(['employee_id' => $other->id, 'punch_type' => PunchType::In, 'punched_at' => Carbon::parse('2026-03-11 07:55:00')]);
+
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertViewHas('attendance', function ($attendance) {
+                $byName = collect($attendance['recent'])->keyBy('name');
+
+                return $byName['Yesterday Yan']['date'] === 'Tue 10 Mar' && $byName['Today Tess']['date'] === null;
+            })
+            ->assertSee('Tue 10 Mar');
+    }
+
+    public function test_the_live_strip_is_a_partition_that_sums_to_active_employees(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 12:00:00'));
+        $at = fn () => Carbon::parse('2026-03-11 07:55:00');
+
+        $working = Employee::factory()->create();
+        $workingIncomplete = Employee::factory()->create();
+        $leftOnTime = Employee::factory()->create();
+        $leftEarly = Employee::factory()->create();
+        $noPunch = Employee::factory()->create();
+        $outOnly = Employee::factory()->create();
+        $absent = Employee::factory()->create();
+        Employee::factory()->create(); // not calculated yet: no row at all
+        $inactive = Employee::factory()->create(['status' => 'inactive']);
+
+        $this->attendanceRow($working, AttendanceStatus::InProgress, ['first_in' => $at()]);
+        $this->attendanceRow($workingIncomplete, AttendanceStatus::Incomplete, ['first_in' => $at()]);
+        $this->attendanceRow($leftOnTime, AttendanceStatus::Present, ['first_in' => $at(), 'last_out' => Carbon::parse('2026-03-11 11:00:00')]);
+        $this->attendanceRow($leftEarly, AttendanceStatus::Present, ['first_in' => $at(), 'last_out' => Carbon::parse('2026-03-11 11:30:00'), 'early_leave_minutes' => 330]);
+        $this->attendanceRow($noPunch, AttendanceStatus::InProgress);
+        $this->attendanceRow($outOnly, AttendanceStatus::InProgress, ['last_out' => Carbon::parse('2026-03-11 11:45:00')]);
+        $this->attendanceRow($absent, AttendanceStatus::Absent);
+        // An inactive employee's row is outside the active partition.
+        $this->attendanceRow($inactive, AttendanceStatus::Present, ['first_in' => $at(), 'last_out' => Carbon::parse('2026-03-11 11:00:00')]);
+
+        $live = \App\Support\DashboardAttendance::liveToday(null);
+
+        // Partitioned by punches: an out-punch means Left, even with no in-punch.
+        $this->assertSame(8, $live['total']);
+        $this->assertSame(2, $live['atWork']);
+        $this->assertSame(3, $live['left']);
+        $this->assertSame(1, $live['leftEarly']);
+        $this->assertSame(3, $live['notIn']);
+        $this->assertSame($live['total'], $live['atWork'] + $live['left'] + $live['notIn']);
+        // Not in's sub-counts are its exact breakdown: no punch yet + not built (due), absent.
+        $this->assertSame(['notInDue' => 2, 'notInAbsent' => 1], array_intersect_key($live, array_flip(['notInDue', 'notInAbsent'])));
+        $this->assertSame($live['notIn'], $live['notInDue'] + $live['notInAbsent'] + $live['notInOff'] + $live['notInHoliday'] + $live['notInLeave']);
+        // "Checked in" is anyone with a punch, in or out — the out-only row
+        // too — so it always equals At work + Left.
+        $this->assertSame(5, $live['checkedIn']);
+        $this->assertSame($live['atWork'] + $live['left'], $live['checkedIn']);
+    }
+
+    private function onSchedule(Employee $employee, array $overrides = []): WorkSchedule
+    {
+        $schedule = WorkSchedule::factory()->create(array_merge([
+            'start_time' => '08:00:00', 'end_time' => '17:00:00', 'grace_minutes' => 10,
+            'break_minutes' => 60, 'workdays' => [1, 2, 3, 4, 5],
+        ], $overrides));
+        $employee->scheduleAssignments()->update(['work_schedule_id' => $schedule->id]);
+
+        return $schedule;
+    }
+
+    public function test_not_in_yet_starts_only_after_start_time_plus_grace(): void
+    {
+        $employee = Employee::factory()->create();
+        $schedule = $this->onSchedule($employee);
+        $row = $this->attendanceRow($employee, AttendanceStatus::InProgress, [
+            'work_date' => '2026-03-11', 'work_schedule_id' => $schedule->id,
+        ]);
+        $row->load('workSchedule');
+
+        $this->assertFalse($row->isNotInYet(Carbon::parse('2026-03-11 07:30:00')));
+        // 08:10 is the end of grace: still simply in progress.
+        $this->assertFalse($row->isNotInYet(Carbon::parse('2026-03-11 08:10:00')));
+        $this->assertTrue($row->isNotInYet(Carbon::parse('2026-03-11 08:10:01')));
+        // Only for today's row.
+        $this->assertFalse($row->isNotInYet(Carbon::parse('2026-03-12 09:00:00')));
+
+        // A punch of either kind means they're not "not in yet".
+        $row->first_in = Carbon::parse('2026-03-11 08:30:00');
+        $this->assertFalse($row->isNotInYet(Carbon::parse('2026-03-11 09:00:00')));
+    }
+
+    public function test_not_in_yet_is_never_off_holiday_leave_or_absent(): void
+    {
+        $now = Carbon::parse('2026-03-11 10:00:00');
+
+        foreach ([AttendanceStatus::Off, AttendanceStatus::Holiday, AttendanceStatus::Leave, AttendanceStatus::Absent] as $status) {
+            $employee = Employee::factory()->create();
+            $schedule = $this->onSchedule($employee);
+            $row = $this->attendanceRow($employee, $status, ['work_date' => '2026-03-11', 'work_schedule_id' => $schedule->id]);
+
+            $this->assertFalse($row->load('workSchedule')->isNotInYet($now), $status->value);
+        }
+    }
+
+    public function test_needs_attention_lists_late_arrivals_then_not_in_yet_mid_day(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 09:30:00'));
+        $make = function (string $name, AttendanceStatus $status, array $overrides = []) {
+            $employee = Employee::factory()->create(['full_name' => $name]);
+            $schedule = $this->onSchedule($employee);
+
+            return $this->attendanceRow($employee, $status, ['work_schedule_id' => $schedule->id, ...$overrides]);
+        };
+
+        $make('Not Yet Nina', AttendanceStatus::InProgress);
+        $make('Late Lou', AttendanceStatus::InProgress, ['first_in' => Carbon::parse('2026-03-11 08:45:00'), 'late_minutes' => 45]);
+        $make('On Time Oscar', AttendanceStatus::InProgress, ['first_in' => Carbon::parse('2026-03-11 07:55:00')]);
+        $make('Later Lena', AttendanceStatus::InProgress, ['first_in' => Carbon::parse('2026-03-11 09:20:00'), 'late_minutes' => 80]);
+
+        $response = $this->actingAs($this->admin())->get(route('dashboard'));
+
+        $response->assertViewHas('attendance', function ($attendance) {
+            $list = collect($attendance['needsAttention']);
+
+            return $list->pluck('name')->all() === ['Later Lena', 'Late Lou', 'Not Yet Nina']
+                && $list->pluck('kind')->all() === ['late', 'late', 'not_in_yet']
+                && $list[0]['detail'] === '1h 20m late'
+                && $list[2]['detail'] === 'Not in yet · due 8:00 AM'
+                && $list->every(fn ($item) => $item['badge'] === null);
+        });
+        $response->assertSeeInOrder(['Later Lena', '1h 20m late', 'Late Lou', '45m late', 'Not Yet Nina', 'Not in yet · due 8:00 AM']);
+    }
+
+    public function test_before_start_plus_grace_a_punchless_employee_is_not_listed_as_not_in_yet(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 08:05:00'));
+        $employee = Employee::factory()->create(['full_name' => 'Early Bird Ed']);
+        $schedule = $this->onSchedule($employee);
+        $this->attendanceRow($employee, AttendanceStatus::InProgress, ['work_schedule_id' => $schedule->id]);
+
+        $this->actingAs($this->admin())->get(route('dashboard'))
+            ->assertViewHas('attendance', fn ($attendance) => $attendance['needsAttention'] === []
+                // ...but the strip still counts them as not in yet (wider scope).
+                && $attendance['live']['notIn'] === 1)
+            ->assertSee('Nothing needs attention today.');
+    }
+
+    public function test_the_live_strip_carries_late_as_a_sub_line_on_at_work_and_left(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 15:00:00'));
+        $in = fn (string $time) => Carbon::parse('2026-03-11 '.$time);
+
+        foreach ([['08:40', 40], ['08:30', 30], ['07:55', 0]] as [$time, $late]) {
+            $this->attendanceRow(Employee::factory()->create(), AttendanceStatus::InProgress, ['first_in' => $in($time), 'late_minutes' => $late]);
+        }
+        $this->attendanceRow(Employee::factory()->create(), AttendanceStatus::Present, ['first_in' => $in('08:20'), 'last_out' => $in('14:00'), 'late_minutes' => 20, 'early_leave_minutes' => 180]);
+        $this->attendanceRow(Employee::factory()->create(), AttendanceStatus::InProgress);
+
+        $live = \App\Support\DashboardAttendance::liveToday(null);
+
+        $this->assertSame(['atWork' => 3, 'atWorkLate' => 2, 'left' => 1, 'leftLate' => 1, 'leftEarly' => 1, 'notIn' => 1], array_intersect_key($live, array_flip(['atWork', 'atWorkLate', 'left', 'leftLate', 'leftEarly', 'notIn'])));
+        // Late is an annotation on a group, never a fourth group: the
+        // partition still sums to active employees.
+        $this->assertSame($live['total'], $live['atWork'] + $live['left'] + $live['notIn']);
+
+        $this->actingAs($this->admin())->get(route('dashboard'))
+            ->assertSeeInOrder(['At work', '3', '2 late', 'Left', '1', '1 late · 1 early', 'Not in', '1']);
+    }
+
+    public function test_the_trend_tooltip_says_attended_not_present(): void
+    {
+        $chart = file_get_contents(resource_path('js/dashboard-chart.js'));
+
+        // The rate is attended (present + incomplete); "present" would misstate it.
+        $this->assertStringContainsString('% attended`', $chart);
+        $this->assertStringNotContainsString('% present`', $chart);
+        $this->assertStringContainsString('% checked in so far`', $chart);
     }
 }
+

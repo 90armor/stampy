@@ -57,7 +57,9 @@ Route::get('/dashboard', function () {
 
         $attendance = [
             'today' => DashboardAttendance::todayBreakdown($employeeIds),
+            'live' => DashboardAttendance::liveToday($employeeIds),
             'needsAttention' => DashboardAttendance::needsAttention($employeeIds),
+            'needsAttentionTotal' => DashboardAttendance::needsAttentionTotal($employeeIds),
             'trend' => DashboardAttendance::weeklyTrend($employeeIds),
             'departments' => DashboardAttendance::departmentAttendance($departments, $employeeIds),
             'recent' => DashboardAttendance::recentActivity($employeeIds),

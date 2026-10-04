@@ -96,7 +96,7 @@ class HolidayCalendarDisplayTest extends TestCase
             ->set('month', self::MONTH);
 
         $component->assertSee('Company Anniversary');
-        $component->assertSee('March 1, 2026, Off, Holiday: Company Anniversary');
+        $component->assertSee('Sunday, 1 March 2026, Off, Holiday: Company Anniversary');
     }
 
     public function test_a_worked_holiday_shows_the_name_with_the_present_colour(): void
@@ -117,7 +117,10 @@ class HolidayCalendarDisplayTest extends TestCase
             ->html();
 
         $this->assertStringContainsString('Test Holiday', $html);
-        $this->assertStringContainsString('bg-green-50 dark:bg-green-900/20', $html);
+        // A worked holiday is Present: the neutral cell surface with the green
+        // day number and check (fill is reserved for exceptions).
+        $this->assertStringContainsString('bg-white dark:bg-slate-800 ring-slate-divider', $html);
+        $this->assertStringContainsString('text-green-700 dark:text-green-400', $html);
     }
 
     public function test_holidays_are_not_shown_on_out_of_month_padding_cells(): void

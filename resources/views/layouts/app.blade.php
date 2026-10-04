@@ -33,20 +33,63 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         @livewireStyles
     </head>
-    <body class="font-sans antialiased bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 bg-shell">
-        <div x-data="{ sidebarOpen: false }" class="h-screen flex overflow-hidden">
+    <body class="font-sans antialiased bg-slate-100 text-slate-900 dark:bg-slate-900 dark:text-slate-100 bg-shell">
+        <div
+            x-data="{
+                sidebarOpen: false,
+                sidebarTrigger: null,
+                openSidebar() {
+                    this.sidebarTrigger = document.activeElement;
+                    this.sidebarOpen = true;
+                    this.$nextTick(() => this.$refs.sidebarClose.focus());
+                },
+                closeSidebar() {
+                    this.sidebarOpen = false;
+
+                    const trigger = this.sidebarTrigger;
+                    this.sidebarTrigger = null;
+
+                    this.$nextTick(() => {
+                        if (trigger && document.body.contains(trigger) && typeof trigger.focus === 'function') {
+                            trigger.focus();
+                        }
+                    });
+                },
+                sidebarFocusables() {
+                    return [...this.$refs.sidebarPanel.querySelectorAll('a, button, [tabindex]:not([tabindex=\'-1\'])')]
+                        .filter((element) => ! element.hasAttribute('disabled'));
+                },
+                trapSidebarTab(event) {
+                    const focusable = this.sidebarFocusables();
+                    const first = focusable[0];
+                    const last = focusable[focusable.length - 1];
+
+                    if (! first || ! last) return;
+
+                    if (event.shiftKey && document.activeElement === first) {
+                        event.preventDefault();
+                        last.focus();
+                    } else if (! event.shiftKey && document.activeElement === last) {
+                        event.preventDefault();
+                        first.focus();
+                    }
+                },
+            }"
+            class="h-screen flex overflow-hidden"
+        >
             <!-- Desktop sidebar -->
             <div class="hidden lg:flex lg:shrink-0">
                 @include('layouts.partials.sidebar')
             </div>
 
             <!-- Mobile sidebar drawer -->
-            <div x-show="sidebarOpen" x-cloak class="relative z-40 lg:hidden" role="dialog" aria-modal="true">
-                <div x-show="sidebarOpen" x-transition:enter="transition-opacity ease-linear duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition-opacity ease-linear duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 bg-slate-900/50" @click="sidebarOpen = false"></div>
+            <div x-show="sidebarOpen" x-cloak class="relative z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Navigation" @keydown.escape.window="if (sidebarOpen) closeSidebar()">
+                <div x-show="sidebarOpen" x-transition:enter="transition-opacity ease-linear duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition-opacity ease-linear duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" class="fixed inset-0 bg-slate-900/50" @click="closeSidebar()"></div>
 
-                <div x-show="sidebarOpen" x-transition:enter="transition ease-in-out duration-200 transform" x-transition:enter-start="-translate-x-full" x-transition:enter-end="translate-x-0" x-transition:leave="transition ease-in-out duration-200 transform" x-transition:leave-start="translate-x-0" x-transition:leave-end="-translate-x-full" class="fixed inset-y-0 left-0 flex w-[242px]">
+                <div x-ref="sidebarPanel" x-show="sidebarOpen" x-transition:enter="transition ease-in-out duration-200 transform" x-transition:enter-start="-translate-x-full" x-transition:enter-end="translate-x-0" x-transition:leave="transition ease-in-out duration-200 transform" x-transition:leave-start="translate-x-0" x-transition:leave-end="-translate-x-full" @keydown.tab="trapSidebarTab($event)" class="fixed inset-y-0 left-0 flex w-[242px]">
                     @include('layouts.partials.sidebar')
-                    <button type="button" class="absolute top-4 -right-10 text-white" @click="sidebarOpen = false">
+                    <button x-ref="sidebarClose" type="button" class="absolute top-3 -right-12 inline-flex h-10 w-10 items-center justify-center rounded-lg text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400" @click="closeSidebar()">
+                        <span class="sr-only">Close navigation</span>
                         <x-icon name="x-mark" class="w-6 h-6" />
                     </button>
                 </div>

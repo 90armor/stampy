@@ -29,6 +29,48 @@ class DepartmentManagementTest extends TestCase
         }
     }
 
+    public function test_a_single_page_list_renders_no_empty_pagination_footer(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        Department::factory()->count(3)->create();
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->assertDontSeeHtml('Pagination Navigation')
+            ->assertDontSeeHtml('border-t border-slate-200/60 px-5 py-4');
+    }
+
+    public function test_a_multi_page_list_uses_the_themed_pagination_with_no_stock_gray_or_blue(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        Department::factory()->count(12)->create();
+
+        $html = Livewire::actingAs($admin)->test(Index::class)->html();
+
+        $this->assertStringContainsString('Pagination Navigation', $html);
+        $this->assertStringContainsString('border-slate-border bg-white dark:bg-slate-750', $html);
+        $this->assertDoesNotMatchRegularExpression('/\b(?:dark:)?(?:[a-z:]+-)?(?:gray|blue)-\d{2,3}\b/', $html);
+
+        // The current page is the shared selected state, and says so itself.
+        $this->assertMatchesRegularExpression('/<span aria-current="page" class="([^"]*)">1<\/span>/', $html);
+        preg_match('/<span aria-current="page" class="([^"]*)">1<\/span>/', $html, $current);
+        $classes = explode(' ', $current[1]);
+        foreach (['font-semibold', 'border-primary-600', 'bg-primary-50', 'text-primary-700', 'dark:bg-primary-600/35'] as $class) {
+            $this->assertContains($class, $classes);
+        }
+        // No neutral surface alongside the tint: bg-white out-ranks bg-primary-50
+        // in the generated CSS, which is how the tint was once silently lost.
+        $this->assertNotContains('bg-white', $classes);
+        $this->assertNotContains('border-slate-300', $classes);
+    }
+
+    public function test_badges_never_wrap(): void
+    {
+        $html = (string) $this->blade('<x-badge color="blue">In progress</x-badge>');
+
+        $this->assertStringContainsString('whitespace-nowrap', $html);
+    }
+
     public function test_admin_can_create_a_department(): void
     {
         $admin = User::factory()->create()->assignRole('admin');
@@ -40,6 +82,31 @@ class DepartmentManagementTest extends TestCase
             ->call('save');
 
         $this->assertDatabaseHas('departments', ['name' => 'Human Resources']);
+    }
+
+    public function test_organization_workspace_and_department_actions_are_accessible(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        $department = Department::factory()->create(['name' => 'Customer Success']);
+
+        $this->actingAs($admin)
+            ->get(route('organization.index'))
+            ->assertOk()
+            ->assertSee('<h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Organization</h1>', false)
+            ->assertDontSee('Departments, Positions, Holidays &amp; Schedules', false)
+            ->assertSee('aria-label="Organization sections"', false)
+            ->assertSee('role="alertdialog"', false)
+            ->assertSee('aria-modal="true"', false)
+            ->assertSee('aria-labelledby="confirm-dialog-departments-title"', false)
+            ->assertSee('aria-describedby="confirm-dialog-departments-description"', false)
+            ->assertSee('@keydown.tab="trapTab($event)"', false);
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->assertSee('Define the teams employees belong to.')
+            ->assertSee('aria-label="Edit Customer Success department"', false)
+            ->assertSee('aria-label="Delete Customer Success department"', false)
+            ->assertSee('role="tooltip"', false);
     }
 
     public function test_admin_can_edit_a_department(): void

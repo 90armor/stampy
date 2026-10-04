@@ -1,0 +1,25 @@
+#!/bin/sh
+# Stampy pre-commit hook: run the test suite and block the commit if it fails.
+#
+# Installed per clone by `composer hooks` (also run by `composer install`),
+# which points git's core.hooksPath at this directory — see CLAUDE.md, Local
+# environment. The suite runs inside the `app` container, the only place the
+# test database host resolves, so Docker Compose must be up.
+#
+# Emergency bypass only, never for a red suite: git commit --no-verify
+
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+if ! docker compose ps --status running --services 2>/dev/null | grep -qx app; then
+    echo "pre-commit: the app container isn't running, so the tests can't run." >&2
+    echo "pre-commit: start it with 'docker compose up -d' and commit again. Commit blocked." >&2
+    exit 1
+fi
+
+echo "pre-commit: running the test suite in the app container…"
+if docker compose exec -T app php artisan test --compact; then
+    exit 0
+fi
+
+echo "pre-commit: tests failed — commit blocked. Fix them and commit again." >&2
+exit 1

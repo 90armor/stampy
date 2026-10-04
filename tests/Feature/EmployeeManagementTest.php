@@ -151,6 +151,40 @@ class EmployeeManagementTest extends TestCase
             ->assertDontSee('Bob Builder');
     }
 
+    public function test_reset_filters_restores_the_default_directory_state(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        $department = Department::factory()->create();
+        Employee::factory()->create(['full_name' => 'Reset Target', 'department_id' => $department->id, 'status' => 'inactive']);
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->set('search', 'Missing')
+            ->set('departmentFilter', (string) $department->id)
+            ->set('statusFilter', 'active')
+            ->assertSee('No employees found')
+            ->call('resetFilters')
+            ->assertSet('search', '')
+            ->assertSet('departmentFilter', '')
+            ->assertSet('statusFilter', '')
+            ->assertSee('Reset Target');
+    }
+
+    public function test_employee_link_and_row_actions_have_explicit_accessible_targets(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        $employee = Employee::factory()->create(['full_name' => 'Accessible Person']);
+
+        $this->actingAs($admin)
+            ->get(route('employees.index'))
+            ->assertOk()
+            ->assertSeeHtml('href="'.route('employees.show', $employee).'"')
+            ->assertSeeHtml('aria-label="Edit Accessible Person"')
+            ->assertSeeHtml('aria-label="Deactivate Accessible Person"')
+            ->assertSee('Edit employee')
+            ->assertSee('Deactivate employee');
+    }
+
     public function test_employee_without_a_role_cannot_view_the_employee_list(): void
     {
         $employee = User::factory()->create()->assignRole('employee');
@@ -215,10 +249,10 @@ class EmployeeManagementTest extends TestCase
         $managerEmployee = Employee::factory()->create(['user_id' => $manager->id]);
         Employee::factory()->create(['full_name' => 'A Report', 'manager_id' => $managerEmployee->id, 'status' => 'active']);
 
-        $this->actingAs($admin)->get(route('employees.index'))->assertOk()->assertSeeHtml('title="Deactivate"');
+        $this->actingAs($admin)->get(route('employees.index'))->assertOk()->assertSeeHtml('aria-label="Deactivate A Report"');
 
         // The manager's directory has rows (their team), so the absence is about the control, not an empty page.
-        $this->actingAs($manager)->get(route('employees.index'))->assertOk()->assertSee('A Report')->assertDontSeeHtml('title="Deactivate"');
+        $this->actingAs($manager)->get(route('employees.index'))->assertOk()->assertSee('A Report')->assertDontSeeHtml('aria-label="Deactivate A Report"');
     }
 
     public function test_manager_cannot_deactivate_an_employee(): void
@@ -450,5 +484,52 @@ class EmployeeManagementTest extends TestCase
             ->assertHasErrors(['username']);
 
         $this->assertSame(0, Employee::whereIn('employee_code', ['EMP-9500', 'EMP-9501'])->count());
+    }
+
+    public function test_employee_pages_carry_no_eyebrow_labels(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        $employee = Employee::factory()->create();
+
+        $this->actingAs($admin)->get(route('employees.index'))
+            ->assertDontSee('People directory')
+            ->assertDontSee('tracking-widest', false);
+
+        $this->actingAs($admin)->get(route('employees.show', $employee))
+            ->assertDontSee('tracking-widest', false)
+            ->assertSee('<h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Details</h2>', false);
+    }
+
+    public function test_the_directory_column_order_ends_with_pinned_status_and_actions(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        Employee::factory()->create();
+
+        $html = Livewire::actingAs($admin)->test(Index::class)->html();
+
+        preg_match_all('/<th[^>]*>\s*(.*?)\s*<\/th>/s', $html, $matches);
+        $headers = array_map(fn ($cell) => trim(strip_tags($cell)), $matches[1]);
+        // Owner decision (docs/ATTENDANCE_UI.md): Status and Actions are the
+        // trailing columns, pinned to the right edge below xl.
+        $this->assertSame(['Employee', 'Department', 'Position', 'Start date', 'Status', 'Actions'], $headers);
+        $this->assertStringContainsString('<th class="table-pin table-pin-start px-6 py-3">Status</th>', $html);
+        $this->assertStringContainsString('<th class="table-pin table-pin-end px-6 py-3 text-right">Actions</th>', $html);
+        $this->assertStringContainsString('x-data="pinnedColumns"', $html);
+        // The three-column filter grid only starts at xl, so it can't overflow
+        // the card at 1024px.
+        $this->assertStringContainsString('xl:grid-cols-[minmax(18rem,1fr)_14rem_11rem]', $html);
+        $this->assertStringNotContainsString('lg:grid-cols-[minmax(18rem,1fr)_14rem_11rem]', $html);
+    }
+
+    public function test_the_stat_strip_is_one_row_of_three_at_every_width_with_card_padding(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+
+        $html = Livewire::actingAs($admin)->test(Index::class)->html();
+
+        // Three cells, one row at every width — no wrapped multi-row grid
+        // that could orphan a cell.
+        $this->assertStringContainsString('grid grid-cols-3 divide-x divide-slate-divider', $html);
+        $this->assertSame(3, substr_count($html, 'min-w-0 px-6 py-4 lg:flex'));
     }
 }

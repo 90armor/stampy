@@ -1,10 +1,9 @@
 <x-guest-layout>
     <a href="{{ route('login') }}" wire:navigate class="mb-6 inline-flex items-center gap-x-1 text-sm font-semibold text-primary-700 hover:text-primary-800 dark:text-accent-300 dark:hover:text-accent-200">
-        <x-icon name="chevron-right" class="w-4 h-4 rotate-180" />
+        <x-icon name="chevron-right" class="w-5 h-5 rotate-180" />
         Back to sign in
     </a>
 
-    <p class="mb-1.5 text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500">Account recovery</p>
     <h2 class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Reset your password</h2>
     <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
         {{ __('Enter your email or username and we\'ll email you a secure link to choose a new one, if your account has an email on file.') }}
@@ -34,7 +33,7 @@
 
             <x-button type="submit" variant="primary" class="w-full">
                 {{ __('Send reset link') }}
-                <x-icon name="chevron-right" class="w-4 h-4" />
+                <x-icon name="chevron-right" class="w-5 h-5" />
             </x-button>
         </form>
     @endif

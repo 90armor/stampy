@@ -1,5 +1,22 @@
 import defaultTheme from 'tailwindcss/defaultTheme';
 import forms from '@tailwindcss/forms';
+import plugin from 'tailwindcss/plugin';
+
+// Deep evergreen — primary brand color for buttons, links, active states.
+// Also published as --primary-N CSS variables (below) for scripts that draw
+// outside Tailwind classes — the dashboard chart — so the hexes live here only.
+const primary = {
+    50: '#f1f7f4',
+    100: '#dcece2',
+    200: '#b9d9c8',
+    300: '#8fc0a7',
+    400: '#5fa07f',
+    500: '#3f8266',
+    600: '#2f6850',
+    700: '#26543f',
+    800: '#1e4232',
+    900: '#173327',
+};
 
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -9,43 +26,44 @@ export default {
         './vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php',
         './storage/framework/views/*.php',
         './resources/views/**/*.blade.php',
+        './resources/js/**/*.js',
     ],
 
     theme: {
         extend: {
             fontFamily: {
-                sans: ['Geist', 'Inter', ...defaultTheme.fontFamily.sans],
+                sans: ['Inter', ...defaultTheme.fontFamily.sans],
                 serif: ['"DM Serif Display"', 'Georgia', 'serif'],
             },
+            // The one control height (docs/DESIGN_SYSTEM.md, Control height):
+            // every text input, select, date/time field and button is h-control,
+            // so a button sits level with the inputs beside it.
+            height: {
+                control: '2.375rem',
+            },
+            // A square icon control beside other controls (month arrows).
+            width: {
+                control: '2.375rem',
+            },
             colors: {
-                // Warm stone — replaces cool slate as the neutral scale (text/borders/surfaces)
-                // to match the warm cream background of the reference "Northstar" mockup.
+                // The neutral scale, as CSS variables (resources/css/app.css):
+                // warm stone in light mode, matching the warm cream of the
+                // reference "Northstar" mockup; a neutral, slightly cool zinc
+                // in dark mode, where stone's red-orange cast read as brown
+                // (dark option C). The `slate` name is kept so no class changes.
+                // Plus the two line tokens (docs/DESIGN_SYSTEM.md, Lines):
+                // `divider` for lines inside a surface, `border` for surface
+                // edges and controls. Each carries its own opacity, so they
+                // take no opacity modifier.
                 slate: {
-                    50: '#fafaf9',
-                    100: '#f5f5f4',
-                    200: '#e7e5e4',
-                    300: '#d6d3d1',
-                    400: '#a8a29e',
-                    500: '#78716c',
-                    600: '#57534e',
-                    700: '#44403c',
-                    800: '#292524',
-                    900: '#1c1917',
-                    950: '#0c0a09',
+                    ...Object.fromEntries(
+                        [50, 100, 200, 300, 400, 500, 600, 700, 750, 800, 900, 950]
+                            .map((step) => [step, `rgb(var(--slate-${step}) / <alpha-value>)`]),
+                    ),
+                    divider: 'rgb(var(--slate-divider))',
+                    border: 'rgb(var(--slate-border))',
                 },
-                // Deep evergreen — primary brand color for buttons, links, active states.
-                primary: {
-                    50: '#f1f7f4',
-                    100: '#dcece2',
-                    200: '#b9d9c8',
-                    300: '#8fc0a7',
-                    400: '#5fa07f',
-                    500: '#3f8266',
-                    600: '#2f6850',
-                    700: '#26543f',
-                    800: '#1e4232',
-                    900: '#173327',
-                },
+                primary,
                 // Mint — accent for icon badges, brand mark, chart bars, hero highlights.
                 accent: {
                     50: '#effcf6',
@@ -63,5 +81,10 @@ export default {
         },
     },
 
-    plugins: [forms],
+    plugins: [
+        forms,
+        plugin(({ addBase }) => addBase({
+            ':root': Object.fromEntries(Object.entries(primary).map(([step, hex]) => [`--primary-${step}`, hex])),
+        })),
+    ],
 };

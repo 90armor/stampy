@@ -3,6 +3,9 @@
 namespace App\Models;
 
 use App\Enums\AttendanceStatus;
+use App\Support\Duration;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -45,16 +48,29 @@ class DailyAttendance extends Model
     }
 
     /**
-     * "7h 30m", or null when there's nothing worked to show — callers decide
-     * how to render that (e.g. an em dash).
+     * "7h 30m" / "45m" (App\Support\Duration), or null when there's nothing
+     * worked to show — callers decide how to render that (e.g. an em dash).
      */
     public function formattedWorkedMinutes(): ?string
     {
-        if ($this->worked_minutes === 0) {
-            return null;
-        }
+        return $this->worked_minutes === 0 ? null : Duration::format($this->worked_minutes);
+    }
 
-        return sprintf('%dh %02dm', intdiv($this->worked_minutes, 60), $this->worked_minutes % 60);
+    /**
+     * "21m" / "1h 20m", or null when the arrival wasn't late — the same
+     * Duration format as worked time.
+     */
+    public function formattedLateMinutes(): ?string
+    {
+        return $this->isLate() ? Duration::format($this->late_minutes) : null;
+    }
+
+    /**
+     * "21m" / "1h 20m", or null when there was no early leave.
+     */
+    public function formattedEarlyLeaveMinutes(): ?string
+    {
+        return $this->leftEarly() ? Duration::format($this->early_leave_minutes) : null;
     }
 
     /**
@@ -84,17 +100,57 @@ class DailyAttendance extends Model
     }
 
     /**
-     * The single resolver every view colours a cell/badge from — "did they
-     * attend" (status) and "was the timing off" (isLate()/leftEarly()) are
-     * independent facts, so no view may re-derive a colour bucket by
-     * checking late_minutes/early_leave_minutes/status itself; they all
-     * call this instead. A timing exception can only ever coincide with
-     * Present: every other status structurally carries zero late/early
-     * minutes (DailySummaryBuilder only computes either when both punches
-     * exist on a workday that isn't a holiday — InProgress/Incomplete/
-     * Absent never have both, and a worked Holiday has them forced to 0),
-     * so 'timing' and every other variant are mutually exclusive by
-     * construction, not by a check here.
+     * When a punchless person counts as "not in yet": the schedule this row
+     * was built with, start_time plus grace_minutes on work_date, in the app
+     * timezone. Null when the row carries no schedule.
+     */
+    public function notInYetAfter(): ?CarbonInterface
+    {
+        if ($this->workSchedule === null) {
+            return null;
+        }
+
+        return Carbon::parse($this->work_date->format('Y-m-d').' '.$this->workSchedule->start_time)
+            ->addMinutes($this->workSchedule->grace_minutes);
+    }
+
+    /**
+     * "Not in yet" (Phase 2.6) is a derived display fact, never a status and
+     * never "absent": an In progress row (so today, a workday, not a holiday
+     * or leave) with no punch at all, once the schedule's start_time +
+     * grace_minutes has passed. Before that point the person is simply in
+     * progress. Off/holiday/leave rows are never In progress, so they never
+     * qualify. The live strip's own "Not in yet" count is wider (anyone
+     * without an in-punch at any time of day); this is the narrower,
+     * actionable subset Needs attention lists (docs/ATTENDANCE_UI.md).
+     */
+    public function isNotInYet(?CarbonInterface $now = null): bool
+    {
+        $now ??= now();
+        $due = $this->notInYetAfter();
+
+        return $this->status === AttendanceStatus::InProgress
+            && $this->first_in === null
+            && $this->last_out === null
+            && $this->work_date->isSameDay($now)
+            && $due !== null
+            && $now->gt($due);
+    }
+
+    /**
+     * The single resolver every view colours a cell/badge from. It encodes
+     * the attendance STATUS only — one value per day. Attributes that can
+     * co-occur on the same day (timing exceptions now, partial leave later)
+     * are annotations inside the cell, exposed through isLate()/leftEarly()/
+     * hasTimingException(), never a colour bucket: a Present day is 'present'
+     * whether or not it was late. No view may re-derive a colour bucket from
+     * late_minutes/early_leave_minutes/status itself; they all call this.
+     *
+     * A 'timing' variant used to exist (Present + a timing exception, amber)
+     * and was removed in Design System v1.1: it made one cell colour carry
+     * two independent facts, and would have needed yet another combined
+     * bucket the first time a second co-occurring attribute (partial leave)
+     * arrived.
      */
     public function displayVariant(): string
     {
@@ -105,7 +161,7 @@ class DailyAttendance extends Model
             AttendanceStatus::Absent => 'absent',
             AttendanceStatus::Incomplete => 'incomplete',
             AttendanceStatus::InProgress => 'in_progress',
-            AttendanceStatus::Present => $this->hasTimingException() ? 'timing' : 'present',
+            AttendanceStatus::Present => 'present',
         };
     }
 }

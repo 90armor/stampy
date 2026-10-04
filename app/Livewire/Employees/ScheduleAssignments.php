@@ -63,7 +63,7 @@ class ScheduleAssignments extends Component
                 'after_or_equal:'.$this->employee->join_date->format('Y-m-d'),
             ],
         ], [
-            'effective_from.after_or_equal' => 'The effective date can\'t be before this employee\'s join date ('.$this->employee->join_date->format('M j, Y').').',
+            'effective_from.after_or_equal' => 'The effective date can\'t be before this employee\'s join date ('.\App\Support\DisplayDate::compact($this->employee->join_date).').',
         ], [
             'work_schedule_id' => 'schedule',
             'effective_from' => 'effective date',

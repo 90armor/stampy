@@ -30,6 +30,13 @@ class ManualPunchTest extends TestCase
     {
         parent::setUp();
 
+        // A fixed clock: this class's data sits on fixed Feb–Mar 2026 dates that
+        // must read as the past (not today, not the future) and as this year,
+        // so DisplayDate omits the year. Without it the class only passed while
+        // the real clock was later in 2026 (CLAUDE.md, pinned-instant check).
+        // A test that travels itself still overrides this.
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
+
         foreach (['admin', 'manager', 'employee'] as $role) {
             Role::firstOrCreate(['name' => $role]);
         }
@@ -72,6 +79,24 @@ class ManualPunchTest extends TestCase
         return [$component, $employee];
     }
 
+    public function test_raw_punch_badges_are_neutral_for_both_directions(): void
+    {
+        $employee = Employee::factory()->create();
+        \App\Models\AttendanceLog::factory()->create(['employee_id' => $employee->id, 'punch_type' => \App\Enums\PunchType::In, 'punched_at' => Carbon::parse('2026-03-02 08:00:00')]);
+        \App\Models\AttendanceLog::factory()->create(['employee_id' => $employee->id, 'punch_type' => \App\Enums\PunchType::Out, 'punched_at' => Carbon::parse('2026-03-02 17:00:00')]);
+
+        $html = Livewire::actingAs($this->admin())
+            ->test(\App\Livewire\Attendance\Show::class, ['employee' => $employee])
+            ->set('month', '2026-03')
+            ->call('openDay', '2026-03-02')
+            ->html();
+
+        // Green means Present; an in-punch is not a status.
+        $this->assertMatchesRegularExpression('/bg-slate-100 text-slate-600[^>]*>\s*In\s*</', $html);
+        $this->assertMatchesRegularExpression('/bg-slate-100 text-slate-600[^>]*>\s*Out\s*</', $html);
+        $this->assertDoesNotMatchRegularExpression('/bg-green-50 text-green-700[^>]*>\s*In\s*</', $html);
+    }
+
     public function test_punch_validation_messages_are_human_readable_not_raw_property_names(): void
     {
         // Laravel's default attribute-name fallback would otherwise read
@@ -98,7 +123,7 @@ class ManualPunchTest extends TestCase
 
         $component->call('addPunch')->assertHasErrors(['newPunchDate']);
 
-        $this->assertStringContainsString("before this employee's start date (Feb 2, 2026)", $component->errors()->first('newPunchDate'));
+        $this->assertStringContainsString("before this employee's start date (Mon 2 Feb)", $component->errors()->first('newPunchDate'));
         $this->assertSame(0, AttendanceLog::where('employee_id', $employee->id)->count());
         $this->assertSame(0, DailyAttendance::where('employee_id', $employee->id)->count());
     }
