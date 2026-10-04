@@ -10,7 +10,7 @@ use App\Models\WorkSchedule;
 use App\Services\Attendance\DailySummaryBuilder;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Blade;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -79,11 +79,20 @@ class DayModalPunchesTest extends TestCase
 
     public function test_the_void_confirmation_is_teleported_above_modals(): void
     {
-        $dialog = File::get(resource_path('views/components/confirm-dialog.blade.php'));
+        // Inspect the rendered markup, never the source: a comment that
+        // mentions z-[60] must not be able to satisfy this.
+        $dialog = Blade::render('<x-confirm-dialog event="confirm-probe" />');
+        $modal = Blade::render('<x-modal name="probe"><p>Body</p></x-modal>');
 
-        $this->assertStringContainsString('<template x-teleport="body">', $dialog);
-        // Modals are z-50; the confirmation must be above them.
-        $this->assertStringContainsString('z-[60]', $dialog);
-        $this->assertStringContainsString('@keydown.escape.window.capture=', $dialog);
+        $this->assertStringStartsWith('<template x-teleport="body">', trim($dialog));
+
+        // The overlay (the element that becomes visible) sits above every modal.
+        $this->assertSame(1, preg_match('/<div\s+x-show="open"[^>]*class="([^"]*)"/', $dialog, $overlay));
+        $this->assertSame(1, preg_match('/(?<![\w-])z-\[?(\d+)\]?(?![\w-])/', $overlay[1], $dialogZ));
+        $this->assertSame(1, preg_match('/aria-modal="true"[^>]*class="[^"]*(?<![\w-])z-\[?(\d+)\]?(?![\w-])/s', $modal, $modalZ));
+        $this->assertGreaterThan((int) $modalZ[1], (int) $dialogZ[1], 'The confirmation must stack above <x-modal>.');
+
+        // Escape closes the confirmation only: caught on window in the capture phase while open.
+        $this->assertMatchesRegularExpression('/@keydown\.escape\.window\.capture="if \(open\) \{ \$event\.stopPropagation\(\); close\(\); \}"/', $dialog);
     }
 }
