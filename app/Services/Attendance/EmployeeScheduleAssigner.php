@@ -112,9 +112,9 @@ class EmployeeScheduleAssigner
     /**
      * Moves every active employee currently on $from (per scheduleOn(today()),
      * the same resolution the builder itself uses) to $to, effective
-     * $effectiveFrom — inactive employees are left alone, matching
-     * attendance:build-daily's own active-only scope; their schedule no
-     * longer affects anything that gets built.
+     * $effectiveFrom — inactive employees are left alone: a bulk move is
+     * about who is on the schedule now, and a former employee's days up to
+     * their left_on keep the schedule they had.
      *
      * @return array{employees: int, days: int, rebuildError: ?string}
      *

@@ -29,7 +29,7 @@ class AttendanceBuildDailyCommand extends Command
             return self::FAILURE;
         }
 
-        $employees = $this->resolveEmployees();
+        $employees = $this->resolveEmployees($from, $to);
 
         if ($employees === null) {
             return self::FAILURE;
@@ -37,6 +37,7 @@ class AttendanceBuildDailyCommand extends Command
 
         $created = 0;
         $updated = 0;
+        $notEmployed = 0;
         $byStatus = [];
         $skipped = [];
 
@@ -48,13 +49,19 @@ class AttendanceBuildDailyCommand extends Command
             try {
                 while ($date->lte($to)) {
                     $row = $builder->build($employee, $date);
+                    $date = $date->copy()->addDay();
+
+                    // After left_on: the builder removed any row instead.
+                    if ($row === null) {
+                        $notEmployed++;
+
+                        continue;
+                    }
 
                     $row->wasRecentlyCreated ? $created++ : $updated++;
 
                     $statusValue = $row->status->value;
                     $byStatus[$statusValue] = ($byStatus[$statusValue] ?? 0) + 1;
-
-                    $date = $date->copy()->addDay();
                 }
             } catch (NoScheduleAssignmentException) {
                 // Caught per employee, not around the whole loop: one
@@ -72,6 +79,10 @@ class AttendanceBuildDailyCommand extends Command
         $this->info("Built daily attendance for {$from->format('Y-m-d')} to {$to->format('Y-m-d')} ({$employees->count()} employee(s)).");
         $this->line("Created: {$created}");
         $this->line("Updated: {$updated}");
+
+        if ($notEmployed > 0) {
+            $this->line("Not employed (no row kept): {$notEmployed}");
+        }
 
         foreach ($byStatus as $status => $count) {
             $this->line("  {$status}: {$count}");
@@ -159,22 +170,24 @@ class AttendanceBuildDailyCommand extends Command
     /**
      * @return ?Collection<int, Employee>
      */
-    private function resolveEmployees(): ?Collection
+    private function resolveEmployees(Carbon $from, Carbon $to): ?Collection
     {
-        $query = Employee::query()->where('status', 'active');
-
         $employeeOption = $this->option('employee');
 
-        if ($employeeOption !== null) {
-            $query->where(function ($q) use ($employeeOption) {
+        // Everyone employed on at least one date in the range; per date the
+        // builder asks isActiveOn() and removes a row after left_on. A named
+        // employee is taken whatever their status — that's how a failed
+        // deactivation rebuild is healed (EmployeeLifecycle).
+        $query = $employeeOption === null
+            ? Employee::query()->activeBetween($from, $to)
+            : Employee::query()->where(function ($q) use ($employeeOption) {
                 $q->where('id', $employeeOption)->orWhere('employee_code', $employeeOption);
             });
-        }
 
         $employees = $query->get();
 
         if ($employeeOption !== null && $employees->isEmpty()) {
-            $this->error("No active employee found matching \"{$employeeOption}\".");
+            $this->error("No employee found matching \"{$employeeOption}\".");
 
             return null;
         }

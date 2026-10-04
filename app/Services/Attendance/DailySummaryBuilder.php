@@ -32,9 +32,26 @@ class DailySummaryBuilder
      */
     public const MAX_SHIFT_HOURS = 18;
 
-    public function build(Employee $employee, CarbonInterface $date): DailyAttendance
+    /**
+     * Returns null, having removed any existing row, for a date the employee
+     * wasn't employed on (Employee::isActiveOn(): before join_date, or after
+     * left_on). A backdated deactivation must not leave the rows built while
+     * they were still active behind it, and the builder stays the only writer
+     * of daily_attendances — so it's the builder that removes them.
+     */
+    public function build(Employee $employee, CarbonInterface $date): ?DailyAttendance
     {
         $workDate = Carbon::instance($date)->startOfDay();
+
+        if (! $employee->isActiveOn($workDate)) {
+            DailyAttendance::query()
+                ->where('employee_id', $employee->id)
+                ->whereDate('work_date', $workDate)
+                ->delete();
+
+            return null;
+        }
+
         $schedule = $employee->scheduleOn($workDate);
 
         $isWorkday = in_array($workDate->dayOfWeekIso, $schedule->workdays, true);
@@ -165,7 +182,7 @@ class DailySummaryBuilder
      * before their join_date, never after today — so widening can't invent a
      * pre-hire or future row (CLAUDE.md: builds can't reach outside real time).
      *
-     * @return int the number of days built
+     * @return int the number of days built (a date after left_on is removed, not built)
      */
     public function rebuildAround(Employee $employee, CarbonInterface $from, ?CarbonInterface $to = null): int
     {
@@ -189,7 +206,11 @@ class DailySummaryBuilder
      * nothing — correct, since nothing about "today" has changed yet for an
      * assignment that doesn't take effect until later.
      *
-     * @return int the number of days built (0 for a future-dated assignment)
+     * Also how a deactivation or reactivation is applied (EmployeeLifecycle):
+     * from the day after left_on, build() removes or rebuilds each row.
+     *
+     * @return int the number of days built (0 for a future-dated assignment;
+     *             dates after left_on are removed, not built)
      */
     public function rebuildFrom(Employee $employee, CarbonInterface $effectiveFrom): int
     {
@@ -208,8 +229,9 @@ class DailySummaryBuilder
         $built = 0;
 
         for ($day = $first->copy(); $day->lte($last); $day->addDay()) {
-            $this->build($employee, $day);
-            $built++;
+            if ($this->build($employee, $day) !== null) {
+                $built++;
+            }
         }
 
         return $built;

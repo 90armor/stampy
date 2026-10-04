@@ -48,7 +48,7 @@
             </div>
 
             <p class="border-t border-slate-divider py-4 text-sm text-slate-500 dark:text-slate-400">
-                Saving changes recalculates attendance for active employees on the affected date or dates.
+                Saving changes recalculates attendance for the employees active on the affected date or dates.
             </p>
         </form>
 

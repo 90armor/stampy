@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Livewire\Employees\FormModal;
 use App\Livewire\Employees\Index;
+use App\Livewire\Employees\StatusModal;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Position;
@@ -131,11 +132,13 @@ class EmployeeManagementTest extends TestCase
         $employee = Employee::factory()->create();
 
         Livewire::actingAs($admin)
-            ->test(Index::class)
-            ->call('deactivate', $employee->id);
+            ->test(StatusModal::class)
+            ->call('openDeactivate', $employee->id)
+            ->call('confirm');
 
         $this->assertDatabaseHas('employees', ['id' => $employee->id]);
         $this->assertSame('inactive', $employee->fresh()->status);
+        $this->assertSame(today()->format('Y-m-d'), $employee->fresh()->left_on->format('Y-m-d'));
     }
 
     public function test_search_filters_the_employee_list(): void
@@ -261,8 +264,8 @@ class EmployeeManagementTest extends TestCase
         $employee = Employee::factory()->create(['status' => 'active']);
 
         Livewire::actingAs($manager)
-            ->test(Index::class)
-            ->call('deactivate', $employee->id)
+            ->test(StatusModal::class)
+            ->call('openDeactivate', $employee->id)
             ->assertForbidden();
 
         $this->assertSame('active', $employee->fresh()->status);
@@ -274,8 +277,8 @@ class EmployeeManagementTest extends TestCase
         $employee = Employee::factory()->create(['status' => 'inactive']);
 
         Livewire::actingAs($manager)
-            ->test(Index::class)
-            ->call('reactivate', $employee->id)
+            ->test(StatusModal::class)
+            ->call('openReactivate', $employee->id)
             ->assertForbidden();
 
         $this->assertSame('inactive', $employee->fresh()->status);
@@ -309,10 +312,12 @@ class EmployeeManagementTest extends TestCase
         $employee = Employee::factory()->create(['status' => 'inactive']);
 
         Livewire::actingAs($admin)
-            ->test(Index::class)
-            ->call('reactivate', $employee->id);
+            ->test(StatusModal::class)
+            ->call('openReactivate', $employee->id)
+            ->call('confirm');
 
         $this->assertSame('active', $employee->fresh()->status);
+        $this->assertNull($employee->fresh()->left_on);
     }
 
     public function test_device_user_id_must_be_unique(): void
@@ -418,17 +423,53 @@ class EmployeeManagementTest extends TestCase
         $this->assertSame(0, Employee::whereIn('employee_code', ['EMP-9500', 'EMP-9501'])->count());
     }
 
-    public function test_a_malformed_join_date_or_status_is_rejected(): void
+    public function test_a_malformed_join_date_is_rejected(): void
     {
         $admin = User::factory()->create()->assignRole('admin');
 
         $this->validCreateForm($admin, ['join_date' => 'not-a-date'])
             ->call('save')
             ->assertHasErrors(['join_date']);
+    }
 
-        $this->validCreateForm($admin, ['employee_code' => 'EMP-9501', 'status' => 'banana'])
+    /**
+     * Status isn't a form field: create always makes an active employee, and
+     * deactivating or reactivating happens only through StatusModal.
+     */
+    public function test_the_form_has_no_status_and_create_makes_an_active_employee(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+
+        $this->validCreateForm($admin)
+            ->assertDontSeeHtml('id="emp_status"')
             ->call('save')
-            ->assertHasErrors(['status']);
+            ->assertHasNoErrors();
+
+        $employee = Employee::where('employee_code', 'EMP-9500')->firstOrFail();
+        $this->assertSame('active', $employee->status);
+        $this->assertNull($employee->left_on);
+    }
+
+    public function test_editing_an_inactive_employee_keeps_them_inactive_and_their_join_date_on_or_before_their_last_day(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        $employee = Employee::factory()->inactive('2024-06-30')->create(['join_date' => '2024-01-01']);
+
+        Livewire::actingAs($admin)
+            ->test(FormModal::class)
+            ->call('edit', $employee->id)
+            ->set('join_date', '2024-07-01')
+            ->call('save')
+            ->assertHasErrors(['join_date'])
+            ->set('join_date', '2024-06-30')
+            ->set('full_name', 'Renamed Leaver')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $employee->refresh();
+        $this->assertSame('Renamed Leaver', $employee->full_name);
+        $this->assertSame('inactive', $employee->status);
+        $this->assertSame('2024-06-30', $employee->left_on->format('Y-m-d'));
     }
 
     public function test_a_login_requires_a_valid_email_and_creates_nothing_when_it_is_missing_or_malformed(): void

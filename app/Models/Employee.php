@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Exceptions\InvalidEmploymentPeriodException;
 use App\Exceptions\NoDefaultWorkScheduleException;
 use App\Exceptions\NoScheduleAssignmentException;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -37,6 +39,7 @@ class Employee extends Model
         'device_user_id',
         'manager_id',
         'status',
+        'left_on',
     ];
 
     /**
@@ -48,6 +51,16 @@ class Employee extends Model
      */
     protected static function booted(): void
     {
+        // Status and the employment period must agree on every write, not
+        // only in the deactivate form — see InvalidEmploymentPeriodException.
+        static::saving(function (self $employee) {
+            if ($employee->exists && ! $employee->isDirty(['status', 'left_on', 'join_date'])) {
+                return;
+            }
+
+            $employee->validateEmploymentPeriod();
+        });
+
         static::created(function (self $employee) {
             $default = WorkSchedule::default() ?? throw new NoDefaultWorkScheduleException($employee);
 
@@ -81,7 +94,74 @@ class Employee extends Model
     {
         return [
             'join_date' => 'date',
+            'left_on' => 'date',
         ];
+    }
+
+    /**
+     * @throws InvalidEmploymentPeriodException
+     */
+    private function validateEmploymentPeriod(): void
+    {
+        $inactive = $this->status === 'inactive';
+
+        if ($inactive && $this->left_on === null) {
+            throw InvalidEmploymentPeriodException::inactiveWithoutLeftOn();
+        }
+
+        if (! $inactive && $this->left_on !== null) {
+            throw InvalidEmploymentPeriodException::activeWithLeftOn();
+        }
+
+        if ($this->left_on === null) {
+            return;
+        }
+
+        if ($this->join_date !== null && $this->left_on->lt($this->join_date)) {
+            throw InvalidEmploymentPeriodException::leftBeforeJoining();
+        }
+
+        if ($this->left_on->gt(today())) {
+            throw InvalidEmploymentPeriodException::leftInFuture();
+        }
+    }
+
+    /**
+     * Employed on $date: join_date ≤ $date and (no left_on, or $date ≤
+     * left_on). The one definition of "active on a date" — isActiveOn() is
+     * the same rule for a loaded instance, and EmployeeTest checks the two
+     * agree at every boundary. It deliberately ignores `status`: the
+     * invariants above keep status and left_on in step, and a date question
+     * needs the date, not today's flag.
+     */
+    public function scopeActiveOn(Builder $query, CarbonInterface $date): Builder
+    {
+        $day = $date->format('Y-m-d');
+
+        return $query->whereDate('join_date', '<=', $day)
+            ->where(fn (Builder $q) => $q->whereNull('left_on')->orWhereDate('left_on', '>=', $day));
+    }
+
+    /**
+     * Active on at least one date in $from..$to — the employees a build over
+     * that range has to visit (attendance:build-daily, an import's rebuild).
+     * The same rule as scopeActiveOn(), widened to a range; per date, the
+     * builder still asks isActiveOn().
+     */
+    public function scopeActiveBetween(Builder $query, CarbonInterface $from, CarbonInterface $to): Builder
+    {
+        return $query->whereDate('join_date', '<=', $to->format('Y-m-d'))
+            ->where(fn (Builder $q) => $q->whereNull('left_on')->orWhereDate('left_on', '>=', $from->format('Y-m-d')));
+    }
+
+    /**
+     * scopeActiveOn() for a loaded instance — same rule, see there.
+     */
+    public function isActiveOn(CarbonInterface $date): bool
+    {
+        $day = Carbon::instance($date)->startOfDay();
+
+        return $this->join_date->lte($day) && ($this->left_on === null || $day->lte($this->left_on));
     }
 
     public function user(): BelongsTo

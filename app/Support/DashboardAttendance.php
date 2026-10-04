@@ -219,8 +219,8 @@ class DashboardAttendance
     }
 
     /**
-     * The attendance rate for each of the last $days days — attended ÷ active
-     * employees, where attended = present + incomplete (Phase 2.7: an
+     * The attendance rate for each of the last $days days — attended ÷ the
+     * employees active on that day (Employee::scopeActiveOn()), where attended = present + incomplete (Phase 2.7: an
      * incomplete day was attended, a punch is just missing). Every day gets
      * a value, a marker, or both, so no bar is ever blank without saying why:
      *
@@ -243,33 +243,21 @@ class DashboardAttendance
      */
     public static function weeklyTrend(?array $employeeIds, int $days = 7): array
     {
-        $total = self::scopedActiveEmployeeQuery($employeeIds)->count();
+        $start = today()->copy()->subDays($days - 1);
 
-        if ($total === 0) {
-            return [];
+        // Each day is measured against the employees active on that day
+        // (Employee::scopeActiveOn()), in the denominator and the numerator
+        // alike: someone who left on Wednesday counts Monday to Wednesday,
+        // and not after.
+        $totals = [];
+
+        for ($cursor = $start->copy(); $cursor->lte(today()); $cursor->addDay()) {
+            $totals[$cursor->format('Y-m-d')] = self::scopedEmployeesActiveOn($employeeIds, $cursor)->count();
         }
 
-        $start = today()->copy()->subDays($days - 1);
-        $range = [$start->format('Y-m-d'), today()->format('Y-m-d')];
-
-        $countsByDate = self::scopedActiveDailyAttendanceQuery($employeeIds)
-            ->whereBetween('work_date', $range)
-            ->selectRaw('work_date, status, count(*) as total, sum('.self::CHECKED_IN.') as checked_in')
-            ->groupBy('work_date', 'status')
-            ->get()
-            ->groupBy(fn (DailyAttendance $row) => $row->work_date->format('Y-m-d'));
-
-        // An In progress row on an earlier day is either still open (an
-        // in-only row inside its pairing window) or stale (the builder hasn't
-        // run since it should have closed).
-        $staleOpenDays = self::scopedActiveDailyAttendanceQuery($employeeIds)
-            ->whereBetween('work_date', $range)
-            ->where('status', AttendanceStatus::InProgress->value)
-            ->get(['work_date', 'first_in', 'last_out'])
-            ->filter(fn (DailyAttendance $row) => ! self::isOpen($row))
-            ->map(fn (DailyAttendance $row) => $row->work_date->format('Y-m-d'))
-            ->unique()
-            ->flip();
+        if (array_sum($totals) === 0) {
+            return [];
+        }
 
         $nonWorking = [AttendanceStatus::Off->value, AttendanceStatus::Holiday->value];
         $attendedStatuses = [AttendanceStatus::Present->value, AttendanceStatus::Incomplete->value];
@@ -280,7 +268,18 @@ class DashboardAttendance
 
         for ($cursor = $start->copy(); $cursor->lte(today()); $cursor->addDay()) {
             $key = $cursor->format('Y-m-d');
-            $rows = $countsByDate->get($key, collect());
+            $total = $totals[$key];
+            $rows = self::rowsOfEmployeesActiveOn($employeeIds, $cursor)
+                ->selectRaw('status, count(*) as total, sum('.self::CHECKED_IN.') as checked_in')
+                ->groupBy('status')
+                ->get();
+            // An In progress row on an earlier day is either still open (an
+            // in-only row inside its pairing window) or stale (the builder
+            // hasn't run since it should have closed it).
+            $isStale = $key !== $todayKey && self::rowsOfEmployeesActiveOn($employeeIds, $cursor)
+                ->where('status', AttendanceStatus::InProgress->value)
+                ->get(['work_date', 'first_in', 'last_out'])
+                ->contains(fn (DailyAttendance $row) => ! self::isOpen($row));
             $byStatus = $rows->mapWithKeys(fn (DailyAttendance $row) => [$row->status->value => (int) $row->total]);
             $statuses = $byStatus->keys();
             $checkedIn = (int) $rows->sum('checked_in');
@@ -292,7 +291,7 @@ class DashboardAttendance
             [$value, $marker, $pending] = match (true) {
                 $isNonWorkingDay => [null, $statuses->contains(AttendanceStatus::Off->value) ? 'Off' : 'Holiday', false],
                 $isToday && $todayPending => [$checkedIn > 0 ? round($checkedIn / $total * 100, 1) : null, 'Today', true],
-                ! $isToday && ($rows->isEmpty() || $staleOpenDays->has($key)) => [null, 'Not calculated', false],
+                ! $isToday && ($rows->isEmpty() || $isStale) => [null, 'Not calculated', false],
                 ! $isToday && $hasOpenRows => [$checkedIn > 0 ? round($checkedIn / $total * 100, 1) : null, 'Pending', true],
                 $attended === 0 => [null, '0%', false],
                 default => [round($attended / $total * 100, 1), null, false],
@@ -465,19 +464,19 @@ class DashboardAttendance
 
     /**
      * Today is pending — not yet a final figure — while any scoped row for
-     * today is still In progress, or some active employee in scope has no
-     * row for today yet (not calculated). Pending attendance must never be
+     * today is still In progress, or some employee in scope active today
+     * (Employee::scopeActiveOn(), so including anyone whose left_on is today)
+     * has no row for today yet (not calculated). Pending attendance must never be
      * shown as 0% or as an absence (docs/ATTENDANCE_UI.md).
      *
      * @param  int[]|null  $employeeIds
      */
     public static function todayIsPending(?array $employeeIds): bool
     {
-        $today = today()->format('Y-m-d');
-        $rows = self::scopedActiveDailyAttendanceQuery($employeeIds)->whereDate('work_date', $today);
+        $rows = self::rowsOfEmployeesActiveOn($employeeIds, today());
 
         return (clone $rows)->where('status', AttendanceStatus::InProgress->value)->exists()
-            || $rows->count() < self::scopedActiveEmployeeQuery($employeeIds)->count();
+            || $rows->count() < self::scopedEmployeesActiveOn($employeeIds, today())->count();
     }
 
     /**
@@ -544,17 +543,28 @@ class DashboardAttendance
     }
 
     /**
-     * Rows of employees who are active **now** — the numerator to match an
-     * active-employee denominator (the trend, todayIsPending()). A deactivated
-     * employee's past days drop out with them: there is no deactivation date
-     * to keep them until (CLAUDE.md, Open questions for Phase 3).
+     * Employees in scope who were employed on $day (Employee::scopeActiveOn())
+     * — the trend's and todayIsPending()'s denominator. Not "active now": a
+     * deactivated employee still counts for the days up to their left_on.
      *
      * @param  int[]|null  $employeeIds
      */
-    private static function scopedActiveDailyAttendanceQuery(?array $employeeIds)
+    private static function scopedEmployeesActiveOn(?array $employeeIds, Carbon $day)
+    {
+        return self::applyEmployeeScope(Employee::query()->activeOn($day), $employeeIds, 'id');
+    }
+
+    /**
+     * $day's rows of the employees scopedEmployeesActiveOn() counts — the
+     * numerator to match that denominator.
+     *
+     * @param  int[]|null  $employeeIds
+     */
+    private static function rowsOfEmployeesActiveOn(?array $employeeIds, Carbon $day)
     {
         return self::scopedDailyAttendanceQuery($employeeIds)
-            ->whereIn('employee_id', Employee::query()->select('id')->where('status', 'active'));
+            ->whereDate('work_date', $day->format('Y-m-d'))
+            ->whereIn('employee_id', Employee::query()->activeOn($day)->select('id'));
     }
 
     /**

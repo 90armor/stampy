@@ -79,7 +79,7 @@ class HolidayManagementTest extends TestCase
             ->assertSee('role="tooltip"', false);
 
         $component->call('create')
-            ->assertSee('Saving changes recalculates attendance for active employees on the affected date or dates.')
+            ->assertSee('Saving changes recalculates attendance for the employees active on the affected date or dates.')
             ->assertSee('maxlength="255"', false)
             ->assertSee('wire:loading.attr="disabled"', false)
             ->assertSee('Saving&hellip;', false);
@@ -186,18 +186,20 @@ class HolidayManagementTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_creating_a_holiday_rebuilds_that_date_for_all_active_employees(): void
+    public function test_creating_a_holiday_rebuilds_that_date_for_every_employee_active_on_it(): void
     {
         // Fixed clock: this test's data sits on fixed 2026 dates (see CLAUDE.md, pinned-instant check).
         $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $admin = $this->admin();
         $active = Employee::factory()->create(['status' => 'active']);
-        $inactive = Employee::factory()->create(['status' => 'inactive']);
+        // Deactivated since, but still employed on WORKDAY — the holiday applies to them too.
+        $leftAfter = Employee::factory()->inactive('2026-03-31')->create();
+        $leftBefore = Employee::factory()->inactive('2026-01-30')->create();
 
-        // Both start the day absent (no punches, an ordinary workday).
+        // Both employed ones start the day absent (no punches, an ordinary workday).
         app(DailySummaryBuilder::class)->build($active, Carbon::parse(self::WORKDAY));
-        app(DailySummaryBuilder::class)->build($inactive, Carbon::parse(self::WORKDAY));
-        $this->assertSame(AttendanceStatus::Absent, DailyAttendance::where('employee_id', $active->id)->first()->status);
+        app(DailySummaryBuilder::class)->build($leftAfter, Carbon::parse(self::WORKDAY));
+        $this->assertSame(AttendanceStatus::Absent, DailyAttendance::where('employee_id', $leftAfter->id)->first()->status);
 
         Livewire::actingAs($admin)
             ->test(Index::class)
@@ -206,16 +208,15 @@ class HolidayManagementTest extends TestCase
             ->set('name', 'Test Holiday')
             ->call('save');
 
-        $this->assertSame(
-            AttendanceStatus::Holiday,
-            DailyAttendance::where('employee_id', $active->id)->where('work_date', self::WORKDAY)->first()->status
-        );
-        // Inactive employees are explicitly out of scope for the rebuild —
-        // their stale row is left exactly as it was.
-        $this->assertSame(
-            AttendanceStatus::Absent,
-            DailyAttendance::where('employee_id', $inactive->id)->where('work_date', self::WORKDAY)->first()->status
-        );
+        foreach ([$active, $leftAfter] as $employee) {
+            $this->assertSame(
+                AttendanceStatus::Holiday,
+                DailyAttendance::where('employee_id', $employee->id)->where('work_date', self::WORKDAY)->first()->status
+            );
+        }
+
+        // Someone who had already left gets no row for the date at all.
+        $this->assertFalse(DailyAttendance::where('employee_id', $leftBefore->id)->exists());
     }
 
     public function test_deleting_a_holiday_reverts_the_rebuilt_days(): void
