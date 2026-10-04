@@ -212,6 +212,21 @@ class Employee extends Model
         return $this->hasMany(DailyAttendance::class);
     }
 
+    public function leaves(): HasMany
+    {
+        return $this->hasMany(Leave::class);
+    }
+
+    public function leaveEntitlements(): HasMany
+    {
+        return $this->hasMany(LeaveEntitlement::class);
+    }
+
+    public function leaveAdjustments(): HasMany
+    {
+        return $this->hasMany(LeaveAdjustment::class);
+    }
+
     /**
      * The schedule in force on a given date — the employee's latest
      * assignment whose effective_from is on or before it, so a later

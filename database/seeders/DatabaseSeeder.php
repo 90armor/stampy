@@ -34,6 +34,8 @@ class DatabaseSeeder extends Seeder
             // present instead of holiday/present-with-no-timing-exception.
             HolidaySeeder::class,
             AttendanceLogSeeder::class,
+            // Real configuration, not demo data — see the seeder.
+            LeaveTypeSeeder::class,
         ]);
 
         // Same window AttendanceLogSeeder just populated, so the seeded
