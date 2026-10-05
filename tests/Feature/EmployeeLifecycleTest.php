@@ -8,6 +8,7 @@ use App\Livewire\Employees\Show;
 use App\Livewire\Employees\StatusModal;
 use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
+use App\Models\Department;
 use App\Models\Employee;
 use App\Models\User;
 use App\Models\WorkSchedule;
@@ -339,6 +340,58 @@ class EmployeeLifecycleTest extends TestCase
         // Today is closed: the one employee active today has a final row.
         $this->assertFalse(DashboardAttendance::todayIsPending(null));
         $this->assertSame(100.0, $trend['2026-04-15']['value']);
+    }
+
+    /**
+     * Every "today" figure counts the employees active today: a future joiner
+     * is in none of them (never "Not in yet"), a leaver's stale row from after
+     * their last day is ignored, and someone whose last day is today counts.
+     */
+    public function test_todays_figures_count_only_employees_active_today(): void
+    {
+        $department = Department::factory()->create();
+        $here = Employee::factory()->create(['department_id' => $department->id]);
+        $future = Employee::factory()->create(['department_id' => $department->id, 'join_date' => '2026-04-20']);
+        $leftToday = Employee::factory()->inactive('2026-04-15')->create(['department_id' => $department->id]);
+        $leftYesterday = Employee::factory()->inactive('2026-04-14')->create(['department_id' => $department->id]);
+
+        // Punchless and past start + grace: "Not in yet".
+        $this->row($here, '2026-04-15', AttendanceStatus::InProgress);
+        $this->row($leftToday, '2026-04-15', AttendanceStatus::Present);
+        // Stale: built before the backdated deactivation.
+        $this->row($leftYesterday, '2026-04-15', AttendanceStatus::Absent);
+
+        $live = DashboardAttendance::liveToday(null);
+        $this->assertSame(2, $live['total']);
+        $this->assertSame(1, $live['left']);
+        $this->assertSame(1, $live['notIn']);
+        $this->assertSame(1, $live['notInDue']);
+        $this->assertSame(0, $live['notInAbsent']);
+
+        $this->assertSame(2, DashboardAttendance::todayBreakdown(null)['total']);
+        $this->assertSame(['Not in yet'], collect(DashboardAttendance::needsAttention(null))->pluck('label')->all());
+        $this->assertSame(1, DashboardAttendance::needsAttentionTotal(null));
+
+        $this->actingAs($this->admin())->get(route('dashboard'))
+            ->assertOk()
+            ->assertViewHas('attendance', function (array $attendance) use ($department) {
+                $card = collect($attendance['departments'])->firstWhere('name', $department->name);
+
+                return $card['employees'] === 2 && $card['checkedIn'] === 1 && $card['attended'] === 1;
+            });
+
+        $this->assertFalse(in_array($future->id, Employee::query()->activeOn(today())->pluck('id')->all(), true));
+    }
+
+    public function test_the_profile_shows_last_day_for_an_inactive_employee_only(): void
+    {
+        $active = Employee::factory()->create();
+        $inactive = Employee::factory()->inactive('2026-04-10')->create(['join_date' => '2025-03-03']);
+
+        Livewire::actingAs($this->admin())->test(Show::class, ['employee' => $inactive])
+            ->assertSeeInOrder(['Start date', 'Mon 3 Mar 2025', 'Last day', 'Fri 10 Apr']);
+        Livewire::actingAs($this->admin())->test(Show::class, ['employee' => $active])
+            ->assertDontSee('Last day');
     }
 
     public function test_today_is_pending_while_someone_who_left_today_has_no_row(): void

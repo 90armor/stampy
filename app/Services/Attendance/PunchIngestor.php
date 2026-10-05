@@ -77,6 +77,7 @@ class PunchIngestor
             array_keys($unknownDeviceIds),
             $times === [] ? null : min($times),
             $times === [] ? null : max($times),
+            $this->countOutsideEmployment($rows),
         );
     }
 
@@ -152,6 +153,32 @@ class PunchIngestor
                 $resolved[$entry['index']]['punch_type'] = $group % 2 === 0 ? PunchType::In : PunchType::Out;
             }
         }
+    }
+
+    /**
+     * How many of the new punches fall outside their employee's employment
+     * period (before join_date, after left_on). They're written all the same:
+     * a punch is a raw hardware fact, and dropping one would lose what the
+     * device reported. The builder keeps no row for those dates, so the
+     * import summary names the count rather than leaving it silent.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     */
+    private function countOutsideEmployment(array $rows): int
+    {
+        if ($rows === []) {
+            return 0;
+        }
+
+        $employees = Employee::query()
+            ->whereIn('id', array_unique(array_column($rows, 'employee_id')))
+            ->get()
+            ->keyBy('id');
+
+        return count(array_filter(
+            $rows,
+            fn (array $row) => ! $employees[$row['employee_id']]->isActiveOn(Carbon::parse($row['punched_at'])),
+        ));
     }
 
     /**

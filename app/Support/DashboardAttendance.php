@@ -20,6 +20,12 @@ use Illuminate\Support\Collection;
  * this is real data now, it must respect the same row-level access rule
  * every other Attendance view already does, which a fake-data dashboard
  * never needed to.
+ *
+ * Every count of employees here is "active on the day" — today for the
+ * strip, breakdown, Needs attention and Department card, each day for the
+ * trend (scopedEmployeesActiveOn(), Employee::scopeActiveOn()) — never
+ * `status`. One definition, the one the builder selects by, so a future
+ * joiner is never "not in yet" and a leaver counts up to their last day.
  */
 class DashboardAttendance
 {
@@ -43,12 +49,9 @@ class DashboardAttendance
      */
     public static function todayBreakdown(?array $employeeIds): array
     {
-        $total = self::scopedActiveEmployeeQuery($employeeIds)->count();
+        $total = self::scopedEmployeesActiveOn($employeeIds, today())->count();
 
-        $today = today()->format('Y-m-d');
-
-        $counts = self::scopedDailyAttendanceQuery($employeeIds)
-            ->whereDate('work_date', $today)
+        $counts = self::rowsOfEmployeesActiveOn($employeeIds, today())
             ->select('status')
             ->selectRaw('count(*) as total')
             ->groupBy('status')
@@ -60,12 +63,10 @@ class DashboardAttendance
         // (see CLAUDE.md's "Status vs. timing" note) — a late day IS a
         // present day, so it must not also claim its own slice of the bar
         // below, which would double count it.
-        $lateCount = self::scopedDailyAttendanceQuery($employeeIds)
-            ->whereDate('work_date', $today)
+        $lateCount = self::rowsOfEmployeesActiveOn($employeeIds, today())
             ->where('late_minutes', '>', 0)
             ->count();
-        $earlyCount = self::scopedDailyAttendanceQuery($employeeIds)
-            ->whereDate('work_date', $today)
+        $earlyCount = self::rowsOfEmployeesActiveOn($employeeIds, today())
             ->where('early_leave_minutes', '>', 0)
             ->count();
 
@@ -184,8 +185,7 @@ class DashboardAttendance
         // whereDate above (SQL's OR binds looser than AND), which would
         // silently leak other employees'/other days' rows into a manager's
         // "needs attention" list.
-        return self::scopedDailyAttendanceQuery($employeeIds)
-            ->whereDate('work_date', today()->format('Y-m-d'))
+        return self::rowsOfEmployeesActiveOn($employeeIds, today())
             ->where(function ($query) {
                 $query->whereIn('status', [AttendanceStatus::Absent->value, AttendanceStatus::Incomplete->value])
                     ->orWhere('late_minutes', '>', 0)
@@ -323,14 +323,12 @@ class DashboardAttendance
      */
     public static function departmentAttendance(Collection $departments, ?array $employeeIds): array
     {
-        $today = today()->format('Y-m-d');
         $pending = self::todayIsPending($employeeIds);
 
-        $byDepartment = self::scopedDailyAttendanceQuery($employeeIds)
+        // Employees active today only, like the strip and each department's
+        // employee count (routes/web.php).
+        $byDepartment = self::rowsOfEmployeesActiveOn($employeeIds, today())
             ->join('employees', 'employees.id', '=', 'daily_attendances.employee_id')
-            // Active only, like the strip and each department's employee count.
-            ->where('employees.status', 'active')
-            ->whereDate('daily_attendances.work_date', $today)
             ->selectRaw('employees.department_id')
             ->selectRaw('sum(daily_attendances.status in (?, ?)) as attended', [AttendanceStatus::Present->value, AttendanceStatus::Incomplete->value])
             ->selectRaw('sum('.self::CHECKED_IN.') as checked_in')
@@ -377,17 +375,13 @@ class DashboardAttendance
      */
     public static function liveToday(?array $employeeIds): array
     {
-        $today = today()->format('Y-m-d');
         $punchless = 'daily_attendances.first_in is null and daily_attendances.last_out is null';
         $atWork = 'daily_attendances.first_in is not null and daily_attendances.last_out is null';
 
         // "Past end time" compares against a PHP-supplied now(), never MySQL's
         // own clock (CLAUDE.md, Local environment: Timezone).
-        $row = self::scopedDailyAttendanceQuery($employeeIds)
-            ->join('employees', 'employees.id', '=', 'daily_attendances.employee_id')
+        $row = self::rowsOfEmployeesActiveOn($employeeIds, today())
             ->leftJoin('work_schedules', 'work_schedules.id', '=', 'daily_attendances.work_schedule_id')
-            ->where('employees.status', 'active')
-            ->whereDate('daily_attendances.work_date', $today)
             ->selectRaw('count(*) as rows_built')
             ->selectRaw("sum({$atWork}) as at_work")
             ->selectRaw("sum({$atWork} and daily_attendances.late_minutes > 0) as at_work_late")
@@ -404,7 +398,7 @@ class DashboardAttendance
             ->toBase()
             ->first();
 
-        $total = self::scopedActiveEmployeeQuery($employeeIds)->count();
+        $total = self::scopedEmployeesActiveOn($employeeIds, today())->count();
         $atWorkCount = (int) ($row->at_work ?? 0);
         $left = (int) ($row->left_count ?? 0);
         $notBuilt = max(0, $total - (int) ($row->rows_built ?? 0));
@@ -529,14 +523,6 @@ class DashboardAttendance
     /**
      * @param  int[]|null  $employeeIds
      */
-    private static function scopedActiveEmployeeQuery(?array $employeeIds)
-    {
-        return self::applyEmployeeScope(Employee::query()->where('status', 'active'), $employeeIds, 'id');
-    }
-
-    /**
-     * @param  int[]|null  $employeeIds
-     */
     private static function scopedDailyAttendanceQuery(?array $employeeIds)
     {
         return self::applyEmployeeScope(DailyAttendance::query(), $employeeIds, 'employee_id');
@@ -544,8 +530,10 @@ class DashboardAttendance
 
     /**
      * Employees in scope who were employed on $day (Employee::scopeActiveOn())
-     * — the trend's and todayIsPending()'s denominator. Not "active now": a
-     * deactivated employee still counts for the days up to their left_on.
+     * — the denominator of every figure on the dashboard, for today (strip,
+     * breakdown, Needs attention, Department card) and for each trend day. Not
+     * `status`: a deactivated employee still counts up to their left_on, and a
+     * future joiner isn't counted (or "not in yet") before their join date.
      *
      * @param  int[]|null  $employeeIds
      */
@@ -563,8 +551,8 @@ class DashboardAttendance
     private static function rowsOfEmployeesActiveOn(?array $employeeIds, Carbon $day)
     {
         return self::scopedDailyAttendanceQuery($employeeIds)
-            ->whereDate('work_date', $day->format('Y-m-d'))
-            ->whereIn('employee_id', Employee::query()->activeOn($day)->select('id'));
+            ->whereDate('daily_attendances.work_date', $day->format('Y-m-d'))
+            ->whereIn('daily_attendances.employee_id', Employee::query()->activeOn($day)->select('id'));
     }
 
     /**

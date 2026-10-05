@@ -150,15 +150,22 @@ class Show extends Component
     {
         $this->authorize('update', $this->employee);
 
+        // A manual punch must fall inside the employment period (join_date to
+        // left_on, Employee::scopeActiveOn()) and not in the future. A device or
+        // CSV punch outside it is kept — raw hardware facts are never dropped —
+        // but an admin entering one by hand is a mistake to catch here.
         $joinDate = $this->employee->join_date;
+        $leftOn = $this->employee->left_on;
+        $lastAllowed = $leftOn !== null && $leftOn->lt(today()) ? $leftOn : today();
+        $outsideEmployment = "A punch must fall within this employee's employment (".$this->employmentPeriod().').';
 
         $this->validate([
-            'newPunchDate' => ['required', 'date', 'after_or_equal:'.$joinDate->format('Y-m-d'), 'before_or_equal:'.today()->format('Y-m-d')],
+            'newPunchDate' => ['required', 'date', 'after_or_equal:'.$joinDate->format('Y-m-d'), 'before_or_equal:'.$lastAllowed->format('Y-m-d')],
             'newPunchTime' => ['required', 'date_format:H:i'],
             'newPunchType' => ['required', 'in:in,out'],
         ], [
-            'newPunchDate.after_or_equal' => "A punch can't be dated before this employee's start date (".\App\Support\DisplayDate::compact($joinDate).").",
-            'newPunchDate.before_or_equal' => "A punch can't be dated in the future.",
+            'newPunchDate.after_or_equal' => $outsideEmployment,
+            'newPunchDate.before_or_equal' => $leftOn !== null ? $outsideEmployment : "A punch can't be dated in the future.",
         ], [
             'newPunchDate' => 'punch date',
             'newPunchTime' => 'punch time',
@@ -229,6 +236,19 @@ class Show extends Component
 
         $this->rebuildAround($punchedAt);
         $this->addingPunchFor = null;
+    }
+
+    /**
+     * "from Mon 2 Feb 2026", or "2 Feb – 10 Apr" once they've left — the
+     * period a manual punch must fall in.
+     */
+    private function employmentPeriod(): string
+    {
+        $leftOn = $this->employee->left_on;
+
+        return $leftOn === null
+            ? 'from '.DisplayDate::compact($this->employee->join_date)
+            : DisplayDate::range($this->employee->join_date, $leftOn);
     }
 
     public function voidPunch(int $punchId): void

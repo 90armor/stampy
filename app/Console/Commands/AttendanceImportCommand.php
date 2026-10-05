@@ -72,6 +72,10 @@ class AttendanceImportCommand extends Command
             $this->line('Unknown device IDs: '.implode(', ', $summary->unknownDeviceIds));
         }
 
+        if ($summary->outsideEmployment > 0) {
+            $this->warn("Outside employment: {$summary->outsideEmployment} punch(es) dated before the employee's join date or after their last day — kept, but they build no attendance.");
+        }
+
         if ($rebuilt !== null) {
             $this->line("Rebuilt daily attendance: {$rebuilt['from']} to {$rebuilt['to']} ({$rebuilt['employees']} employee(s), {$rebuilt['days']} day(s)).");
         } elseif (! $dryRun && $rebuildFailure === null) {

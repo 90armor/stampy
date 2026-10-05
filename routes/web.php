@@ -44,8 +44,10 @@ Route::get('/dashboard', function () {
                 ->count(),
         ];
 
+        // Employees active today (Employee::scopeActiveOn()) — the Department
+        // card's "N / M", so M must match DashboardAttendance's own count.
         $departments = Department::withCount(['employees' => fn ($query) => $query
-            ->where('status', 'active')
+            ->activeOn(today())
             ->when($employeeIds !== null, fn ($q) => $q->whereIn('id', $employeeIds)),
         ])
             ->orderBy('name')

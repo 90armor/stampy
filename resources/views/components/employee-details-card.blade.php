@@ -40,13 +40,29 @@
                 @endif
             </dd>
         </div>
+        {{-- A leaver's Start date and Last day share a row, so Device user ID
+        moves ahead of them; an active employee keeps the usual order. --}}
+        @if ($employee->left_on)
+            <div class="sm:col-span-2 sm:grid sm:grid-cols-subgrid sm:items-baseline">
+                <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Device user ID</dt>
+                <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">{{ $employee->device_user_id ?? '—' }}</dd>
+            </div>
+        @endif
         <div class="sm:col-span-2 sm:grid sm:grid-cols-subgrid sm:items-baseline">
             <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Start date</dt>
             <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">{{ \App\Support\DisplayDate::compact($employee->join_date) }}</dd>
         </div>
-        <div class="sm:col-span-2 sm:grid sm:grid-cols-subgrid sm:items-baseline">
-            <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Device user ID</dt>
-            <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">{{ $employee->device_user_id ?? '—' }}</dd>
-        </div>
+        @if ($employee->left_on)
+            <div class="sm:col-span-2 sm:grid sm:grid-cols-subgrid sm:items-baseline">
+                <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Last day</dt>
+                <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">{{ \App\Support\DisplayDate::compact($employee->left_on) }}</dd>
+            </div>
+        @endif
+        @unless ($employee->left_on)
+            <div class="sm:col-span-2 sm:grid sm:grid-cols-subgrid sm:items-baseline">
+                <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Device user ID</dt>
+                <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">{{ $employee->device_user_id ?? '—' }}</dd>
+            </div>
+        @endunless
     </dl>
 </x-card>

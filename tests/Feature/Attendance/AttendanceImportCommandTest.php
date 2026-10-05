@@ -57,6 +57,38 @@ class AttendanceImportCommandTest extends TestCase
         $this->assertSame(18, AttendanceLog::count());
     }
 
+    /**
+     * Raw hardware facts are never dropped: a punch after the employee's last
+     * day is stored, counted in a warning line, and builds no row.
+     */
+    public function test_a_punch_outside_the_employment_period_is_kept_warned_about_and_builds_no_row(): void
+    {
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
+        $leaver = Employee::factory()->inactive('2026-04-10')->create(['device_user_id' => '2001']);
+
+        $path = $this->tempCsv("user_id,timestamp,state\n"
+            ."2001,2026-04-09 08:00:00,0\n"
+            ."2001,2026-04-09 17:00:00,1\n"
+            ."2001,2026-04-13 08:00:00,0\n"
+            ."2001,2026-04-13 17:00:00,1\n");
+
+        $this->artisan('attendance:import', ['file' => $path])
+            ->assertSuccessful()
+            ->expectsOutputToContain('Imported: 4')
+            ->expectsOutputToContain('Outside employment: 2 punch(es)');
+
+        $this->assertSame(4, AttendanceLog::where('employee_id', $leaver->id)->count());
+        $this->assertSame('present', DailyAttendance::where('employee_id', $leaver->id)->whereDate('work_date', '2026-04-09')->first()->status->value);
+        $this->assertFalse(DailyAttendance::where('employee_id', $leaver->id)->whereDate('work_date', '>', '2026-04-10')->exists());
+    }
+
+    public function test_no_outside_employment_line_when_every_punch_is_inside_it(): void
+    {
+        $this->artisan('attendance:import', ['file' => $this->fixture])
+            ->assertSuccessful()
+            ->doesntExpectOutputToContain('Outside employment');
+    }
+
     public function test_unknown_device_ids_are_skipped_and_reported(): void
     {
         $this->artisan('attendance:import', ['file' => $this->fixture])

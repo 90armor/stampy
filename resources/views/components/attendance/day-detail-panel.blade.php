@@ -111,7 +111,7 @@ divergence here would be a real correctness bug, not just a style one. --}}
                 <div>
                     <x-input-label for="new_punch_date_{{ $dayKey }}" value="Date" class="!mb-1 !text-xs" />
                     {{-- min/max mirror addPunch()'s rule: from the join date to today. --}}
-                    <x-date-picker id="new_punch_date_{{ $dayKey }}" model="newPunchDate" label="Date" :min="$employee->join_date->format('Y-m-d')" :max="today()->format('Y-m-d')" />
+                    <x-date-picker id="new_punch_date_{{ $dayKey }}" model="newPunchDate" label="Date" :min="$employee->join_date->format('Y-m-d')" :max="($employee->left_on !== null && $employee->left_on->lt(today()) ? $employee->left_on : today())->format('Y-m-d')" />
                 </div>
                 <div>
                     <x-input-label id="new_punch_time_{{ $dayKey }}-label" for="new_punch_time_{{ $dayKey }}" value="Time" class="!mb-1 !text-xs" />
