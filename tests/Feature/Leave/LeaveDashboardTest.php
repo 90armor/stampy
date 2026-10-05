@@ -171,6 +171,25 @@ class LeaveDashboardTest extends TestCase
         $this->assertTrue(DailyAttendance::where('employee_id', $amLeave->id)->first()->isNotInYet());
     }
 
+    public function test_past_end_time_uses_the_expected_end_so_pm_leave_ends_at_noon(): void
+    {
+        $pmLeave = $this->person('Pm Leave');
+        $this->leave($pmLeave, LeaveHalf::Pm);
+        $this->punch($pmLeave, self::DAY.' 08:00:00', 'in');                   // forgot to punch out at noon
+        $fullDay = $this->person('Full Day');
+        $this->punch($fullDay, self::DAY.' 08:00:00', 'in');
+
+        foreach (['11:59:00' => 0, '12:30:00' => 1, '17:30:00' => 2] as $time => $pastEnd) {
+            $this->travelTo(Carbon::parse(self::DAY." {$time}"));
+            $this->build($pmLeave);
+            $this->build($fullDay);
+
+            $live = DashboardAttendance::liveToday(null);
+            $this->assertSame(2, $live['atWork'], $time);
+            $this->assertSame($pastEnd, $live['atWorkPastEnd'], $time);
+        }
+    }
+
     // ── The month summary ──────────────────────────────────────────────
 
     public function test_the_summary_counts_leave_as_workdays_and_half_days_as_half(): void
@@ -196,7 +215,11 @@ class LeaveDashboardTest extends TestCase
 
                 return true;
             })
-            ->assertSeeHtml('Leave <strong class="font-semibold text-slate-900 dark:text-slate-100">3</strong>');
+            // Status counts sum to workdays: Present 1 + Absent 2 + Incomplete 0 + On leave 2 = 5.
+            ->assertSeeHtml('On leave <strong class="font-semibold text-slate-900 dark:text-slate-100">2</strong>')
+            // Leave taken is its own measure, on its own line.
+            ->assertSeeHtml('Leave taken: <strong class="font-semibold text-slate-900 dark:text-slate-100">3 days</strong>')
+            ->assertSee('counted separately from the workday figures above');
     }
 
     // ── The rate's denominator ─────────────────────────────────────────

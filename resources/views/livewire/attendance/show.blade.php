@@ -163,12 +163,21 @@
                         <span class="text-xs text-slate-500 dark:text-slate-400">({{ $summary['incomplete_late'] }} late)</span>
                     @endif
                 </span>
-                {{-- Leave days are workdays too (Phase 3d): full days 1, half days 0.5.
-                Plain for now; 3e designs the leave annotations. --}}
-                @if ($summary['leave_tenths'] > 0)
-                    <span class="text-slate-500 dark:text-slate-400">Leave <strong class="font-semibold text-slate-900 dark:text-slate-100">{{ \App\Support\LeaveDays::format($summary['leave_tenths']) }}</strong></span>
+                {{-- Status counts only, so Present + Absent + Incomplete + On leave
+                is always Calculated workdays (Phase 3e). How much leave was
+                taken is a different measure — half days, and days worked on
+                leave — so it gets its own line below, never this sum. --}}
+                @if ($summary['leave'] > 0)
+                    <span class="text-slate-500 dark:text-slate-400">On leave <strong class="font-semibold text-slate-900 dark:text-slate-100">{{ $summary['leave'] }}</strong></span>
                 @endif
             </div>
+
+            @if ($summary['leave_tenths'] > 0)
+                <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                    Leave taken: <strong class="font-semibold text-slate-900 dark:text-slate-100">{{ \App\Support\LeaveDays::format($summary['leave_tenths']) }} {{ $summary['leave_tenths'] === \App\Support\LeaveDays::DAY ? 'day' : 'days' }}</strong>
+                    <span class="text-xs">· counted separately from the workday figures above (half days count 0.5)</span>
+                </p>
+            @endif
 
             @if ($summary['total_worked_minutes'] > 0)
                 <p class="mt-3 border-t border-slate-divider pt-3 text-xs text-slate-500 dark:text-slate-400">

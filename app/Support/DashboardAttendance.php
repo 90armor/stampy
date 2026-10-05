@@ -377,7 +377,8 @@ class DashboardAttendance
      *
      * - atWork: an in-punch and no out-punch yet (an open day, or an in-only
      *   day whose window closed). 'atWorkPastEnd' of them are past their
-     *   schedule's end (Phase 2.7 — overtime, or a missing out-punch).
+     *   expected end — ExpectedWindow's, so the schedule's end or noon on PM
+     *   leave (Phase 2.7 — overtime, or a missing out-punch).
      * - left: has an out-punch — Present, or an out-only Incomplete day.
      * - notIn: no punches today. Its state sub-counts partition it exactly
      *   (they always sum to notIn): 'notInDue' (a punchless In progress row,
@@ -401,14 +402,10 @@ class DashboardAttendance
         $punchless = 'daily_attendances.first_in is null and daily_attendances.last_out is null';
         $atWork = 'daily_attendances.first_in is not null and daily_attendances.last_out is null';
 
-        // "Past end time" compares against a PHP-supplied now(), never MySQL's
-        // own clock (CLAUDE.md, Local environment: Timezone).
         $row = self::rowsOfEmployeesActiveOn($employeeIds, today())
-            ->leftJoin('work_schedules', 'work_schedules.id', '=', 'daily_attendances.work_schedule_id')
             ->selectRaw('count(*) as rows_built')
             ->selectRaw("sum({$atWork}) as at_work")
             ->selectRaw("sum({$atWork} and daily_attendances.late_minutes > 0) as at_work_late")
-            ->selectRaw("sum({$atWork} and timestamp(daily_attendances.work_date, work_schedules.end_time) <= ?) as at_work_past_end", [now()->format('Y-m-d H:i:s')])
             ->selectRaw('sum(daily_attendances.last_out is not null) as left_count')
             ->selectRaw('sum(daily_attendances.last_out is not null and daily_attendances.late_minutes > 0) as left_late')
             ->selectRaw('sum(daily_attendances.last_out is not null and daily_attendances.early_leave_minutes > 0) as left_early')
@@ -425,6 +422,21 @@ class DashboardAttendance
         $atWorkCount = (int) ($row->at_work ?? 0);
         $left = (int) ($row->left_count ?? 0);
         $notBuilt = max(0, $total - (int) ($row->rows_built ?? 0));
+
+        // "Past end time": an in-only row whose expected end has passed against
+        // a PHP-supplied now(), never MySQL's own clock (CLAUDE.md, Local
+        // environment: Timezone) —
+        // ExpectedWindow's end, the one definition of the day's expected end
+        // (Phase 3e): the schedule's end_time, or break_start for someone on
+        // PM leave who didn't punch out at noon.
+        $atWorkPastEnd = self::rowsOfEmployeesActiveOn($employeeIds, today())
+            ->whereNotNull('first_in')
+            ->whereNull('last_out')
+            ->with('workSchedule')
+            ->get()
+            ->tap(fn (Collection $rows) => DailyAttendance::withLeaveDays($rows))
+            ->filter(fn (DailyAttendance $row) => ($end = $row->expectedWindow()?->end) !== null && now()->gte($end))
+            ->count();
 
         // Punchless In progress rows still inside a half-day leave (an AM
         // leave, before the PM start + grace) aren't due yet: they move from
@@ -443,7 +455,7 @@ class DashboardAttendance
         return [
             'atWork' => $atWorkCount,
             'atWorkLate' => (int) ($row->at_work_late ?? 0),
-            'atWorkPastEnd' => (int) ($row->at_work_past_end ?? 0),
+            'atWorkPastEnd' => $atWorkPastEnd,
             'left' => $left,
             'leftLate' => (int) ($row->left_late ?? 0),
             'leftEarly' => (int) ($row->left_early ?? 0),
