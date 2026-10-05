@@ -169,6 +169,23 @@ class EmployeeDashboardTest extends TestCase
         $this->actingAs($this->employee->user)->get(route('dashboard'))->assertDontSee('Decided since your last visit');
     }
 
+    public function test_a_request_the_employee_cancelled_themself_is_not_news(): void
+    {
+        $this->request($this->employee, '2026-06-22', '2026-06-22');
+        Livewire::actingAs($this->employee->user)->test(TimeOff::class);
+        $this->travelTo(now()->addHour());
+
+        $leave = $this->employee->leaves()->sole();
+        $service = app(LeaveRequestService::class);
+        $service->approve($leave, $this->manager->user);
+        $service->approve($leave->fresh(), User::factory()->create()->assignRole('admin'));
+        // Approved by others since the last visit — news, until they cancel it themself.
+        $this->actingAs($this->employee->user)->get(route('dashboard'))->assertSee('Decided since your last visit');
+        $service->cancel($leave->fresh(), $this->employee->user);
+
+        $this->actingAs($this->employee->user)->get(route('dashboard'))->assertDontSee('Decided since your last visit');
+    }
+
     public function test_coming_up_is_the_next_approved_leave(): void
     {
         $this->actingAs($this->employee->user)->get(route('dashboard'))->assertSee('No approved leave coming up.');
