@@ -2,21 +2,17 @@
 
 namespace App\Livewire\Leave;
 
-use App\Enums\ApprovalOutcome;
-use App\Enums\LeaveStatus;
 use App\Exceptions\StaleLeaveDecisionException;
-use App\Models\ApprovalStep;
 use App\Models\Employee;
 use App\Models\Leave;
 use App\Models\LeaveEntitlement;
 use App\Models\LeaveType;
-use App\Models\User;
 use App\Services\Leave\Balance;
 use App\Services\Leave\EntitlementCalculator;
 use App\Services\Leave\LeaveBalance;
 use App\Services\Leave\LeaveDayCounter;
 use App\Services\Leave\LeaveRequestService;
-use Carbon\CarbonInterface;
+use App\Support\LeaveDecisions;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -28,9 +24,9 @@ use Livewire\Component;
  * the leave services (LeaveBalance, LeaveDayCounter, EntitlementCalculator);
  * nothing here re-derives a rule.
  *
- * Requests decided since the user last opened the page carry a "New" marker:
- * users.time_off_seen_at is read once on opening, then moved to now. It's
- * the only notification there is.
+ * Requests decided since the user last opened the page carry a "New" marker
+ * (LeaveDecisions): users.time_off_seen_at is read once on opening, then
+ * moved to now. The employee dashboard shows the same ones until then.
  */
 class TimeOff extends Component
 {
@@ -52,7 +48,7 @@ class TimeOff extends Component
         $user = auth()->user();
 
         if ($user->employee !== null) {
-            $this->newIds = $this->decidedSince($user->employee, $user, $user->time_off_seen_at);
+            $this->newIds = LeaveDecisions::since($user->employee, $user, $user->time_off_seen_at)->pluck('id')->all();
         }
 
         $user->forceFill(['time_off_seen_at' => now()])->save();
@@ -152,31 +148,5 @@ class TimeOff extends Component
 
                 return ['leave' => $leave, 'days' => array_sum($counter->countLeave($leave))];
             });
-    }
-
-    /**
-     * Requests that were decided — a step approved or rejected, or cancelled
-     * by someone else — after $seenAt (all of them on a first visit is too
-     * loud: none). The marker is for news the user didn't cause.
-     *
-     * @return list<int>
-     */
-    private function decidedSince(Employee $employee, User $user, ?CarbonInterface $seenAt): array
-    {
-        if ($seenAt === null) {
-            return [];
-        }
-
-        return Leave::query()
-            ->where('employee_id', $employee->id)
-            ->with('approvalSteps')
-            ->get()
-            ->filter(fn (Leave $leave) => $leave->approvalSteps->contains(fn (ApprovalStep $step) => in_array($step->outcome, [ApprovalOutcome::Approved, ApprovalOutcome::Rejected], true)
-                    && $step->decided_by !== $user->id
-                    && $step->decided_at->gt($seenAt))
-                || ($leave->status === LeaveStatus::Cancelled && $leave->cancelled_by !== $user->id && $leave->cancelled_at?->gt($seenAt)))
-            ->pluck('id')
-            ->values()
-            ->all();
     }
 }

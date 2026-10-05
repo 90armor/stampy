@@ -181,4 +181,24 @@ class Leave extends Model implements Approvable
             default => null,
         };
     }
+
+    /**
+     * How soon it starts, while that's within a week — "Starts today",
+     * "Starts tomorrow", "Starts in 3 days" — or that it's under way: one
+     * that has ended is "Already taken" (sick leave filed after the fact),
+     * one that began and hasn't ended "Already started".
+     */
+    public function startsLabel(): ?string
+    {
+        $days = (int) today()->diffInDays($this->start_date->copy()->startOfDay(), false);
+
+        return match (true) {
+            $this->end_date->lt(today()) => 'Already taken',
+            $days < 0 => 'Already started',
+            $days === 0 => 'Starts today',
+            $days === 1 => 'Starts tomorrow',
+            $days <= 7 => "Starts in {$days} days",
+            default => null,
+        };
+    }
 }

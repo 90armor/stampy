@@ -79,7 +79,7 @@ Route::get('/dashboard', function () {
     // Without the team figures: their own leave and attendance (Phase 3e),
     // for anyone with an employee record.
     $mine = $stats === null && auth()->user()->employee !== null
-        ? EmployeeDashboard::for(auth()->user()->employee)
+        ? EmployeeDashboard::for(auth()->user()->employee, auth()->user())
         : null;
 
     return view('dashboard', ['stats' => $stats, 'attendance' => $attendance, 'mine' => $mine]);

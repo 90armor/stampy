@@ -10,10 +10,6 @@
     // A type not usable yet: when it becomes usable, and what's been earned meanwhile.
     $usableLine = fn ($balance, $row) => 'Usable from '.DisplayDate::compact($balance->usableFrom)
         .($row['earnedSoFar'] !== null ? ' · '.LeaveDays::label($row['earnedSoFar']).' earned so far' : '');
-    // The decision's own note (approve or reject), for the requester's feedback.
-    $decisionNote = fn ($leave) => $leave->approvalSteps
-        ->filter(fn ($step) => $step->note !== null && in_array($step->outcome, [\App\Enums\ApprovalOutcome::Approved, \App\Enums\ApprovalOutcome::Rejected], true))
-        ->last();
 @endphp
 
 <div class="space-y-6">
@@ -174,7 +170,7 @@
                     @foreach ($requests as $item)
                         @php
                             $leave = $item['leave'];
-                            $note = $decisionNote($leave);
+                            $note = \App\Support\LeaveDecisions::note($leave);
                             $step = $leave->waitingLabel();
                         @endphp
                         <li wire:key="leave-card-{{ $leave->id }}" class="border-t border-slate-divider px-4 py-4 first:border-t-0">
@@ -209,7 +205,7 @@
                             @foreach ($requests as $item)
                                 @php
                                     $leave = $item['leave'];
-                                    $note = $decisionNote($leave);
+                                    $note = \App\Support\LeaveDecisions::note($leave);
                                     $step = $leave->waitingLabel();
                                 @endphp
                                 <tr wire:key="leave-row-{{ $leave->id }}" class="relative align-top">

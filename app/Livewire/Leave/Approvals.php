@@ -157,7 +157,7 @@ class Approvals extends Component
         return [
             'leave' => $leave,
             'submitted' => 'Submitted '.DisplayDate::compact($leave->created_at),
-            'when' => self::when($leave),
+            'when' => $leave->startsLabel(),
             'stuck' => false,
             'dates' => $leave->displayDates(),
             'days' => LeaveDays::label(array_sum($cost)),
@@ -167,24 +167,5 @@ class Approvals extends Component
             'department' => $employee->department?->name,
             'alsoOff' => $alsoOff->map(fn (Leave $other) => "{$other->employee->full_name} ({$other->leaveType->name}, ".$other->displayDates().', '.$other->status->value.')')->all(),
         ];
-    }
-
-    /**
-     * How soon it starts, while that's within a week, or that it's already
-     * under way: a retroactive request (sick leave filed after the fact) is
-     * "Already taken", one that began and hasn't ended "Already started".
-     */
-    private static function when(Leave $leave): ?string
-    {
-        $days = (int) today()->diffInDays($leave->start_date->copy()->startOfDay(), false);
-
-        return match (true) {
-            $leave->end_date->lt(today()) => 'Already taken',
-            $days < 0 => 'Already started',
-            $days === 0 => 'Starts today',
-            $days === 1 => 'Starts tomorrow',
-            $days <= 7 => "Starts in {$days} days",
-            default => null,
-        };
     }
 }

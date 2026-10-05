@@ -276,11 +276,40 @@
             ]);
         @endphp
 
-        {{-- The employee dashboard (Phase 3e): their leave on the left, the
-        month on the right from lg; one column below, in reading order. Two
-        independent stacks, so a short card never leaves a hole. --}}
+        {{-- The employee dashboard (Phase 3e): decisions, balance and pending
+        requests on the left; what's coming up and the month on the right from
+        lg; one column below, in reading order. Two independent stacks, so a
+        short card never leaves a hole. --}}
         <div class="grid gap-6 lg:grid-cols-2 lg:items-start">
             <div class="flex min-w-0 flex-col gap-6">
+                {{-- Decided since they last opened Time off (LeaveDecisions) — the
+                same "New" state Time off shows; without email, this is where an
+                employee finds out. A rejection's note is the reason, so it shows. --}}
+                @if (count($mine['decided']))
+                    <x-card>
+                        <div class="{{ $cardHeader }}">
+                            <h2 class="{{ $cardTitle }}">Decided since your last visit</h2>
+                            <p class="{{ $cardMeta }}">{{ count($mine['decided']) }} new</p>
+                        </div>
+                        <ul class="mt-4">
+                            @foreach ($mine['decided'] as $leave)
+                                @php $decision = \App\Support\LeaveDecisions::note($leave); @endphp
+                                <li class="border-t border-slate-divider py-2.5 first:border-t-0 first:pt-0 last:pb-0">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $leave->leaveType->name }} · <span class="tabular-nums">{{ $leave->displayDates() }}</span></p>
+                                        <x-badge :color="$leave->status->badgeColor()">{{ $leave->status->label() }}</x-badge>
+                                        <x-badge color="primary">New</x-badge>
+                                    </div>
+                                    @if ($decision)
+                                        <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">“{{ $decision->note }}” <span class="text-slate-500 dark:text-slate-400">— {{ $decision->decidedBy?->name ?? 'an approver' }}</span></p>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                        <div class="mt-4"><a href="{{ route('time-off.index') }}" wire:navigate class="{{ $link }}">See them on Time off</a></div>
+                    </x-card>
+                @endif
+
                 <x-card>
                     <div class="{{ $cardHeader }}">
                         <h2 class="{{ $cardTitle }}">Leave balance</h2>
@@ -327,6 +356,19 @@
             </div>
 
             <div class="flex min-w-0 flex-col gap-6">
+                <x-card>
+                    <div class="{{ $cardHeader }}">
+                        <h2 class="{{ $cardTitle }}">Coming up</h2>
+                    </div>
+                    @if ($mine['next'])
+                        @php $next = $mine['next']['leave']; @endphp
+                        <p class="mt-4 text-sm font-medium text-slate-700 dark:text-slate-200">{{ $next->leaveType->name }} · <span class="tabular-nums">{{ $next->displayDates() }}</span></p>
+                        <p class="mt-0.5 text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ implode(' · ', array_filter([\App\Support\LeaveDays::label($mine['next']['days']), $next->startsLabel()])) }}</p>
+                    @else
+                        <p class="mt-4 text-sm text-slate-500 dark:text-slate-400">No approved leave coming up.</p>
+                    @endif
+                </x-card>
+
                 <x-card>
                     <div class="{{ $cardHeader }}">
                         <h2 class="{{ $cardTitle }}">This month</h2>

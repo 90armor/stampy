@@ -2,7 +2,9 @@
 
 namespace Tests\Feature\Leave;
 
+use App\Enums\LeaveHalf;
 use App\Livewire\Attendance\Show;
+use App\Livewire\Leave\TimeOff;
 use App\Models\AttendanceLog;
 use App\Models\Employee;
 use App\Models\LeaveType;
@@ -141,6 +143,46 @@ class EmployeeDashboardTest extends TestCase
         // A manager without an employee record has no inbox (LeavePolicy::decideAny).
         $this->actingAs(User::factory()->create()->assignRole('manager'))->get(route('dashboard'))
             ->assertDontSee('Pending approvals');
+    }
+
+    public function test_decisions_since_the_last_time_off_visit_show_with_the_rejection_note_until_time_off_is_opened(): void
+    {
+        $this->request($this->employee, '2026-06-22', '2026-06-22');
+
+        // Before a first visit to Time off nothing is "new" — everything would be.
+        $this->actingAs($this->employee->user)->get(route('dashboard'))->assertDontSee('Decided since your last visit');
+
+        Livewire::actingAs($this->employee->user)->test(TimeOff::class);
+        $this->travelTo(now()->addHour());
+        app(LeaveRequestService::class)->reject($this->employee->leaves()->sole(), $this->manager->user, 'Stocktake that day');
+
+        $this->actingAs($this->employee->user)->get(route('dashboard'))
+            ->assertSee('Decided since your last visit')
+            ->assertSee('1 new')
+            ->assertSeeInOrder(['Annual · ', 'Mon 22 Jun', 'Rejected', 'New'])
+            ->assertSee('“Stocktake that day”', false)
+            ->assertSee('— Manager');
+
+        // The dashboard doesn't mark them seen; opening Time off does.
+        $this->actingAs($this->employee->user)->get(route('dashboard'))->assertSee('Decided since your last visit');
+        Livewire::actingAs($this->employee->user)->test(TimeOff::class)->assertSee('New');
+        $this->actingAs($this->employee->user)->get(route('dashboard'))->assertDontSee('Decided since your last visit');
+    }
+
+    public function test_coming_up_is_the_next_approved_leave(): void
+    {
+        $this->actingAs($this->employee->user)->get(route('dashboard'))->assertSee('No approved leave coming up.');
+
+        $admin = User::factory()->create()->assignRole('admin');
+        $service = app(LeaveRequestService::class);
+        // Filed by an admin: approved on submit. The later one isn't "next"; a pending one doesn't count.
+        $service->submit($this->employee, $this->annual, Carbon::parse('2026-07-06'), Carbon::parse('2026-07-07'), null, null, $admin);
+        $service->submit($this->employee, $this->annual, Carbon::parse('2026-06-24'), Carbon::parse('2026-06-24'), LeaveHalf::Am, null, $admin);
+        $this->request($this->employee, '2026-06-19', '2026-06-19');
+
+        $this->actingAs($this->employee->user)->get(route('dashboard'))
+            ->assertSeeInOrder(['Coming up', 'Annual · ', 'Wed 24 Jun · AM', '0.5 day · Starts in 7 days', 'This month'])
+            ->assertDontSee('No approved leave coming up.');
     }
 
     public function test_someone_without_an_employee_record_keeps_the_plain_card(): void
