@@ -85,6 +85,15 @@ class Employee extends Model
                 app(LeaveGranter::class)->regrantAfterJoinDateChange($employee);
             }
         });
+
+        // The reporting tree changed, so every memoized subordinateIds() may be
+        // stale — approval eligibility is evaluated when someone decides, and
+        // must see a move made earlier in the same request.
+        static::saved(function (self $employee) {
+            if ($employee->wasRecentlyCreated || $employee->wasChanged('manager_id')) {
+                self::forgetSubordinateIds();
+            }
+        });
     }
 
     /**
@@ -291,6 +300,12 @@ class Employee extends Model
     public function subordinateIds(): array
     {
         return self::$subordinateIdsCache[$this->id] ??= $this->resolveSubordinateIds();
+    }
+
+    /** Drops every memoized subordinateIds() result (see booted()). */
+    public static function forgetSubordinateIds(): void
+    {
+        self::$subordinateIdsCache = [];
     }
 
     public function isManagerOf(self $other): bool

@@ -2,21 +2,36 @@
 
 namespace App\Models;
 
+use App\Contracts\Approvable;
 use App\Enums\LeaveHalf;
 use App\Enums\LeaveStatus;
 use App\Exceptions\InvalidLeaveException;
+use App\Exceptions\InvalidLeaveTransitionException;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 /**
- * A leave request. Its own shape is enforced here (InvalidLeaveException);
- * request rules that need other rows — overlap, balance, who may approve —
- * belong to the request lifecycle (Phase 3c), not this model.
+ * A leave request. Its own shape (InvalidLeaveException) and its status
+ * transitions (InvalidLeaveTransitionException) are enforced here; rules that
+ * need other rows — overlap, balance, who may approve — belong to
+ * LeaveRequestService. Goes through the shared approval engine as an
+ * Approvable (ApprovalFlow).
  */
-class Leave extends Model
+class Leave extends Model implements Approvable
 {
+    /**
+     * Where each status may go. Creation takes any status (an admin's filing
+     * on someone's behalf is approved on submit); only changes are checked.
+     */
+    private const TRANSITIONS = [
+        'pending' => ['approved', 'rejected', 'cancelled'],
+        'approved' => ['cancelled'],
+        'rejected' => [],
+        'cancelled' => [],
+    ];
+
     use HasFactory;
 
     protected $fillable = [
@@ -47,6 +62,22 @@ class Leave extends Model
 
     protected static function booted(): void
     {
+        static::saving(function (self $leave) {
+            $status = $leave->status ?? LeaveStatus::Pending;
+
+            if ($leave->exists && $leave->isDirty('status')) {
+                $from = LeaveStatus::from($leave->getRawOriginal('status'));
+
+                if (! in_array($status->value, self::TRANSITIONS[$from->value], true)) {
+                    throw InvalidLeaveTransitionException::between($from, $status);
+                }
+            }
+
+            if (($status === LeaveStatus::Pending) !== ($leave->current_step !== null)) {
+                throw InvalidLeaveTransitionException::stepMismatch($status);
+            }
+        });
+
         static::saving(function (self $leave) {
             if ($leave->exists && ! $leave->isDirty(['start_date', 'end_date', 'half', 'leave_type_id'])) {
                 return;
@@ -95,5 +126,20 @@ class Leave extends Model
     public function approvalSteps(): MorphMany
     {
         return $this->morphMany(ApprovalStep::class, 'approvable')->orderBy('step');
+    }
+
+    public function approvalSubject(): Employee
+    {
+        return $this->employee;
+    }
+
+    public function currentApprovalStep(): ?int
+    {
+        return $this->status === LeaveStatus::Pending ? $this->current_step : null;
+    }
+
+    public function isHalfDay(): bool
+    {
+        return $this->half !== null;
     }
 }
