@@ -21,10 +21,13 @@ use Carbon\CarbonImmutable;
  * EntitlementCalculator, LeaveDayCounter, LeaveDecisions and
  * AttendanceSummary — the same ones Time off and My attendance show, so the
  * pages can't disagree. The dashboard doesn't mark decisions seen: they stay
- * here until Time off is opened.
+ * here until Time off is opened, for at most DECISIONS_DAYS.
  */
 final class EmployeeDashboard
 {
+    /** How far back the decisions card looks, whenever Time off was last opened. */
+    public const DECISIONS_DAYS = 30;
+
     /**
      * @return array{decided: list<Leave>, balances: list<array{name: string, available: int, usableFrom: ?CarbonImmutable, earnedSoFar: ?int}>, next: ?array{leave: Leave, days: int}, month: array<string, int>, pending: list<array{leave: Leave, days: int}>}
      */
@@ -49,7 +52,9 @@ final class EmployeeDashboard
             ->first();
 
         return [
-            'decided' => LeaveDecisions::since($employee, $user, $user->time_off_seen_at)->all(),
+            // At most the last 30 days, so someone who never opens Time off
+            // doesn't carry old decisions here forever.
+            'decided' => LeaveDecisions::since($employee, $user, $user->time_off_seen_at?->max(now()->subDays(self::DECISIONS_DAYS)))->all(),
             'next' => $next !== null ? $withDays($next) : null,
             'balances' => LeaveType::query()
                 ->where('is_active', true)

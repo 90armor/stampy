@@ -19,6 +19,10 @@ $item comes from Leave\Approvals::describe(). --}}
             </div>
             <p class="text-sm tabular-nums text-slate-700 dark:text-slate-200">{{ $leave->leaveType->name }} · {{ $item['dates'] }} · {{ $item['days'] }}</p>
             <p class="text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ implode(' · ', array_filter([$item['submitted'], $item['when']])) }}</p>
+            {{-- Why it's stuck, when the reason is that nobody can decide step 1 today. --}}
+            @if ($item['awayReason'])
+                <p class="text-xs text-slate-600 dark:text-slate-300">{{ $item['awayReason'] }}.</p>
+            @endif
             @if ($leave->reason)
                 <p class="text-sm text-slate-600 dark:text-slate-300">“{{ $leave->reason }}”</p>
             @endif

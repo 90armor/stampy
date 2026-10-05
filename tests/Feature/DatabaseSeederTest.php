@@ -124,6 +124,7 @@ class DatabaseSeederTest extends TestCase
         $this->assertTrue(Leave::where('status', 'pending')->where('current_step', 1)->exists());
         $this->assertTrue(Leave::where('status', 'pending')->where('current_step', 2)->exists());
         $this->assertTrue(Leave::where('status', 'pending')->where('current_step', 1)->get()->contains(fn (Leave $leave) => ApprovalInbox::isStuck($leave)), 'No stuck request.');
+        $this->assertTrue(Leave::where('status', 'pending')->where('current_step', 1)->get()->contains(fn (Leave $leave) => ApprovalInbox::awayReason($leave) !== null), 'No request stuck on an approver who is away.');
         $this->assertTrue(Leave::whereColumn('start_date', '!=', 'end_date')->whereYear('start_date', today()->year)->whereYear('end_date', today()->year + 1)->exists(), 'No cross-year leave.');
         $this->assertTrue(Leave::where('half', 'am')->exists() && Leave::where('half', 'pm')->exists());
         // Every decided request has its steps (nothing written around the service).

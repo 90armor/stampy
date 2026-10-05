@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Leave;
 
+use App\Enums\LeaveHalf;
 use App\Enums\LeaveStatus;
 use App\Livewire\Leave\Approvals;
 use App\Models\Department;
@@ -246,6 +247,35 @@ class ApprovalsPageTest extends TestCase
             ->assertDontSee('Stuck');
         $this->assertSame(4, ApprovalInbox::count($this->manager->user));
         $this->assertNotNull($waiting);
+    }
+
+    public function test_a_request_is_stuck_when_every_step_one_approver_is_on_leave_today(): void
+    {
+        // Mon 15 Jun: a fresh request starting in two weeks — not stuck on its own.
+        $leave = $this->request($this->employee, '2026-06-29', '2026-06-29');
+        $this->assertFalse(ApprovalInbox::isStuck($leave));
+
+        // A half day away doesn't stop the manager deciding.
+        $this->service()->submit($this->manager, $this->annual, Carbon::parse('2026-06-15'), Carbon::parse('2026-06-15'), LeaveHalf::Am, null, $this->admin);
+        $this->assertNull(ApprovalInbox::awayReason($leave));
+
+        // On full-day leave until Tuesday (the PM half today, then a separate
+        // Tuesday request — one absence): nobody can decide step 1.
+        $this->service()->submit($this->manager, $this->annual, Carbon::parse('2026-06-15'), Carbon::parse('2026-06-15'), LeaveHalf::Pm, null, $this->admin);
+        $this->service()->submit($this->manager, $this->annual, Carbon::parse('2026-06-16'), Carbon::parse('2026-06-16'), null, null, $this->admin);
+        $this->assertSame('Manager (manager) is on leave until Tue 16 Jun', ApprovalInbox::awayReason($leave));
+        $this->assertTrue(ApprovalInbox::isStuck($leave));
+        $this->assertSame(1, ApprovalInbox::count($this->admin));
+
+        Livewire::actingAs($this->admin)->test(Approvals::class)
+            ->set('showOverrides', true)
+            ->assertSee('Stuck')
+            ->assertSee('Manager (manager) is on leave until Tue 16 Jun.');
+
+        // A skip-level manager who's in can still decide: not stuck for that reason.
+        $boss = $this->person('Boss', 'manager');
+        $this->manager->update(['manager_id' => $boss->id]);
+        $this->assertNull(ApprovalInbox::awayReason($leave->fresh()));
     }
 
     private function service(): LeaveRequestService

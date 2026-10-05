@@ -111,6 +111,7 @@ class Approvals extends Component
         $describeOverrides = fn (Collection $leaves) => $leaves->map(fn (Leave $leave) => [
             ...$this->describe($leave, $balances, $counter, $visible),
             'stuck' => ApprovalInbox::isStuck($leave),
+            'awayReason' => ApprovalInbox::awayReason($leave),
         ])->all();
 
         $deciding = $this->decidingId !== null ? Leave::with(['employee', 'leaveType'])->find($this->decidingId) : null;
@@ -159,6 +160,7 @@ class Approvals extends Component
             'submitted' => 'Submitted '.DisplayDate::compact($leave->created_at),
             'when' => $leave->startsLabel(),
             'stuck' => false,
+            'awayReason' => null,
             'dates' => $leave->displayDates(),
             'days' => LeaveDays::label(array_sum($cost)),
             'balanceType' => $balanceType->name,

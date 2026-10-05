@@ -7,6 +7,7 @@ use App\Livewire\Attendance\Show;
 use App\Livewire\Leave\TimeOff;
 use App\Models\AttendanceLog;
 use App\Models\Employee;
+use App\Models\Leave;
 use App\Models\LeaveType;
 use App\Models\User;
 use App\Models\WorkSchedule;
@@ -60,9 +61,9 @@ class EmployeeDashboardTest extends TestCase
         return Employee::factory()->create(['full_name' => $name, 'user_id' => $user->id, 'manager_id' => $manager?->id, 'join_date' => $joined]);
     }
 
-    private function request(Employee $employee, string $from, string $to): void
+    private function request(Employee $employee, string $from, string $to, ?string $reason = null): Leave
     {
-        app(LeaveRequestService::class)->submit($employee, $this->annual, Carbon::parse($from), Carbon::parse($to), null, null, $employee->user);
+        return app(LeaveRequestService::class)->submit($employee, $this->annual, Carbon::parse($from), Carbon::parse($to), null, $reason, $employee->user)['leave'];
     }
 
     public function test_an_employee_sees_their_balance_and_pending_requests(): void
@@ -74,7 +75,7 @@ class EmployeeDashboardTest extends TestCase
             ->assertSee('Leave balance')
             // 18 granted, 3 reserved by the pending request — Time off's available().
             ->assertSeeInOrder(['Annual', '15', 'available'])
-            ->assertSee('My pending requests')
+            ->assertSee('Upcoming')
             ->assertSee('1 waiting')
             ->assertSeeInOrder(['Annual · ', '22–24 Jun'])
             ->assertSee('3 days · Waiting for manager')
@@ -92,7 +93,7 @@ class EmployeeDashboardTest extends TestCase
         $this->actingAs($newcomer->user)->get(route('dashboard'))
             ->assertSee('Usable from '.DisplayDate::compact(Carbon::parse('2027-03-01')))
             ->assertSee('earned so far')
-            ->assertSee('Nothing waiting for a decision.');
+            ->assertSee('No leave requested or coming up.');
     }
 
     public function test_this_month_is_the_same_summary_as_my_attendance(): void
@@ -159,7 +160,7 @@ class EmployeeDashboardTest extends TestCase
         $this->actingAs($this->employee->user)->get(route('dashboard'))
             ->assertSee('Decided since your last visit')
             ->assertSee('1 new')
-            ->assertSeeInOrder(['Annual · ', 'Mon 22 Jun', 'Rejected', 'New'])
+            ->assertSeeInOrder(['Annual · ', 'Mon 22 Jun', 'Rejected'])
             ->assertSee('“Stocktake that day”', false)
             ->assertSee('— Manager');
 
@@ -186,20 +187,43 @@ class EmployeeDashboardTest extends TestCase
         $this->actingAs($this->employee->user)->get(route('dashboard'))->assertDontSee('Decided since your last visit');
     }
 
-    public function test_coming_up_is_the_next_approved_leave(): void
+    public function test_upcoming_lists_pending_requests_then_the_next_approved_leave(): void
     {
-        $this->actingAs($this->employee->user)->get(route('dashboard'))->assertSee('No approved leave coming up.');
+        $this->actingAs($this->employee->user)->get(route('dashboard'))->assertSee('No leave requested or coming up.');
 
         $admin = User::factory()->create()->assignRole('admin');
         $service = app(LeaveRequestService::class);
-        // Filed by an admin: approved on submit. The later one isn't "next"; a pending one doesn't count.
+        // Filed by an admin: approved on submit. The later one isn't "next".
         $service->submit($this->employee, $this->annual, Carbon::parse('2026-07-06'), Carbon::parse('2026-07-07'), null, null, $admin);
         $service->submit($this->employee, $this->annual, Carbon::parse('2026-06-24'), Carbon::parse('2026-06-24'), LeaveHalf::Am, null, $admin);
-        $this->request($this->employee, '2026-06-19', '2026-06-19');
+        $this->request($this->employee, '2026-06-29', '2026-06-29');
 
         $this->actingAs($this->employee->user)->get(route('dashboard'))
-            ->assertSeeInOrder(['Coming up', 'Annual · ', 'Wed 24 Jun · AM', '0.5 day · Starts in 7 days', 'This month'])
-            ->assertDontSee('No approved leave coming up.');
+            ->assertSeeInOrder(['Upcoming', 'Mon 29 Jun', 'Pending', '1 day · Waiting for manager', 'Wed 24 Jun · AM', 'Approved', '0.5 day · Starts in 7 days', 'This month'])
+            ->assertDontSee('Tue 7 Jul')
+            ->assertDontSee('No leave requested or coming up.');
+    }
+
+    public function test_the_decisions_card_is_newest_first_and_looks_back_at_most_30_days(): void
+    {
+        $first = $this->request($this->employee, '2026-06-22', '2026-06-22', 'First');
+        $second = $this->request($this->employee, '2026-06-23', '2026-06-23', 'Second');
+        Livewire::actingAs($this->employee->user)->test(TimeOff::class);
+        $service = app(LeaveRequestService::class);
+
+        // Decided in the opposite order to how they were requested.
+        $this->travelTo(now()->addHour());
+        $service->reject($second, $this->manager->user, 'Second decided first');
+        $this->travelTo(now()->addHour());
+        $service->reject($first, $this->manager->user, 'First decided last');
+
+        $this->actingAs($this->employee->user)->get(route('dashboard'))
+            ->assertSeeInOrder(['Decided since your last visit', 'First decided last', 'Second decided first']);
+
+        // Never opening Time off again: 31 days on, the card is gone; Time off still marks them.
+        $this->travelTo(now()->addDays(31));
+        $this->actingAs($this->employee->user)->get(route('dashboard'))->assertDontSee('Decided since your last visit');
+        Livewire::actingAs($this->employee->user)->test(TimeOff::class)->assertSee('New');
     }
 
     public function test_someone_without_an_employee_record_keeps_the_plain_card(): void

@@ -117,10 +117,17 @@ class LeaveSeeder extends Seeder
             }
         }
 
+        // Aye Aye Mon (EMP-0001), the only one who can decide step 1 for
+        // Kyaw Kyaw Naing, is on leave from today: his pending request is
+        // stuck for that reason (ApprovalInbox::awayReason()). She has no
+        // manager, so her own request goes straight to the admin.
+        $ayeAye = $this->employee('EMP-0001');
+        $this->approved($ayeAye, $this->annual, $today, $this->workday($ayeAye, $today->copy()->addDay()), null, 'Conference abroad');
+
         // On leave today — anyone with no punches yet today, so the dashboard
         // counts them as on leave rather than Not in. Who that is depends on
         // the time of day the seed runs.
-        $used = ['EMP-0002', 'EMP-0009', 'EMP-0012', 'EMP-0019', 'EMP-0025', 'EMP-0020', 'EMP-0021', 'EMP-0024', 'EMP-0026'];
+        $used = ['EMP-0001', 'EMP-0002', 'EMP-0009', 'EMP-0012', 'EMP-0019', 'EMP-0025', 'EMP-0020', 'EMP-0021', 'EMP-0024', 'EMP-0026'];
         $codes = Employee::query()->activeOn($today)->whereNotIn('employee_code', $used)->orderBy('employee_code')->pluck('employee_code')->all();
         if ($away = $this->firstTodayWhere($codes, fn (DailyAttendance $row) => $row->first_in === null && $row->last_out === null)) {
             $tomorrow = $this->workday($away, $today->copy()->addDay());

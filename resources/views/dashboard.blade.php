@@ -276,15 +276,17 @@
             ]);
         @endphp
 
-        {{-- The employee dashboard (Phase 3e): decisions, balance and pending
-        requests on the left; what's coming up and the month on the right from
-        lg; one column below, in reading order. Two independent stacks, so a
+        {{-- The employee dashboard (Phase 3e): decisions and balance on the left;
+        upcoming leave and the month on the right from lg; one column below, in
+        reading order — at most four cards on a phone. Two independent stacks, so a
         short card never leaves a hole. --}}
         <div class="grid gap-6 lg:grid-cols-2 lg:items-start">
             <div class="flex min-w-0 flex-col gap-6">
-                {{-- Decided since they last opened Time off (LeaveDecisions) — the
-                same "New" state Time off shows; without email, this is where an
-                employee finds out. A rejection's note is the reason, so it shows. --}}
+                {{-- Decided since they last opened Time off (LeaveDecisions), newest
+                first, at most the last 30 days — the same "New" state Time off
+                shows, which the title already says, so no per-item badge. Without
+                email, this is where an employee finds out; a rejection's note is
+                the reason, so it shows. --}}
                 @if (count($mine['decided']))
                     <x-card>
                         <div class="{{ $cardHeader }}">
@@ -298,7 +300,6 @@
                                     <div class="flex flex-wrap items-center gap-2">
                                         <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $leave->leaveType->name }} · <span class="tabular-nums">{{ $leave->displayDates() }}</span></p>
                                         <x-badge :color="$leave->status->badgeColor()">{{ $leave->status->label() }}</x-badge>
-                                        <x-badge color="primary">New</x-badge>
                                     </div>
                                     @if ($decision)
                                         <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">“{{ $decision->note }}” <span class="text-slate-500 dark:text-slate-400">— {{ $decision->decidedBy?->name ?? 'an approver' }}</span></p>
@@ -333,39 +334,41 @@
                     @endif
                     <div class="mt-4"><a href="{{ route('time-off.index') }}" wire:navigate class="{{ $link }}">Request leave on Time off</a></div>
                 </x-card>
-
-                <x-card>
-                    <div class="{{ $cardHeader }}">
-                        <h2 class="{{ $cardTitle }}">My pending requests</h2>
-                        @if (count($mine['pending']))<p class="{{ $cardMeta }}">{{ count($mine['pending']) }} waiting</p>@endif
-                    </div>
-                    @if (count($mine['pending']))
-                        <ul class="mt-4">
-                            @foreach ($mine['pending'] as $item)
-                                <li class="border-t border-slate-divider py-2.5 first:border-t-0 first:pt-0 last:pb-0">
-                                    <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $item['leave']->leaveType->name }} · <span class="tabular-nums">{{ $item['leave']->displayDates() }}</span></p>
-                                    <p class="mt-0.5 text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ \App\Support\LeaveDays::label($item['days']).' · '.$item['leave']->waitingLabel() }}</p>
-                                </li>
-                            @endforeach
-                        </ul>
-                        <div class="mt-4"><a href="{{ route('time-off.index') }}" wire:navigate class="{{ $link }}">See all requests on Time off</a></div>
-                    @else
-                        <p class="mt-4 text-sm text-slate-500 dark:text-slate-400">Nothing waiting for a decision.</p>
-                    @endif
-                </x-card>
             </div>
 
             <div class="flex min-w-0 flex-col gap-6">
+                {{-- Upcoming: pending requests with whose decision they wait for,
+                then the next approved leave. --}}
                 <x-card>
                     <div class="{{ $cardHeader }}">
-                        <h2 class="{{ $cardTitle }}">Coming up</h2>
+                        <h2 class="{{ $cardTitle }}">Upcoming</h2>
+                        @if (count($mine['pending']))<p class="{{ $cardMeta }}">{{ count($mine['pending']) }} waiting</p>@endif
                     </div>
-                    @if ($mine['next'])
-                        @php $next = $mine['next']['leave']; @endphp
-                        <p class="mt-4 text-sm font-medium text-slate-700 dark:text-slate-200">{{ $next->leaveType->name }} · <span class="tabular-nums">{{ $next->displayDates() }}</span></p>
-                        <p class="mt-0.5 text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ implode(' · ', array_filter([\App\Support\LeaveDays::label($mine['next']['days']), $next->startsLabel()])) }}</p>
+                    @if (count($mine['pending']) || $mine['next'])
+                        <ul class="mt-4">
+                            @foreach ($mine['pending'] as $item)
+                                <li class="border-t border-slate-divider py-2.5 first:border-t-0 first:pt-0 last:pb-0">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $item['leave']->leaveType->name }} · <span class="tabular-nums">{{ $item['leave']->displayDates() }}</span></p>
+                                        <x-badge :color="$item['leave']->status->badgeColor()">{{ $item['leave']->status->label() }}</x-badge>
+                                    </div>
+                                    <p class="mt-0.5 text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ \App\Support\LeaveDays::label($item['days']).' · '.$item['leave']->waitingLabel() }}</p>
+                                </li>
+                            @endforeach
+                            @if ($mine['next'])
+                                @php $next = $mine['next']['leave']; @endphp
+                                <li class="border-t border-slate-divider py-2.5 first:border-t-0 first:pt-0 last:pb-0">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $next->leaveType->name }} · <span class="tabular-nums">{{ $next->displayDates() }}</span></p>
+                                        <x-badge :color="$next->status->badgeColor()">{{ $next->status->label() }}</x-badge>
+                                    </div>
+                                    <p class="mt-0.5 text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ implode(' · ', array_filter([\App\Support\LeaveDays::label($mine['next']['days']), $next->startsLabel()])) }}</p>
+                                </li>
+                            @endif
+                        </ul>
+                        <div class="mt-4"><a href="{{ route('time-off.index') }}" wire:navigate class="{{ $link }}">See all requests on Time off</a></div>
                     @else
-                        <p class="mt-4 text-sm text-slate-500 dark:text-slate-400">No approved leave coming up.</p>
+                        <p class="mt-4 text-sm text-slate-500 dark:text-slate-400">No leave requested or coming up.</p>
                     @endif
                 </x-card>
 

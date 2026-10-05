@@ -21,10 +21,11 @@ final class LeaveDecisions
 {
     /**
      * Requests decided after $seenAt — a step approved or rejected, or the
-     * request cancelled, by someone other than $user. One the user cancelled
-     * themself isn't news, whatever was decided before: their own last word
-     * supersedes it. None at all before the first visit to Time off ($seenAt
-     * null): everything would be "new", which says nothing.
+     * request cancelled, by someone other than $user — newest decision
+     * first. One the user cancelled themself isn't news, whatever was decided
+     * before: their own last word supersedes it. None at all before the
+     * first visit to Time off ($seenAt null): everything would be "new",
+     * which says nothing.
      *
      * @return Collection<int, Leave>
      */
@@ -37,14 +38,30 @@ final class LeaveDecisions
         return Leave::query()
             ->where('employee_id', $employee->id)
             ->with(['leaveType', 'approvalSteps.decidedBy'])
-            ->orderByDesc('updated_at')
             ->get()
             ->reject(fn (Leave $leave) => $leave->status === LeaveStatus::Cancelled && $leave->cancelled_by === $user->id)
-            ->filter(fn (Leave $leave) => $leave->approvalSteps->contains(fn (ApprovalStep $step) => in_array($step->outcome, [ApprovalOutcome::Approved, ApprovalOutcome::Rejected], true)
-                    && $step->decided_by !== $user->id
-                    && $step->decided_at->gt($seenAt))
-                || ($leave->status === LeaveStatus::Cancelled && $leave->cancelled_by !== $user->id && $leave->cancelled_at?->gt($seenAt)))
+            ->map(fn (Leave $leave) => ['leave' => $leave, 'at' => self::decidedAt($leave, $user)])
+            ->filter(fn (array $item) => $item['at'] !== null && $item['at']->gt($seenAt))
+            ->sortByDesc(fn (array $item) => $item['at']->getTimestamp())
+            ->pluck('leave')
             ->values();
+    }
+
+    /**
+     * When someone other than $user last decided the request: the latest
+     * approved or rejected step they recorded, or a cancellation.
+     */
+    private static function decidedAt(Leave $leave, User $user): ?CarbonInterface
+    {
+        $times = $leave->approvalSteps
+            ->filter(fn (ApprovalStep $step) => in_array($step->outcome, [ApprovalOutcome::Approved, ApprovalOutcome::Rejected], true) && $step->decided_by !== $user->id)
+            ->pluck('decided_at');
+
+        if ($leave->status === LeaveStatus::Cancelled && $leave->cancelled_by !== $user->id && $leave->cancelled_at !== null) {
+            $times->push($leave->cancelled_at);
+        }
+
+        return $times->sortByDesc(fn (CarbonInterface $at) => $at->getTimestamp())->first();
     }
 
     /**
