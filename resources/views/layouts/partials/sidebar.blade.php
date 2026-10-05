@@ -8,7 +8,8 @@ $navItems = [
     // pattern instead of the derived 'prefix.*' every other item uses.
     ['label' => 'Attendance', 'route' => 'attendance.index', 'icon' => 'clock', 'visible' => auth()->user()->hasAnyRole(['admin', 'manager']), 'enabled' => true, 'activePatterns' => ['attendance.index', 'attendance.show']],
     ['label' => 'My attendance', 'route' => 'attendance.mine', 'icon' => 'user-circle', 'visible' => true, 'enabled' => true, 'activePatterns' => ['attendance.mine']],
-    ['label' => 'Time off', 'icon' => 'calendar-days', 'visible' => true, 'enabled' => false],
+    // Gated by the ability each page itself checks, never a role list (CLAUDE.md, Roles & authorization).
+    ['label' => 'Time off', 'route' => 'time-off.index', 'icon' => 'calendar-days', 'visible' => auth()->user()->can('timeOff', \App\Models\Leave::class), 'enabled' => true, 'activePatterns' => ['time-off.*']],
     ['label' => 'Reports', 'icon' => 'document-text', 'visible' => auth()->user()->hasAnyRole(['admin', 'manager']), 'enabled' => false],
 ];
 @endphp

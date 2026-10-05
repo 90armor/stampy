@@ -60,6 +60,12 @@ final class LeaveDays
         return str_ends_with($decimal, '.0') ? substr($decimal, 0, -2) : $decimal;
     }
 
+    /** Tenths → "1 day", "0.5 day", "3.5 days" — an amount with its unit, the same everywhere. */
+    public static function label(int $tenths): string
+    {
+        return self::format($tenths).' '.(abs($tenths) <= self::DAY ? 'day' : 'days');
+    }
+
     /**
      * $numerator / $denominator tenths, rounded up to the next half day —
      * ceil(n / (d × 5)) × 5, all in integers. Non-negative inputs only.

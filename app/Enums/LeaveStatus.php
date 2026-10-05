@@ -22,4 +22,19 @@ enum LeaveStatus: string
             self::Cancelled => 'Cancelled',
         };
     }
+
+    /**
+     * The x-badge colour for a request's status — one value per request. Not
+     * an attendance status: pending is amber (the alert role, waiting on
+     * someone), never the timing annotation's amber text.
+     */
+    public function badgeColor(): string
+    {
+        return match ($this) {
+            self::Pending => 'amber',
+            self::Approved => 'green',
+            self::Rejected => 'red',
+            self::Cancelled => 'slate',
+        };
+    }
 }

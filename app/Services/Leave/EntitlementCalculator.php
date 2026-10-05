@@ -85,6 +85,21 @@ class EntitlementCalculator
     }
 
     /**
+     * What someone not yet eligible has earned from joining through $asOf —
+     * the same calculation as the eligibility year's grant, cut at $asOf, for
+     * Time off's "Usable from 1 Mar 2027 · 15.5 days earned so far" (Phase
+     * 3e). Null when there is no balance or the type is already usable.
+     */
+    public function earnedSoFar(Employee $employee, LeaveType $type, CarbonInterface $asOf): ?int
+    {
+        if ($type->days_per_year === null || $this->eligibleOn($employee, $type)->lte($asOf)) {
+            return null;
+        }
+
+        return $this->earned($employee, $type, $employee->join_date->year, $asOf);
+    }
+
+    /**
      * Each year from $fromYear to $lastDay's year, from the later of 1 Jan and
      * join_date to the earlier of 31 Dec and $lastDay, pro-rated and rounded
      * on its own.

@@ -726,6 +726,11 @@ Verified:
 - **Tests:** 775 pass in fixed order, three random orders (seeds 1105, 4242, 90210) and at all 20 pinned instants. The lock test and the rate test were each shown to fail against the code they guard.
 - **Walkthrough on the dev database:** an admin approved a full-day leave for EMP-0002, who had punched in at 08:04, and an AM leave for EMP-0001, who hadn't punched. After the 15-minute build, EMP-0002's row was `leave` with the punch kept, flagged "Punched on approved leave" last in Needs attention. EMP-0001's was `in_progress` with "Not in yet · due 1:00 PM". Cancelling EMP-0002's leave turned the row back to `in_progress`.
 
+### Go-live notes
+
+- **A real admin who also takes leave needs their login linked to an employee record** (`employees.user_id`). Without the link they can't request their own leave (Time off shows only "File for an employee") and aren't in anyone's step-1 chain. A record-less admin is fine only for a system or test account — like the seeded `admin@example.com`.
+- **Opening balances** (leave already taken, or carried, before the system went live) go in as admin adjustments: grants are only ever created for the current year or later (`leave:grant`).
+
 ### Still open
 
 - **HR to confirm the leave-type list** — Medical's 30 days and pay, whether Special is paid or made up, anything company-specific. This is a seed-data change only.

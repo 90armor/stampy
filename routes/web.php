@@ -5,6 +5,7 @@ use App\Livewire\Attendance\Index as AttendanceIndex;
 use App\Livewire\Attendance\Show as AttendanceShow;
 use App\Livewire\Employees\Index as EmployeesIndex;
 use App\Livewire\Employees\Show as ShowEmployee;
+use App\Livewire\Leave\TimeOff;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Position;
@@ -85,6 +86,11 @@ Route::middleware('auth')->group(function () {
     // regardless of role). Row-level scoping, not route middleware, is what
     // keeps this from exposing anyone else's data.
     Route::get('/my-attendance', AttendanceShow::class)->name('attendance.mine');
+
+    // Leave (Phase 3e). No role middleware: who may open each page is a
+    // LeavePolicy ability (timeOff), checked in the component's mount() and
+    // render(), and the same ability gates the sidebar item.
+    Route::get('/time-off', TimeOff::class)->name('time-off.index');
 });
 
 Route::middleware(['auth', 'role:admin|manager'])->group(function () {

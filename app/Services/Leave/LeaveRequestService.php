@@ -10,6 +10,7 @@ use App\Exceptions\AffectedLeavesChangedException;
 use App\Exceptions\LeaveValidationException;
 use App\Exceptions\StaleLeaveDecisionException;
 use App\Models\Employee;
+use App\Models\Holiday;
 use App\Models\Leave;
 use App\Models\LeaveEntitlement;
 use App\Models\LeaveType;
@@ -19,7 +20,9 @@ use App\Services\Attendance\DailySummaryBuilder;
 use App\Services\Attendance\EmployeeScheduleAssigner;
 use App\Support\DisplayDate;
 use App\Support\LeaveDays;
+use App\Support\WorkdayCalendar;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -119,6 +122,90 @@ class LeaveRequestService
         });
 
         return ['leave' => $leave, 'rebuildError' => $leave->status === LeaveStatus::Approved ? $this->rebuild($leave, 'approval') : null];
+    }
+
+    /**
+     * What submit() would do, checked by the same rules and nothing written
+     * — the request modal's review step (Phase 3e). Throws
+     * LeaveValidationException exactly as submit() would. No row lock: it
+     * writes nothing, and submit() checks everything again under the lock.
+     *
+     * @throws LeaveValidationException
+     */
+    public function preview(
+        Employee $employee,
+        LeaveType $type,
+        CarbonInterface $start,
+        CarbonInterface $end,
+        ?LeaveHalf $half,
+        User $actor,
+    ): LeavePreview {
+        Gate::forUser($actor)->authorize('create', [Leave::class, $employee]);
+
+        $start = Carbon::instance($start)->startOfDay();
+        $end = Carbon::instance($end)->startOfDay();
+        $employee = $employee->fresh();
+        $type = $type->fresh();
+
+        $cost = $this->validate($employee, $type, $start, $end, $half, $actor);
+        $balanceType = $type->deductsFrom ?? $type;
+
+        $balances = [];
+
+        if ($balanceType->days_per_year !== null) {
+            foreach ($cost as $year => $days) {
+                $before = $this->balances->for($employee, $balanceType, $year)->available();
+                $balances[$year] = ['before' => $before, 'after' => $before - $days];
+            }
+        }
+
+        return new LeavePreview(
+            employee: $employee,
+            type: $type,
+            balanceType: $balanceType,
+            start: CarbonImmutable::instance($start),
+            end: CarbonImmutable::instance($end),
+            half: $half?->value,
+            cost: $cost,
+            balances: $balances,
+            notCharged: $this->notCharged($employee, $type, $start, $end),
+            approvedOnSubmit: $actor->hasRole('admin') && ! $actor->is($employee->user),
+        );
+    }
+
+    /**
+     * The dates in $start..$end a workdays type doesn't charge, with why —
+     * the same WorkdayCalendar rule LeaveDayCounter counts by. A
+     * calendar-days type charges every date.
+     *
+     * @return list<array{date: CarbonImmutable, reason: string}>
+     */
+    private function notCharged(Employee $employee, LeaveType $type, Carbon $start, Carbon $end): array
+    {
+        if ($type->counts === LeaveCounting::CalendarDays) {
+            return [];
+        }
+
+        $holidayNames = Holiday::query()
+            ->whereBetween('date', [$start->format('Y-m-d'), $end->format('Y-m-d')])
+            ->pluck('name', 'date')
+            ->mapWithKeys(fn (string $name, string $date) => [Carbon::parse($date)->format('Y-m-d') => $name])
+            ->all();
+
+        $days = [];
+
+        for ($day = $start->copy(); $day->lte($end); $day->addDay()) {
+            if (WorkdayCalendar::isWorkday($employee, $day, array_map(fn () => true, $holidayNames))) {
+                continue;
+            }
+
+            $days[] = [
+                'date' => CarbonImmutable::instance($day),
+                'reason' => $holidayNames[$day->format('Y-m-d')] ?? ($day->isWeekend() ? $day->format('l') : 'Day off'),
+            ];
+        }
+
+        return $days;
     }
 
     /**

@@ -30,6 +30,32 @@ class LeavePolicy
         return $user->can('view', $leave->employee);
     }
 
+    /**
+     * The Time off page (Phase 3e): anyone with an employee record (their own
+     * balances and requests), and anyone who can file for others — an admin
+     * without an employee record still files there.
+     */
+    public function timeOff(User $user): bool
+    {
+        return $user->employee !== null || $this->fileForOthers($user);
+    }
+
+    /** Filing on someone else's behalf ("File for an employee") — admins only. */
+    public function fileForOthers(User $user): bool
+    {
+        return $user->hasRole('admin');
+    }
+
+    /**
+     * The Approvals page and its badge (Phase 3e): anyone who could be asked
+     * to decide — an admin, or a manager with an employee record (step 1 is
+     * for managers whose employee manages the requester, ApprovalFlow).
+     */
+    public function decideAny(User $user): bool
+    {
+        return $user->hasRole('admin') || ($user->hasRole('manager') && $user->employee !== null);
+    }
+
     /** For themself, or an admin for anyone — including employees with no login. */
     public function create(User $user, Employee $employee): bool
     {
