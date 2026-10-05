@@ -7,8 +7,8 @@ use App\Enums\PunchType;
 use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
 use App\Models\Employee;
-use App\Models\Holiday;
 use App\Models\WorkSchedule;
+use App\Support\WorkdayCalendar;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 
@@ -54,7 +54,7 @@ class DailySummaryBuilder
 
         $schedule = $employee->scheduleOn($workDate);
 
-        $isWorkday = in_array($workDate->dayOfWeekIso, $schedule->workdays, true);
+        $isWorkday = WorkdayCalendar::isScheduledWorkday($schedule, $workDate);
 
         $firstIn = AttendanceLog::query()
             ->notVoided()
@@ -131,7 +131,7 @@ class DailySummaryBuilder
             }
         }
 
-        $isHoliday = Holiday::query()->whereDate('date', $workDate)->exists();
+        $isHoliday = WorkdayCalendar::isHoliday($workDate);
 
         $attributes = $this->calculate($schedule, $workDate, $isWorkday, $firstIn, $lastOut, $isHoliday);
         $attributes['work_schedule_id'] = $schedule->id;
