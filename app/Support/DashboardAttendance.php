@@ -126,13 +126,17 @@ class DashboardAttendance
 
     /**
      * Who needs a look today, worst-first: Absent, then Incomplete, then a
-     * late arrival, then "Not in yet". It follows the builder's statuses
+     * late arrival, then "Not in yet", then — least urgent — anyone who
+     * punched during approved leave (DailyAttendance::workedOnLeave(), Phase
+     * 3d: plain text, no badge; the admin decides whether to cancel the leave).
+     * One entry per person, under their most urgent kind. It follows the builder's statuses
      * (Phase 2.7): an Absent row — a punchless day whose schedule end has
      * passed — shows as Absent, as in the attendance table. A late arrival is
      * included whatever its status, including a day still In progress,
      * because the point of this list is "who might need a nudge". "Not in
-     * yet" is only a punchless In progress row past start_time + grace_minutes
-     * (DailyAttendance::isNotInYet()). Neither late nor "not in yet" is a
+     * yet" is only a punchless In progress row past the expected start +
+     * grace_minutes — start_time, or the PM start on an AM-leave day
+     * (DailyAttendance::isNotInYet()), and its "due" time is that start. Neither late nor "not in yet" is a
      * status, so neither carries a badge. Capped at $limit, most urgent
      * first; needsAttentionTotal() is the uncapped count for the header.
      *
@@ -148,9 +152,8 @@ class DashboardAttendance
                 'absent' => ['Absent', 'red', null],
                 'incomplete' => ['Incomplete', 'violet', null],
                 'late' => ['Late', null, Duration::format($row->late_minutes).' late'],
-                'not_in_yet' => ['Not in yet', null, 'Not in yet · due '.AttendanceTime::format(
-                    Carbon::parse($row->work_date->format('Y-m-d').' '.$row->workSchedule->start_time)
-                )],
+                'not_in_yet' => ['Not in yet', null, 'Not in yet · due '.AttendanceTime::format($row->expectedWindow()->start)],
+                'worked_on_leave' => ['On approved leave', null, 'Punched on approved leave'],
             };
 
             return [
@@ -191,10 +194,12 @@ class DashboardAttendance
                     ->orWhere('late_minutes', '>', 0)
                     ->orWhere(fn ($q) => $q->where('status', AttendanceStatus::InProgress->value)
                         ->whereNull('first_in')
-                        ->whereNull('last_out'));
+                        ->whereNull('last_out'))
+                    ->orWhereNotNull('daily_attendances.leave_id');
             })
             ->with(['employee', 'workSchedule'])
             ->get()
+            ->tap(fn (Collection $rows) => DailyAttendance::withLeaveDays($rows))
             ->map(fn (DailyAttendance $row) => [
                 'row' => $row,
                 'kind' => match (true) {
@@ -202,6 +207,7 @@ class DashboardAttendance
                     $row->status === AttendanceStatus::Incomplete => 'incomplete',
                     $row->isLate() => 'late',
                     $row->isNotInYet() => 'not_in_yet',
+                    $row->workedOnLeave() => 'worked_on_leave',
                     default => null,
                 },
             ])
@@ -211,7 +217,7 @@ class DashboardAttendance
             // Sorted in PHP rather than a SQL ORDER BY FIELD(): the set is
             // small (bounded by today's employee count).
             ->sortBy(fn (array $item) => [
-                ['absent' => 0, 'incomplete' => 1, 'late' => 2, 'not_in_yet' => 3][$item['kind']],
+                ['absent' => 0, 'incomplete' => 1, 'late' => 2, 'not_in_yet' => 3, 'worked_on_leave' => 4][$item['kind']],
                 $item['kind'] === 'late' ? -$item['row']->late_minutes : 0,
                 $item['row']->employee->full_name,
             ])
@@ -220,12 +226,13 @@ class DashboardAttendance
 
     /**
      * The attendance rate for each of the last $days days — attended ÷ the
-     * employees active on that day (Employee::scopeActiveOn()), where attended = present + incomplete (Phase 2.7: an
+     * employees active on that day (Employee::scopeActiveOn()) less those on
+     * full-day approved leave (a `leave` row, Phase 3d), where attended = present + incomplete (Phase 2.7: an
      * incomplete day was attended, a punch is just missing). Every day gets
      * a value, a marker, or both, so no bar is ever blank without saying why:
      *
      * - Off / Holiday: every scoped row is Off or Holiday — not a working day,
-     *   no bar.
+     *   no bar. Leave: everyone expected is on full-day leave — no bar.
      * - Pending: the day is still open — today while todayIsPending(), or an
      *   earlier day with an In progress row still inside its pairing window
      *   (an in-only row; a late in-punch can keep yesterday open past
@@ -273,6 +280,10 @@ class DashboardAttendance
                 ->selectRaw('status, count(*) as total, sum('.self::CHECKED_IN.') as checked_in')
                 ->groupBy('status')
                 ->get();
+            // Whoever is on full-day approved leave isn't expected that day
+            // (Phase 3d): out of the denominator, so five people on leave
+            // don't read as an attendance drop. Half-day leave stays in.
+            $expected = $total - (int) $rows->firstWhere('status', AttendanceStatus::Leave)?->total;
             // An In progress row on an earlier day is either still open (an
             // in-only row inside its pairing window) or stale (the builder
             // hasn't run since it should have closed it).
@@ -290,11 +301,13 @@ class DashboardAttendance
 
             [$value, $marker, $pending] = match (true) {
                 $isNonWorkingDay => [null, $statuses->contains(AttendanceStatus::Off->value) ? 'Off' : 'Holiday', false],
-                $isToday && $todayPending => [$checkedIn > 0 ? round($checkedIn / $total * 100, 1) : null, 'Today', true],
+                // Everyone expected that day is on full-day leave.
+                $expected <= 0 && $statuses->contains(AttendanceStatus::Leave->value) => [null, 'Leave', false],
+                $isToday && $todayPending => [$checkedIn > 0 ? round($checkedIn / $expected * 100, 1) : null, 'Today', true],
                 ! $isToday && ($rows->isEmpty() || $isStale) => [null, 'Not calculated', false],
-                ! $isToday && $hasOpenRows => [$checkedIn > 0 ? round($checkedIn / $total * 100, 1) : null, 'Pending', true],
+                ! $isToday && $hasOpenRows => [$checkedIn > 0 ? round($checkedIn / $expected * 100, 1) : null, 'Pending', true],
                 $attended === 0 => [null, '0%', false],
-                default => [round($attended / $total * 100, 1), null, false],
+                default => [round($attended / $expected * 100, 1), null, false],
             };
 
             $trend[] = [
@@ -319,7 +332,10 @@ class DashboardAttendance
      * @param  Collection<int, Department>  $departments  already scoped by
      *                                                    the caller (see routes/web.php)
      * @param  int[]|null  $employeeIds
-     * @return list<array{name: string, employees: int, attended: int, checkedIn: int, pending: bool}>
+     *                                   'expected' is the denominator: the department's headcount less anyone on
+     *                                   full-day approved leave today (Phase 3d); the view shows "On leave"
+     *                                   instead of 0 / 0 when that's everyone.
+     * @return list<array{name: string, employees: int, expected: int, attended: int, checkedIn: int, pending: bool}>
      */
     public static function departmentAttendance(Collection $departments, ?array $employeeIds): array
     {
@@ -332,6 +348,7 @@ class DashboardAttendance
             ->selectRaw('employees.department_id')
             ->selectRaw('sum(daily_attendances.status in (?, ?)) as attended', [AttendanceStatus::Present->value, AttendanceStatus::Incomplete->value])
             ->selectRaw('sum('.self::CHECKED_IN.') as checked_in')
+            ->selectRaw('sum(daily_attendances.status = ?) as on_leave', [AttendanceStatus::Leave->value])
             ->groupBy('employees.department_id')
             ->get()
             ->keyBy('department_id');
@@ -342,6 +359,9 @@ class DashboardAttendance
             return [
                 'name' => $department->name,
                 'employees' => $department->employees_count,
+                // The N / M denominator: the headcount less anyone on
+                // full-day approved leave today (Phase 3d), as in the trend.
+                'expected' => $department->employees_count - (int) ($row->on_leave ?? 0),
                 'attended' => (int) ($row->attended ?? 0),
                 'checkedIn' => (int) ($row->checked_in ?? 0),
                 'pending' => $pending,
@@ -363,6 +383,9 @@ class DashboardAttendance
      *   (they always sum to notIn): 'notInDue' (a punchless In progress row,
      *   or no row built yet), 'notInAbsent', 'notInOff', 'notInHoliday' and
      *   'notInLeave' — a row with no punches can only be one of those.
+     *   'notInLeave' is a full-day leave, or (Phase 3d) a punchless In
+     *   progress row still inside its AM leave, before the PM start + grace —
+     *   not due yet, so not counted as due (DailyAttendance::isAwayOnLeaveNow()).
      *
      * Timing counts — 'atWorkLate', 'leftLate', 'leftEarly' — annotate their
      * group (a subset of it), never a fourth group. 'checkedIn' (anyone with a
@@ -403,6 +426,20 @@ class DashboardAttendance
         $left = (int) ($row->left_count ?? 0);
         $notBuilt = max(0, $total - (int) ($row->rows_built ?? 0));
 
+        // Punchless In progress rows still inside a half-day leave (an AM
+        // leave, before the PM start + grace) aren't due yet: they move from
+        // "due" to "on leave", so the sub-line still sums to the cell.
+        $awayOnLeave = self::rowsOfEmployeesActiveOn($employeeIds, today())
+            ->where('status', AttendanceStatus::InProgress->value)
+            ->whereNull('first_in')
+            ->whereNull('last_out')
+            ->whereNotNull('leave_id')
+            ->with('workSchedule')
+            ->get()
+            ->tap(fn (Collection $rows) => DailyAttendance::withLeaveDays($rows))
+            ->filter(fn (DailyAttendance $row) => $row->isAwayOnLeaveNow())
+            ->count();
+
         return [
             'atWork' => $atWorkCount,
             'atWorkLate' => (int) ($row->at_work_late ?? 0),
@@ -412,11 +449,11 @@ class DashboardAttendance
             'leftEarly' => (int) ($row->left_early ?? 0),
             'notIn' => max(0, $total - $atWorkCount - $left),
             // Not built yet reads as "due", like a punchless In progress row: today's build simply hasn't reached them.
-            'notInDue' => (int) ($row->due ?? 0) + $notBuilt,
+            'notInDue' => (int) ($row->due ?? 0) + $notBuilt - $awayOnLeave,
             'notInAbsent' => (int) ($row->absent ?? 0),
             'notInOff' => (int) ($row->off_count ?? 0),
             'notInHoliday' => (int) ($row->holiday ?? 0),
-            'notInLeave' => (int) ($row->on_leave ?? 0),
+            'notInLeave' => (int) ($row->on_leave ?? 0) + $awayOnLeave,
             'checkedIn' => (int) ($row->checked_in ?? 0),
             'total' => $total,
         ];

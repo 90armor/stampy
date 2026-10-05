@@ -124,11 +124,17 @@
                                     "Attended N / M" (present + incomplete) once it has closed. --}}
                                     @php
                                         $departmentCount = $department['pending'] ? $department['checkedIn'] : $department['attended'];
-                                        $departmentShare = $department['employees'] > 0 ? round($departmentCount / $department['employees'] * 100, 1) : 0;
+                                        // M leaves out anyone on full-day approved leave today (Phase 3d).
+                                        $departmentShare = $department['expected'] > 0 ? round($departmentCount / $department['expected'] * 100, 1) : 0;
+                                        $allOnLeave = $department['expected'] <= 0 && $department['employees'] > 0;
                                     @endphp
                                     <div class="flex items-baseline justify-between gap-2">
                                         <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $department['name'] }}</p>
-                                        <p class="text-sm tabular-nums text-slate-600 dark:text-slate-300">{{ $department['pending'] ? 'Checked in' : 'Attended' }} <span class="font-semibold text-slate-900 dark:text-slate-100">{{ $departmentCount }}</span> / {{ $department['employees'] }}</p>
+                                        @if ($allOnLeave)
+                                            <p class="text-sm text-slate-500 dark:text-slate-400">On leave</p>
+                                        @else
+                                            <p class="text-sm tabular-nums text-slate-600 dark:text-slate-300">{{ $department['pending'] ? 'Checked in' : 'Attended' }} <span class="font-semibold text-slate-900 dark:text-slate-100">{{ $departmentCount }}</span> / {{ $department['expected'] }}</p>
+                                        @endif
                                     </div>
                                     <p class="text-xs text-slate-500 dark:text-slate-400">{{ $department['employees'] }} {{ $department['employees'] === 1 ? 'employee' : 'employees' }}</p>
                                     <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-750"><div @class(['h-full rounded-full', 'bg-primary-200 dark:bg-primary-800' => $department['pending'], 'bg-primary-500' => ! $department['pending']]) style="width: {{ $departmentShare }}%"></div></div>
@@ -155,10 +161,10 @@
                                     <span class="{{ $avatar }}" aria-hidden="true">{{ strtoupper(substr($person['name'], 0, 1)) }}</span>
                                     <div class="min-w-0 flex-1">
                                         <p class="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{{ $person['name'] }}</p>
-                                        @if ($person['kind'] === 'not_in_yet')
-                                            {{-- Not in yet is a derived fact, not a status or an
-                                            absence: muted text with the scheduled start, under the
-                                            name so a narrow column doesn't truncate the name. --}}
+                                        @if (in_array($person['kind'], ['not_in_yet', 'worked_on_leave'], true))
+                                            {{-- Not in yet and worked on leave are derived facts, not a
+                                            status or an absence: muted text, under the name so a
+                                            narrow column doesn't truncate the name. --}}
                                             <p class="mt-0.5 text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ $person['detail'] }}</p>
                                         @endif
                                     </div>

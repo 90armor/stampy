@@ -3,16 +3,23 @@
 namespace App\Models;
 
 use App\Enums\AttendanceStatus;
+use App\Enums\LeaveHalf;
+use App\Enums\LeaveStatus;
+use App\Services\Attendance\ExpectedWindow;
+use App\Services\Attendance\LeaveDay;
 use App\Support\Duration;
-use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Collection;
 
 class DailyAttendance extends Model
 {
     use HasFactory;
+
+    /** leaveDay()'s answer, once resolved (or preloaded by withLeaveDays()). */
+    private ?LeaveDay $resolvedLeaveDay = null;
 
     protected $fillable = [
         'employee_id',
@@ -112,18 +119,125 @@ class DailyAttendance extends Model
     }
 
     /**
-     * When a punchless person counts as "not in yet": the schedule this row
-     * was built with, start_time plus grace_minutes on work_date, in the app
-     * timezone. Null when the row carries no schedule.
+     * The approved leave on this date, as the builder saw it (LeaveDay): a
+     * full day (a whole-day leave, or an AM and a PM leave together), one
+     * half, or none. leave_id alone can't tell an AM+PM date from an AM one,
+     * so this looks at every approved leave covering the date — one query per
+     * row, or none after withLeaveDays().
      */
-    public function notInYetAfter(): ?CarbonInterface
+    public function leaveDay(): LeaveDay
+    {
+        if ($this->leave_id === null) {
+            return LeaveDay::none();
+        }
+
+        return $this->resolvedLeaveDay ??= LeaveDay::on(
+            Leave::query()
+                ->where('employee_id', $this->employee_id)
+                ->where('status', LeaveStatus::Approved->value)
+                ->whereDate('start_date', '<=', $this->work_date->format('Y-m-d'))
+                ->whereDate('end_date', '>=', $this->work_date->format('Y-m-d'))
+                ->get(),
+            $this->work_date,
+        );
+    }
+
+    /**
+     * Resolves leaveDay() for every row with a leave_id in one query.
+     *
+     * @param  Collection<int, self>  $rows
+     */
+    public static function withLeaveDays(Collection $rows): void
+    {
+        $withLeave = $rows->whereNotNull('leave_id');
+
+        if ($withLeave->isEmpty()) {
+            return;
+        }
+
+        $leaves = Leave::query()
+            ->whereIn('employee_id', $withLeave->pluck('employee_id')->unique())
+            ->where('status', LeaveStatus::Approved->value)
+            ->whereDate('start_date', '<=', $withLeave->max('work_date')->format('Y-m-d'))
+            ->whereDate('end_date', '>=', $withLeave->min('work_date')->format('Y-m-d'))
+            ->get()
+            ->groupBy('employee_id');
+
+        foreach ($withLeave as $row) {
+            $row->resolvedLeaveDay = LeaveDay::on($leaves->get($row->employee_id, collect()), $row->work_date);
+        }
+    }
+
+    /**
+     * When this person was expected at work (ExpectedWindow — the builder's
+     * definition): the schedule's day, or the half worked on a half-day
+     * leave. Null when the row carries no schedule.
+     */
+    public function expectedWindow(): ?ExpectedWindow
     {
         if ($this->workSchedule === null) {
             return null;
         }
 
-        return Carbon::parse($this->work_date->format('Y-m-d').' '.$this->workSchedule->start_time)
-            ->addMinutes($this->workSchedule->grace_minutes);
+        return ExpectedWindow::for($this->workSchedule, $this->work_date, $this->leaveDay()->half);
+    }
+
+    /**
+     * When a punchless person counts as "not in yet": the expected start plus
+     * grace_minutes on work_date, in the app timezone — start_time, or the PM
+     * start on an AM-leave day (Phase 3d). Null when the row carries no
+     * schedule.
+     */
+    public function notInYetAfter(): ?CarbonInterface
+    {
+        return $this->expectedWindow()?->start->copy()->addMinutes($this->workSchedule->grace_minutes);
+    }
+
+    /**
+     * A punchless In progress row still inside its half-day leave (an AM
+     * leave, before the PM start + grace): the person isn't due yet, so the
+     * live strip counts them "on leave", not "due" (Phase 3d).
+     */
+    public function isAwayOnLeaveNow(?CarbonInterface $now = null): bool
+    {
+        $now ??= now();
+        $due = $this->notInYetAfter();
+
+        return $this->status === AttendanceStatus::InProgress
+            && $this->first_in === null
+            && $this->last_out === null
+            && $this->leaveDay()->half === LeaveHalf::Am
+            && $due !== null
+            && $now->lt($due);
+    }
+
+    /**
+     * "Worked on approved leave" (Phase 3d) — a derived display fact, never a
+     * status, like isNotInYet(): someone punched during leave they were
+     * granted. On a full-day leave (an AM plus a PM leave included), any
+     * punch; on an AM leave, an in-punch before break_start; on a PM leave, an
+     * out-punch after the PM start. Arriving at 11:55 on an AM-leave day
+     * counts — it's an annotation, and the admin decides whether to cancel
+     * the leave; the balance is never refunded automatically.
+     */
+    public function workedOnLeave(): bool
+    {
+        $leaveDay = $this->leaveDay();
+
+        if ($leaveDay->fullDay) {
+            return $this->first_in !== null || $this->last_out !== null;
+        }
+
+        $window = $leaveDay->isHalfDay() ? $this->expectedWindow() : null;
+
+        if ($window?->breakStart === null) {
+            return false;
+        }
+
+        return match ($leaveDay->half) {
+            LeaveHalf::Am => $this->first_in !== null && $this->first_in->lt($window->breakStart),
+            LeaveHalf::Pm => $this->last_out !== null && $this->last_out->gt($window->breakEnd),
+        };
     }
 
     /**

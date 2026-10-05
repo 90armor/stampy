@@ -11,6 +11,7 @@ use App\Models\Holiday;
 use App\Services\Attendance\DailySummaryBuilder;
 use App\Support\AttendanceTime;
 use App\Support\DisplayDate;
+use App\Support\LeaveDays;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
@@ -489,17 +490,27 @@ class Show extends Component
 
         $counts = $records->countBy(fn (DailyAttendance $row) => $row->status->value);
 
+        // A day of leave is still one of the workdays (Phase 3d, rule 20), so
+        // "3 of 22 workdays taken as leave" is true.
         $workdayStatuses = [
-            AttendanceStatus::Present->value,
-            AttendanceStatus::Absent->value,
-            AttendanceStatus::Incomplete->value,
+            AttendanceStatus::Present,
+            AttendanceStatus::Absent,
+            AttendanceStatus::Incomplete,
+            AttendanceStatus::Leave,
         ];
+        $workdays = $records->filter(fn (DailyAttendance $row) => in_array($row->status, $workdayStatuses, true));
+        DailyAttendance::withLeaveDays($workdays);
 
         return [
-            'workdays' => $records->whereIn('status', array_map(
-                fn (string $value) => AttendanceStatus::from($value),
-                $workdayStatuses
-            ))->count(),
+            'workdays' => $workdays->count(),
+            // Leave taken on those workdays, in tenths of a day (LeaveDays): a
+            // full day 1, a half day 0.5 — a half-day Present day counts once
+            // in workdays and 0.5 here. An off day or holiday inside a leave
+            // costs nothing, so it isn't a workday and isn't counted.
+            'leave_tenths' => $workdays->whereNotNull('leave_id')->sum(
+                fn (DailyAttendance $row) => $row->leaveDay()->fullDay ? LeaveDays::DAY : LeaveDays::HALF
+            ),
+            'leave' => $counts->get(AttendanceStatus::Leave->value, 0),
             'present' => $counts->get(AttendanceStatus::Present->value, 0),
             // "of which N late" is a breakdown of Present, so only Present
             // days count here, even though since Phase 2.6 an incomplete day

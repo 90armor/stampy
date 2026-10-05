@@ -119,8 +119,9 @@
             <div class="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
                 {{-- "Calculated workdays", not "Workdays" — this only counts
                 days the builder has already processed (present+absent+
-                incomplete rows that exist — a late/early day is already a
-                present row, not a fourth category), not every scheduled
+                incomplete rows that exist, plus leave days since Phase 3d —
+                a late/early day is already a present row, not a fourth
+                category), not every scheduled
                 workday in the month. A month that's only partly built would
                 otherwise read as having far fewer workdays than it actually
                 has. --}}
@@ -162,6 +163,11 @@
                         <span class="text-xs text-slate-500 dark:text-slate-400">({{ $summary['incomplete_late'] }} late)</span>
                     @endif
                 </span>
+                {{-- Leave days are workdays too (Phase 3d): full days 1, half days 0.5.
+                Plain for now; 3e designs the leave annotations. --}}
+                @if ($summary['leave_tenths'] > 0)
+                    <span class="text-slate-500 dark:text-slate-400">Leave <strong class="font-semibold text-slate-900 dark:text-slate-100">{{ \App\Support\LeaveDays::format($summary['leave_tenths']) }}</strong></span>
+                @endif
             </div>
 
             @if ($summary['total_worked_minutes'] > 0)
