@@ -19,10 +19,6 @@
 
         @if ($step === 'form')
             <form id="leave-request-form" wire:submit="review" class="space-y-4 px-4 py-4 sm:px-6">
-                @error('leave')
-                    <div class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-900">{{ $message }}</div>
-                @enderror
-
                 @if ($forOthers)
                     <div>
                         <x-input-label for="leave_employee_search" value="Employee" />
@@ -65,17 +61,21 @@
                     <x-input-error :messages="$errors->get('leave_type_id')" class="{{ $fieldError }}" />
                 </div>
 
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                        <x-input-label for="leave_start" value="From" />
-                        <x-date-picker id="leave_start" model="start_date" label="First day" :min="$minDate" :max="$maxDate" />
-                        <x-input-error :messages="$errors->get('start_date')" class="{{ $fieldError }}" />
+                <div>
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                            <x-input-label for="leave_start" value="From" />
+                            <x-date-picker id="leave_start" model="start_date" label="First day" :min="$minDate" :max="$maxDate" />
+                        </div>
+                        <div>
+                            <x-input-label for="leave_end" value="To" />
+                            <x-date-picker id="leave_end" model="end_date" label="Last day" :min="$minDate" :max="$maxDate" placeholder="Same day" clearable />
+                        </div>
                     </div>
-                    <div>
-                        <x-input-label for="leave_end" value="To" />
-                        <x-date-picker id="leave_end" model="end_date" label="Last day" :min="$minDate" :max="$maxDate" placeholder="Same day" clearable />
-                        <x-input-error :messages="$errors->get('end_date')" class="{{ $fieldError }}" />
-                    </div>
+                    {{-- The dates' errors, and the request-as-a-whole ones (balance), full
+                    width under the row: an overlap or a shortfall is about the dates
+                    together, and a long message wrapped badly inside one column. --}}
+                    <x-input-error :messages="array_merge($errors->get('start_date'), $errors->get('end_date'), $errors->get('leave'))" class="{{ $fieldError }}" />
                 </div>
 
                 <div
@@ -101,7 +101,8 @@
             </form>
 
             <div class="mx-4 flex items-center justify-end gap-3 border-t border-slate-divider py-4 sm:mx-6">
-                <x-button type="button" variant="secondary" wire:click="close">Cancel</x-button>
+                {{-- "Close", not "Cancel": on Time off, cancel means cancelling leave. --}}
+                <x-button type="button" variant="secondary" wire:click="close">Close</x-button>
                 <x-button type="submit" form="leave-request-form" variant="primary" wire:loading.attr="disabled" wire:target="review">
                     <span wire:loading.remove wire:target="review">Review</span>
                     <span wire:loading wire:target="review">Checking&hellip;</span>

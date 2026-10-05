@@ -103,7 +103,7 @@
                     </div>
                 </div>
                 <div class="mx-4 flex items-center justify-end gap-3 border-t border-slate-divider py-4 sm:mx-6">
-                    <x-button type="button" variant="secondary" wire:click="$set('showDecision', false)">Cancel</x-button>
+                    <x-button type="button" variant="secondary" wire:click="$set('showDecision', false)">Close</x-button>
                     <x-button type="submit" :variant="$decision === 'reject' ? 'danger' : 'primary'" wire:loading.attr="disabled" wire:target="decide">
                         {{ $decision === 'reject' ? 'Reject' : 'Approve' }}
                     </x-button>

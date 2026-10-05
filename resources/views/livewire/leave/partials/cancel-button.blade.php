@@ -6,6 +6,8 @@ rendered where LeavePolicy::cancel allows it. --}}
         title: 'Cancel this leave?',
         message: @js('Cancel your '.$leave->leaveType->name.' leave for '.$label.'? Its days go back to your balance.'),
         confirmText: 'Cancel leave',
+        {{-- Never a bare "Cancel" to dismiss: on Time off it means cancelling leave. --}}
+        cancelText: 'Keep leave',
         method: 'cancel',
         args: [{{ $leave->id }}],
     })"

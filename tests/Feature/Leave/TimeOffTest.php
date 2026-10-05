@@ -132,6 +132,27 @@ class TimeOffTest extends TestCase
         $this->assertSame('2026-06-23', $leave->end_date->format('Y-m-d'));
     }
 
+    public function test_dismiss_labels_never_say_a_bare_cancel_and_date_errors_sit_under_the_date_row(): void
+    {
+        app(LeaveRequestService::class)->submit($this->employee, $this->annual, Carbon::parse('2026-06-22'), Carbon::parse('2026-06-22'), null, null, $this->employee->user);
+
+        // The cancel-leave confirmation: "Keep leave" / "Cancel leave".
+        Livewire::actingAs($this->employee->user)->test(TimeOff::class)
+            ->assertSeeHtml("confirmText: 'Cancel leave'")
+            ->assertSeeHtml("cancelText: 'Keep leave'");
+
+        // The overlap error: in the full-width slot after the date row, not inside the From column.
+        $html = $this->modal()->call('open')
+            ->set('leave_type_id', $this->annual->id)
+            ->set('start_date', '2026-06-22')
+            ->call('review')
+            ->html();
+        $this->assertMatchesRegularExpression('/wire:click="close"[^>]*>\s*Close\s*</', $html);
+        $this->assertDoesNotMatchRegularExpression('/>\s*Cancel\s*<\/button>/', $html);
+        // The To picker, the end of its column, the end of the grid row, then the error list.
+        $this->assertMatchesRegularExpression('/id="leave_end-native".*?<\/div>\s*<\/div>\s*<\/div>(?:(?!<div).)*<li>These dates overlap your pending Annual leave/s', $html);
+    }
+
     public function test_service_errors_land_on_their_fields(): void
     {
         // More than the 20 available: the balance error is the form's own.
