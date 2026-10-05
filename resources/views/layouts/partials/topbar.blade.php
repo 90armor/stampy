@@ -1,7 +1,13 @@
 <div class="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-x-4 border-b border-slate-border bg-white/70 backdrop-blur-xl px-4 sm:px-6 dark:bg-slate-800/60">
-    <button type="button" class="rounded-lg p-2 text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:hidden dark:text-slate-400" @click="openSidebar()">
-        <span class="sr-only">Open sidebar</span>
+    @php $waiting = \App\Support\ApprovalBadge::count(auth()->user()); @endphp
+    {{-- Below lg the sidebar is a drawer, so its Approvals badge is hidden until
+    opened: a dot on the menu button says something is waiting (Phase 3e). --}}
+    <button type="button" class="relative rounded-lg p-2 text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:hidden dark:text-slate-400" @click="openSidebar()">
+        <span class="sr-only">Open sidebar{{ $waiting > 0 ? ' — '.$waiting.' '.Str::plural('approval', $waiting).' waiting' : '' }}</span>
         <x-icon name="bars-3" class="w-6 h-6" />
+        @if ($waiting > 0)
+            <span class="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-primary-600 dark:bg-primary-400" aria-hidden="true"></span>
+        @endif
     </button>
 
     <div class="flex flex-1 items-center justify-between">
