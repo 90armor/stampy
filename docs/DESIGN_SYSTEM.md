@@ -62,6 +62,23 @@ Attendance color is model-driven. `DailyAttendance::displayVariant()` is the sou
 
 **Color = status only; co-occurring attributes are annotations.** A cell or badge color encodes one value per record — its status. Attributes that can co-occur with that status on the same record (attendance timing exceptions now, partial leave later) are annotations inside the cell, never the cell or badge color. For attendance timing the annotation is the timing text color (`amber-700` light, `amber-300` dark, medium weight) on the specific value; see [Attendance UI](ATTENDANCE_UI.md). In dense grids (the attendance calendar) **fill emphasizes exceptions**: the common, expected status (Present) uses the neutral surface with a colored number and icon, and only exception statuses get a tinted fill; a non-working state (Off) is quieter still — no fill and a dashed boundary.
 
+**Leave request status badges.** A leave request has its own status, separate from attendance, and one badge per request from `LeaveStatus::badgeColor()` — the only place it's chosen:
+
+| Request status | Badge | Why |
+|---|---|---|
+| Pending | `amber` | Waiting on someone — the alert role |
+| Approved | `green` | Done, in the request's favour |
+| Rejected | `red` | Done, against it; the decision's note is shown beside it |
+| Cancelled | `slate` | No longer in effect — the quietest |
+
+Annotations stay separate badges, never a recolouring of the status: `New` (`primary`) on a request decided since the employee last opened Time off, and `Stuck` (`amber`, the same alert role as Pending) on an override an admin should step in on.
+
+**Why Pending's amber doesn't clash with timing's amber.** Amber has two roles, kept apart by form and by place:
+- **The timing annotation is amber *text*** (`amber-700` / `amber-300`, medium weight) on one value — a late In time, a Late or Early figure — and only in attendance views. It is never a badge and never a fill.
+- **An amber *badge*** (tinted pill, ring, label) is the alert role: something is waiting on someone. Pending and Stuck are this role, and they appear only on leave requests (Time off, Approvals, the dashboard), never in an attendance cell.
+
+The two can't meet on one record: a pending request never reaches attendance at all (the builder reads approved leave only), and approved leave shows in attendance as the accent `Leave` status, not as a request badge. A reader who sees amber text on a time reads "timing"; one who sees an amber pill that says "Pending" reads "waiting" — the label always says which. For the same reason a request's green Approved never sits beside attendance's green Present: on the attendance side, that leave is accent.
+
 ## Typography
 
 - Inter is the primary UI font through `font-sans`, with system sans-serif fallbacks.
