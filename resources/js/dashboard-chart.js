@@ -107,6 +107,9 @@ function initAttendanceTrendChart() {
             responsive: true,
             maintainAspectRatio: false,
             animation: reducedMotion ? false : undefined,
+            // Room above a full bar for its marker ("Today" over a 100%
+            // provisional bar), which is drawn above the bar's top.
+            layout: { padding: { top: 18 } },
             plugins: {
                 legend: { display: false },
                 markerLabels: { markers, color: muted },

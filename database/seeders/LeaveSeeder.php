@@ -79,7 +79,9 @@ class LeaveSeeder extends Seeder
         // balance too — granted early, as `leave:grant --year=` would.
         $kaung = $this->employee('EMP-0012');
         app(LeaveGranter::class)->grant($kaung, $today->year + 1, $today);
-        $this->submit($kaung, $this->annual, Carbon::create($today->year, 12, 29), Carbon::create($today->year + 1, 1, 2), null, 'New Year with family');
+        // From the last week of December to the first workday from 5 Jan, so
+        // both years are charged (1 Jan is a holiday, and the 2nd may be a weekend).
+        $this->submit($kaung, $this->annual, $this->workday($kaung, Carbon::create($today->year, 12, 28)), $this->workday($kaung, Carbon::create($today->year + 1, 1, 5)), null, 'New Year with family');
 
         // Su Myat Noe (EMP-0019): Special, deducted from Annual.
         $suMyat = $this->employee('EMP-0019');
