@@ -24,7 +24,7 @@
                         @if ($action === 'deactivate')
                             Deactivate {{ $employee->full_name }}? They will no longer appear in active lists. Attendance history up to their last day is preserved.
                         @else
-                            Reactivate {{ $employee->full_name }}? They will appear in active lists again, and the days since {{ \App\Support\DisplayDate::compact($employee->left_on) }} count as workdays again.
+                            Reactivate {{ $employee->full_name }}? They will appear in active lists again, and the days since {{ \App\Support\DisplayDate::compact($employee->left_on) }} count as workdays again. Leave cancelled or shortened when they were deactivated isn't restored.
                         @endif
                     </p>
                 </div>
@@ -36,6 +36,24 @@
                     <x-date-picker id="status_left_on" model="left_on" label="Last day" :min="$employee->join_date->format('Y-m-d')" :max="today()->format('Y-m-d')" />
                     <x-input-error :messages="$errors->get('left_on')" class="mt-1" />
                 </div>
+
+                {{-- The first Deactivate lists what it will do to leave after the last day;
+                the second writes it (Employees\StatusModal). --}}
+                @if ($affectedLeaves !== [])
+                    <div class="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-200 dark:ring-amber-500/30">
+                        <p class="font-medium">Leave after their last day will change:</p>
+                        <ul class="mt-2 space-y-1">
+                            @foreach ($affectedLeaves as $affected)
+                                @php
+                                    $change = $affected['action'] === 'cancel'
+                                        ? 'cancelled'
+                                        : 'shortened to end '.\App\Support\DisplayDate::compact(\Carbon\Carbon::parse($affected['end']));
+                                @endphp
+                                <li>{{ $affected['type'] }} · {{ $affected['dates'] }} ({{ $affected['status'] }}) — {{ $change }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
             @endif
 
             {{-- The status change already happened whenever this shows — only
@@ -53,7 +71,13 @@
                 @else
                     <x-button type="button" variant="secondary" wire:click="close" wire:loading.attr="disabled" wire:target="confirm">Cancel</x-button>
                     <x-button type="submit" variant="danger" wire:loading.attr="disabled" wire:target="confirm">
-                        {{ $action === 'deactivate' ? 'Deactivate' : 'Reactivate' }}
+                        @if ($action === 'reactivate')
+                            Reactivate
+                        @elseif ($affectedLeaves !== [])
+                            Deactivate and adjust {{ count($affectedLeaves) }} {{ Str::plural('leave', count($affectedLeaves)) }}
+                        @else
+                            Deactivate
+                        @endif
                     </x-button>
                 @endif
             </div>

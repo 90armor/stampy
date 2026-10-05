@@ -2,8 +2,10 @@
 
 namespace App\Livewire\Employees;
 
+use App\Exceptions\AffectedLeavesChangedException;
 use App\Models\Employee;
 use App\Services\EmployeeLifecycle;
+use App\Services\Leave\LeaveRequestService;
 use App\Support\DisplayDate;
 use Carbon\Carbon;
 use Livewire\Attributes\On;
@@ -20,6 +22,12 @@ use Livewire\Component;
  * Alpine-only and closes the moment it's confirmed, so it could show neither
  * a server-side error on the last-day field (before the join date) nor the
  * rebuild warning EmployeeLifecycle can return.
+ *
+ * Deactivating can change leave (LeaveRequestService::deactivationEffects()),
+ * so it is a two-step confirm when it does: the first Deactivate lists the
+ * leaves that will be cancelled or shortened, without writing; the second
+ * writes — unless the list changed in between (re-shown, asked again).
+ * Changing the date starts over. With no leave affected it's one click.
  */
 class StatusModal extends Component
 {
@@ -39,6 +47,22 @@ class StatusModal extends Component
      * until the modal is closed.
      */
     public ?string $rebuildError = null;
+
+    /**
+     * The affected leaves shown for confirmation, and the last day they were
+     * computed for — empty until a deactivation would change some.
+     *
+     * @var list<array<string, mixed>>
+     */
+    public array $affectedLeaves = [];
+
+    public ?string $affectedFor = null;
+
+    /** A new last day means a different list: back to the first step. */
+    public function updatedLeftOn(): void
+    {
+        $this->reset(['affectedLeaves', 'affectedFor']);
+    }
 
     #[On('deactivate-employee')]
     public function openDeactivate(int $id): void
@@ -61,7 +85,7 @@ class StatusModal extends Component
         $this->open($employee, 'reactivate');
     }
 
-    public function confirm(EmployeeLifecycle $lifecycle): void
+    public function confirm(EmployeeLifecycle $lifecycle, LeaveRequestService $leaves): void
     {
         abort_if($this->employee === null, 404);
 
@@ -82,7 +106,26 @@ class StatusModal extends Component
                 'left_on.before_or_equal' => 'The last day can\'t be in the future.',
             ]);
 
-            $result = $lifecycle->deactivate($this->employee, Carbon::parse($this->left_on));
+            $leftOn = Carbon::parse($this->left_on);
+            $effects = $leaves->deactivationEffects($this->employee, $leftOn);
+            $alreadyShown = $this->affectedFor === $this->left_on
+                && LeaveRequestService::effectsKey($effects) === LeaveRequestService::effectsKey($this->affectedLeaves);
+
+            if ($effects !== [] && ! $alreadyShown) {
+                $this->affectedLeaves = $effects;
+                $this->affectedFor = $this->left_on;
+
+                return;
+            }
+
+            try {
+                $result = $lifecycle->deactivate($this->employee, $leftOn, auth()->user(), $effects);
+            } catch (AffectedLeavesChangedException $e) {
+                $this->affectedLeaves = $e->effects();
+                $this->affectedFor = $this->left_on;
+
+                return;
+            }
         } else {
             $this->authorize('update', $this->employee);
 
@@ -105,14 +148,14 @@ class StatusModal extends Component
     public function close(): void
     {
         $this->showModal = false;
-        $this->reset(['employee', 'left_on', 'rebuildError']);
+        $this->reset(['employee', 'left_on', 'rebuildError', 'affectedLeaves', 'affectedFor']);
         $this->resetErrorBag();
     }
 
     private function open(Employee $employee, string $action): void
     {
         $this->resetErrorBag();
-        $this->reset(['left_on', 'rebuildError']);
+        $this->reset(['left_on', 'rebuildError', 'affectedLeaves', 'affectedFor']);
         $this->employee = $employee;
         $this->action = $action;
         $this->showModal = true;

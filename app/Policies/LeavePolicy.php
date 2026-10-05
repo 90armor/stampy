@@ -2,8 +2,11 @@
 
 namespace App\Policies;
 
+use App\Enums\LeaveStatus;
 use App\Models\Employee;
+use App\Models\Leave;
 use App\Models\User;
+use App\Services\Approval\ApprovalFlow;
 
 /**
  * Who may do what with leave (CLAUDE.md, Phase 3, Authorization). The
@@ -11,9 +14,48 @@ use App\Models\User;
  */
 class LeavePolicy
 {
+    /**
+     * Anyone with something to see: admins and managers, and anyone with an
+     * employee record (their own leave). Which leaves a list shows is
+     * Leave::scopeVisibleTo(), through EmployeeScope.
+     */
+    public function viewAny(User $user): bool
+    {
+        return $user->hasAnyRole(['admin', 'manager']) || $user->employee !== null;
+    }
+
+    /** Mirrors EmployeePolicy::view: their own, their reports' (a manager's), anyone's (an admin's). */
+    public function view(User $user, Leave $leave): bool
+    {
+        return $user->can('view', $leave->employee);
+    }
+
     /** For themself, or an admin for anyone — including employees with no login. */
     public function create(User $user, Employee $employee): bool
     {
         return $user->hasRole('admin') || $user->employee?->is($employee) === true;
+    }
+
+    /** A pending request at a step this user may decide (ApprovalFlow::canDecide()). */
+    public function approve(User $user, Leave $leave): bool
+    {
+        return $leave->status === LeaveStatus::Pending && app(ApprovalFlow::class)->canDecide($user, $leave);
+    }
+
+    /**
+     * A pending or approved leave: by the requester (the employee it's for)
+     * while it hasn't started yet, by an admin at any time.
+     */
+    public function cancel(User $user, Leave $leave): bool
+    {
+        if (! in_array($leave->status, [LeaveStatus::Pending, LeaveStatus::Approved], true)) {
+            return false;
+        }
+
+        if ($user->hasRole('admin')) {
+            return true;
+        }
+
+        return $user->employee?->is($leave->employee) === true && today()->lt($leave->start_date);
     }
 }

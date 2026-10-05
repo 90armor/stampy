@@ -3,10 +3,13 @@
 namespace App\Services;
 
 use App\Models\Employee;
+use App\Models\User;
 use App\Services\Attendance\DailySummaryBuilder;
 use App\Services\Attendance\EmployeeScheduleAssigner;
+use App\Services\Leave\LeaveRequestService;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -27,20 +30,36 @@ use Throwable;
  * period is one unbroken span again and the gap days become ordinary days
  * (absent if punchless). A rehire — a second employment period — isn't
  * modelled (CLAUDE.md, Employee lifecycle).
+ *
+ * Deactivating also settles the employee's pending and approved leaves after
+ * left_on, in the same write (LeaveRequestService::applyDeactivation()): one
+ * that starts after it is cancelled, one that spans it is cut to end on it (or
+ * cancelled, if nothing working is left). Reactivating doesn't restore them.
  */
 class EmployeeLifecycle
 {
     public function __construct(
         private DailySummaryBuilder $builder,
         private EmployeeScheduleAssigner $assigner,
+        private LeaveRequestService $leaves,
     ) {}
 
     /**
+     * $expectedLeaveEffects is the list of affected leaves the admin was shown
+     * (LeaveRequestService::deactivationEffects()); if it no longer matches,
+     * nothing is written (AffectedLeavesChangedException). Null skips the check.
+     *
+     * @param  list<array<string, mixed>>|null  $expectedLeaveEffects
      * @return array{days: int, rebuildError: ?string}
      */
-    public function deactivate(Employee $employee, CarbonInterface $leftOn): array
+    public function deactivate(Employee $employee, CarbonInterface $leftOn, ?User $actor = null, ?array $expectedLeaveEffects = null): array
     {
-        $employee->update(['status' => 'inactive', 'left_on' => $leftOn->format('Y-m-d')]);
+        DB::transaction(function () use ($employee, $leftOn, $actor, $expectedLeaveEffects) {
+            Employee::query()->lockForUpdate()->findOrFail($employee->id);
+
+            $this->leaves->applyDeactivation($employee, $leftOn, $actor, $expectedLeaveEffects);
+            $employee->update(['status' => 'inactive', 'left_on' => $leftOn->format('Y-m-d')]);
+        });
 
         return $this->rebuildAfter($employee, Carbon::instance($leftOn), 'Deactivation');
     }

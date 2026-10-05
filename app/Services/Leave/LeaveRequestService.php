@@ -6,7 +6,9 @@ use App\Enums\ApprovalOutcome;
 use App\Enums\LeaveCounting;
 use App\Enums\LeaveHalf;
 use App\Enums\LeaveStatus;
+use App\Exceptions\AffectedLeavesChangedException;
 use App\Exceptions\LeaveValidationException;
+use App\Exceptions\StaleLeaveDecisionException;
 use App\Models\Employee;
 use App\Models\Leave;
 use App\Models\LeaveEntitlement;
@@ -19,6 +21,7 @@ use App\Support\DisplayDate;
 use App\Support\LeaveDays;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
@@ -116,6 +119,209 @@ class LeaveRequestService
         });
 
         return ['leave' => $leave, 'rebuildError' => $leave->status === LeaveStatus::Approved ? $this->rebuild($leave, 'approval') : null];
+    }
+
+    /**
+     * Approves the step the request is waiting at. A manager's step-1 approval
+     * moves it to step 2 (or, for a sole admin's own request, self_approved and
+     * done); an admin's decision at step 1 completes both steps; step 2's
+     * approval completes the request, which then rebuilds its days.
+     * $expectedStep is the step the actor saw: if the request has moved on, the
+     * decision fails cleanly (StaleLeaveDecisionException).
+     *
+     * @return array{leave: Leave, rebuildError: ?string}
+     */
+    public function approve(Leave $leave, User $actor, ?string $note = null, ?int $expectedStep = null): array
+    {
+        $leave = $this->decide($leave, $actor, $expectedStep, function (Leave $leave) use ($actor, $note) {
+            if ($this->flow->decidesBothSteps($actor, $leave)) {
+                $this->flow->record($leave, ApprovalFlow::MANAGER_STEP, ApprovalOutcome::Approved, $actor, $note);
+                $this->flow->record($leave, ApprovalFlow::ADMIN_STEP, ApprovalOutcome::Approved, $actor, $note);
+                $leave->update(['status' => LeaveStatus::Approved, 'current_step' => null]);
+
+                return;
+            }
+
+            $this->flow->record($leave, $leave->current_step, ApprovalOutcome::Approved, $actor, $note);
+
+            if ($leave->current_step === ApprovalFlow::MANAGER_STEP) {
+                $this->moveToStepTwo($leave);
+
+                return;
+            }
+
+            $leave->update(['status' => LeaveStatus::Approved, 'current_step' => null]);
+        });
+
+        return ['leave' => $leave, 'rebuildError' => $leave->status === LeaveStatus::Approved ? $this->rebuild($leave, 'approval') : null];
+    }
+
+    /**
+     * Rejects at the step the request is waiting at, which ends it. Nothing to
+     * rebuild: a pending leave never touched attendance.
+     */
+    public function reject(Leave $leave, User $actor, ?string $note = null, ?int $expectedStep = null): Leave
+    {
+        return $this->decide($leave, $actor, $expectedStep, function (Leave $leave) use ($actor, $note) {
+            $this->flow->record($leave, $leave->current_step, ApprovalOutcome::Rejected, $actor, $note);
+            $leave->update(['status' => LeaveStatus::Rejected, 'current_step' => null]);
+        });
+    }
+
+    /**
+     * Cancels a pending or approved leave (LeavePolicy::cancel: the requester
+     * before it starts, an admin any time). Its steps stay as they are. A
+     * cancelled approved leave rebuilds its days.
+     *
+     * @return array{leave: Leave, rebuildError: ?string}
+     */
+    public function cancel(Leave $leave, User $actor): array
+    {
+        $wasApproved = false;
+
+        $leave = DB::transaction(function () use ($leave, $actor, &$wasApproved) {
+            $leave = $this->lock($leave);
+
+            if (! in_array($leave->status, [LeaveStatus::Pending, LeaveStatus::Approved], true)) {
+                throw StaleLeaveDecisionException::noLongerPending($leave->status->value);
+            }
+
+            Gate::forUser($actor)->authorize('cancel', $leave);
+
+            $wasApproved = $leave->status === LeaveStatus::Approved;
+            $this->markCancelled($leave, $actor);
+
+            return $leave;
+        });
+
+        return ['leave' => $leave, 'rebuildError' => $wasApproved ? $this->rebuild($leave, 'cancellation') : null];
+    }
+
+    /**
+     * What deactivating $employee with this last day does to their pending
+     * and approved leaves after it — listed for the admin before they confirm
+     * (Employees\StatusModal), then applied in the same write
+     * (applyDeactivation()). A leave that starts after left_on is cancelled; one
+     * that spans it is cut to end on left_on, or cancelled if that leaves it
+     * costing nothing. Reactivating doesn't restore them.
+     *
+     * @return list<array{id: int, type: string, dates: string, status: string, action: string, end: ?string}>
+     */
+    public function deactivationEffects(Employee $employee, CarbonInterface $leftOn): array
+    {
+        $leftOn = Carbon::instance($leftOn)->startOfDay();
+
+        return Leave::query()
+            ->where('employee_id', $employee->id)
+            ->whereIn('status', [LeaveStatus::Pending->value, LeaveStatus::Approved->value])
+            ->whereDate('end_date', '>', $leftOn->format('Y-m-d'))
+            ->with('leaveType')
+            ->orderBy('start_date')
+            ->orderBy('id')
+            ->get()
+            ->map(function (Leave $leave) use ($employee, $leftOn) {
+                $keepsDays = $leave->start_date->lte($leftOn)
+                    && array_sum($this->counter->count($employee, $leave->leaveType, $leave->start_date, $leftOn, $leave->isHalfDay())) > 0;
+
+                return [
+                    'id' => $leave->id,
+                    'type' => $leave->leaveType->name,
+                    'dates' => $leave->start_date->eq($leave->end_date) ? DisplayDate::compact($leave->start_date) : DisplayDate::range($leave->start_date, $leave->end_date),
+                    'status' => $leave->status->value,
+                    'action' => $keepsDays ? 'shorten' : 'cancel',
+                    'end' => $keepsDays ? $leftOn->format('Y-m-d') : null,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Applies deactivationEffects() inside the caller's transaction (the
+     * employee row already locked — EmployeeLifecycle::deactivate()). With
+     * $expected (what the admin was shown), a different list throws
+     * AffectedLeavesChangedException and nothing is written.
+     *
+     * @param  list<array<string, mixed>>|null  $expected
+     */
+    public function applyDeactivation(Employee $employee, CarbonInterface $leftOn, ?User $actor, ?array $expected = null): void
+    {
+        $effects = $this->deactivationEffects($employee, $leftOn);
+
+        if ($expected !== null && self::effectsKey($effects) !== self::effectsKey($expected)) {
+            throw new AffectedLeavesChangedException($effects);
+        }
+
+        foreach ($effects as $effect) {
+            $leave = Leave::query()->lockForUpdate()->findOrFail($effect['id']);
+
+            if ($effect['action'] === 'cancel') {
+                $this->markCancelled($leave, $actor);
+            } else {
+                $leave->update(['end_date' => $effect['end']]);
+            }
+        }
+    }
+
+    /**
+     * Two effect lists describe the same change.
+     *
+     * @param  list<array<string, mixed>>  $effects
+     */
+    public static function effectsKey(array $effects): string
+    {
+        return collect($effects)->map(fn (array $effect) => $effect['id'].':'.$effect['action'].':'.$effect['end'])->implode('|');
+    }
+
+    /**
+     * The shared shape of approve() and reject(): lock, check the request is
+     * still where the actor saw it, authorize, apply. A double decision that
+     * slips past the check hits approval_steps' unique index, reported the
+     * same way.
+     */
+    private function decide(Leave $leave, User $actor, ?int $expectedStep, callable $apply): Leave
+    {
+        return DB::transaction(function () use ($leave, $actor, $expectedStep, $apply) {
+            $leave = $this->lock($leave);
+
+            if ($leave->status !== LeaveStatus::Pending) {
+                throw StaleLeaveDecisionException::noLongerPending($leave->status->value);
+            }
+
+            if ($expectedStep !== null && $leave->current_step !== $expectedStep) {
+                throw StaleLeaveDecisionException::movedOn();
+            }
+
+            Gate::forUser($actor)->authorize('approve', $leave);
+
+            try {
+                $apply($leave);
+            } catch (UniqueConstraintViolationException) {
+                throw StaleLeaveDecisionException::movedOn();
+            }
+
+            return $leave;
+        });
+    }
+
+    /** The employee row first, then the leave — always in that order. */
+    private function lock(Leave $leave): Leave
+    {
+        $employee = Employee::query()->lockForUpdate()->findOrFail($leave->employee_id);
+        $leave = Leave::query()->lockForUpdate()->findOrFail($leave->id);
+        $leave->setRelation('employee', $employee);
+
+        return $leave;
+    }
+
+    private function markCancelled(Leave $leave, ?User $actor): void
+    {
+        $leave->update([
+            'status' => LeaveStatus::Cancelled,
+            'current_step' => null,
+            'cancelled_by' => $actor?->id,
+            'cancelled_at' => now(),
+        ]);
     }
 
     /**

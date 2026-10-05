@@ -7,6 +7,8 @@ use App\Enums\LeaveHalf;
 use App\Enums\LeaveStatus;
 use App\Exceptions\InvalidLeaveException;
 use App\Exceptions\InvalidLeaveTransitionException;
+use App\Support\EmployeeScope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -136,6 +138,18 @@ class Leave extends Model implements Approvable
     public function currentApprovalStep(): ?int
     {
         return $this->status === LeaveStatus::Pending ? $this->current_step : null;
+    }
+
+    /**
+     * The leaves $user may see in a list — EmployeeScope's rule, the same as
+     * every other list: an admin everyone's, a manager their team's, anyone
+     * else their own.
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        $ids = EmployeeScope::for($user, 'Leave list')->ids;
+
+        return $ids === null ? $query : $query->whereIn('employee_id', $ids);
     }
 
     public function isHalfDay(): bool
