@@ -148,6 +148,23 @@
             </div>
 
             <div class="contents xl:flex xl:min-w-0 xl:flex-col xl:gap-6">
+                {{-- Approvers (Phase 3e): gated on the Approvals page's own
+                ability through ApprovalBadge, which is 0 without it — and
+                hidden at 0. First below xl too: on a phone it's the one
+                notification there is. --}}
+                @if (($waitingApprovals = \App\Support\ApprovalBadge::count(auth()->user())) > 0)
+                    <x-card class="order-first">
+                        <h2 class="{{ $cardTitle }}">Pending approvals</h2>
+                        <p class="mt-2 flex items-baseline gap-x-2">
+                            <span class="text-3xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ $waitingApprovals }}</span> <span class="text-sm text-slate-500 dark:text-slate-400">leave {{ $waitingApprovals === 1 ? 'request' : 'requests' }} you can decide</span>
+                        </p>
+                        <x-button :href="route('approvals.index')" variant="secondary" wire:navigate class="mt-4">
+                            Review requests
+                            <x-icon name="chevron-right" class="h-5 w-5" />
+                        </x-button>
+                    </x-card>
+                @endif
+
                 <x-card class="order-1">
                     <div class="{{ $cardHeader }}">
                         <h2 class="{{ $cardTitle }}">Needs attention</h2>
@@ -235,6 +252,116 @@
                         </ul>
                     </x-card>
                 @endif
+            </div>
+        </div>
+    @elseif ($mine)
+        @php
+            $cardHeader = 'flex items-baseline justify-between gap-4';
+            $cardTitle = 'text-lg font-semibold text-slate-900 dark:text-slate-100';
+            $cardMeta = 'shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400';
+            $row = 'flex items-baseline justify-between gap-4 border-t border-slate-divider py-2.5 first:border-t-0 first:pt-0 last:pb-0';
+            $link = 'rounded text-sm font-medium text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-2 hover:decoration-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:decoration-primary-700 dark:hover:decoration-primary-400';
+            $month = $mine['month'];
+            // The same "of which" breakdowns as My attendance's summary, built
+            // as one string (Blade keeps the whitespace between directives).
+            $presentNote = implode(' · ', array_filter([
+                $month['late'] > 0 ? $month['late'].' late' : null,
+                $month['early_leave_days'] > 0 ? $month['early_leave_days'].' left early' : null,
+            ]));
+            $monthRows = array_filter([
+                'Present' => [$month['present'], $presentNote !== '' ? 'of which '.$presentNote : null],
+                'Absent' => [$month['absent'], null],
+                'Incomplete' => [$month['incomplete'], $month['incomplete_late'] > 0 ? $month['incomplete_late'].' late' : null],
+                'On leave' => $month['leave'] > 0 ? [$month['leave'], null] : null,
+            ]);
+        @endphp
+
+        {{-- The employee dashboard (Phase 3e): their leave on the left, the
+        month on the right from lg; one column below, in reading order. Two
+        independent stacks, so a short card never leaves a hole. --}}
+        <div class="grid gap-6 lg:grid-cols-2 lg:items-start">
+            <div class="flex min-w-0 flex-col gap-6">
+                <x-card>
+                    <div class="{{ $cardHeader }}">
+                        <h2 class="{{ $cardTitle }}">Leave balance</h2>
+                        <p class="{{ $cardMeta }}">{{ today()->year }}</p>
+                    </div>
+                    @if (count($mine['balances']))
+                        <dl class="mt-4">
+                            @foreach ($mine['balances'] as $balance)
+                                <div class="{{ $row }}">
+                                    <dt class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $balance['name'] }}</dt>
+                                    @if ($balance['usableFrom'] === null)
+                                        <dd class="text-sm tabular-nums text-slate-500 dark:text-slate-400"><span class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ \App\Support\LeaveDays::format($balance['available']) }}</span> available</dd>
+                                    @else
+                                        <dd class="text-right text-sm text-slate-500 dark:text-slate-400">{{ 'Usable from '.\App\Support\DisplayDate::compact($balance['usableFrom']).($balance['earnedSoFar'] !== null ? ' · '.\App\Support\LeaveDays::label($balance['earnedSoFar']).' earned so far' : '') }}</dd>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </dl>
+                    @else
+                        <p class="mt-4 text-sm text-slate-500 dark:text-slate-400">No leave balances yet.</p>
+                    @endif
+                    <div class="mt-4"><a href="{{ route('time-off.index') }}" wire:navigate class="{{ $link }}">Request leave on Time off</a></div>
+                </x-card>
+
+                <x-card>
+                    <div class="{{ $cardHeader }}">
+                        <h2 class="{{ $cardTitle }}">My pending requests</h2>
+                        @if (count($mine['pending']))<p class="{{ $cardMeta }}">{{ count($mine['pending']) }} waiting</p>@endif
+                    </div>
+                    @if (count($mine['pending']))
+                        <ul class="mt-4">
+                            @foreach ($mine['pending'] as $item)
+                                <li class="border-t border-slate-divider py-2.5 first:border-t-0 first:pt-0 last:pb-0">
+                                    <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $item['leave']->leaveType->name }} · <span class="tabular-nums">{{ $item['leave']->displayDates() }}</span></p>
+                                    <p class="mt-0.5 text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ \App\Support\LeaveDays::label($item['days']).' · '.$item['leave']->waitingLabel() }}</p>
+                                </li>
+                            @endforeach
+                        </ul>
+                        <div class="mt-4"><a href="{{ route('time-off.index') }}" wire:navigate class="{{ $link }}">See all requests on Time off</a></div>
+                    @else
+                        <p class="mt-4 text-sm text-slate-500 dark:text-slate-400">Nothing waiting for a decision.</p>
+                    @endif
+                </x-card>
+            </div>
+
+            <div class="flex min-w-0 flex-col gap-6">
+                <x-card>
+                    <div class="{{ $cardHeader }}">
+                        <h2 class="{{ $cardTitle }}">This month</h2>
+                        <p class="{{ $cardMeta }}">{{ \App\Support\DisplayDate::month(today()) }}</p>
+                    </div>
+                    @if ($month['workdays'] > 0)
+                        {{-- AttendanceSummary, the same counts as My attendance:
+                        the status rows always add up to Calculated workdays. --}}
+                        <dl class="mt-4">
+                            <div class="{{ $row }}">
+                                <dt class="text-sm text-slate-500 dark:text-slate-400">Calculated workdays</dt>
+                                <dd class="text-base font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ $month['workdays'] }}</dd>
+                            </div>
+                            @foreach ($monthRows as $label => [$count, $note])
+                                <div class="{{ $row }}">
+                                    <dt class="text-sm text-slate-500 dark:text-slate-400">
+                                        {{ $label }}
+                                        @if ($note)<span class="block text-xs">{{ $note }}</span>@endif
+                                    </dt>
+                                    <dd class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ $count }}</dd>
+                                </div>
+                            @endforeach
+                        </dl>
+                        @if ($month['leave_tenths'] > 0 || $month['total_worked_minutes'] > 0)
+                            <p class="mt-4 border-t border-slate-divider pt-3 text-xs text-slate-500 dark:text-slate-400">
+                                {{ implode(' · ', array_filter([
+                                    $month['leave_tenths'] > 0 ? 'Leave taken: '.\App\Support\LeaveDays::label($month['leave_tenths']) : null,
+                                    $month['total_worked_minutes'] > 0 ? 'Worked: '.\App\Support\Duration::format($month['total_worked_minutes']) : null,
+                                ])) }}
+                            </p>
+                        @endif
+                    @else
+                        <p class="mt-4 text-sm text-slate-500 dark:text-slate-400">No workdays calculated this month yet.</p>
+                    @endif
+                </x-card>
             </div>
         </div>
     @else

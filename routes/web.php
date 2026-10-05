@@ -11,6 +11,7 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Position;
 use App\Support\DashboardAttendance;
+use App\Support\EmployeeDashboard;
 use App\Support\EmployeeScope;
 use Illuminate\Support\Facades\Route;
 
@@ -75,7 +76,13 @@ Route::get('/dashboard', function () {
         ];
     }
 
-    return view('dashboard', ['stats' => $stats, 'attendance' => $attendance]);
+    // Without the team figures: their own leave and attendance (Phase 3e),
+    // for anyone with an employee record.
+    $mine = $stats === null && auth()->user()->employee !== null
+        ? EmployeeDashboard::for(auth()->user()->employee)
+        : null;
+
+    return view('dashboard', ['stats' => $stats, 'attendance' => $attendance, 'mine' => $mine]);
 })->middleware('auth')->name('dashboard');
 
 Route::middleware('auth')->group(function () {

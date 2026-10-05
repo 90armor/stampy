@@ -8,6 +8,9 @@
 // which would read as "nobody came in". Bars use primary-500, the same green
 // as the department attendance bars, so the page has one data-viz green.
 //
+// A day with everyone on full-day leave (Phase 3d) is a muted "Leave"
+// marker the same way.
+//
 // Today is pending until it is calculated: it carries a muted "Today" marker,
 // and the checked-in share so far is drawn as a lighter, provisional bar with
 // the marker above it — never as a final 0% (docs/ATTENDANCE_UI.md).

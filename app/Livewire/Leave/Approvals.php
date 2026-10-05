@@ -10,7 +10,6 @@ use App\Services\Approval\ApprovalInbox;
 use App\Services\Leave\LeaveBalance;
 use App\Services\Leave\LeaveDayCounter;
 use App\Services\Leave\LeaveRequestService;
-use App\Support\DisplayDate;
 use App\Support\EmployeeScope;
 use App\Support\LeaveDays;
 use Illuminate\Support\Collection;
@@ -151,21 +150,13 @@ class Approvals extends Component
 
         return [
             'leave' => $leave,
-            'dates' => self::dates($leave),
+            'dates' => $leave->displayDates(),
             'days' => LeaveDays::label(array_sum($cost)),
             'balanceType' => $balanceType->name,
             'deducted' => $balanceType->isNot($leave->leaveType),
             'after' => $after,
             'department' => $employee->department?->name,
-            'alsoOff' => $alsoOff->map(fn (Leave $other) => "{$other->employee->full_name} ({$other->leaveType->name}, ".self::dates($other).', '.$other->status->value.')')->all(),
+            'alsoOff' => $alsoOff->map(fn (Leave $other) => "{$other->employee->full_name} ({$other->leaveType->name}, ".$other->displayDates().', '.$other->status->value.')')->all(),
         ];
-    }
-
-    private static function dates(Leave $leave): string
-    {
-        return ($leave->start_date->eq($leave->end_date)
-            ? DisplayDate::compact($leave->start_date)
-            : DisplayDate::range($leave->start_date, $leave->end_date))
-            .($leave->half !== null ? ' · '.$leave->half->label() : '');
     }
 }

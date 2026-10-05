@@ -7,6 +7,7 @@ use App\Enums\LeaveHalf;
 use App\Enums\LeaveStatus;
 use App\Exceptions\InvalidLeaveException;
 use App\Exceptions\InvalidLeaveTransitionException;
+use App\Support\DisplayDate;
 use App\Support\EmployeeScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -155,5 +156,29 @@ class Leave extends Model implements Approvable
     public function isHalfDay(): bool
     {
         return $this->half !== null;
+    }
+
+    /**
+     * The dates as every leave list shows them: "Mon 22 Jun", "22–24 Jun",
+     * with " · AM"/" · PM" on a half day (DisplayDate's forms).
+     */
+    public function displayDates(): string
+    {
+        return ($this->start_date->eq($this->end_date)
+            ? DisplayDate::compact($this->start_date)
+            : DisplayDate::range($this->start_date, $this->end_date))
+            .($this->half !== null ? ' · '.$this->half->label() : '');
+    }
+
+    /**
+     * Whose decision a pending request waits for, or null once none is.
+     */
+    public function waitingLabel(): ?string
+    {
+        return match ($this->currentApprovalStep()) {
+            1 => 'Waiting for manager',
+            2 => 'Waiting for admin',
+            default => null,
+        };
     }
 }

@@ -7,14 +7,6 @@
     $cardMeta = 'shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400';
     // Adjustments only appear when someone has one this year.
     $showAdjustments = collect($balanceRows)->contains(fn ($row) => $row['balance']->adjustments !== 0);
-    $dates = fn ($leave) => ($leave->start_date->eq($leave->end_date)
-        ? DisplayDate::compact($leave->start_date)
-        : DisplayDate::range($leave->start_date, $leave->end_date)).($leave->half ? ' · '.$leave->half->label() : '');
-    $stepLabel = fn ($leave) => match ($leave->currentApprovalStep()) {
-        1 => 'Waiting for manager',
-        2 => 'Waiting for admin',
-        default => null,
-    };
     // A type not usable yet: when it becomes usable, and what's been earned meanwhile.
     $usableLine = fn ($balance, $row) => 'Usable from '.DisplayDate::compact($balance->usableFrom)
         .($row['earnedSoFar'] !== null ? ' · '.LeaveDays::label($row['earnedSoFar']).' earned so far' : '');
@@ -183,7 +175,7 @@
                         @php
                             $leave = $item['leave'];
                             $note = $decisionNote($leave);
-                            $step = $stepLabel($leave);
+                            $step = $leave->waitingLabel();
                         @endphp
                         <li wire:key="leave-card-{{ $leave->id }}" class="border-t border-slate-divider px-4 py-4 first:border-t-0">
                             <div class="flex flex-wrap items-center gap-2">
@@ -191,11 +183,11 @@
                                 <x-badge :color="$leave->status->badgeColor()">{{ $leave->status->label() }}</x-badge>
                                 @if (in_array($leave->id, $newIds, true))<x-badge color="primary">New</x-badge>@endif
                             </div>
-                            <p class="mt-1 text-sm tabular-nums text-slate-600 dark:text-slate-300">{{ $dates($leave) }} · {{ LeaveDays::label($item['days']) }}</p>
+                            <p class="mt-1 text-sm tabular-nums text-slate-600 dark:text-slate-300">{{ $leave->displayDates() }} · {{ LeaveDays::label($item['days']) }}</p>
                             @if ($step)<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $step }}</p>@endif
                             @if ($note)<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">“{{ $note->note }}” — {{ $note->decidedBy?->name ?? 'an approver' }}</p>@endif
                             @can('cancel', $leave)
-                                <div class="mt-3">@include('livewire.leave.partials.cancel-button', ['leave' => $leave, 'label' => $dates($leave)])</div>
+                                <div class="mt-3">@include('livewire.leave.partials.cancel-button', ['leave' => $leave, 'label' => $leave->displayDates()])</div>
                             @endcan
                         </li>
                     @endforeach
@@ -218,14 +210,14 @@
                                 @php
                                     $leave = $item['leave'];
                                     $note = $decisionNote($leave);
-                                    $step = $stepLabel($leave);
+                                    $step = $leave->waitingLabel();
                                 @endphp
                                 <tr wire:key="leave-row-{{ $leave->id }}" class="relative align-top">
                                     <td class="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
                                         {{ $leave->leaveType->name }}
                                         @if (in_array($leave->id, $newIds, true))<x-badge color="primary" class="ml-1.5">New</x-badge>@endif
                                     </td>
-                                    <td class="whitespace-nowrap px-3 py-4 tabular-nums text-slate-700 dark:text-slate-300">{{ $dates($leave) }}</td>
+                                    <td class="whitespace-nowrap px-3 py-4 tabular-nums text-slate-700 dark:text-slate-300">{{ $leave->displayDates() }}</td>
                                     <td class="px-3 py-4 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ LeaveDays::format($item['days']) }}</td>
                                     <td class="px-3 py-4">
                                         <x-badge :color="$leave->status->badgeColor()">{{ $leave->status->label() }}</x-badge>
@@ -234,7 +226,7 @@
                                     </td>
                                     <td class="relative px-6 py-4 text-right">
                                         @can('cancel', $leave)
-                                            @include('livewire.leave.partials.cancel-button', ['leave' => $leave, 'label' => $dates($leave)])
+                                            @include('livewire.leave.partials.cancel-button', ['leave' => $leave, 'label' => $leave->displayDates()])
                                         @endcan
                                         @unless ($loop->last)<span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-divider"></span>@endunless
                                     </td>
