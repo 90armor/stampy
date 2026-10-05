@@ -526,11 +526,14 @@ class LeaveRequestService
             ->with('leaveType')
             ->get();
 
+        // "your" to the requester; the name when an admin files for someone else.
+        $whose = $actor->employee?->is($employee) ? 'your' : "{$employee->full_name}'s";
+
         foreach ($existing as $other) {
             $otherHalves = $other->half !== null && $half !== null && $other->half !== $half;
 
             if (! $otherHalves) {
-                $add('start_date', "These dates overlap {$employee->full_name}'s {$other->status->value} {$other->leaveType->name} leave ("
+                $add('start_date', "These dates overlap {$whose} {$other->status->value} {$other->leaveType->name} leave ("
                     .($other->start_date->eq($other->end_date) ? DisplayDate::compact($other->start_date) : DisplayDate::range($other->start_date, $other->end_date))
                     .($other->half !== null ? ', '.$other->half->label() : '').').');
             }

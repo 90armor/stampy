@@ -307,6 +307,9 @@ class LeaveSubmitTest extends TestCase
         $this->assertSame(LeaveHalf::Pm, $this->submit('2026-06-22', '2026-06-22', half: LeaveHalf::Pm)->half);
 
         $errors = $this->refused(fn () => $this->submit('2026-06-22', '2026-06-22', half: LeaveHalf::Am));
+        // The requester reads "your"; an admin filing for them reads the name.
+        $this->assertStringContainsString('overlap your pending Annual leave (Mon 22 Jun, AM)', $this->message($errors));
+        $errors = $this->refused(fn () => $this->submit('2026-06-22', '2026-06-22', actor: $this->admin, half: LeaveHalf::Am));
         $this->assertStringContainsString("overlap Employee's pending Annual leave (Mon 22 Jun, AM)", $this->message($errors));
 
         // A full day overlaps both halves.
