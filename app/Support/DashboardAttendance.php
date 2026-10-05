@@ -280,7 +280,6 @@ class DashboardAttendance
                 ->selectRaw('status, count(*) as total, sum('.self::CHECKED_IN.') as checked_in')
                 ->groupBy('status')
                 ->get();
-            $leaveRow = $rows->firstWhere('status', AttendanceStatus::Leave);
             // An In progress row on an earlier day is either still open (an
             // in-only row inside its pairing window) or stale (the builder
             // hasn't run since it should have closed it).
@@ -296,13 +295,11 @@ class DashboardAttendance
             $isNonWorkingDay = $statuses->isNotEmpty() && $statuses->every(fn (string $status) => in_array($status, $nonWorking, true));
             $hasOpenRows = $statuses->contains(AttendanceStatus::InProgress->value);
             $isOpen = $isToday ? $todayPending : ($hasOpenRows && ! $isStale);
-            // Whoever is on full-day approved leave isn't expected that day
-            // (Phase 3d): out of the denominator, so five people on leave
-            // don't read as an attendance drop. Half-day leave stays in.
-            // While the day is open the bar counts anyone with a punch, so
-            // someone who came in on their leave day stays in the
-            // denominator too — the bar never passes 100%.
-            $expected = $total - (int) $leaveRow?->total + ($isOpen ? (int) $leaveRow?->checked_in : 0);
+            $leaveRow = $rows->firstWhere('status', AttendanceStatus::Leave);
+            // N is "checked in" while the day is open, "attended" once closed.
+            $expected = self::expected($total, $isOpen
+                ? (int) $leaveRow?->total - (int) $leaveRow?->checked_in
+                : (int) $leaveRow?->total);
 
             [$value, $marker, $pending] = match (true) {
                 $isNonWorkingDay => [null, $statuses->contains(AttendanceStatus::Off->value) ? 'Off' : 'Holiday', false],
@@ -337,10 +334,8 @@ class DashboardAttendance
      * @param  Collection<int, Department>  $departments  already scoped by
      *                                                    the caller (see routes/web.php)
      * @param  int[]|null  $employeeIds
-     *                                   'expected' is the denominator: the department's headcount less anyone on
-     *                                   full-day approved leave today (Phase 3d) — while pending, less only those
-     *                                   on leave with no punch, since N counts every punch; the view shows "On
-     *                                   leave" instead of 0 / 0 when that's everyone.
+     *                                   'expected' is the denominator (expected()); the view shows "On leave"
+     *                                   instead of 0 / 0 when that's everyone.
      * @return list<array{name: string, employees: int, expected: int, attended: int, checkedIn: int, pending: bool}>
      */
     public static function departmentAttendance(Collection $departments, ?array $employeeIds): array
@@ -355,7 +350,7 @@ class DashboardAttendance
             ->selectRaw('sum(daily_attendances.status in (?, ?)) as attended', [AttendanceStatus::Present->value, AttendanceStatus::Incomplete->value])
             ->selectRaw('sum('.self::CHECKED_IN.') as checked_in')
             ->selectRaw('sum(daily_attendances.status = ?) as on_leave', [AttendanceStatus::Leave->value])
-            ->selectRaw('sum(daily_attendances.status = ? and '.self::CHECKED_IN.') as on_leave_checked_in', [AttendanceStatus::Leave->value])
+            ->selectRaw('sum(daily_attendances.status = ? and not '.self::CHECKED_IN.') as on_leave_punchless', [AttendanceStatus::Leave->value])
             ->groupBy('employees.department_id')
             ->get()
             ->keyBy('department_id');
@@ -366,11 +361,10 @@ class DashboardAttendance
             return [
                 'name' => $department->name,
                 'employees' => $department->employees_count,
-                // The N / M denominator: the headcount less anyone on
-                // full-day approved leave today (Phase 3d), as in the trend —
-                // except, while N is "Checked in", anyone on leave who
-                // punched anyway: they're in N, so they stay in M.
-                'expected' => $department->employees_count - (int) ($row->on_leave ?? 0) + ($pending ? (int) ($row->on_leave_checked_in ?? 0) : 0),
+                // N is "Checked in" while pending, "Attended" once closed.
+                'expected' => self::expected($department->employees_count, $pending
+                    ? (int) ($row->on_leave_punchless ?? 0)
+                    : (int) ($row->on_leave ?? 0)),
                 'attended' => (int) ($row->attended ?? 0),
                 'checkedIn' => (int) ($row->checked_in ?? 0),
                 'pending' => $pending,
@@ -569,6 +563,25 @@ class DashboardAttendance
      * its schedule's end. An In progress row that fails this is stale — the
      * builder hasn't run since it should have closed it.
      */
+    /**
+     * The rate's denominator M, for the trend and the Department card: the
+     * headcount, less each person on full-day approved leave **unless they're
+     * counted in N** (Phase 3d, refined in 3e) — so five people on leave
+     * don't read as an attendance drop, and N never passes M. Half-day leave
+     * stays in.
+     *
+     * The caller passes those on full-day leave and outside its own N. Only a
+     * `leave` row can be: both punches on a leave day make it `present`,
+     * which is in N either way. While N is "checked in" (any punch), that's
+     * a `leave` row with no punch; once N is "attended" (present +
+     * incomplete), every `leave` row — a single punch on a leave day stays
+     * `leave`, never `incomplete`.
+     */
+    private static function expected(int $headcount, int $onLeaveOutsideN): int
+    {
+        return $headcount - $onLeaveOutsideN;
+    }
+
     private static function isOpen(DailyAttendance $row): bool
     {
         if ($row->first_in !== null && $row->last_out === null) {

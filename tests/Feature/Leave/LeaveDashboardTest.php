@@ -291,35 +291,44 @@ class LeaveDashboardTest extends TestCase
         $this->assertSame(['employees' => 3, 'expected' => 2, 'attended' => 1, 'pending' => false], array_intersect_key($card, array_flip(['employees', 'expected', 'attended', 'pending'])));
     }
 
-    public function test_someone_who_punches_on_their_leave_day_stays_in_the_denominator_while_the_day_is_open(): void
+    public function test_someone_on_full_day_leave_leaves_the_denominator_unless_counted_in_n(): void
     {
-        // 09:00, today pending: one at work, one on leave who came in anyway, one away on leave.
+        // 09:00, today open (N = checked in): one at work, two on leave who
+        // came in anyway, one away on leave.
         $atWork = $this->person('At Work');
         $this->punch($atWork, self::DAY.' 08:00:00', 'in');
         $cameIn = $this->person('Came In');
         $this->leave($cameIn);
         $this->punch($cameIn, self::DAY.' 08:05:00', 'in');
+        $workedFull = $this->person('Worked Full');
+        $this->leave($workedFull);
+        $this->punch($workedFull, self::DAY.' 08:02:00', 'in');
         $away = $this->person('Away');
         $this->leave($away);
+        $people = [$atWork, $cameIn, $workedFull, $away];
 
-        foreach ([$atWork, $cameIn, $away] as $employee) {
+        foreach ($people as $employee) {
             $this->build($employee);
         }
 
-        // Checked in 2 / 2 — not 2 / 1: both punches are in N, so both are in M.
+        // Checked in 3 / 3, not 3 / 1: everyone with a punch is in N, so in M.
         $card = DashboardAttendance::departmentAttendance(Department::withCount('employees')->get(), null)[0];
-        $this->assertEquals(['checkedIn' => 2, 'expected' => 2, 'pending' => true], array_intersect_key($card, array_flip(['checkedIn', 'expected', 'pending'])));
+        $this->assertEquals(['checkedIn' => 3, 'expected' => 3, 'pending' => true], array_intersect_key($card, array_flip(['checkedIn', 'expected', 'pending'])));
         $bar = collect(DashboardAttendance::weeklyTrend(null))->firstWhere('date', self::DAY);
         $this->assertSame([100.0, 'Today'], [$bar['value'], $bar['marker']]);
 
-        // Once closed, N is attended (present + incomplete): a one-punch leave
-        // day stays leave, so it's out of both again — 1 attended of 1 expected.
+        // 18:00, closed (N = attended): a full day worked on leave is present,
+        // so in N and in M — the case that would read 2 / 1 otherwise. A
+        // one-punch leave day stays leave: out of both.
         $this->punch($atWork, self::DAY.' 17:00:00', 'out');
-        $this->travelTo(Carbon::parse('2026-06-18 09:00:00'));
-        foreach ([$atWork, $cameIn, $away] as $employee) {
+        $this->punch($workedFull, self::DAY.' 17:00:00', 'out');
+        $this->travelTo(Carbon::parse(self::DAY.' 18:00:00'));
+        foreach ($people as $employee) {
             $this->build($employee);
         }
 
+        $card = DashboardAttendance::departmentAttendance(Department::withCount('employees')->get(), null)[0];
+        $this->assertEquals(['attended' => 2, 'expected' => 2, 'pending' => false], array_intersect_key($card, array_flip(['attended', 'expected', 'pending'])));
         $bar = collect(DashboardAttendance::weeklyTrend(null))->firstWhere('date', self::DAY);
         $this->assertSame([100.0, null], [$bar['value'], $bar['marker']]);
     }
