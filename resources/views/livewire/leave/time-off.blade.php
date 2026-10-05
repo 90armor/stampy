@@ -111,7 +111,7 @@
                                 @if ($showAdjustments)<th scope="col" class="px-3 py-3 text-right font-medium">Adjustments</th>@endif
                                 <th scope="col" class="px-3 py-3 text-right font-medium">Used</th>
                                 <th scope="col" class="px-3 py-3 text-right font-medium">Pending</th>
-                                <th scope="col" class="relative px-6 py-3 text-right font-medium">Available<span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-divider"></span></th>
+                                <th scope="col" class="px-6 py-3 text-right font-medium">Available<span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-divider"></span></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -120,7 +120,7 @@
                                 <tr class="relative">
                                     <td class="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">{{ $row['type']->name }}</td>
                                     @if ($balance->usableFrom !== null)
-                                        <td colspan="{{ $showAdjustments ? 6 : 5 }}" class="relative px-6 py-4 text-right text-slate-500 dark:text-slate-400">
+                                        <td colspan="{{ $showAdjustments ? 6 : 5 }}" class="px-6 py-4 text-right text-slate-500 dark:text-slate-400">
                                             {{ $usableLine($balance, $row) }}
                                             @unless ($loop->last)<span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-divider"></span>@endunless
                                         </td>
@@ -130,7 +130,7 @@
                                         @if ($showAdjustments)<td class="px-3 py-4 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ LeaveDays::format($balance->adjustments) }}</td>@endif
                                         <td class="px-3 py-4 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ LeaveDays::format($balance->used) }}</td>
                                         <td class="px-3 py-4 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ LeaveDays::format($balance->pending) }}</td>
-                                        <td class="relative px-6 py-4 text-right font-semibold tabular-nums text-slate-900 dark:text-slate-100">
+                                        <td class="px-6 py-4 text-right font-semibold tabular-nums text-slate-900 dark:text-slate-100">
                                             {{ LeaveDays::format($balance->available()) }}
                                             @unless ($loop->last)<span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-divider"></span>@endunless
                                         </td>
@@ -202,7 +202,7 @@
                                 <th scope="col" class="px-3 py-3 font-medium">Dates</th>
                                 <th scope="col" class="px-3 py-3 text-right font-medium">Days</th>
                                 <th scope="col" class="px-3 py-3 font-medium">Status</th>
-                                <th scope="col" class="relative px-6 py-3 font-medium"><span class="sr-only">Actions</span><span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-divider"></span></th>
+                                <th scope="col" class="px-6 py-3 font-medium"><span class="sr-only">Actions</span><span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-divider"></span></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -224,7 +224,7 @@
                                         @if ($step)<p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $step }}</p>@endif
                                         @if ($note)<p class="mt-1 max-w-xs text-xs text-slate-500 dark:text-slate-400">“{{ $note->note }}” — {{ $note->decidedBy?->name ?? 'an approver' }}</p>@endif
                                     </td>
-                                    <td class="relative px-6 py-4 text-right">
+                                    <td class="px-6 py-4 text-right">
                                         @can('cancel', $leave)
                                             @include('livewire.leave.partials.cancel-button', ['leave' => $leave, 'label' => $leave->displayDates()])
                                         @endcan

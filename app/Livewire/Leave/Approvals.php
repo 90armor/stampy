@@ -72,7 +72,7 @@ class Approvals extends Component
 
         $this->validate(
             ['note' => [$this->decision === 'reject' ? 'required' : 'nullable', 'string', 'max:1000']],
-            ['note.required' => 'Say why — this note is all the requester sees.'],
+            ['note.required' => 'Write a reason to reject this request.'],
         );
 
         $note = trim($this->note) !== '' ? trim($this->note) : null;
