@@ -3,6 +3,8 @@ $navItems = [
     ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'home', 'visible' => true, 'enabled' => true],
     ['label' => 'Employees', 'route' => 'employees.index', 'icon' => 'users', 'visible' => auth()->user()->hasAnyRole(['admin', 'manager']), 'enabled' => true],
     ['label' => 'Organization', 'route' => 'organization.index', 'icon' => 'building-office', 'visible' => auth()->user()->hasRole('admin'), 'enabled' => true],
+    // Policy, not structure (Phase 3e): leave types now, overtime rules in Phase 4.
+    ['label' => 'Policies', 'route' => 'policies.index', 'icon' => 'scale', 'visible' => auth()->user()->can('viewAny', \App\Models\LeaveType::class), 'enabled' => true],
     // 'Attendance' and 'My attendance' share the 'attendance.' route-name
     // prefix but must not both light up together, so each gets an explicit
     // pattern instead of the derived 'prefix.*' every other item uses.

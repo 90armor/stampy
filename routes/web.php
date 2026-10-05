@@ -114,6 +114,10 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::get('/organization', function () {
         return view('organization');
     })->name('organization.index');
+    // Policy rather than structure (Phase 3e): Leave types now, OT rules in Phase 4.
+    Route::get('/policies', function () {
+        return view('policies');
+    })->name('policies.index');
 });
 
 require __DIR__.'/auth.php';
