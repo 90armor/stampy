@@ -173,12 +173,14 @@ class EmployeeScheduleAssigner
      * (CLAUDE.md, "daily_attendances builds itself"), so this can't be left
      * to heal itself. Public: Employees\ScheduleAssignments::deleteAssignment()
      * reuses this for the same message after its own rebuildFrom() call,
-     * rather than a second copy of the same wording drifting out of sync.
+     * rather than a second copy of the same wording drifting out of sync — as
+     * do EmployeeLifecycle and LeaveRequestService ($until: a range that ends
+     * before today, such as a past leave).
      */
-    public function rebuildRecoveryMessage(CarbonInterface $effectiveFrom, string $employeeOption = ''): string
+    public function rebuildRecoveryMessage(CarbonInterface $effectiveFrom, string $employeeOption = '', ?CarbonInterface $until = null): string
     {
         $from = $effectiveFrom->format('Y-m-d');
-        $to = today()->format('Y-m-d');
+        $to = ($until ?? today())->format('Y-m-d');
         $employeeFlag = $employeeOption === '' ? '' : " {$employeeOption}";
 
         return "Not every affected day may have been rebuilt. Run: php artisan attendance:build-daily --from={$from} --to={$to}{$employeeFlag}";

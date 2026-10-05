@@ -224,6 +224,26 @@ class DailySummaryBuilder
         return $this->buildRange($employee, $first, $last);
     }
 
+    /**
+     * Rebuilds $from..$to as given, clamped like the others to join_date and
+     * today — for a change that affects exactly a known span, such as an
+     * approved or cancelled leave (LeaveRequestService). An empty range (a
+     * leave entirely in the future) builds nothing.
+     *
+     * @return int the number of days built
+     */
+    public function rebuildBetween(Employee $employee, CarbonInterface $from, CarbonInterface $to): int
+    {
+        $first = Carbon::instance($from)->startOfDay()->max($employee->join_date->copy()->startOfDay());
+        $last = Carbon::instance($to)->startOfDay()->min(today());
+
+        if ($first->gt($last)) {
+            return 0;
+        }
+
+        return $this->buildRange($employee, $first, $last);
+    }
+
     private function buildRange(Employee $employee, Carbon $first, Carbon $last): int
     {
         $built = 0;
