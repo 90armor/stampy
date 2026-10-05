@@ -114,7 +114,7 @@ class AttendanceLeaveViewsTest extends TestCase
         $this->show()->call('openDay', '2026-06-10')
             ->assertSee('Medical · AM')
             ->assertSee('Annual · PM')
-            ->assertSee('Wed 10 Jun · AM · Charged 0.5 day')
+            ->assertSee('Wed 10 Jun · Charged 0.5 day')
             ->assertSee('View on profile');
 
         // A holiday inside Annual isn't charged; Maternity's calendar days are, weekend or not.

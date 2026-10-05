@@ -11,17 +11,21 @@ $record: the day's DailyAttendance. $holiday: the holiday's name, or null. --}}
 
 @php
     $leaveDay = $record->leaveDay();
-    $leaveLine = implode(' · ', array_filter([
+    // One fact per line, each short: joined on one line they widened the
+    // Daily attendance table's pinned Status column into a scroll at 1440.
+    $leaveLines = array_filter([
         $leaveDay->isHalfDay() ? $leaveDay->half->label().' leave' : null,
         $record->workedOnLeave() ? 'Worked on leave' : null,
-    ]));
+    ]);
     $holidayLine = $holiday !== null && $record->status !== \App\Enums\AttendanceStatus::Holiday ? $holiday : null;
 @endphp
 
-@if ($leaveLine !== '')
-    <span class="mt-0.5 block whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">{{ $leaveLine }}</span>
-@endif
+@foreach ($leaveLines as $line)
+    <span class="mt-0.5 block whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">{{ $line }}</span>
+@endforeach
 @if ($holidayLine)
-    {{-- Fuchsia, as the calendar cell and the day modal name a holiday. --}}
-    <span class="mt-0.5 block whitespace-nowrap text-xs font-medium text-fuchsia-700 dark:text-fuchsia-300">{{ $holidayLine }}</span>
+    {{-- Fuchsia, as the calendar cell and the day modal name a holiday. A
+    name can be long ("Commemoration Day of King Father Norodom Sihanouk"),
+    so it wraps within a fixed width rather than widening the column. --}}
+    <span class="mt-0.5 block w-40 text-xs font-medium leading-4 text-fuchsia-700 dark:text-fuchsia-300">{{ $holidayLine }}</span>
 @endif
