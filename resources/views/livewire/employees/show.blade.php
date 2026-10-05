@@ -99,6 +99,11 @@
         <x-card class="order-4 lg:col-span-8 lg:row-start-2">
             <livewire:employees.schedule-assignments :employee="$employee" :key="'schedule-assignments-'.$employee->id" />
         </x-card>
+
+        {{-- Leave (Phase 3e): full width, under the rest — the balance table needs it. --}}
+        <x-card :padding="false" class="order-5 lg:col-span-12">
+            <livewire:employees.leave-card :employee="$employee" :key="'leave-card-'.$employee->id" />
+        </x-card>
     </div>
 
     <livewire:employees.form-modal />

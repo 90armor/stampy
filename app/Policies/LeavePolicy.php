@@ -47,6 +47,15 @@ class LeavePolicy
     }
 
     /**
+     * Correcting a balance with an adjustment (the employee profile's Leave
+     * card) — admins only. Also how opening balances go in at go-live.
+     */
+    public function adjust(User $user): bool
+    {
+        return $user->hasRole('admin');
+    }
+
+    /**
      * The Approvals page and its badge (Phase 3e): anyone who could be asked
      * to decide — an admin, or a manager with an employee record (step 1 is
      * for managers whose employee manages the requester, ApprovalFlow).

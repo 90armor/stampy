@@ -93,9 +93,12 @@ class TimeOffTest extends TestCase
 
     public function test_balances_show_each_type_and_the_no_balance_types_below(): void
     {
-        Livewire::actingAs($this->employee->user)->test(TimeOff::class)
-            ->assertSeeHtml('<td class="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">Annual</td>')
-            ->assertSee('Also available: Special (deducted from Annual), Unpaid.');
+        $html = Livewire::actingAs($this->employee->user)->test(TimeOff::class)
+            ->assertSee('Also available: Special (deducted from Annual), Unpaid.')
+            ->html();
+        // Annual has its own row (the shared balances partial); Special and Unpaid don't.
+        $this->assertMatchesRegularExpression('/<td class="px-6 py-4 font-medium[^"]*">\s*Annual\s*</', $html);
+        $this->assertDoesNotMatchRegularExpression('/<td class="px-6 py-4 font-medium[^"]*">\s*(Special|Unpaid)\s*</', $html);
     }
 
     public function test_a_type_not_yet_usable_says_when_and_how_much_is_earned(): void
