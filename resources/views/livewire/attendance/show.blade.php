@@ -294,10 +294,16 @@
                             $statusLabel = $record ? $record->status->label() : 'Not calculated';
                             $lateMinutesLabel = $lateArrival ? $record->late_minutes.' minute'.($record->late_minutes === 1 ? '' : 's') : null;
                             $earlyMinutesLabel = $earlyDeparture ? $record->early_leave_minutes.' minute'.($record->early_leave_minutes === 1 ? '' : 's') : null;
+                            // Leave annotations (Phase 3e): the half on a half-day leave day,
+                            // and punches in leave time — never the cell colour.
+                            $cellHalf = $record && $record->leaveDay()->isHalfDay() ? $record->leaveDay()->half->label() : null;
+                            $cellWorkedOnLeave = $record && $record->workedOnLeave();
                             $cellAriaLabel = \App\Support\DisplayDate::long($cell['date']).', '.$statusLabel
                                 .($lateArrival ? ', arrived '.$lateMinutesLabel.' late' : '')
                                 .($earlyDeparture ? ', left '.$earlyMinutesLabel.' early' : '')
-                                .($holiday ? ', Holiday: '.$holiday->name : '');
+                                .($cellHalf ? ', '.$cellHalf.' leave' : '')
+                                .($cellWorkedOnLeave ? ', worked on leave' : '')
+                                .($holiday ? ', Holiday: '.$holiday : '');
                         @endphp
 
                         @if ($cell['inMonth'])
@@ -359,12 +365,22 @@
                                     so the cell shows a small flag instead (the name stays in the
                                     cell's accessible label and in the day modal). A cell whose
                                     status icon is already the holiday flag needs no second one. --}}
-                                    <span class="hidden w-full line-clamp-2 text-[10px] font-medium leading-tight text-fuchsia-700 dark:text-fuchsia-300 sm:block" title="{{ $holiday->name }}">
-                                        {{ $holiday->name }}
+                                    <span class="hidden w-full line-clamp-2 text-[10px] font-medium leading-tight text-fuchsia-700 dark:text-fuchsia-300 sm:block" title="{{ $holiday }}">
+                                        {{ $holiday }}
                                     </span>
                                     @unless ($style['icon'] === 'flag')
                                         <x-icon name="flag" class="h-5 w-5 shrink-0 text-fuchsia-700 dark:text-fuchsia-300 sm:hidden" />
                                     @endunless
+                                @endif
+                                {{-- Leave annotations: muted (slate-600 on the tinted fills), 10px
+                                like the holiday name; below sm just the half ("AM"), where a
+                                full phrase can't fit — the cell's label and the day modal
+                                say the rest. --}}
+                                @if ($cellHalf || $cellWorkedOnLeave)
+                                    <span class="hidden w-full text-[10px] font-medium leading-tight text-slate-600 dark:text-slate-400 sm:block">{{ implode(' · ', array_filter([$cellHalf ? $cellHalf.' leave' : null, $cellWorkedOnLeave ? 'Worked on leave' : null])) }}</span>
+                                    @if ($cellHalf)
+                                        <span class="text-[10px] font-medium leading-tight text-slate-600 dark:text-slate-400 sm:hidden" aria-hidden="true">{{ $cellHalf }}</span>
+                                    @endif
                                 @endif
                                 {{-- Off and an unworked Holiday both show nothing below the
                                 day number — no punches on a non-working day is expected, not
@@ -503,6 +519,7 @@
                                         timing (amber); a "Late 21m" chip here repeated the same
                                         fact. Colour comes from the status-only displayVariant(). --}}
                                         <x-badge :color="$variantStyles[$record->displayVariant()]['badge']">{{ $record->status->label() }}</x-badge>
+                                        <x-attendance.annotations :record="$record" :holiday="$holidaysByDate->get($dayKey)" />
                                     </td>
                                     <td class="whitespace-nowrap px-6 py-2 text-sm tabular-nums text-slate-700 dark:text-slate-300">
                                         @if ($record->first_in)
@@ -525,7 +542,9 @@
                                     <td @class(['whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums', 'font-medium text-amber-700 dark:text-amber-300' => $markedLate])>{!! e($record->formattedLateMinutes()) ?: $emDash !!}</td>
                                     <td @class(['whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums', 'font-medium text-amber-700 dark:text-amber-300' => $markedEarly])>{!! e($record->formattedEarlyLeaveMinutes()) ?: $emDash !!}</td>
                                     <td @class(['py-2 text-sm text-slate-500 dark:text-slate-400', 'px-6' => ! $canManagePunches, 'pl-6 pr-2' => $canManagePunches])>
-                                        {!! $record->note !== null ? e($record->note) : $emDash !!}
+                                        {{-- The note, and the holiday's name on a holiday — why its late/early are zero. --}}
+                                        @php $noteText = implode(' · ', array_filter([$holidaysByDate->get($dayKey), $record->note])); @endphp
+                                        {!! $noteText !== '' ? e($noteText) : $emDash !!}
                                         @if (! $canManagePunches && ! $loop->last)
                                             <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-divider"></span>
                                         @endif
@@ -633,7 +652,7 @@
                             @if ($modalHoliday)
                                 <p class="mt-0.5 flex items-center gap-1 text-sm font-medium text-fuchsia-700 dark:text-fuchsia-300">
                                     <x-icon name="flag" class="h-5 w-5 shrink-0" />
-                                    {{ $modalHoliday->name }}
+                                    {{ $modalHoliday }}
                                 </p>
                             @endif
                         </div>
@@ -711,6 +730,49 @@
                             </div>
                         @endif
                     </dl>
+
+                    {{-- Every approved leave covering the day (an AM and a PM can be two
+                    types), with what it charged that day — LeaveDayCounter's answer,
+                    so a holiday or day off inside Annual says "Not charged" and
+                    Maternity's calendar days say "Charged". --}}
+                    @if ($dayLeaves !== [])
+                        @php
+                            $viewer = auth()->user();
+                            // Gated by each destination's own ability: the profile's Leave
+                            // card for whoever may open the profile, else the employee's own
+                            // Time off.
+                            [$leaveLinkUrl, $leaveLinkLabel] = match (true) {
+                                $viewer->can('viewAny', \App\Models\Employee::class) && $viewer->can('view', $employee) => [route('employees.show', $employee), 'View on profile'],
+                                $viewer->employee?->is($employee) && $viewer->can('timeOff', \App\Models\Leave::class) => [route('time-off.index'), 'View in Time off'],
+                                default => [null, null],
+                            };
+                        @endphp
+                        <div class="mt-5 border-t border-slate-divider pt-4">
+                            <h4 class="text-xs font-medium text-slate-500 dark:text-slate-400">Leave</h4>
+                            <ul class="mt-2 space-y-2">
+                                @foreach ($dayLeaves as $item)
+                                    @php
+                                        $dayLeave = $item['leave'];
+                                        $chargedText = $item['charged'] > 0
+                                            ? 'Charged '.\App\Support\LeaveDays::label($item['charged'])
+                                            : 'Not charged — '.($modalHoliday ? 'holiday' : 'day off');
+                                    @endphp
+                                    <li class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                                        <div>
+                                            <p class="text-sm font-medium text-slate-900 dark:text-slate-100">{{ $dayLeave->leaveType->name.($dayLeave->half ? ' · '.$dayLeave->half->label() : '') }}</p>
+                                            <p class="text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ $dayLeave->displayDates().' · '.$chargedText }}</p>
+                                        </div>
+                                        @if ($leaveLinkUrl)
+                                            <a href="{{ $leaveLinkUrl }}" wire:navigate class="rounded text-sm font-medium text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-2 hover:decoration-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:decoration-primary-700 dark:hover:decoration-primary-400">{{ $leaveLinkLabel }}</a>
+                                        @endif
+                                    </li>
+                                @endforeach
+                            </ul>
+                            @if ($modalRecord?->workedOnLeave())
+                                <p class="mt-2 text-xs text-slate-600 dark:text-slate-300">Worked on leave: there are punches in leave time. The leave stands unless an admin cancels it.</p>
+                            @endif
+                        </div>
+                    @endif
 
                     <div class="mt-5 border-t border-slate-divider pt-4">
                         <x-attendance.day-detail-panel

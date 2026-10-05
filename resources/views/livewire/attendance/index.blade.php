@@ -36,7 +36,8 @@
         || $employeeFilter !== ''
         || $departmentFilter !== ''
         || $selectedStatuses !== $defaultStatuses
-        || $timingFilters !== [];
+        || $timingFilters !== []
+        || $workedOnLeave;
 @endphp
 
 <div class="space-y-6">
@@ -318,6 +319,23 @@
             @endforeach
         </div>
         </fieldset>
+
+        {{-- Neither a status nor timing: days worked on approved leave, the way
+        to find past cases (Needs attention lists only today's). --}}
+        <fieldset>
+        <legend class="text-xs font-medium text-slate-700 dark:text-slate-300">Leave</legend>
+        <div class="mt-2 flex flex-wrap gap-2">
+            <button
+                type="button"
+                wire:click="toggleWorkedOnLeave"
+                aria-pressed="{{ $workedOnLeave ? 'true' : 'false' }}"
+                @class([$chipBase, $chipSelected => $workedOnLeave, $chipUnselected => ! $workedOnLeave])
+            >
+                @if ($workedOnLeave)<x-icon name="check" class="h-3.5 w-3.5" />@endif
+                {{ $chipLabel('Worked on leave') }}
+            </button>
+        </div>
+        </fieldset>
         </div>
 
         @if ($maxBuiltDate && $toDate > $maxBuiltDate)
@@ -439,6 +457,7 @@
                                     from displayVariant(), which is status-only: a late Present
                                     day is a green "Present". --}}
                                     <x-badge :color="$style['badge']">{{ $attendance->status->label() }}</x-badge>
+                                    <x-attendance.annotations :record="$attendance" :holiday="$holidays[$attendance->work_date->format('Y-m-d')] ?? null" />
                                 </td>
                                 <td class="table-pin table-pin-end py-2 pl-2 pr-6 text-right">
                                     {{-- The row's only link: visible at rest, a 40px target

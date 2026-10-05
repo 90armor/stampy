@@ -37,10 +37,22 @@ final class WorkdayCalendar
      */
     public static function holidaysBetween(CarbonInterface $from, CarbonInterface $to): array
     {
+        return array_map(fn () => true, self::holidayNamesBetween($from, $to));
+    }
+
+    /**
+     * The same lookup with each holiday's name — what the attendance views
+     * annotate a day with (a present day on a holiday says which, so its
+     * zero late/early minutes are explained). One query for the range.
+     *
+     * @return array<string, string> 'Y-m-d' => name
+     */
+    public static function holidayNamesBetween(CarbonInterface $from, CarbonInterface $to): array
+    {
         return Holiday::query()
             ->whereBetween('date', [$from->format('Y-m-d'), $to->format('Y-m-d')])
-            ->pluck('date')
-            ->mapWithKeys(fn (CarbonInterface $date) => [$date->format('Y-m-d') => true])
+            ->get(['date', 'name'])
+            ->mapWithKeys(fn (Holiday $holiday) => [$holiday->date->format('Y-m-d') => $holiday->name])
             ->all();
     }
 

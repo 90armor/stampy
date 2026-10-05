@@ -2,15 +2,18 @@
 
 namespace App\Livewire\Attendance;
 
+use App\Enums\LeaveStatus;
 use App\Enums\PunchSource;
 use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
 use App\Models\Employee;
-use App\Models\Holiday;
+use App\Models\Leave;
 use App\Services\Attendance\DailySummaryBuilder;
+use App\Services\Leave\LeaveDayCounter;
 use App\Support\AttendanceSummary;
 use App\Support\AttendanceTime;
 use App\Support\DisplayDate;
+use App\Support\WorkdayCalendar;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
@@ -293,7 +296,11 @@ class Show extends Component
         return DailyAttendance::query()
             ->where('employee_id', $this->employee->id)
             ->whereBetween('work_date', [$start->format('Y-m-d'), $end->format('Y-m-d')])
+            ->with('workSchedule')
             ->get()
+            // Leave days resolved once for the month (the half-day and
+            // worked-on-leave annotations read them), not per cell.
+            ->tap(fn (Collection $rows) => DailyAttendance::withLeaveDays($rows))
             ->keyBy(fn (DailyAttendance $row) => $row->work_date->format('Y-m-d'));
     }
 
@@ -454,20 +461,52 @@ class Show extends Component
      * deliberate: daily_attendances only has rows for dates the builder has
      * already reached, so a holiday three weeks out would have no row at
      * all if this were sourced from there — employees need to see upcoming
-     * holidays, which is most of the point of showing them. Powers the
-     * calendar grid only; not fetched or shown in the table view.
+     * holidays, which is most of the point of showing them. Read through
+     * the builder's own lookup (WorkdayCalendar::holidayNamesBetween()), not
+     * a query of its own. Powers the calendar, the day modal and (Phase 3e)
+     * the table view's holiday annotation.
      *
-     * @return Collection<string, Holiday>
+     * @return Collection<string, string> 'Y-m-d' => name
      */
+    /**
+     * Every approved leave covering the day the modal is open on — an AM and
+     * a PM leave can be two types, and daily_attendances.leave_id holds only
+     * one — with what it charges that day (LeaveDayCounter, never inferred:
+     * nothing on a holiday or day off for a workdays type, a full day for
+     * Maternity's calendar days).
+     *
+     * @return list<array{leave: Leave, charged: int}>
+     */
+    private function dayLeaves(): array
+    {
+        if ($this->viewingDay === null) {
+            return [];
+        }
+
+        $date = Carbon::createFromFormat('Y-m-d', $this->viewingDay)->startOfDay();
+        $counter = app(LeaveDayCounter::class);
+
+        return Leave::query()
+            ->where('employee_id', $this->employee->id)
+            ->where('status', LeaveStatus::Approved->value)
+            ->whereDate('start_date', '<=', $date)
+            ->whereDate('end_date', '>=', $date)
+            ->with('leaveType')
+            ->orderByRaw("half = 'pm'")
+            ->get()
+            ->map(fn (Leave $leave) => [
+                'leave' => $leave,
+                'charged' => array_sum($counter->count($this->employee, $leave->leaveType, $date, $date, $leave->half !== null)),
+            ])
+            ->all();
+    }
+
     private function holidaysByDate(): Collection
     {
         $start = $this->monthStart();
-        $end = $start->copy()->endOfMonth();
 
-        return Holiday::query()
-            ->whereBetween('date', [$start->format('Y-m-d'), $end->format('Y-m-d')])
-            ->get()
-            ->keyBy(fn (Holiday $holiday) => $holiday->date->format('Y-m-d'));
+        // The builder's own lookup (WorkdayCalendar), names included.
+        return collect(WorkdayCalendar::holidayNamesBetween($start, $start->copy()->endOfMonth()));
     }
 
     /**
@@ -537,6 +576,7 @@ class Show extends Component
             'punchesByDate' => $this->punchesByDate(),
             'overnightPunches' => $this->overnightPunches($existing),
             'holidaysByDate' => $this->holidaysByDate(),
+            'dayLeaves' => $this->dayLeaves(),
             'lastBuiltInMonth' => $lastBuiltInMonth,
             'monthFullyBuilt' => $lastBuiltInMonth === $days->last()['date']->format('Y-m-d'),
             // Same reasoning as $layoutData just above: nobody reaches
