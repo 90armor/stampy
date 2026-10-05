@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Enums\LeaveStatus;
 use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
 use App\Models\Employee;
+use App\Models\Leave;
 use App\Models\LeaveEntitlement;
 use App\Models\LeaveType;
 use App\Services\Leave\EntitlementCalculator;
@@ -104,5 +106,35 @@ class DatabaseSeederTest extends TestCase
 
         $this->assertGreaterThan(0, (clone $inOnly)->where('late_minutes', '>', 0)->count());
         $this->assertGreaterThan(0, (clone $inOnly)->where('late_minutes', 0)->count());
+    }
+
+    /**
+     * LeaveSeeder's demo requests (Phase 3e): every state the Time off and
+     * Approvals pages show, made through LeaveRequestService, with approved
+     * past days rebuilt as leave.
+     */
+    public function test_seeded_leave_covers_every_request_state(): void
+    {
+        $this->seed();
+
+        foreach (LeaveStatus::cases() as $status) {
+            $this->assertTrue(Leave::where('status', $status->value)->exists(), "No seeded {$status->value} leave.");
+        }
+        $this->assertTrue(Leave::where('status', 'pending')->where('current_step', 1)->exists());
+        $this->assertTrue(Leave::where('status', 'pending')->where('current_step', 2)->exists());
+        $this->assertTrue(Leave::whereColumn('start_date', '!=', 'end_date')->whereYear('start_date', today()->year)->whereYear('end_date', today()->year + 1)->exists(), 'No cross-year leave.');
+        $this->assertTrue(Leave::where('half', 'am')->exists() && Leave::where('half', 'pm')->exists());
+        // Every decided request has its steps (nothing written around the service).
+        $this->assertSame(0, Leave::whereIn('status', ['approved', 'rejected'])->doesntHave('approvalSteps')->count());
+        // Approving rebuilt the days: every built day inside an approved leave
+        // carries one, and no other day does. (Which past days exist depends
+        // on the date — on 1 Jan there are none this year.)
+        $covered = DailyAttendance::query()->whereExists(fn ($query) => $query->from('leaves')
+            ->whereColumn('leaves.employee_id', 'daily_attendances.employee_id')
+            ->where('leaves.status', 'approved')
+            ->whereColumn('leaves.start_date', '<=', 'daily_attendances.work_date')
+            ->whereColumn('leaves.end_date', '>=', 'daily_attendances.work_date'));
+        $this->assertSame((clone $covered)->count(), (clone $covered)->whereNotNull('leave_id')->count());
+        $this->assertSame((clone $covered)->count(), DailyAttendance::whereNotNull('leave_id')->count());
     }
 }
