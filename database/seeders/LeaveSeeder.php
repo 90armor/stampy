@@ -127,8 +127,15 @@ class LeaveSeeder extends Seeder
         // On leave today — anyone with no punches yet today, so the dashboard
         // counts them as on leave rather than Not in. Who that is depends on
         // the time of day the seed runs.
-        $used = ['EMP-0001', 'EMP-0002', 'EMP-0009', 'EMP-0012', 'EMP-0019', 'EMP-0025', 'EMP-0020', 'EMP-0021', 'EMP-0024', 'EMP-0026'];
-        $codes = Employee::query()->activeOn($today)->whereNotIn('employee_code', $used)->orderBy('employee_code')->pluck('employee_code')->all();
+        $used = ['EMP-0001', 'EMP-0002', 'EMP-0009', 'EMP-0017', 'EMP-0012', 'EMP-0019', 'EMP-0025', 'EMP-0020', 'EMP-0021', 'EMP-0024', 'EMP-0026'];
+        // At least a year's service, so Annual is usable whatever the date;
+        // and nobody the seeder has already given a request.
+        $codes = Employee::query()->activeOn($today)
+            ->whereDate('join_date', '<=', $today->copy()->subYear())
+            ->whereNotIn('employee_code', $used)
+            ->orderBy('employee_code')
+            ->pluck('employee_code')
+            ->all();
         if ($away = $this->firstTodayWhere($codes, fn (DailyAttendance $row) => $row->first_in === null && $row->last_out === null)) {
             $tomorrow = $this->workday($away, $today->copy()->addDay());
             $away->user !== null
