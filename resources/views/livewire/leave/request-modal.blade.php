@@ -115,36 +115,36 @@
 
                 <div>
                     @if ($forOthers)
-                        <p class="text-sm text-slate-500 dark:text-slate-400">For {{ $review['employee'] }}</p>
+                        <p class="text-sm text-slate-500 dark:text-slate-400">For {{ $summary['employee'] }}</p>
                     @endif
-                    <p class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ $review['type'] }} · {{ $review['total'] }}</p>
-                    <p class="mt-0.5 text-sm tabular-nums text-slate-600 dark:text-slate-300">{{ $review['dates'] }}</p>
+                    <p class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ $summary['type'] }} · {{ $summary['total'] }}</p>
+                    <p class="mt-0.5 text-sm tabular-nums text-slate-600 dark:text-slate-300">{{ $summary['dates'] }}</p>
                 </div>
 
                 <div class="rounded-lg bg-slate-50 px-4 py-3 text-sm dark:bg-slate-800">
-                    @if (! $review['hasBalance'])
-                        <p class="text-slate-700 dark:text-slate-200">{{ $review['type'] }} leave has no balance to draw from.</p>
-                    @elseif (count($review['years']) === 1)
-                        @php $line = $review['years'][0]; @endphp
-                        <p class="text-slate-700 dark:text-slate-200">Uses <span class="font-semibold">{{ $line['cost'] }}</span> of {{ $review['charges'] }}</p>
+                    @if (! $summary['hasBalance'])
+                        <p class="text-slate-700 dark:text-slate-200">{{ $summary['type'] }} leave has no balance to draw from.</p>
+                    @elseif (count($summary['years']) === 1)
+                        @php $line = $summary['years'][0]; @endphp
+                        <p class="text-slate-700 dark:text-slate-200">Uses <span class="font-semibold">{{ $line['cost'] }}</span> of {{ $summary['charges'] }}</p>
                         <p class="mt-1 tabular-nums text-slate-600 dark:text-slate-300">Available {{ $line['before'] }} → <span class="font-semibold text-slate-900 dark:text-slate-100">{{ $line['after'] }}</span></p>
                     @else
-                        <p class="text-slate-700 dark:text-slate-200">Crosses New Year — each year's {{ $review['charges'] }} balance pays for its own days:</p>
+                        <p class="text-slate-700 dark:text-slate-200">Crosses New Year — each year's {{ $summary['charges'] }} balance pays for its own days:</p>
                         <ul class="mt-2 space-y-1 tabular-nums">
-                            @foreach ($review['years'] as $line)
+                            @foreach ($summary['years'] as $line)
                                 <li class="text-slate-600 dark:text-slate-300">{{ $line['year'] }}: uses <span class="font-semibold text-slate-900 dark:text-slate-100">{{ $line['cost'] }}</span> · available {{ $line['before'] }} → <span class="font-semibold text-slate-900 dark:text-slate-100">{{ $line['after'] }}</span></li>
                             @endforeach
                         </ul>
                     @endif
                 </div>
 
-                @if ($review['notCharged'] !== [])
-                    <p class="text-sm text-slate-500 dark:text-slate-400">Not charged: {{ implode(', ', $review['notCharged']) }}.</p>
+                @if ($summary['notCharged'] !== [])
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Not charged: {{ implode(', ', $summary['notCharged']) }}.</p>
                 @endif
 
                 <p class="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
                     <x-icon name="info" class="mt-0.5 h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" />
-                    @if ($review['approvedOnSubmit'])
+                    @if ($summary['approvedOnSubmit'])
                         <span>Filed by you as an admin, this leave is approved immediately — there are no approval steps.</span>
                     @else
                         <span>Your manager reviews it first, then an admin. You can cancel it until it starts.</span>
@@ -155,7 +155,7 @@
             <div class="mx-4 flex items-center justify-end gap-3 border-t border-slate-divider py-4 sm:mx-6">
                 <x-button type="button" variant="secondary" wire:click="back">Back</x-button>
                 <x-button type="button" variant="primary" wire:click="submit" wire:loading.attr="disabled" wire:target="submit">
-                    <span wire:loading.remove wire:target="submit">{{ $review['approvedOnSubmit'] ? 'File and approve' : 'Submit request' }}</span>
+                    <span wire:loading.remove wire:target="submit">{{ $summary['approvedOnSubmit'] ? 'File and approve' : 'Submit request' }}</span>
                     <span wire:loading wire:target="submit">Submitting&hellip;</span>
                 </x-button>
             </div>

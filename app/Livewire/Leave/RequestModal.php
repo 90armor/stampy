@@ -57,8 +57,14 @@ class RequestModal extends Component
 
     public string $reason = '';
 
-    /** @var array<string, mixed> the review step's display, from the preview */
-    public array $review = [];
+    /**
+     * The review step's display, from the preview. Not named $review: in
+     * Livewire's JS proxy a property shadows the method of the same name,
+     * so wire:submit="review" would read the array and call nothing.
+     *
+     * @var array<string, mixed>
+     */
+    public array $summary = [];
 
     public ?string $previewKey = null;
 
@@ -154,7 +160,7 @@ class RequestModal extends Component
 
         $message = $this->forOthers
             ? "Filed {$preview->type->name} leave for {$preview->employee->full_name} — approved."
-            : "Requested {$preview->type->name} leave for {$this->review['dates']}.";
+            : "Requested {$preview->type->name} leave for {$this->summary['dates']}.";
 
         $this->dispatch('leave-saved', message: $message, rebuildError: $result['rebuildError']);
         $this->showModal = false;
@@ -230,7 +236,7 @@ class RequestModal extends Component
         $sameType = $preview->balanceType->is($preview->type);
         $years = array_keys($preview->cost);
 
-        $this->review = [
+        $this->summary = [
             'employee' => $preview->employee->full_name,
             'type' => $preview->type->name,
             'dates' => ($preview->start->eq($preview->end)
@@ -254,7 +260,7 @@ class RequestModal extends Component
 
     private function resetModal(): void
     {
-        $this->reset(['step', 'forOthers', 'employeeId', 'employeeLocked', 'employeeSearch', 'leave_type_id', 'start_date', 'end_date', 'half', 'reason', 'review', 'previewKey', 'changed']);
+        $this->reset(['step', 'forOthers', 'employeeId', 'employeeLocked', 'employeeSearch', 'leave_type_id', 'start_date', 'end_date', 'half', 'reason', 'summary', 'previewKey', 'changed']);
         $this->resetErrorBag();
     }
 
