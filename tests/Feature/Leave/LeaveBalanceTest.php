@@ -44,14 +44,13 @@ class LeaveBalanceTest extends TestCase
         ]);
     }
 
+    /** Sets the year's grant — replacing the one an employee created mid-test may have been given automatically. */
     private function grant(int $year, string $days, ?Employee $employee = null, ?LeaveType $type = null): void
     {
-        LeaveEntitlement::factory()->create([
-            'employee_id' => ($employee ?? $this->employee)->id,
-            'leave_type_id' => ($type ?? $this->annual)->id,
-            'year' => $year,
-            'days' => $days,
-        ]);
+        LeaveEntitlement::updateOrCreate(
+            ['employee_id' => ($employee ?? $this->employee)->id, 'leave_type_id' => ($type ?? $this->annual)->id, 'year' => $year],
+            ['days' => $days],
+        );
     }
 
     private function leave(string $from, string $to, LeaveStatus $status = LeaveStatus::Approved, ?LeaveType $type = null, ?Employee $employee = null): Leave

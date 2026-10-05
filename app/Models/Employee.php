@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Exceptions\InvalidEmploymentPeriodException;
 use App\Exceptions\NoDefaultWorkScheduleException;
 use App\Exceptions\NoScheduleAssignmentException;
+use App\Services\Leave\LeaveGranter;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -45,9 +46,15 @@ class Employee extends Model
     /**
      * Assigns a freshly-created employee the current default schedule,
      * effective from their join_date — every employee must have at least
-     * one employee_work_schedules row from this point on (see scheduleOn()).
-     * save() below wraps this in the same transaction as the employee insert
-     * itself, so a missing default leaves neither row behind.
+     * one employee_work_schedules row from this point on (see scheduleOn()) —
+     * and this year's leave grants (LeaveGranter). save() below wraps both in
+     * the same transaction as the employee insert itself, so a missing default
+     * or a failed grant leaves no row behind. With no leave types configured
+     * the grant simply creates nothing; leave:grant catches up daily.
+     *
+     * A corrected join_date re-grants the automatic grants it was computed
+     * from (LeaveGranter::regrantAfterJoinDateChange()), in the same
+     * transaction as the update.
      */
     protected static function booted(): void
     {
@@ -69,21 +76,30 @@ class Employee extends Model
                 'effective_from' => $employee->join_date,
                 'created_by' => auth()->id(),
             ]);
+
+            app(LeaveGranter::class)->grant($employee, today()->year, today());
+        });
+
+        static::updated(function (self $employee) {
+            if ($employee->wasChanged('join_date')) {
+                app(LeaveGranter::class)->regrantAfterJoinDateChange($employee);
+            }
         });
     }
 
     /**
-     * Only a brand-new row is wrapped: the created() listener above inserts
-     * this employee's initial schedule assignment as part of this very same
-     * save() call (Eloquent fires model events synchronously, inside the
-     * call that triggered them), and the two must succeed or fail together
-     * — without this, a missing default would leave a committed employee row
-     * with no schedule at all, the exact state scheduleOn() must never see.
-     * An update never touches that invariant, so it isn't wrapped.
+     * A brand-new row is wrapped: the created() listener above inserts
+     * this employee's initial schedule assignment and leave grants as part of
+     * this very same save() call (Eloquent fires model events synchronously,
+     * inside the call that triggered them), and they must succeed or fail
+     * together — without this, a missing default would leave a committed
+     * employee row with no schedule at all, the exact state scheduleOn() must
+     * never see. An update that changes join_date is wrapped too, for the
+     * re-grant the updated() listener does. Any other update isn't.
      */
     public function save(array $options = []): bool
     {
-        if ($this->exists) {
+        if ($this->exists && ! $this->isDirty('join_date')) {
             return parent::save($options);
         }
 

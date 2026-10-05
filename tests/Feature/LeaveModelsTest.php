@@ -270,7 +270,7 @@ class LeaveModelsTest extends TestCase
     public function test_entitlements_and_adjustments_alone_do_not_lock_a_type(): void
     {
         $type = LeaveType::factory()->create();
-        LeaveEntitlement::factory()->for($type)->create();
+        LeaveEntitlement::factory()->for($type)->forYear(2020)->create();
         LeaveAdjustment::factory()->for($type)->create();
 
         $type->update(['counts' => LeaveCounting::CalendarDays, 'allows_half_day' => false]);
@@ -282,7 +282,7 @@ class LeaveModelsTest extends TestCase
     {
         $referenced = [
             'a leave' => fn (LeaveType $type) => Leave::factory()->for($type)->create(),
-            'an entitlement' => fn (LeaveType $type) => LeaveEntitlement::factory()->for($type)->create(),
+            'an entitlement' => fn (LeaveType $type) => LeaveEntitlement::factory()->for($type)->forYear(2020)->create(),
             'an adjustment' => fn (LeaveType $type) => LeaveAdjustment::factory()->for($type)->create(),
             'a deducting type' => fn (LeaveType $type) => LeaveType::factory()->deductsFrom($type)->create(),
         ];

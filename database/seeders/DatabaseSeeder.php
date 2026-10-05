@@ -27,6 +27,10 @@ class DatabaseSeeder extends Seeder
             WorkScheduleSeeder::class,
             DepartmentSeeder::class,
             PositionSeeder::class,
+            // Before EmployeeSeeder: each employee's creation grants this
+            // year's leave (Employee::booted(), LeaveGranter), which needs the
+            // types to exist. Real configuration, not demo data — see the seeder.
+            LeaveTypeSeeder::class,
             EmployeeSeeder::class,
             // Before AttendanceLogSeeder/build-daily below — holidays must
             // already exist when the builder first runs, or the seeded
@@ -34,8 +38,6 @@ class DatabaseSeeder extends Seeder
             // present instead of holiday/present-with-no-timing-exception.
             HolidaySeeder::class,
             AttendanceLogSeeder::class,
-            // Real configuration, not demo data — see the seeder.
-            LeaveTypeSeeder::class,
         ]);
 
         // Same window AttendanceLogSeeder just populated, so the seeded

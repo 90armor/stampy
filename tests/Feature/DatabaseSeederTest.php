@@ -2,7 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Models\AttendanceLog;
+use App\Models\DailyAttendance;
 use App\Models\Employee;
+use App\Models\LeaveEntitlement;
+use App\Models\LeaveType;
+use App\Services\Leave\EntitlementCalculator;
+use App\Support\LeaveDays;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -37,6 +43,41 @@ class DatabaseSeederTest extends TestCase
         );
     }
 
+    /**
+     * The same kind of guard for leave: LeaveTypeSeeder runs before
+     * EmployeeSeeder, so each employee's creation grants this year's leave
+     * (Employee::booted(), LeaveGranter). Every seeded employee must hold
+     * exactly the grants the calculator says they're eligible for today — a
+     * seeder order or event-suppression regression leaves them with none.
+     */
+    public function test_every_seeded_employee_has_the_leave_grants_they_are_eligible_for(): void
+    {
+        $this->seed();
+
+        $calculator = app(EntitlementCalculator::class);
+        $types = LeaveType::query()->whereNotNull('days_per_year')->get();
+        $this->assertGreaterThan(0, $types->count(), 'Sanity check: the seeder should have created leave types with a balance.');
+
+        $problems = [];
+
+        foreach (Employee::all() as $employee) {
+            foreach ($types as $type) {
+                $expected = $calculator->forYear($employee, $type, today()->year);
+                $row = LeaveEntitlement::query()
+                    ->where('employee_id', $employee->id)->where('leave_type_id', $type->id)->where('year', today()->year)
+                    ->first();
+
+                $want = $expected->isGrantableOn(today()) ? LeaveDays::toDecimal($expected->days) : null;
+
+                if ($row?->days !== $want) {
+                    $problems[] = "{$employee->employee_code} {$type->name}: expected ".($want ?? 'no grant').', got '.($row?->days ?? 'no grant');
+                }
+            }
+        }
+
+        $this->assertSame([], $problems);
+    }
+
     public function test_seeded_attendance_never_includes_a_punch_later_than_now(): void
     {
         // Mid-shift, so today's generated day has punches on both sides of now.
@@ -44,8 +85,8 @@ class DatabaseSeederTest extends TestCase
 
         $this->seed();
 
-        $this->assertGreaterThan(0, \App\Models\AttendanceLog::count());
-        $this->assertSame(0, \App\Models\AttendanceLog::where('punched_at', '>', now())->count());
+        $this->assertGreaterThan(0, AttendanceLog::count());
+        $this->assertSame(0, AttendanceLog::where('punched_at', '>', now())->count());
     }
 
     public function test_seeded_attendance_includes_late_incomplete_days(): void
@@ -56,7 +97,7 @@ class DatabaseSeederTest extends TestCase
 
         // Some in-only days punch in late, so dev data exercises late on
         // incomplete days (Phase 2.6) as well as on-time ones.
-        $inOnly = \App\Models\DailyAttendance::query()
+        $inOnly = DailyAttendance::query()
             ->where('status', 'incomplete')
             ->whereNotNull('first_in')
             ->whereDate('work_date', '<', today());
