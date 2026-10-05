@@ -156,7 +156,7 @@
                     <x-card class="order-first">
                         <h2 class="{{ $cardTitle }}">Pending approvals</h2>
                         <p class="mt-2 flex items-baseline gap-x-2">
-                            <span class="text-3xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ $waitingApprovals }}</span> <span class="text-sm text-slate-500 dark:text-slate-400">leave {{ $waitingApprovals === 1 ? 'request' : 'requests' }} you can decide</span>
+                            <span class="text-3xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ $waitingApprovals }}</span> <span class="text-sm text-slate-500 dark:text-slate-400">leave {{ $waitingApprovals === 1 ? 'request' : 'requests' }} waiting on you</span>
                         </p>
                         <x-button :href="route('approvals.index')" variant="secondary" wire:navigate class="mt-4">
                             Review requests

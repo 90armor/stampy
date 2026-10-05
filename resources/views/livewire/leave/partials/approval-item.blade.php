@@ -7,11 +7,18 @@ $item comes from Leave\Approvals::describe(). --}}
 <li wire:key="approval-{{ $leave->id }}" class="border-t border-slate-divider px-4 py-4 first:border-t-0 sm:px-6">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
         <div class="min-w-0 flex-1 space-y-1.5">
-            <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {{ $leave->employee->full_name }}
-                @if ($item['department'])<span class="font-normal text-slate-500 dark:text-slate-400"> · {{ $item['department'] }}</span>@endif
-            </p>
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {{ $leave->employee->full_name }}
+                    @if ($item['department'])<span class="font-normal text-slate-500 dark:text-slate-400"> · {{ $item['department'] }}</span>@endif
+                </p>
+                {{-- Overrides only: waiting 2+ working days, or starting within 2. --}}
+                @if ($item['stuck'])
+                    <x-badge color="amber">Stuck</x-badge>
+                @endif
+            </div>
             <p class="text-sm tabular-nums text-slate-700 dark:text-slate-200">{{ $leave->leaveType->name }} · {{ $item['dates'] }} · {{ $item['days'] }}</p>
+            <p class="text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ implode(' · ', array_filter([$item['submitted'], $item['when']])) }}</p>
             @if ($leave->reason)
                 <p class="text-sm text-slate-600 dark:text-slate-300">“{{ $leave->reason }}”</p>
             @endif

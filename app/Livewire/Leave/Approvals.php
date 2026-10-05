@@ -10,6 +10,7 @@ use App\Services\Approval\ApprovalInbox;
 use App\Services\Leave\LeaveBalance;
 use App\Services\Leave\LeaveDayCounter;
 use App\Services\Leave\LeaveRequestService;
+use App\Support\DisplayDate;
 use App\Support\EmployeeScope;
 use App\Support\LeaveDays;
 use Illuminate\Support\Collection;
@@ -106,6 +107,11 @@ class Approvals extends Component
         $inbox = ApprovalInbox::for($user);
         $visible = EmployeeScope::for($user, 'Approvals')->ids;
         $describe = fn (Collection $leaves) => $leaves->map(fn (Leave $leave) => $this->describe($leave, $balances, $counter, $visible))->all();
+        // Only the override group says "Stuck": it's why an admin steps in there.
+        $describeOverrides = fn (Collection $leaves) => $leaves->map(fn (Leave $leave) => [
+            ...$this->describe($leave, $balances, $counter, $visible),
+            'stuck' => ApprovalInbox::isStuck($leave),
+        ])->all();
 
         $deciding = $this->decidingId !== null ? Leave::with(['employee', 'leaveType'])->find($this->decidingId) : null;
 
@@ -113,7 +119,7 @@ class Approvals extends Component
             'isAdmin' => $user->hasRole('admin'),
             'stepOne' => $describe($inbox['stepOne']),
             'stepTwo' => $describe($inbox['stepTwo']),
-            'overrides' => $describe($inbox['overrides']),
+            'overrides' => $describeOverrides($inbox['overrides']),
             'deciding' => $deciding,
             'decidesBoth' => $deciding !== null && $flow->decidesBothSteps($user, $deciding),
         ])->layout('layouts.app', ['header' => 'Approvals']);
@@ -150,6 +156,9 @@ class Approvals extends Component
 
         return [
             'leave' => $leave,
+            'submitted' => 'Submitted '.DisplayDate::compact($leave->created_at),
+            'when' => self::when($leave),
+            'stuck' => false,
             'dates' => $leave->displayDates(),
             'days' => LeaveDays::label(array_sum($cost)),
             'balanceType' => $balanceType->name,
@@ -158,5 +167,24 @@ class Approvals extends Component
             'department' => $employee->department?->name,
             'alsoOff' => $alsoOff->map(fn (Leave $other) => "{$other->employee->full_name} ({$other->leaveType->name}, ".$other->displayDates().', '.$other->status->value.')')->all(),
         ];
+    }
+
+    /**
+     * How soon it starts, while that's within a week, or that it's already
+     * under way: a retroactive request (sick leave filed after the fact) is
+     * "Already taken", one that began and hasn't ended "Already started".
+     */
+    private static function when(Leave $leave): ?string
+    {
+        $days = (int) today()->diffInDays($leave->start_date->copy()->startOfDay(), false);
+
+        return match (true) {
+            $leave->end_date->lt(today()) => 'Already taken',
+            $days < 0 => 'Already started',
+            $days === 0 => 'Starts today',
+            $days === 1 => 'Starts tomorrow',
+            $days <= 7 => "Starts in {$days} days",
+            default => null,
+        };
     }
 }

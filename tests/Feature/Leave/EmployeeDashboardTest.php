@@ -135,7 +135,7 @@ class EmployeeDashboardTest extends TestCase
 
         $this->actingAs($this->manager->user)->get(route('dashboard'))
             ->assertSee('Pending approvals')
-            ->assertSeeText('1 leave request you can decide')
+            ->assertSeeText('1 leave request waiting on you')
             ->assertSee(route('approvals.index'));
 
         // A manager without an employee record has no inbox (LeavePolicy::decideAny).

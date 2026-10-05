@@ -10,6 +10,7 @@ use App\Models\Leave;
 use App\Models\LeaveType;
 use App\Models\User;
 use App\Models\WorkSchedule;
+use App\Services\Approval\ApprovalInbox;
 use App\Services\Leave\LeaveRequestService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -176,6 +177,75 @@ class ApprovalsPageTest extends TestCase
         $page->call('decide')
             ->assertSee('This request has already been approved.')
             ->assertSee('Nothing waiting for you');
+    }
+
+    public function test_the_count_is_what_waits_on_the_user_and_overrides_only_once_stuck(): void
+    {
+        // Mon 15 Jun: a request starting in two weeks, at step 1.
+        $later = $this->request($this->employee, '2026-06-29', '2026-06-30');
+
+        // The manager: their step 1. The admin: not yet — it isn't stuck.
+        $this->assertSame(1, ApprovalInbox::count($this->manager->user));
+        $this->assertSame(0, ApprovalInbox::count($this->admin));
+        $this->actingAs($this->admin)->get(route('dashboard'))
+            ->assertDontSee('Pending approvals')
+            ->assertDontSee('approval waiting');
+
+        // Tue: one working day waited. Wed: two — stuck, so the admin's too.
+        $this->travelTo(Carbon::parse('2026-06-16 09:00:00'));
+        $this->assertSame(0, ApprovalInbox::count($this->admin));
+        $this->travelTo(Carbon::parse('2026-06-17 09:00:00'));
+        $this->assertSame(1, ApprovalInbox::count($this->admin));
+        $this->actingAs($this->admin)->get(route('dashboard'))
+            ->assertSee('Pending approvals')
+            ->assertSee('Open sidebar — 1 approval waiting');
+
+        // Step 2 always counts for an admin.
+        $this->service()->approve($later, $this->manager->user);
+        $this->assertSame(1, ApprovalInbox::count($this->admin));
+        $this->assertSame(0, ApprovalInbox::count($this->manager->user));
+    }
+
+    public function test_stuck_means_two_working_days_waited_or_starting_within_two_days(): void
+    {
+        // Submitted Fri 19 Jun: Mon is one working day, Tue two.
+        $this->travelTo(Carbon::parse('2026-06-19 16:00:00'));
+        $leave = $this->request($this->employee, '2026-07-06', '2026-07-06');
+
+        $this->assertFalse(ApprovalInbox::isStuck($leave, Carbon::parse('2026-06-22')));
+        $this->assertTrue(ApprovalInbox::isStuck($leave, Carbon::parse('2026-06-23')));
+
+        // Starting within two working days (from Friday: Mon or Tue), or
+        // already under way: stuck at once.
+        $this->assertTrue(ApprovalInbox::isStuck($this->request($this->employee, '2026-06-22', '2026-06-22')));
+        $this->assertTrue(ApprovalInbox::isStuck($this->request($this->employee, '2026-06-23', '2026-06-23')));
+        $this->assertFalse(ApprovalInbox::isStuck($this->request($this->employee, '2026-06-24', '2026-06-24')));
+    }
+
+    public function test_overrides_put_stuck_first_and_items_say_when_they_were_submitted_and_start(): void
+    {
+        // Mon: one starting 6 Jul. Wed: one starting 29 Jun, one tomorrow, one taken last week.
+        $waiting = $this->request($this->employee, '2026-07-06', '2026-07-06', 'Waited since Monday');
+        $this->travelTo(Carbon::parse('2026-06-17 09:00:00'));
+        $this->request($this->employee, '2026-06-29', '2026-06-29', 'Just submitted');
+        $this->request($this->employee, '2026-06-18', '2026-06-18', 'Tomorrow');
+        $this->request($this->employee, '2026-06-10', '2026-06-10', 'Filed after the fact');
+
+        Livewire::actingAs($this->admin)->test(Approvals::class)
+            ->set('showOverrides', true)
+            // Stuck ones first by start date (10, 18 Jun, 6 Jul), then the rest.
+            ->assertSeeInOrder(['Filed after the fact', 'Tomorrow', 'Waited since Monday', 'Just submitted'])
+            ->assertSee('Submitted Mon 15 Jun')
+            ->assertSee('Submitted Wed 17 Jun · Starts tomorrow')
+            ->assertSee('Submitted Wed 17 Jun · Already taken')
+            ->assertSee('Stuck');
+
+        // The manager's own group is by start date, with no Stuck marker.
+        Livewire::actingAs($this->manager->user)->test(Approvals::class)
+            ->assertSeeInOrder(['Filed after the fact', 'Tomorrow', 'Just submitted', 'Waited since Monday'])
+            ->assertDontSee('Stuck');
+        $this->assertSame(4, ApprovalInbox::count($this->manager->user));
+        $this->assertNotNull($waiting);
     }
 
     private function service(): LeaveRequestService
