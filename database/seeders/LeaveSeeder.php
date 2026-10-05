@@ -21,6 +21,10 @@ use Illuminate\Database\Seeder;
  * show, at dates relative to today (like HolidaySeeder's demo slots), so
  * whenever migrate:fresh --seed runs there is something on each screen.
  *
+ * One pending request starts on the next working day, so an admin's
+ * Approvals page has a stuck override (requests submitted at seed time are
+ * otherwise too new to be stuck).
+ *
  * Everything goes through LeaveRequestService — submit, approve, reject,
  * cancel — so the approval steps, balances and the rebuild of approved days
  * are exactly what the app itself would produce; nothing is written to
@@ -82,6 +86,12 @@ class LeaveSeeder extends Seeder
         // From the last week of December to the first workday from 5 Jan, so
         // both years are charged (1 Jan is a holiday, and the 2nd may be a weekend).
         $this->submit($kaung, $this->annual, $this->workday($kaung, Carbon::create($today->year, 12, 28)), $this->workday($kaung, Carbon::create($today->year + 1, 1, 5)), null, 'New Year with family');
+
+        // Hnin Hnin Wai (EMP-0017): waiting at step 1 for a leave that starts
+        // on the next working day — stuck (ApprovalInbox::isStuck()), so it's
+        // on an admin's badge and first among the overrides.
+        $hnin = $this->employee('EMP-0017');
+        $this->submit($hnin, $this->annual, $this->workday($hnin, $today->copy()->addDay()), null, null, 'Child’s school event');
 
         // Su Myat Noe (EMP-0019): Special, deducted from Annual.
         $suMyat = $this->employee('EMP-0019');
