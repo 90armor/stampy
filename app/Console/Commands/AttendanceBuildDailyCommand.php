@@ -45,10 +45,12 @@ class AttendanceBuildDailyCommand extends Command
             // join_date is the only hire/start-date column on employees —
             // don't build days before someone was hired.
             $date = $employee->join_date->gt($from) ? $employee->join_date->copy() : $from->copy();
+            // Once per employee for the whole run, not per day (Phase 3d).
+            $leaves = $builder->approvedLeavesBetween($employee, $date, $to);
 
             try {
                 while ($date->lte($to)) {
-                    $row = $builder->build($employee, $date);
+                    $row = $builder->build($employee, $date, $leaves);
                     $date = $date->copy()->addDay();
 
                     // After left_on: the builder removed any row instead.

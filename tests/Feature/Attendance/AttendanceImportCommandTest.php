@@ -11,6 +11,7 @@ use App\Services\Attendance\DailySummaryBuilder;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Tests\Support\RefusingStreamWrapper;
 use Tests\TestCase;
 
@@ -209,11 +210,11 @@ class AttendanceImportCommandTest extends TestCase
         {
             public int $builds = 0;
 
-            public function build(Employee $employee, CarbonInterface $date): DailyAttendance
+            public function build(Employee $employee, CarbonInterface $date, ?Collection $leaves = null): ?DailyAttendance
             {
                 $this->builds++;
 
-                return parent::build($employee, $date);
+                return parent::build($employee, $date, $leaves);
             }
         };
         $this->app->instance(DailySummaryBuilder::class, $counter);

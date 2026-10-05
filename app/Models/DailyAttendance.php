@@ -18,6 +18,7 @@ class DailyAttendance extends Model
         'employee_id',
         'work_date',
         'work_schedule_id',
+        'leave_id',
         'first_in',
         'last_out',
         'worked_minutes',
@@ -45,6 +46,17 @@ class DailyAttendance extends Model
     public function workSchedule(): BelongsTo
     {
         return $this->belongsTo(WorkSchedule::class);
+    }
+
+    /**
+     * The approved leave covering this date, set by the builder whatever the
+     * status (Phase 3d). One leave only: on a date with both an AM and a PM
+     * leave it's the AM one, so a view listing a day's leave must query every
+     * approved leave covering the date, not just this one.
+     */
+    public function leave(): BelongsTo
+    {
+        return $this->belongsTo(Leave::class);
     }
 
     /**
