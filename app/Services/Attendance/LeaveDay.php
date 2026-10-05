@@ -49,6 +49,12 @@ final readonly class LeaveDay
         return new self(null, false, null);
     }
 
+    /** The same leave, its half ignored — the builder's fallback for a half-day on a schedule with no break_start. */
+    public function withoutHalf(): self
+    {
+        return new self($this->leaveId, $this->fullDay, null);
+    }
+
     public function isHalfDay(): bool
     {
         return $this->half !== null;

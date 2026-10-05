@@ -3,6 +3,7 @@
 namespace App\Livewire\Schedules;
 
 use App\Exceptions\BulkReassignmentTooFarBackException;
+use App\Exceptions\HalfDayLeaveNeedsBreakException;
 use App\Exceptions\InvalidWorkScheduleException;
 use App\Exceptions\WorkScheduleInUseException;
 use App\Exceptions\WorkScheduleIsDefaultException;
@@ -186,7 +187,7 @@ class Index extends Component
         // after the clock ticks past midnight), not the primary check.
         try {
             $this->bulkResult = $assigner->bulkReassign($from, $to, Carbon::parse($this->bulk_effective_from));
-        } catch (BulkReassignmentTooFarBackException $e) {
+        } catch (BulkReassignmentTooFarBackException|HalfDayLeaveNeedsBreakException $e) {
             $this->addError('form', $e->getMessage());
         }
     }

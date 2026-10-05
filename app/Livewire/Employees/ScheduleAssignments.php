@@ -2,11 +2,13 @@
 
 namespace App\Livewire\Employees;
 
+use App\Exceptions\HalfDayLeaveNeedsBreakException;
 use App\Models\Employee;
 use App\Models\EmployeeWorkSchedule;
 use App\Models\WorkSchedule;
 use App\Services\Attendance\DailySummaryBuilder;
 use App\Services\Attendance\EmployeeScheduleAssigner;
+use App\Support\DisplayDate;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
@@ -63,7 +65,7 @@ class ScheduleAssignments extends Component
                 'after_or_equal:'.$this->employee->join_date->format('Y-m-d'),
             ],
         ], [
-            'effective_from.after_or_equal' => 'The effective date can\'t be before this employee\'s join date ('.\App\Support\DisplayDate::compact($this->employee->join_date).').',
+            'effective_from.after_or_equal' => 'The effective date can\'t be before this employee\'s join date ('.DisplayDate::compact($this->employee->join_date).').',
         ], [
             'work_schedule_id' => 'schedule',
             'effective_from' => 'effective date',
@@ -71,7 +73,13 @@ class ScheduleAssignments extends Component
 
         $schedule = WorkSchedule::findOrFail($this->work_schedule_id);
 
-        $result = $assigner->assign($this->employee, $schedule, Carbon::parse($this->effective_from));
+        try {
+            $result = $assigner->assign($this->employee, $schedule, Carbon::parse($this->effective_from));
+        } catch (HalfDayLeaveNeedsBreakException $e) {
+            $this->addError('work_schedule_id', $e->getMessage());
+
+            return;
+        }
 
         $this->showModal = false;
         $this->reset(['work_schedule_id', 'effective_from']);
@@ -105,6 +113,19 @@ class ScheduleAssignments extends Component
         }
 
         $effectiveFrom = $assignment->effective_from;
+
+        // The dates it governed fall back to the neighbouring assignment's
+        // schedule; refuse if that strands a half-day leave without a break.
+        $remaining = $this->employee->scheduleAssignments->reject(fn (EmployeeWorkSchedule $row) => $row->is($assignment))->values();
+        $stranded = $assigner->halfDaysWithoutBreak($this->employee, $remaining);
+
+        if ($stranded !== []) {
+            $fallback = $this->employee->replicate()->setRelation('scheduleAssignments', $remaining)->scheduleOn($effectiveFrom);
+            $this->addError('delete', (new HalfDayLeaveNeedsBreakException($fallback->name, $stranded))->getMessage());
+
+            return;
+        }
+
         $assignment->delete();
 
         // The deleted row's dates may have been the ones in force for part
