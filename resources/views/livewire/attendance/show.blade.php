@@ -519,7 +519,8 @@
                                         timing (amber); a "Late 21m" chip here repeated the same
                                         fact. Colour comes from the status-only displayVariant(). --}}
                                         <x-badge :color="$variantStyles[$record->displayVariant()]['badge']">{{ $record->status->label() }}</x-badge>
-                                        <x-attendance.annotations :record="$record" :holiday="$holidaysByDate->get($dayKey)" />
+                                        {{-- The holiday's name goes in the Note column here, not under the badge. --}}
+                                        <x-attendance.annotations :record="$record" />
                                     </td>
                                     <td class="whitespace-nowrap px-6 py-2 text-sm tabular-nums text-slate-700 dark:text-slate-300">
                                         @if ($record->first_in)

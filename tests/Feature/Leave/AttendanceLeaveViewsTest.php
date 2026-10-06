@@ -94,8 +94,10 @@ class AttendanceLeaveViewsTest extends TestCase
         // Mon 15: present on an AM-leave day. Tue 16: present on full-day leave.
         $this->assertMatchesRegularExpression('/Mon 15 Jun.*?Present.*?AM leave/s', $html);
         $this->assertMatchesRegularExpression('/Tue 16 Jun.*?Present.*?Worked on leave/s', $html);
-        // Wed 17, worked on a holiday: the name in the status cell and the Note column — why late/early are zero.
-        $this->assertMatchesRegularExpression('/Wed 17 Jun.*?Present\s*<\/span>\s*<span[^>]*fuchsia[^>]*>Busy Day<\/span>.*?Busy Day/s', $html);
+        // Wed 17, worked on a holiday: this view has a Note column, so the name is
+        // there — why late/early are zero — and not under the badge.
+        $this->assertMatchesRegularExpression('/Wed 17 Jun.*?Present\s*<\/span>\s*<\/td>.*?Busy Day/s', $html);
+        $this->assertSame(1, substr_count($html, 'Busy Day'));
         // Fri 12, an unworked holiday: the badge already says Holiday, so only the Note names it.
         $this->assertMatchesRegularExpression('/Fri 12 Jun.*?Holiday\s*<\/span>\s*<\/td>.*?Quiet Day/s', $html);
     }
@@ -145,9 +147,12 @@ class AttendanceLeaveViewsTest extends TestCase
             ->assertDontSee('Wed 17 Jun')
             ->assertSee('Worked on leave');
 
-        Livewire::actingAs($this->admin)->test(Index::class)
+        // No Note column here: the name sits under the badge, muted — not a status colour.
+        $html = Livewire::actingAs($this->admin)->test(Index::class)
             ->set('fromDate', '2026-06-17')
             ->set('toDate', '2026-06-17')
-            ->assertSee('Busy Day');
+            ->html();
+        $this->assertMatchesRegularExpression('/<span class="[^"]*text-slate-500[^"]*">Busy Day<\/span>/', $html);
+        $this->assertStringNotContainsString('fuchsia-700 dark:text-fuchsia-300">Busy Day', $html);
     }
 }

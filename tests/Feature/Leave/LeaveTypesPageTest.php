@@ -123,6 +123,25 @@ class LeaveTypesPageTest extends TestCase
         $this->assertNotNull($page);
     }
 
+    public function test_raising_the_service_requirement_says_what_it_affects_and_revokes_nothing(): void
+    {
+        $employee = $this->employee();
+        $service = app(LeaveRequestService::class);
+        $leave = $service->submit($employee, $this->annual, Carbon::parse('2026-06-22'), Carbon::parse('2026-06-22'), null, null, $this->admin)['leave'];
+        $grant = $employee->leaveEntitlements()->where('leave_type_id', $this->annual->id)->sole();
+
+        Livewire::actingAs($this->admin)->test(Index::class)->call('edit', $this->annual->id)
+            ->assertSee('A change affects grants not yet made; grants already made and approved leave are untouched.')
+            ->set('min_service_months', '120')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        // Ten years now required, but the grant already made and the approved leave stand.
+        $this->assertSame(120, $this->annual->fresh()->min_service_months);
+        $this->assertSame($grant->days, $grant->fresh()->days);
+        $this->assertSame(LeaveStatus::Approved, $leave->fresh()->status);
+    }
+
     public function test_delete_only_while_nothing_refers_to_the_type_otherwise_deactivate_with_the_pending_count(): void
     {
         $unused = LeaveType::factory()->withoutBalance()->create(['name' => 'Unused']);

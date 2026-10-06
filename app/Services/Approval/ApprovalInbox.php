@@ -91,29 +91,54 @@ class ApprovalInbox
      * - or it starts within two working days — on or before the second
      *   working day after today (on a Friday: Monday or Tuesday) — or has
      *   already started;
-     * - or everyone who could decide step 1 is away (awayReason()) — the
-     *   most common reason a request stalls.
+     * - or everyone who could decide step 1 is away (awayReason()) and none
+     *   of them is back before the day the start rule above would make it
+     *   stuck (stuckDeadline()) — the most common reason a request stalls;
+     *   an absence that ends in time doesn't count.
      */
     public static function isStuck(Leave $leave, ?CarbonInterface $today = null): bool
     {
         $today = ($today ?? today())->copy()->startOfDay();
+        $deadline = self::stuckDeadline($leave);
 
-        return $leave->start_date->copy()->startOfDay()->lte(self::workdaysAfter($leave, $today, 2))
-            || self::workdaysAfter($leave, $leave->created_at->copy()->startOfDay(), 2)->lte($today)
-            || self::awayReason($leave, $today) !== null;
+        if ($deadline->lte($today)) {
+            return true;
+        }
+
+        if (self::workdaysAfter($leave, $leave->created_at->copy()->startOfDay(), 2)->lte($today)) {
+            return true;
+        }
+
+        // Away only blocks the request if nobody who can decide it is back
+        // before the deadline: a manager back two weeks before it starts
+        // decides it then, and an admin's override would pre-empt them.
+        $away = self::away($leave, $today);
+
+        return $away !== null && $away['backOn']->gte($deadline);
     }
 
     /**
-     * Why nobody can decide step 1 today, or null when someone can: every
-     * eligible step-1 approver (ApprovalFlow::stepOneApprovers() — the
-     * skip-level managers included) is on approved full-day leave today
-     * (LeaveDay's rule, so an AM plus a PM leave counts). E.g. "Aye Aye Mon
-     * (manager) is on leave until Tue 6 Oct". Null with no approvers at all:
-     * that request is waiting on an admin anyway.
+     * Who is away, when every eligible step-1 approver (ApprovalFlow::
+     * stepOneApprovers() — the skip-level managers included) is on approved
+     * full-day leave today (LeaveDay's rule, so an AM plus a PM leave
+     * counts) — e.g. "Aye Aye Mon (manager) is on leave until Tue 6 Oct" —
+     * whether or not that makes the request stuck (isStuck()). Null when
+     * someone can decide today, and with no approvers at all: that request
+     * is waiting on an admin anyway.
      */
     public static function awayReason(Leave $leave, ?CarbonInterface $today = null): ?string
     {
-        $today = ($today ?? today())->copy()->startOfDay();
+        return self::away($leave, ($today ?? today())->copy()->startOfDay())['reason'] ?? null;
+    }
+
+    /**
+     * The step-1 approvers' absence covering $today: the line to show, and
+     * backOn — the first working day any of them is back.
+     *
+     * @return array{reason: string, backOn: CarbonInterface}|null
+     */
+    private static function away(Leave $leave, CarbonInterface $today): ?array
+    {
         $approvers = app(ApprovalFlow::class)->stepOneApprovers($leave);
 
         if ($approvers->isEmpty()) {
@@ -128,6 +153,7 @@ class ApprovalInbox
             ->groupBy('employee_id');
 
         $away = [];
+        $backOn = null;
 
         foreach ($approvers as $approver) {
             $own = $leaves->get($approver->employee->id, collect());
@@ -137,23 +163,26 @@ class ApprovalInbox
             }
 
             $role = $approver->hasRole('admin') ? 'admin' : 'manager';
-            $until = self::awayUntil($approver->employee, $own, $today);
+            [$until, $back] = self::absence($approver->employee, $own, $today);
+            $backOn = $backOn === null || $back->lt($backOn) ? $back : $backOn;
             // "Wai Yan Aung (manager) is on leave until Wed 7 Oct; Aye Aye Mon (manager) until Tue 6 Oct"
             $away[] = "{$approver->employee->full_name} ({$role}) ".($away === [] ? 'is on leave until ' : 'until ').DisplayDate::compact($until);
         }
 
-        return implode('; ', $away);
+        return ['reason' => implode('; ', $away), 'backOn' => $backOn];
     }
 
     /**
-     * The last day of an absence that covers $today: following full-day
-     * leaves extend it while they join up, with the days off and holidays
-     * between them bridging (a Friday leave and a Monday one are one
-     * absence). Capped at two months.
+     * An absence covering $today: its last day, and the first working day
+     * after it — when they're back. Following full-day leaves extend it
+     * while they join up, with the days off and holidays between them
+     * bridging (a Friday leave and a Monday one are one absence). Capped at
+     * two months.
      *
      * @param  Collection<int, Leave>  $leaves  the employee's approved leaves ending today or later
+     * @return array{0: CarbonInterface, 1: CarbonInterface}
      */
-    private static function awayUntil(Employee $employee, Collection $leaves, CarbonInterface $today): CarbonInterface
+    private static function absence(Employee $employee, Collection $leaves, CarbonInterface $today): array
     {
         $until = $today->copy();
 
@@ -161,11 +190,29 @@ class ApprovalInbox
             if (LeaveDay::on($leaves, $day)->fullDay) {
                 $until = $day->copy();
             } elseif (WorkdayCalendar::isWorkday($employee, $day)) {
-                break;
+                return [$until, $day];
             }
         }
 
-        return $until;
+        return [$until, $until->copy()->addDay()];
+    }
+
+    /**
+     * The day a request becomes stuck by its start: the second of the
+     * requester's working days before it — from then on it starts within two
+     * working days (on a Friday, a Tuesday start). A request already under
+     * way is past it. Capped at a month.
+     */
+    private static function stuckDeadline(Leave $leave): CarbonInterface
+    {
+        $day = $leave->start_date->copy()->startOfDay();
+
+        for ($found = 0, $step = 0; $found < 2 && $step < 31; $step++) {
+            $day = $day->subDay();
+            $found += WorkdayCalendar::isWorkday($leave->employee, $day) ? 1 : 0;
+        }
+
+        return $day;
     }
 
     /**

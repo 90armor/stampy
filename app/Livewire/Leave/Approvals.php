@@ -153,7 +153,15 @@ class Approvals extends Component
             ->whereDate('end_date', '>=', $leave->start_date->format('Y-m-d'))
             ->with(['employee', 'leaveType'])
             ->orderBy('start_date')
-            ->get();
+            ->orderBy('id')
+            ->get()
+            // One entry per person — the count is of people, not requests —
+            // in the order of their first leave in these dates.
+            ->groupBy('employee_id')
+            ->map(fn (Collection $leaves) => $leaves->first()->employee->full_name.' ('
+                .$leaves->map(fn (Leave $other) => "{$other->leaveType->name}, ".$other->displayDates().', '.$other->status->value)->implode('; ')
+                .')')
+            ->values();
 
         return [
             'leave' => $leave,
@@ -167,7 +175,7 @@ class Approvals extends Component
             'deducted' => $balanceType->isNot($leave->leaveType),
             'after' => $after,
             'department' => $employee->department?->name,
-            'alsoOff' => $alsoOff->map(fn (Leave $other) => "{$other->employee->full_name} ({$other->leaveType->name}, ".$other->displayDates().', '.$other->status->value.')')->all(),
+            'alsoOff' => $alsoOff->all(),
         ];
     }
 }

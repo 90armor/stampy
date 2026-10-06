@@ -133,6 +133,19 @@ class ApprovalsPageTest extends TestCase
             ->assertDontSee('Outsider');
     }
 
+    public function test_also_off_counts_people_and_groups_each_persons_leaves(): void
+    {
+        // One colleague with two leaves in these dates is one other person.
+        $colleague = $this->person('Colleague', 'employee', $this->manager);
+        $this->request($colleague, '2026-06-22', '2026-06-22');
+        $this->request($colleague, '2026-06-24', '2026-06-24');
+        $this->request($this->employee, '2026-06-22', '2026-06-24');
+
+        Livewire::actingAs($this->manager->user)->test(Approvals::class)
+            ->assertSee('1 other in Sales during these dates — Colleague (Annual, Mon 22 Jun, pending; Annual, Wed 24 Jun, pending).')
+            ->assertDontSee('2 others in Sales');
+    }
+
     public function test_reject_needs_a_note_and_approve_does_not(): void
     {
         $first = $this->request($this->employee, '2026-06-22', '2026-06-22');
@@ -249,9 +262,9 @@ class ApprovalsPageTest extends TestCase
         $this->assertNotNull($waiting);
     }
 
-    public function test_a_request_is_stuck_when_every_step_one_approver_is_on_leave_today(): void
+    public function test_an_approver_away_makes_a_request_stuck_only_if_they_are_not_back_before_its_deadline(): void
     {
-        // Mon 15 Jun: a fresh request starting in two weeks — not stuck on its own.
+        // Mon 15 Jun: a fresh request for Mon 29 Jun — its stuck deadline is Thu 25.
         $leave = $this->request($this->employee, '2026-06-29', '2026-06-29');
         $this->assertFalse(ApprovalInbox::isStuck($leave));
 
@@ -259,23 +272,38 @@ class ApprovalsPageTest extends TestCase
         $this->service()->submit($this->manager, $this->annual, Carbon::parse('2026-06-15'), Carbon::parse('2026-06-15'), LeaveHalf::Am, null, $this->admin);
         $this->assertNull(ApprovalInbox::awayReason($leave));
 
-        // On full-day leave until Tuesday (the PM half today, then a separate
-        // Tuesday request — one absence): nobody can decide step 1.
+        // Away the PM half today and all Tuesday (one absence), back Wed 17 —
+        // well before the deadline: not stuck, but the line still shows.
         $this->service()->submit($this->manager, $this->annual, Carbon::parse('2026-06-15'), Carbon::parse('2026-06-15'), LeaveHalf::Pm, null, $this->admin);
         $this->service()->submit($this->manager, $this->annual, Carbon::parse('2026-06-16'), Carbon::parse('2026-06-16'), null, null, $this->admin);
         $this->assertSame('Manager (manager) is on leave until Tue 16 Jun', ApprovalInbox::awayReason($leave));
-        $this->assertTrue(ApprovalInbox::isStuck($leave));
-        $this->assertSame(1, ApprovalInbox::count($this->admin));
+        $this->assertFalse(ApprovalInbox::isStuck($leave));
+        $this->assertSame(0, ApprovalInbox::count($this->admin));
+
+        Livewire::actingAs($this->admin)->test(Approvals::class)
+            ->set('showOverrides', true)
+            ->assertDontSee('Stuck')
+            ->assertSee('Manager (manager) is on leave until Tue 16 Jun.');
+
+        // Away until Fri 26, back Mon 29: a request for Wed 1 Jul has its
+        // deadline on Mon 29, so nobody can decide it in time — stuck.
+        $this->service()->submit($this->manager, $this->annual, Carbon::parse('2026-06-17'), Carbon::parse('2026-06-26'), null, null, $this->admin);
+        $later = $this->request($this->employee, '2026-07-01', '2026-07-01');
+        $this->assertSame('Manager (manager) is on leave until Fri 26 Jun', ApprovalInbox::awayReason($later));
+        $this->assertTrue(ApprovalInbox::isStuck($later));
+        // Back before the 29 Jun request's own deadline? Thu 25 — no: stuck too.
+        $this->assertTrue(ApprovalInbox::isStuck($leave->fresh()));
 
         Livewire::actingAs($this->admin)->test(Approvals::class)
             ->set('showOverrides', true)
             ->assertSee('Stuck')
-            ->assertSee('Manager (manager) is on leave until Tue 16 Jun.');
+            ->assertSee('Manager (manager) is on leave until Fri 26 Jun.');
 
-        // A skip-level manager who's in can still decide: not stuck for that reason.
+        // A skip-level manager who's in can still decide: no absence at all.
         $boss = $this->person('Boss', 'manager');
         $this->manager->update(['manager_id' => $boss->id]);
-        $this->assertNull(ApprovalInbox::awayReason($leave->fresh()));
+        $this->assertNull(ApprovalInbox::awayReason($later->fresh()));
+        $this->assertFalse(ApprovalInbox::isStuck($later->fresh()));
     }
 
     private function service(): LeaveRequestService

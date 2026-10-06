@@ -56,7 +56,13 @@
                                 <x-text-input id="leave_type_service" type="number" min="0" max="120" wire:model="min_service_months" placeholder="From joining" class="pr-16" />
                                 <span class="{{ $daysSuffix }}">Months</span>
                             </div>
-                            <p class="{{ $hint }}">Months of service before it can be used.</p>
+                            <p class="{{ $hint }}">
+                                @if ($editing)
+                                    Months of service before it can be used. A change affects grants not yet made; grants already made and approved leave are untouched.
+                                @else
+                                    Months of service before it can be used.
+                                @endif
+                            </p>
                             <x-input-error :messages="$errors->get('min_service_months')" class="mt-1" />
                         </div>
                         <div>
