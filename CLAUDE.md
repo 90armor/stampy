@@ -762,8 +762,7 @@ Verified:
 
 ### Go-live notes
 
-- **A real admin who also takes leave needs their login linked to an employee record** (`employees.user_id`). Without the link they can't request their own leave (Time off shows only "File for an employee") and aren't in anyone's step-1 chain. A record-less admin is fine only for a system or test account — like the seeded `admin@example.com`.
-- **Opening balances** (leave already taken, or carried, before the system went live) go in as admin adjustments: grants are only ever created for the current year or later (`leave:grant`).
+The checklist an admin follows before real use is **`docs/GO_LIVE.md`**: environment and timezone, the production seed (never plain `db:seed` — `DatabaseSeeder` is the demo system), the first admin, schedules with "Break starts", HR's confirmation of the leave types, managers with the manager role, admins linked to employee records, opening balances by hand as adjustments, and the scheduler with `leave:grant`.
 
 ### Still open
 
