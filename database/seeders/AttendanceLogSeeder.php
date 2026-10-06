@@ -60,8 +60,14 @@ class AttendanceLogSeeder extends Seeder
 
         while ($date->lte($to)) {
             if (in_array($date->dayOfWeekIso, $schedule->workdays, true)) {
-                foreach ($employees as $employee) {
-                    array_push($records, ...$this->generateDay($employee, $schedule, $date));
+                // The employee's position in the list (1, 2, 3…), never their
+                // id: ids depend on what the database saw before — inside the
+                // test suite, rolled-back inserts still advance AUTO_INCREMENT
+                // — and a rule on an id's parity once seeded different data
+                // there than when run alone. On a fresh database the two agree,
+                // so dev data is unchanged.
+                foreach ($employees->values() as $index => $employee) {
+                    array_push($records, ...$this->generateDay($employee, $index + 1, $schedule, $date));
                 }
             }
 
@@ -124,7 +130,7 @@ class AttendanceLogSeeder extends Seeder
     /**
      * @return PunchRecord[]
      */
-    private function generateDay(Employee $employee, WorkSchedule $schedule, Carbon $date): array
+    private function generateDay(Employee $employee, int $position, WorkSchedule $schedule, Carbon $date): array
     {
         $start = Carbon::parse($date->format('Y-m-d').' '.$schedule->start_time);
         $end = Carbon::parse($date->format('Y-m-d').' '.$schedule->end_time);
@@ -152,10 +158,10 @@ class AttendanceLogSeeder extends Seeder
             // 15 + 6..60 minutes after start, which stays past the 10-minute
             // grace even after the ±8 minute jitter below.
             'missing_out' => [
-                ['time' => (function () use ($start, $employee, $date) {
+                ['time' => (function () use ($start, $position, $date) {
                     $offset = mt_rand(1, 10);
 
-                    return ($employee->id + $date->day) % 2 === 1
+                    return ($position + $date->day) % 2 === 1
                         ? $start->copy()->addMinutes(15 + $offset * 6)
                         : $start->copy()->subMinutes($offset);
                 })(), 'type' => PunchType::In],

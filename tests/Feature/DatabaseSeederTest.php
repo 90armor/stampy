@@ -13,6 +13,8 @@ use App\Services\Approval\ApprovalInbox;
 use App\Services\Leave\EntitlementCalculator;
 use App\Support\LeaveDays;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\Depends;
 use Tests\TestCase;
 
 /**
@@ -139,5 +141,76 @@ class DatabaseSeederTest extends TestCase
             ->whereColumn('leaves.end_date', '>=', 'daily_attendances.work_date'));
         $this->assertSame((clone $covered)->count(), (clone $covered)->whereNotNull('leave_id')->count());
         $this->assertSame((clone $covered)->count(), DailyAttendance::whereNotNull('leave_id')->count());
+    }
+
+    /**
+     * The seed must not depend on database ids. Inside the suite, rolled-back
+     * inserts from earlier tests still advance AUTO_INCREMENT, so the seeded
+     * employees' ids differ from a fresh database's; AttendanceLogSeeder once
+     * chose late in-punches by an id's parity, and the seeded data — and every
+     * hash baseline taken from it — changed with the tests that ran first.
+     * Seeded twice, with the ids starting at opposite parity, at one pinned
+     * instant: the content must be the same.
+     *
+     * @return array{firstId: int, digest: string}
+     */
+    public function test_the_seed_is_the_same_whatever_the_ids_first_seed(): array
+    {
+        $this->travelTo('2026-07-15 10:30:00');
+        $this->seed();
+        $this->assertGreaterThan(0, DailyAttendance::count());
+
+        return ['firstId' => (int) Employee::min('id'), 'digest' => $this->seedDigest()];
+    }
+
+    /**
+     * @param  array{firstId: int, digest: string}  $first
+     */
+    #[Depends('test_the_seed_is_the_same_whatever_the_ids_first_seed')]
+    public function test_the_seed_is_the_same_whatever_the_ids_second_seed(array $first): void
+    {
+        $this->travelTo('2026-07-15 10:30:00');
+
+        // Burn employee ids until the next one has the other parity.
+        do {
+            $burned = $this->burnEmployeeId();
+        } while (($burned + 1) % 2 === $first['firstId'] % 2);
+
+        $this->seed();
+
+        $this->assertNotSame($first['firstId'] % 2, Employee::min('id') % 2);
+        $this->assertSame($first['digest'], $this->seedDigest());
+    }
+
+    /** Insert and delete one bare employee row (and its department and position): AUTO_INCREMENT moves on. */
+    private function burnEmployeeId(): int
+    {
+        $department = DB::table('departments')->insertGetId(['name' => 'Burned']);
+        $position = DB::table('positions')->insertGetId(['name' => 'Burned']);
+        $id = DB::table('employees')->insertGetId(['employee_code' => 'BURNED', 'full_name' => 'Burned', 'department_id' => $department, 'position_id' => $position, 'join_date' => '2020-01-01', 'status' => 'active']);
+
+        DB::table('employees')->where('id', $id)->delete();
+        DB::table('departments')->where('id', $department)->delete();
+        DB::table('positions')->where('id', $position)->delete();
+
+        return $id;
+    }
+
+    /** The seeded punches, days and leaves, keyed by employee code — never by an id. */
+    private function seedDigest(): string
+    {
+        $code = DB::table('employees')->pluck('employee_code', 'id');
+
+        $punches = AttendanceLog::query()->orderBy('punched_at')->orderBy('punch_type')->get()
+            ->map(fn (AttendanceLog $log) => [$code[$log->employee_id], $log->punched_at->format('Y-m-d H:i:s'), $log->punch_type->value])
+            ->sortBy(fn (array $row) => implode('|', $row))->values();
+        $days = DailyAttendance::query()->get()
+            ->map(fn (DailyAttendance $row) => [$code[$row->employee_id], $row->work_date->format('Y-m-d'), $row->status->value, $row->first_in?->format('H:i:s'), $row->last_out?->format('Y-m-d H:i:s'), $row->worked_minutes, $row->late_minutes, $row->early_leave_minutes, $row->leave_id !== null])
+            ->sortBy(fn (array $row) => $row[0].$row[1])->values();
+        $leaves = Leave::query()->get()
+            ->map(fn (Leave $leave) => [$code[$leave->employee_id], $leave->start_date->format('Y-m-d'), $leave->end_date->format('Y-m-d'), $leave->half?->value, $leave->status->value, $leave->current_step])
+            ->sortBy(fn (array $row) => implode('|', array_map('strval', $row)))->values();
+
+        return hash('sha256', json_encode([$punches, $days, $leaves]));
     }
 }
