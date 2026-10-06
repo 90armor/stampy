@@ -144,13 +144,18 @@ class DatabaseSeederTest extends TestCase
     }
 
     /**
-     * The seed must not depend on database ids. Inside the suite, rolled-back
-     * inserts from earlier tests still advance AUTO_INCREMENT, so the seeded
-     * employees' ids differ from a fresh database's; AttendanceLogSeeder once
-     * chose late in-punches by an id's parity, and the seeded data — and every
-     * hash baseline taken from it — changed with the tests that ran first.
-     * Seeded twice, with the ids starting at opposite parity, at one pinned
-     * instant: the content must be the same.
+     * The seed must not depend on what ran before it. Two causes were found,
+     * each making the seeded data — and every hash baseline taken from it —
+     * change with the tests that ran first:
+     * - database ids: rolled-back inserts from earlier tests still advance
+     *   AUTO_INCREMENT, and AttendanceLogSeeder once chose late in-punches by
+     *   an id's parity;
+     * - PHP's global random state: it drew from mt_rand(), which a Faker
+     *   generator left by an earlier test reseeds at random when it is
+     *   garbage-collected (only some random orders hit it, e.g. seed 1105).
+     * Seeded twice at one pinned instant — the second time with the ids at
+     * the opposite parity and the global generator reseeded on every
+     * query — the content must be the same.
      *
      * @return array{firstId: int, digest: string}
      */
@@ -175,6 +180,11 @@ class DatabaseSeederTest extends TestCase
         do {
             $burned = $this->burnEmployeeId();
         } while (($burned + 1) % 2 === $first['firstId'] % 2);
+
+        // And reseed PHP's global generator at random on every query, as a
+        // garbage-collected Faker generator can at any moment (its destructor
+        // calls mt_srand()): the seeder must not draw from that state.
+        DB::listen(fn () => mt_srand());
 
         $this->seed();
 
