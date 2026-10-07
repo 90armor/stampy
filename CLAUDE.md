@@ -898,7 +898,7 @@ Verified:
 
 ### Go-live notes
 
-The checklist an admin follows before real use is **`docs/GO_LIVE.md`**: environment and timezone, the production seed (never plain `db:seed` — `DatabaseSeeder` is the demo system), the first admin, schedules with "Break starts", HR's confirmation of the leave types, managers with the manager role, admins linked to employee records, opening balances by hand as adjustments, and the scheduler with `leave:grant`.
+The checklist an admin follows before real use is **`docs/GO_LIVE.md`**: environment and timezone, the production seed (never plain `db:seed` — `DatabaseSeeder` is the demo system), the first admin, schedules with "Break starts", HR's confirmation of the leave types, managers with the manager role, admins linked to employee records, opening balances by hand as adjustments, and the scheduler with `leave:grant`. The policy questions HR still has to answer — each with its current default, who decided it and where to change it — are one sheet, **`docs/HR_DECISIONS.md`**, taken to HR before step 1.
 
 ### Still open
 

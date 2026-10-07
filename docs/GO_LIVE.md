@@ -4,6 +4,8 @@ The checklist an admin works through before anyone uses Stampy for real. Do the 
 
 ## 1. Environment and timezone
 
+Before anything else, take **[`HR_DECISIONS.md`](HR_DECISIONS.md)** to HR: the leave, overtime and time off in lieu policy questions with their current defaults. Steps 4 and 7 enter the answers, and two of them lock once used.
+
 - `APP_ENV=production`, `APP_DEBUG=false`, and a real `APP_KEY` in `.env`.
 - The app timezone is **Asia/Phnom_Penh**, set in `config/app.php` (not in `.env`): every attendance and leave rule is a local-time rule. Check it with `php artisan about` (Environment → Timezone).
 - The server's own clock must be correct (NTP). The database's session timezone doesn't matter — no query uses MySQL's clock.
