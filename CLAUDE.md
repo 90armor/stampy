@@ -789,6 +789,94 @@ Verified:
 
 The checklist an admin follows before real use is **`docs/GO_LIVE.md`**: environment and timezone, the production seed (never plain `db:seed` — `DatabaseSeeder` is the demo system), the first admin, schedules with "Break starts", HR's confirmation of the leave types, managers with the manager role, admins linked to employee records, opening balances by hand as adjustments, and the scheduler with `leave:grant`.
 
+## Phase 4 — Overtime (scope, not yet built)
+
+Scoped 7 Oct 2026. Owner decisions are marked **(owner)**; the rest are recommendations the owner accepted. Rates and limits follow the Cambodian Labour Law and Prakas 112/25 (6 May 2025) until HR confirms the company's policy **(owner)**. Like leave types, every number below is a setting in Policies, never a constant in code.
+
+### Policy
+
+1. **Two ways to request** **(owner)**:
+   - **Planned:** submitted before the overtime starts. This is the normal path; Prakas 112/25 expects overtime to be planned (employers notify the Ministry three working days ahead).
+   - **Claim:** submitted after the fact, for unplanned overtime, up to **7 days** back (setting). Admins may go back further, as with leave.
+   A request whose start time has passed when it's submitted is a claim. Both go through the same approval.
+2. **Approval authorizes; punches decide the hours.** A request approves a window (date, start, end). The hours actually credited are the time the employee was punched in **inside that approved window and outside their expected working window**, never more than approved. Approve 18:00–20:00, leave at 19:20 → 1h 20m. Leave at 21:00 → 2h. No punches → nothing.
+3. **Rates** (settings; Labour Law §139, §164):
+
+   | When | Rate |
+   |---|---|
+   | Workday, outside night hours | 150% |
+   | Night hours, 22:00–05:00 | 200% |
+   | Weekly rest day (a non-workday of the schedule) | 200% |
+   | Public holiday | 200% |
+
+   - A window crossing 22:00 or 05:00 is split by the minute: 21:00–23:00 on a workday is 1h at 150% and 1h at 200%.
+   - Rates don't stack: a holiday on a weekend at night is 200%, once.
+   - The system records minutes per rate. It never computes money: there's no wage data, and payroll is outside this app.
+4. **Pay or time off, chosen by the employee on the request** **(owner)**. The approver can change it when deciding (the step history records the change).
+5. **Time off in lieu (TOIL)** **(owner)**:
+   - **1:1.** One hour of overtime earns one hour off, whatever the rate (ratio is a setting).
+   - Credited minutes accumulate per employee. **Every full 4 hours becomes 0.5 day** in a "Time off in lieu" leave type; the remainder keeps accumulating.
+   - TOIL is taken exactly like Annual — same request flow, balance, half days.
+   - The law expects a day off within the following week for rest-day work taken as time off (§151–152); the system shows the balance but doesn't enforce timing. HR to confirm.
+6. **Limits** (settings; §137 and Prakas 112/25): at most **2 hours of overtime a day**, and at most **10 hours of work a day** including overtime. A request that would exceed either is refused for employees and managers; **an admin may override with a required reason** **(owner)**, recorded on the request.
+7. **Voluntary.** Overtime is requested by the employee (or filed by an admin on their behalf with their agreement, as leave is). There's no "assign overtime" flow.
+
+### Attendance integration
+
+8. **The builder computes overtime**, so it stays derived and recomputable. New columns on `daily_attendances`: `overtime_request_id`, `overtime_minutes_standard` (150%), `overtime_minutes_premium` (200%). Approving, cancelling, or correcting a punch rebuilds the day.
+9. **Outside the expected window** means outside `ExpectedWindow` for a workday. On a weekly rest day or holiday there is no expected window, so all approved, punched time counts (at 200%).
+10. **Early arrival** counts only if an approved window covers it. Arriving at 07:00 for an 08:00 schedule isn't overtime by itself.
+11. **Overnight:** overtime past midnight belongs to the work date of its in-punch, within the existing 18h pairing window. A window may end after midnight (e.g. 20:00–01:00).
+12. **Leave days:**
+    - No overtime request on a date covered by an approved full-day leave (the employee should cancel the leave first; "worked on leave" already flags the punch).
+    - Half-day leave: overtime is only time outside the **full** schedule window, not the shrunk one. AM leave + work 13:00–19:00 → 17:00–19:00 can be overtime. HR to confirm.
+13. **Incomplete days:** with no out-punch, no overtime is credited (the end time isn't known). It becomes credited once the punch is corrected.
+
+### TOIL settlement
+
+14. **TOIL credit follows the computed minutes, not the request.** When a day's overtime minutes change (approval, cancellation, punch correction), the employee's TOIL total is recalculated and the difference is posted as an **append-only, system-authored `leave_adjustments` row** linked to the overtime request. Never an edit.
+15. **Cancelling approved TOIL overtime** whose days are already taken may push the TOIL balance negative. That's allowed and shown, like an over-used Annual; HR decides.
+16. **The TOIL leave type** is seeded: no yearly grant, a balance built only from adjustments, half days allowed, workdays. Carry-over cap and expiry are HR settings.
+
+### Approval and authorization
+
+17. **Same engine as leave:** `approval_steps`, `ApprovalFlow`, manager → admin, every rule from Phase 3 rule 8 (no self-approval, sole-admin, override, approver-away stuck rule). `OvertimeRequest` implements `Approvable`.
+18. **One Approvals page** for leave and overtime, with the type shown on each item. The badge counts both.
+19. **`OvertimePolicy`** mirrors `LeavePolicy` (view, create for self or admin on behalf, approve, cancel). Cancel: the requester before the window starts, an admin any time.
+
+### Schema
+
+**`overtime_requests`** — `employee_id`, `date`, `starts_at`/`ends_at` (datetime), `kind` (`planned`/`claim`), `compensation` (`pay`/`time_off`), `reason`, `status` (`pending`/`approved`/`rejected`/`cancelled`), `current_step`, `requested_by`, `cancelled_by`/`cancelled_at`, `limit_override_reason` nullable, timestamps. One non-cancelled, non-rejected request per employee per date.
+
+**`overtime_settings`** — one row: rates, night window, daily overtime cap, daily total cap, claim window days, TOIL ratio, TOIL block minutes, TOIL leave type id. Changing a rate applies to days rebuilt afterwards; already-paid months are payroll's history, not this table's.
+
+**`daily_attendances`** — alter-migration adding the three overtime columns.
+
+**`leave_adjustments`** — alter-migration adding nullable `overtime_request_id`.
+
+### UI
+
+- **Overtime page** (everyone with an employee record): my requests with approved vs credited hours, a two-step request modal (planned or claim, pay or time off) whose review shows the rate split and any limit problem.
+- **Approvals:** overtime items alongside leave, with planned window, actual punches once known, and compensation choice.
+- **Policies → Overtime:** the settings above.
+- **Attendance views:** credited overtime as an annotation on the day (`OT 1h 20m`), never a status colour.
+- **Monthly overtime report** (admin): per employee, minutes at 150% and 200%, paid vs TOIL, with a CSV download for payroll. This is the one report Phase 4 needs; the rest stays in Phase 5.
+
+### Build order
+
+- **4a — Guard and schema:** first, `DatabaseSeeder` refuses to run in production (carried from Phase 3's "Still open"). Then the tables, settings, models, the TOIL leave type.
+- **4b — Builder:** overtime minutes, the rate split, the leave and overnight rules.
+- **4c — Requests:** submit, limits and override, approval on the shared engine, cancel, TOIL settlement.
+- **4d — UI:** Overtime page, Approvals, Policies, annotations, monthly report. Screenshot review stop as in 3e.
+- **4e — Closeout:** docs, GO_LIVE.md additions, pinned instants (add 21:59/22:01 and 04:59/05:01).
+
+### Still open (HR)
+
+- Rates, limits and the claim window as company policy.
+- TOIL ratio, whether rest-day TOIL must be taken the following week, carry-over and expiry.
+- Overtime on half-day leave days.
+- Whether overtime needs both approval steps or the manager alone.
+
 ### Still open
 
 - **HR to confirm the leave-type list** — Medical's 30 days and pay, whether Special is paid or made up, anything company-specific. This is a seed-data change only.
