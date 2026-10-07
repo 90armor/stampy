@@ -9,6 +9,8 @@ use App\Enums\OvertimeStatus;
 use App\Exceptions\InvalidOvertimeRequestException;
 use App\Exceptions\InvalidOvertimeTransitionException;
 use App\Policies\OvertimePolicy;
+use App\Support\AttendanceTime;
+use App\Support\DisplayDate;
 use App\Support\EmployeeScope;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\UsePolicy;
@@ -165,6 +167,47 @@ class OvertimeRequest extends Model implements Approvable
     public function approvalStartsOn(): ?CarbonInterface
     {
         return $this->kind === OvertimeKind::Planned ? $this->date : null;
+    }
+
+    /** "5:00 PM – 7:00 PM", with "(+1)" when it ends after midnight (the attendance views' convention). */
+    public function displayWindow(): string
+    {
+        return AttendanceTime::format($this->starts_at).' – '.AttendanceTime::format($this->ends_at)
+            .($this->ends_at->isSameDay($this->starts_at) ? '' : ' (+1)');
+    }
+
+    /** "Mon 5 Oct, 5:00 PM – 7:00 PM". */
+    public function displayDateAndWindow(): string
+    {
+        return DisplayDate::compact($this->date).', '.$this->displayWindow();
+    }
+
+    /** Whose decision a pending request waits for, or null once none is (as Leave::waitingLabel()). */
+    public function waitingLabel(): ?string
+    {
+        return match ($this->currentApprovalStep()) {
+            1 => 'Waiting for manager',
+            2 => 'Waiting for admin',
+            default => null,
+        };
+    }
+
+    /**
+     * For an approver: how soon a planned request starts, while that's within
+     * a week, or that it's already been worked ("Already worked" for a claim,
+     * or a planned date that has passed).
+     */
+    public function startsLabel(): ?string
+    {
+        $days = (int) today()->diffInDays($this->date->copy()->startOfDay(), false);
+
+        return match (true) {
+            $this->kind === OvertimeKind::Claim || $days < 0 => 'Already worked',
+            $days === 0 => 'Starts today',
+            $days === 1 => 'Starts tomorrow',
+            $days <= 7 => "Starts in {$days} days",
+            default => null,
+        };
     }
 
     /** The requests a user may see in a list — EmployeeScope's rule, as Leave::scopeVisibleTo(). */

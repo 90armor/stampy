@@ -78,19 +78,12 @@ class OvertimeCalculator
             return $credited;
         }
 
-        $from = max($firstIn->getTimestamp(), $request->starts_at->getTimestamp());
-        $to = min($lastOut->getTimestamp(), $request->ends_at->getTimestamp());
+        $segments = $this->countedSpans($request, $firstIn, $lastOut, $schedule, $workDate, $isScheduledWorkday, $isHoliday);
 
-        if ($to <= $from) {
+        if ($segments === []) {
             return $credited;
         }
 
-        $window = ExpectedWindow::for($schedule, $workDate);
-        $excluded = $isScheduledWorkday && ! $isHoliday
-            ? [$window->start->getTimestamp(), $window->end->getTimestamp()]
-            : ($window->breakStart !== null ? [$window->breakStart->getTimestamp(), $window->breakEnd->getTimestamp()] : null);
-
-        $segments = $excluded === null ? [[$from, $to]] : self::subtract([$from, $to], $excluded);
         $seconds = array_sum(array_map(fn (array $segment) => $segment[1] - $segment[0], $segments));
 
         // Highest precedence first, so the rounding shortfall below goes to the first one present.
@@ -111,6 +104,38 @@ class OvertimeCalculator
         }
 
         return new OvertimeCredit($request->id, ...self::truncate($byCategory));
+    }
+
+    /**
+     * The spans that count, as timestamps — [first_in, last_out] ∩ [starts_at,
+     * ends_at], less the schedule's full window on a day with scheduled hours,
+     * or less the break on one without. What calculate() credits, and what a
+     * request's review shows counting (OvertimeRequestService::preview()).
+     *
+     * @return list<array{0: int, 1: int}>
+     */
+    public function countedSpans(
+        OvertimeRequest $request,
+        CarbonInterface $firstIn,
+        CarbonInterface $lastOut,
+        WorkSchedule $schedule,
+        CarbonInterface $workDate,
+        bool $isScheduledWorkday,
+        bool $isHoliday,
+    ): array {
+        $from = max($firstIn->getTimestamp(), $request->starts_at->getTimestamp());
+        $to = min($lastOut->getTimestamp(), $request->ends_at->getTimestamp());
+
+        if ($to <= $from) {
+            return [];
+        }
+
+        $window = ExpectedWindow::for($schedule, $workDate);
+        $excluded = $isScheduledWorkday && ! $isHoliday
+            ? [$window->start->getTimestamp(), $window->end->getTimestamp()]
+            : ($window->breakStart !== null ? [$window->breakStart->getTimestamp(), $window->breakEnd->getTimestamp()] : null);
+
+        return $excluded === null ? [[$from, $to]] : self::subtract([$from, $to], $excluded);
     }
 
     /**

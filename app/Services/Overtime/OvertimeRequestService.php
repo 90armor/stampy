@@ -21,11 +21,13 @@ use App\Services\Attendance\EmployeeScheduleAssigner;
 use App\Services\Attendance\ExpectedWindow;
 use App\Services\Attendance\LeaveDay;
 use App\Services\Attendance\OvertimeCalculator;
+use App\Services\Attendance\OvertimeCredit;
 use App\Support\AttendanceTime;
 use App\Support\DisplayDate;
 use App\Support\Duration;
 use App\Support\WorkdayCalendar;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
@@ -90,7 +92,7 @@ class OvertimeRequestService
         $request = DB::transaction(function () use ($employee, $date, $startsAt, $endsAt, $compensation, $reason, $actor, $overrideReason) {
             $employee = Employee::query()->lockForUpdate()->findOrFail($employee->id);
 
-            $override = $this->validate($employee, $date, $startsAt, $endsAt, $compensation, $actor, $overrideReason);
+            $override = $this->validate($employee, $date, $startsAt, $endsAt, $compensation, $actor, $overrideReason)['override'];
             $onBehalf = $actor->hasRole('admin') && ! $actor->is($employee->user);
 
             $request = new OvertimeRequest([
@@ -126,6 +128,141 @@ class OvertimeRequestService
         });
 
         return ['request' => $request, 'rebuildError' => $request->status === OvertimeStatus::Approved ? $this->rebuild($request, 'approval') : null];
+    }
+
+    /**
+     * What submit() would file, checked by the same rules and nothing written
+     * — the request modal's review (Phase 4d). Throws exactly as submit()
+     * would, except that an admin over a daily limit without an override
+     * reason gets the problems back (limitProblems) to give one. No row lock:
+     * it writes nothing, and submit() checks everything again under the lock.
+     *
+     * @throws OvertimeValidationException
+     */
+    public function preview(
+        Employee $employee,
+        CarbonInterface $date,
+        CarbonInterface $startsAt,
+        CarbonInterface $endsAt,
+        OvertimeCompensation $compensation,
+        User $actor,
+        ?string $overrideReason = null,
+    ): OvertimePreview {
+        Gate::forUser($actor)->authorize('create', [OvertimeRequest::class, $employee]);
+
+        $employee = $employee->fresh();
+        $date = Carbon::instance($date)->startOfDay();
+        $startsAt = Carbon::instance($startsAt);
+        $endsAt = Carbon::instance($endsAt);
+
+        $checked = $this->validate($employee, $date, $startsAt, $endsAt, $compensation, $actor, $overrideReason, deferAdminLimits: true);
+        $day = $checked['day'];
+        $window = new OvertimeRequest(['date' => $date, 'starts_at' => $startsAt, 'ends_at' => $endsAt]);
+        $settings = OvertimeSettings::current();
+        $immutable = fn (int $timestamp) => CarbonImmutable::createFromTimestamp($timestamp, $date->getTimezone());
+
+        $credit = $this->calculator->calculate($window, $startsAt, $endsAt, $day['schedule'], $date, $day['isScheduledWorkday'], $day['isHoliday'], LeaveDay::none(), $settings);
+        $counted = array_map(fn (array $span) => [$immutable($span[0]), $immutable($span[1])],
+            $this->calculator->countedSpans($window, $startsAt, $endsAt, $day['schedule'], $date, $day['isScheduledWorkday'], $day['isHoliday']));
+        $normalFrom = max($startsAt->getTimestamp(), $day['window']->start->getTimestamp());
+        $normalTo = min($endsAt->getTimestamp(), $day['window']->end->getTimestamp());
+        $isClaim = ! $startsAt->gt(now());
+
+        $row = $isClaim ? $employee->dailyAttendances()->whereDate('work_date', $date->format('Y-m-d'))->first() : null;
+        $toil = null;
+
+        if ($compensation === OvertimeCompensation::TimeOff) {
+            $adds = intdiv($credit->total() * $settings->toil_ratio_percent, 100);
+            $saved = app(TimeOffInLieuReconciler::class)->remainderMinutes($employee) ?? 0;
+            $toil = ['adds' => $adds, 'saved' => $saved, 'completes' => intdiv($saved + $adds, $settings->toil_block_minutes)];
+        }
+
+        $onBehalf = $actor->hasRole('admin') && ! $actor->is($employee->user);
+
+        return new OvertimePreview(
+            employee: $employee,
+            date: CarbonImmutable::instance($date),
+            startsAt: CarbonImmutable::instance($startsAt),
+            endsAt: CarbonImmutable::instance($endsAt),
+            kind: $isClaim ? OvertimeKind::Claim : OvertimeKind::Planned,
+            compensation: $compensation,
+            credit: $credit,
+            counted: $counted,
+            normal: $day['hasHours'] && $normalTo > $normalFrom ? [$immutable($normalFrom), $immutable($normalTo)] : null,
+            limitProblems: $checked['override'] === null ? $checked['limitProblems'] : [],
+            overrideReason: $checked['override'],
+            punches: $row !== null ? ['in' => $row->first_in?->toImmutable(), 'out' => $row->last_out?->toImmutable()] : null,
+            toil: $toil,
+            approvedOnSubmit: $onBehalf,
+            reviewers: $onBehalf ? '' : $this->reviewers($employee),
+        );
+    }
+
+    /**
+     * The minutes an approved window can credit — all of it worked
+     * (OvertimeCalculator on the window itself): "1h 20m credited of 2h
+     * approved".
+     */
+    public function approvedMinutes(OvertimeRequest $request): int
+    {
+        return $this->creditableMinutes($this->day($request->employee, $request->date->copy()), $request->starts_at, $request->ends_at);
+    }
+
+    /**
+     * What the day's punches would credit if the request were approved — for
+     * an approver deciding a claim or a past planned request (Phase 4d):
+     * "Punched 8:02 AM – 7:05 PM → 2h would be credited (workday)". Null when
+     * the day has no row yet. The builder's own calculation, on its paired
+     * punches.
+     *
+     * @return array{in: ?Carbon, out: ?Carbon, credit: OvertimeCredit}|null
+     */
+    public function wouldCredit(OvertimeRequest $request): ?array
+    {
+        $row = $request->employee->dailyAttendances()->whereDate('work_date', $request->date->format('Y-m-d'))->first();
+
+        if ($row === null) {
+            return null;
+        }
+
+        $day = $this->day($request->employee, $request->date->copy());
+        $leaveDay = LeaveDay::on($this->leavesOn($request->employee, $request->date->copy(), [LeaveStatus::Approved]), $request->date);
+
+        return [
+            'in' => $row->first_in,
+            'out' => $row->last_out,
+            'credit' => $this->calculator->calculate($request, $row->first_in, $row->last_out, $day['schedule'], $request->date, $day['isScheduledWorkday'], $day['isHoliday'], $leaveDay, OvertimeSettings::current()),
+        ];
+    }
+
+    /**
+     * The limit problems a request has now — what the decision completing it
+     * would re-check (approve()). For the approve dialog: a manager sees them
+     * as a notice, an admin at the final step is asked for an override reason.
+     *
+     * @return list<string>
+     */
+    public function currentLimitProblems(OvertimeRequest $request): array
+    {
+        $day = $this->day($request->employee, $request->date->copy());
+
+        return $this->limitProblems($day, $this->creditableMinutes($day, $request->starts_at, $request->ends_at));
+    }
+
+    /** Who reviews a new request of $employee's, in words. */
+    private function reviewers(Employee $employee): string
+    {
+        $probe = new OvertimeRequest;
+        $probe->setRelation('employee', $employee);
+        $skip = $this->flow->stepOneSkipReason($probe);
+
+        if ($skip !== null) {
+            return "It goes straight to an admin: {$skip}";
+        }
+
+        $names = $this->flow->stepOneApprovers($probe)->map(fn (User $user) => $user->employee?->full_name ?? $user->name)->implode(' or ');
+
+        return "{$names} reviews it first, then an admin. You can cancel it until it starts.";
     }
 
     /**
@@ -358,7 +495,11 @@ class OvertimeRequestService
      * Every rule a new request must meet, in stages; the first stage with a
      * failure throws (OvertimeValidationException).
      *
-     * @return ?string the override reason to store — only when a limit is exceeded and an admin gave one
+     * Returns the override reason to store (only when a limit is exceeded and
+     * an admin gave one), the day, the creditable minutes and the limit
+     * problems (for a preview's review).
+     *
+     * @return array{override: ?string, day: array<string, mixed>, creditable: int, limitProblems: list<string>}
      *
      * @throws OvertimeValidationException
      */
@@ -370,7 +511,8 @@ class OvertimeRequestService
         OvertimeCompensation $compensation,
         User $actor,
         ?string $overrideReason,
-    ): ?string {
+        bool $deferAdminLimits = false,
+    ): array {
         $errors = new ValidationErrors;
 
         // 1. Employment.
@@ -449,30 +591,24 @@ class OvertimeRequestService
         $errors->throwIfAny();
 
         // 6. The daily limits.
-        $override = $this->checkLimits($errors, $day, $creditable, $actor, $overrideReason);
+        $override = $this->checkLimits($errors, $day, $creditable, $actor, $overrideReason, $deferAdminLimits);
 
         // 7. Time off needs somewhere to credit it.
         $this->checkCompensation($errors, $compensation);
 
         $errors->throwIfAny();
 
-        return $override;
+        return ['override' => $override, 'day' => $day, 'creditable' => $creditable, 'limitProblems' => $this->limitProblems($day, $creditable)];
     }
 
     /**
-     * The limits (rule 6) on a window's creditable minutes: on a day with
-     * scheduled hours, at most max_overtime_minutes_per_day of overtime, and
-     * the scheduled minutes (less the half on leave) plus the overtime at
-     * most max_work_minutes_per_day. On a day with none — a non-workday or a
-     * holiday — only the total applies (Claude's decision, open to the
-     * owner's veto: the 2-hour cap is about extending a normal day, and would
-     * forbid an ordinary 8-hour Saturday). Over a limit, only an admin's
-     * override reason lets it through.
+     * The daily-limit problems with a window's creditable minutes, in words
+     * (empty when it's within them) — rule 6, see checkLimits().
      *
      * @param  array<string, mixed>  $day  day()
-     * @return ?string the override reason to store, if one was needed
+     * @return list<string>
      */
-    private function checkLimits(ValidationErrors $errors, array $day, int $creditable, User $actor, ?string $overrideReason): ?string
+    private function limitProblems(array $day, int $creditable): array
     {
         $settings = OvertimeSettings::current();
         $problems = [];
@@ -489,14 +625,37 @@ class OvertimeRequestService
                 : 'This is '.Duration::format($total).' of work').'; the limit is '.Duration::format($settings->max_work_minutes_per_day).' a day.';
         }
 
+        return $problems;
+    }
+
+    /**
+     * The limits (rule 6) on a window's creditable minutes: on a day with
+     * scheduled hours, at most max_overtime_minutes_per_day of overtime, and
+     * the scheduled minutes (less the half on leave) plus the overtime at
+     * most max_work_minutes_per_day. On a day with none — a non-workday or a
+     * holiday — only the total applies (Claude's decision, open to the
+     * owner's veto: the 2-hour cap is about extending a normal day, and would
+     * forbid an ordinary 8-hour Saturday). Over a limit, only an admin's
+     * override reason lets it through.
+     *
+     * $deferForAdmin (a preview): an admin over a limit without a reason
+     * isn't refused yet — the review shows the problems and asks for one.
+     *
+     * @param  array<string, mixed>  $day  day()
+     * @return ?string the override reason to store, if one was needed
+     */
+    private function checkLimits(ValidationErrors $errors, array $day, int $creditable, User $actor, ?string $overrideReason, bool $deferForAdmin = false): ?string
+    {
+        $problems = $this->limitProblems($day, $creditable);
+
         if ($problems === []) {
             return null;
         }
 
         $reason = trim((string) $overrideReason);
 
-        if ($actor->hasRole('admin') && $reason !== '') {
-            return $reason;
+        if ($actor->hasRole('admin') && ($reason !== '' || $deferForAdmin)) {
+            return $reason !== '' ? $reason : null;
         }
 
         foreach ($problems as $problem) {

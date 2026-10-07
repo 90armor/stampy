@@ -61,6 +61,7 @@ class User extends Authenticatable
             'password_reset_at' => 'datetime',
             'temporary_password_expires_at' => 'datetime',
             'time_off_seen_at' => 'datetime',
+            'overtime_seen_at' => 'datetime',
         ];
     }
 }

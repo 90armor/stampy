@@ -17,13 +17,21 @@ use App\Services\Approval\ApprovalFlow;
 class OvertimePolicy
 {
     /**
-     * Anyone with something to see: admins and managers, and anyone with an
-     * employee record (their own). Which requests a list shows is
-     * OvertimeRequest::scopeVisibleTo(), through EmployeeScope.
+     * The Overtime page and its sidebar item (Phase 4d): anyone with an
+     * employee record (their own requests), and an admin, who files for
+     * others there — the Time off precedent (LeavePolicy::timeOff). A manager
+     * without an employee record has an empty EmployeeScope, so nothing to
+     * see. Which requests a list shows is OvertimeRequest::scopeVisibleTo().
      */
     public function viewAny(User $user): bool
     {
-        return $user->hasAnyRole(['admin', 'manager']) || $user->employee !== null;
+        return $user->employee !== null || $this->fileForOthers($user);
+    }
+
+    /** Filing on someone else's behalf ("File for an employee") — admins only. */
+    public function fileForOthers(User $user): bool
+    {
+        return $user->hasRole('admin');
     }
 
     /** Mirrors EmployeePolicy::view: their own, their reports' (a manager's), anyone's (an admin's). */

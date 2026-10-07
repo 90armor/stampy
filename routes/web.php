@@ -7,6 +7,7 @@ use App\Livewire\Employees\Index as EmployeesIndex;
 use App\Livewire\Employees\Show as ShowEmployee;
 use App\Livewire\Leave\Approvals;
 use App\Livewire\Leave\TimeOff;
+use App\Livewire\Overtime\Index as OvertimeIndex;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Position;
@@ -101,6 +102,7 @@ Route::middleware('auth')->group(function () {
     // decideAny).
     Route::get('/time-off', TimeOff::class)->name('time-off.index');
     Route::get('/approvals', Approvals::class)->name('approvals.index');
+    Route::get('/overtime', OvertimeIndex::class)->name('overtime.index');
 });
 
 Route::middleware(['auth', 'role:admin|manager'])->group(function () {

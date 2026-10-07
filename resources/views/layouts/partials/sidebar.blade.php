@@ -12,6 +12,7 @@ $navItems = [
     ['label' => 'My attendance', 'route' => 'attendance.mine', 'icon' => 'user-circle', 'visible' => true, 'enabled' => true, 'activePatterns' => ['attendance.mine']],
     // Gated by the ability each page itself checks, never a role list (CLAUDE.md, Roles & authorization).
     ['label' => 'Time off', 'route' => 'time-off.index', 'icon' => 'calendar-days', 'visible' => auth()->user()->can('timeOff', \App\Models\Leave::class), 'enabled' => true, 'activePatterns' => ['time-off.*']],
+    ['label' => 'Overtime', 'route' => 'overtime.index', 'icon' => 'bolt', 'visible' => auth()->user()->can('viewAny', \App\Models\OvertimeRequest::class), 'enabled' => true, 'activePatterns' => ['overtime.*']],
     ['label' => 'Approvals', 'route' => 'approvals.index', 'icon' => 'inbox', 'visible' => auth()->user()->can('decideAny', \App\Models\Leave::class), 'enabled' => true, 'activePatterns' => ['approvals.*'], 'badge' => \App\Support\ApprovalBadge::count(auth()->user())],
         ['label' => 'Reports', 'icon' => 'document-text', 'visible' => auth()->user()->hasAnyRole(['admin', 'manager']), 'enabled' => false],
 ];
