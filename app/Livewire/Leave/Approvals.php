@@ -232,6 +232,7 @@ class Approvals extends Component
         $request->loadMissing(['employee.department', 'approvalSteps.decidedBy']);
 
         $worked = null;
+        $workedHint = null;
 
         if (! $request->date->isFuture()) {
             $would = $service->wouldCredit($request);
@@ -243,13 +244,23 @@ class Approvals extends Component
             $which = $request->compensation === OvertimeCompensation::Pay && $categories !== []
                 ? ' ('.collect($categories)->keys()->map(fn ($key) => strtolower(OvertimeSummary::CATEGORIES[$key][0]))->implode(', ').')'
                 : '';
+            // Less than requested is written against the request, so it can't be read past.
+            $requested = $service->approvedMinutes($request);
+            $short = $credit !== null && $credit->total() < $requested;
             $worked = match (true) {
                 $would === null || ($would['in'] === null && $would['out'] === null) => 'No punches on record for this day yet: nothing would be credited until they\'re added.',
                 $would['out'] === null => 'Punched in '.AttendanceTime::format($would['in']).'. No out-punch: nothing would be credited until it\'s added.',
                 default => 'Punched '.AttendanceTime::format($would['in']).' – '.AttendanceTime::format($would['out'])
                     .($would['out']->isSameDay($request->date) ? '' : ' (+1)')
-                    .' → '.($credit->total() > 0 ? Duration::format($credit->total()).' would be credited'.$which : 'nothing would be credited'),
+                    .' → '.match (true) {
+                        ! $short => Duration::format($credit->total()).' would be credited'.$which,
+                        $credit->total() > 0 => Duration::format($credit->total()).' of '.Duration::format($requested).' requested would be credited'.$which,
+                        default => 'none of '.Duration::format($requested).' requested would be credited',
+                    },
             };
+            if ($short && $would['in'] !== null && $would['out'] !== null) {
+                $workedHint = 'Check the punches before approving — an out-punch may be missing.';
+            }
         }
 
         return [
@@ -261,6 +272,7 @@ class Approvals extends Component
             'awayReason' => null,
             'department' => $request->employee->department?->name,
             'worked' => $worked,
+            'workedHint' => $workedHint,
         ];
     }
 

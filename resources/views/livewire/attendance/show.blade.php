@@ -827,11 +827,14 @@
                             :new-punch-date="$newPunchDate"
                             :new-punch-time="$newPunchTime"
                             :new-punch-type="$newPunchType"
+                            initial-focus
                         />
                     </div>
 
+                    {{-- Opening lands on Add punch for an admin, else Close — never on a link in the
+                    Leave or Overtime section above (the first [autofocus] in the modal wins). --}}
                     <div class="mt-5 flex justify-end border-t border-slate-divider pt-4">
-                        <x-button type="button" variant="secondary" wire:click="closeDayModal">Close</x-button>
+                        <x-button type="button" variant="secondary" wire:click="closeDayModal" autofocus>Close</x-button>
                     </div>
                 </div>
             @endif

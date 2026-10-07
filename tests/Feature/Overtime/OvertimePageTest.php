@@ -241,6 +241,7 @@ class OvertimePageTest extends TestCase
             ->call('review')
             ->assertSee('This is a claim: the time has already started.')
             ->assertSee('With your punches (out 7:05 PM), all 2h 00m would be credited.')
+            ->assertDontSee('Requested:')
             // A claim has already started: only an admin can cancel it now.
             ->assertSee('Aye Aye Mon reviews it first, then an admin.')
             ->assertDontSee('You can cancel it until it starts.');
@@ -256,13 +257,24 @@ class OvertimePageTest extends TestCase
         $this->modal()
             ->set('date', '2026-06-12')->set('start_time', '17:00')->set('end_time', '18:00')
             ->call('review')
-            ->assertSee('Workday (150%) 1h 00m')
+            // The split is the request, said so above the lower punch figure.
+            ->assertSee('Requested: Workday (150%) 1h 00m')
             ->assertSee('With your punches (out 5:08 PM), 8m would be credited. If you forgot to punch out, ask an admin to correct the punch first.');
 
         $this->modal()
             ->set('date', '2026-06-11')->set('start_time', '17:00')->set('end_time', '18:00')
             ->call('review')
+            ->assertSee('Requested: Workday (150%) 1h 00m')
             ->assertSee("No out-punch: nothing would be credited until it's added.");
+
+        // Punches that cover the whole window: the split is what will be credited, no prefix.
+        $this->worked('2026-06-10', '08:00:00', '18:30:00');
+        app(DailySummaryBuilder::class)->rebuildAround($this->employee, Carbon::parse('2026-06-10'));
+        $this->modal()
+            ->set('date', '2026-06-10')->set('start_time', '17:00')->set('end_time', '18:00')
+            ->call('review')
+            ->assertSee('Workday (150%) 1h 00m')
+            ->assertDontSee('Requested:');
     }
 
     public function test_an_overnight_end_is_the_next_day(): void

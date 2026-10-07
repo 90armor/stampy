@@ -45,6 +45,9 @@ class Overtime extends Component
 
         return response()->streamDownload(function () use ($report, $month, $exportedAt, $categories) {
             $out = fopen('php://output', 'w');
+            // A UTF-8 byte-order mark: HR opens this in Excel, which otherwise
+            // reads the file as ANSI and breaks "—" and Khmer or Myanmar names.
+            fwrite($out, "\xEF\xBB\xBF");
             fputcsv($out, ['Overtime report, '.DisplayDate::month($month).' — generated '.$exportedAt->format('Y-m-d H:i').' ('.config('app.timezone').')']);
             if ($report['open']) {
                 fputcsv($out, ['This month is still open: figures can change until it ends.']);

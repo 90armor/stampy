@@ -31,6 +31,9 @@ approval-item. $item comes from Leave\Approvals::describeOvertime(). --}}
             {{-- A claim, or a planned date that has passed: did they actually stay? --}}
             @if ($item['worked'])
                 <p class="text-sm tabular-nums text-slate-700 dark:text-slate-200">{{ $item['worked'] }}</p>
+                @if ($item['workedHint'])
+                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ $item['workedHint'] }}</p>
+                @endif
             @endif
             @if ($steps->isNotEmpty())
                 <ul class="space-y-0.5 text-xs text-slate-500 dark:text-slate-400">

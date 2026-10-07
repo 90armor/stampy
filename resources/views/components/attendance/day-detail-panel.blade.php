@@ -11,6 +11,9 @@
     // recorded on this day belongs to, when it isn't this day's.
     'overnightOut' => null,
     'overnightShifts' => null,
+    // The day modal's initial focus (docs/DESIGN_SYSTEM.md, Overlays): Add
+    // punch for an admin. Off in the table's expanded row.
+    'initialFocus' => false,
 ])
 
 {{-- Shared by the table view's expandable row and the calendar view's day
@@ -39,7 +42,7 @@ divergence here would be a real correctness bug, not just a style one. --}}
             @endif
         </h4>
         @if ($canEdit && ! $isAdding)
-            <x-button type="button" variant="secondary" wire:click="startAddingPunch('{{ $dayKey }}')">
+            <x-button type="button" variant="secondary" wire:click="startAddingPunch('{{ $dayKey }}')" :autofocus="$initialFocus">
                 <x-icon name="plus" class="h-5 w-5" />
                 Add punch
             </x-button>

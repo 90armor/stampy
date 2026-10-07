@@ -164,7 +164,11 @@ class OvertimeReportTest extends TestCase
         $response = Livewire::actingAs($this->admin)->test(Overtime::class)->set('month', '2026-05')->call('download');
         $response->assertFileDownloaded('overtime-2026-05-exported-2026-06-15-0910.csv');
 
-        $lines = array_map('str_getcsv', explode("\n", trim($this->downloadedContent($response))));
+        // A UTF-8 byte-order mark first, for Excel; the rows after it are plain CSV.
+        $content = $this->downloadedContent($response);
+        $this->assertStringStartsWith("\xEF\xBB\xBF", $content);
+        $this->assertSame(1, substr_count($content, "\xEF\xBB\xBF"));
+        $lines = array_map('str_getcsv', explode("\n", trim(substr($content, 3))));
         $this->assertSame('Overtime report, May 2026 — generated 2026-06-15 09:10 (Asia/Phnom_Penh)', $lines[0][0]);
         $this->assertStringStartsWith('Only approved, credited minutes count.', $lines[1][0]);
         $this->assertSame(['Code', 'Name', 'Department', 'Pay: Workday minutes', 'Pay: Night minutes', 'Pay: Rest day minutes', 'Pay: Holiday minutes', 'Time off minutes', 'Pay-equivalent hours'], $lines[2]);
@@ -174,7 +178,7 @@ class OvertimeReportTest extends TestCase
 
         // The open month says so in the file too.
         $open = Livewire::actingAs($this->admin)->test(Overtime::class)->call('download');
-        $this->assertSame('This month is still open: figures can change until it ends.', str_getcsv(explode("\n", $this->downloadedContent($open))[1])[0]);
+        $this->assertSame('This month is still open: figures can change until it ends.', str_getcsv(explode("\n", substr($this->downloadedContent($open), 3))[1])[0]);
     }
 
     private function downloadedContent($response): string

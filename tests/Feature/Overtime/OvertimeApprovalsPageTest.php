@@ -117,7 +117,24 @@ class OvertimeApprovalsPageTest extends TestCase
         Livewire::actingAs($this->manager->user)->test(Approvals::class)
             ->assertSee('Punched 8:02 AM – 7:05 PM → 2h 00m would be credited (workday)')
             ->assertSee('No punches on record for this day yet: nothing would be credited until they\'re added.')
+            ->assertDontSee('Check the punches before approving')
             ->assertSee('Already worked');
+    }
+
+    public function test_less_than_requested_is_written_against_the_request_with_a_hint(): void
+    {
+        AttendanceLog::factory()->create(['employee_id' => $this->employee->id, 'punched_at' => '2026-06-12 08:01:00', 'punch_type' => 'in']);
+        AttendanceLog::factory()->create(['employee_id' => $this->employee->id, 'punched_at' => '2026-06-12 17:01:00', 'punch_type' => 'out']);
+        AttendanceLog::factory()->create(['employee_id' => $this->employee->id, 'punched_at' => '2026-06-11 08:00:00', 'punch_type' => 'in']);
+        AttendanceLog::factory()->create(['employee_id' => $this->employee->id, 'punched_at' => '2026-06-11 16:30:00', 'punch_type' => 'out']);
+        app(DailySummaryBuilder::class)->rebuildAround($this->employee, Carbon::parse('2026-06-11'), Carbon::parse('2026-06-12'));
+        $this->overtime('2026-06-12', '17:00', '18:00');
+        $this->overtime('2026-06-11', '17:00', '18:00');
+
+        Livewire::actingAs($this->manager->user)->test(Approvals::class)
+            ->assertSee('Punched 8:01 AM – 5:01 PM → 1m of 1h 00m requested would be credited (workday)')
+            ->assertSee('Punched 8:00 AM – 4:30 PM → none of 1h 00m requested would be credited')
+            ->assertSee('Check the punches before approving — an out-punch may be missing.');
     }
 
     public function test_the_page_shows_exactly_what_the_badge_counts(): void

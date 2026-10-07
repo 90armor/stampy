@@ -112,6 +112,35 @@ class OvertimeAttendanceViewsTest extends TestCase
             ->assertSee('View in Overtime');
     }
 
+    /**
+     * The day modal opens on Add punch for an admin and on Close for anyone
+     * else (docs/DESIGN_SYSTEM.md, Overlays), never on the Overtime or Leave
+     * section's link above them: both are marked autofocus, and <x-modal>
+     * takes the first visible one.
+     */
+    public function test_the_day_modal_still_opens_on_add_punch_or_close_with_an_overtime_link_above(): void
+    {
+        $this->overtime('2026-06-10', '19:00:00');
+        $autofocused = function (string $html): array {
+            preg_match_all('/<(a|button)\b([^>]*)>(.*?)<\/\1>/s', $html, $controls, PREG_SET_ORDER);
+
+            return collect($controls)
+                ->filter(fn ($control) => preg_match('/\sautofocus(=|\s|$)/', $control[2]))
+                ->map(fn ($control) => trim(strip_tags($control[3])))
+                ->values()->all();
+        };
+
+        $admin = Livewire::actingAs($this->admin)->test(Show::class, ['employee' => $this->employee])
+            ->set('month', '2026-06')->call('openDay', '2026-06-10')
+            ->assertSee('View on profile');
+        $this->assertSame(['Add punch', 'Close'], $autofocused($admin->html()));
+
+        $own = Livewire::actingAs($this->employee->user)->test(Show::class, ['employee' => $this->employee])
+            ->set('month', '2026-06')->call('openDay', '2026-06-10')
+            ->assertSee('View in Overtime');
+        $this->assertSame(['Close'], $autofocused($own->html()));
+    }
+
     public function test_a_credited_pay_day_shows_its_categories_in_the_modal(): void
     {
         $this->overtime('2026-06-12', '23:00:00', '21:00', '23:00');

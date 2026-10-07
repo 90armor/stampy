@@ -258,6 +258,7 @@ class RequestModal extends Component
         // A claim: what the day's real punches would credit if it were
         // approved — the window can promise more than they stayed for.
         $punches = null;
+        $punchesDiffer = false;
         if ($preview->kind === OvertimeKind::Claim) {
             $in = $preview->punches['in'] ?? null;
             $out = $preview->punches['out'] ?? null;
@@ -271,6 +272,7 @@ class RequestModal extends Component
                     .($credited > 0 ? Duration::format($credited).' would be credited' : 'nothing would be credited')
                     .'. If '.($this->forOthers ? 'they' : 'you').' forgot to punch out, ask an admin to correct the punch first.',
             };
+            $punchesDiffer = ($credited ?? 0) < $preview->credit->total();
         }
 
         $toil = null;
@@ -297,7 +299,8 @@ class RequestModal extends Component
                 ? 'Only '.collect($preview->counted)->map($span)->implode(' and ').' counts. '.$span($preview->normal).' is normal working hours.'
                 : null,
             // Rates belong to pay only: time off is earned 1:1 whatever the category.
-            'split' => $preview->compensation === OvertimeCompensation::Pay ? OvertimeSummary::categoryLine([
+            // Above a lower punch-based figure it says it's the request, not the credit.
+            'split' => $preview->compensation === OvertimeCompensation::Pay ? ($punchesDiffer ? 'Requested: ' : '').OvertimeSummary::categoryLine([
                 'workday' => $preview->credit->workday, 'night' => $preview->credit->night,
                 'rest_day' => $preview->credit->restDay, 'holiday' => $preview->credit->holiday,
             ]) : null,
