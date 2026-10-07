@@ -8,6 +8,7 @@ use App\Livewire\Employees\Show as ShowEmployee;
 use App\Livewire\Leave\Approvals;
 use App\Livewire\Leave\TimeOff;
 use App\Livewire\Overtime\Index as OvertimeIndex;
+use App\Livewire\Reports\Overtime as OvertimeReport;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Position;
@@ -120,6 +121,8 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::get('/policies', function () {
         return view('policies');
     })->name('policies.index');
+    // Reports (Phase 4d): the page checks its own ability (ReportPolicy); this group is the second layer.
+    Route::get('/reports/overtime', OvertimeReport::class)->name('reports.overtime');
 });
 
 require __DIR__.'/auth.php';

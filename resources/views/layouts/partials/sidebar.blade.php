@@ -14,7 +14,10 @@ $navItems = [
     ['label' => 'Time off', 'route' => 'time-off.index', 'icon' => 'calendar-days', 'visible' => auth()->user()->can('timeOff', \App\Models\Leave::class), 'enabled' => true, 'activePatterns' => ['time-off.*']],
     ['label' => 'Overtime', 'route' => 'overtime.index', 'icon' => 'bolt', 'visible' => auth()->user()->can('viewAny', \App\Models\OvertimeRequest::class), 'enabled' => true, 'activePatterns' => ['overtime.*']],
     ['label' => 'Approvals', 'route' => 'approvals.index', 'icon' => 'inbox', 'visible' => auth()->user()->can('decideAny', \App\Models\Leave::class), 'enabled' => true, 'activePatterns' => ['approvals.*'], 'badge' => \App\Support\ApprovalBadge::count(auth()->user())],
-        ['label' => 'Reports', 'icon' => 'document-text', 'visible' => auth()->user()->hasAnyRole(['admin', 'manager']), 'enabled' => false],
+    // Reports (Phase 4d): live for whoever can open the overtime report (ReportPolicy); still "Soon" for managers.
+    auth()->user()->can('reports.overtime')
+        ? ['label' => 'Reports', 'route' => 'reports.overtime', 'icon' => 'document-text', 'visible' => true, 'enabled' => true, 'activePatterns' => ['reports.*']]
+        : ['label' => 'Reports', 'icon' => 'document-text', 'visible' => auth()->user()->hasRole('manager'), 'enabled' => false],
 ];
 @endphp
 
