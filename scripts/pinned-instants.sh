@@ -1,5 +1,5 @@
 #!/bin/sh
-# Run the test suite with the clock pinned at each of the 21 instants
+# Run the test suite with the clock pinned at each of the 25 instants
 # (CLAUDE.md, Local environment, "One suite at a time"). Each instant's full
 # PHPUnit output is kept in its own log, so a failure that doesn't reproduce
 # still leaves its error text behind:
@@ -12,7 +12,7 @@
 #
 # Tests\TestCase::setUp() travels to PIN_NOW when it's set; a test class that
 # pins its own clock still does so after it. Exits 1 if any instant failed.
-# Takes about 16 minutes for the whole suite; it's one suite run at a time,
+# Takes about 25 minutes for the whole suite; it's one suite run at a time,
 # so don't commit (the pre-commit hook runs the suite) while it's going.
 
 cd "$(git rev-parse --show-toplevel)" || exit 1
@@ -40,7 +40,8 @@ for t in \
     "2026-02-07 23:59:30" "2026-02-08 12:00:00" "2026-02-28 23:59:30" "2026-03-01 00:00:30" \
     "2026-03-31 23:59:30" "2026-04-01 00:00:30" "2026-07-15 12:00:00" "2026-12-31 23:59:30" \
     "2027-01-01 00:00:30" "2027-01-01 00:05:30" "2028-02-29 12:00:00" "2028-03-01 00:00:30" \
-    "2030-07-15 12:00:00"
+    "2030-07-15 12:00:00" \
+    "2026-02-03 21:59:30" "2026-02-03 22:00:30" "2026-02-05 04:59:30" "2026-02-05 05:00:30"
 do
     log="$RUN/$(echo "$t" | tr ' :' '_-').log"
     if docker compose exec -T -e PIN_NOW="$t" app php vendor/bin/phpunit --colors=never "$@" > "$log" 2>&1; then

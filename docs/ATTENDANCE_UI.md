@@ -12,6 +12,8 @@ There is no `Late` attendance status. A person who arrived late or left early st
 
 A cell or badge color encodes the attendance **status** only — one value per day. Attributes that can co-occur on the same day (timing exceptions now, partial leave later) are **annotations inside the cell**, never the cell or badge color. A late or early Present day is a green "Present".
 
+Credited overtime (Phase 4b, `daily_attendances`' four `overtime_*_minutes` columns) is the same kind of attribute: an annotation, never a status or a colour. Its visuals come in Phase 4d.
+
 `DailyAttendance::displayVariant()` is the only source of truth for the display variant, and it is status-only. Views must not independently infer a color from status or timing fields. Timing stays exposed through `isLate()`, `leftEarly()`, and `hasTimingException()`.
 
 | Display variant | Meaning |
