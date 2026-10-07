@@ -4,11 +4,14 @@ namespace App\Services\Attendance;
 
 use App\Enums\AttendanceStatus;
 use App\Enums\LeaveStatus;
+use App\Enums\OvertimeStatus;
 use App\Enums\PunchType;
 use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
 use App\Models\Employee;
 use App\Models\Leave;
+use App\Models\OvertimeRequest;
+use App\Models\OvertimeSettings;
 use App\Models\WorkSchedule;
 use App\Support\WorkdayCalendar;
 use Carbon\Carbon;
@@ -24,7 +27,11 @@ use Illuminate\Support\Facades\Log;
  *
  * Approved leave is an input since Phase 3d (LeaveDay): a range build loads
  * the employee's approved leaves once (approvedLeavesBetween()) and passes
- * them to build() for every date; a lone build() loads its own.
+ * them to build() for every date; a lone build() loads its own. Approved
+ * overtime requests are one more since Phase 4b, loaded the same way
+ * (approvedOvertimeBetween()) and credited by OvertimeCalculator — a separate
+ * dimension like late minutes: they never change a day's status. Every
+ * multi-date build goes through buildDates().
  *
  * Every attendance_logs query here uses AttendanceLog::notVoided() — a
  * voided punch (e.g. someone else's finger matched the device) must never
@@ -41,6 +48,8 @@ class DailySummaryBuilder
      */
     public const MAX_SHIFT_HOURS = 18;
 
+    public function __construct(private OvertimeCalculator $overtime = new OvertimeCalculator) {}
+
     /**
      * Returns null, having removed any existing row, for a date the employee
      * wasn't employed on (Employee::isActiveOn(): before join_date, or after
@@ -48,7 +57,7 @@ class DailySummaryBuilder
      * they were still active behind it, and the builder stays the only writer
      * of daily_attendances — so it's the builder that removes them.
      */
-    public function build(Employee $employee, CarbonInterface $date, ?Collection $leaves = null): ?DailyAttendance
+    public function build(Employee $employee, CarbonInterface $date, ?Collection $leaves = null, ?Collection $overtime = null): ?DailyAttendance
     {
         $workDate = Carbon::instance($date)->startOfDay();
 
@@ -157,6 +166,16 @@ class DailySummaryBuilder
         $attributes['work_schedule_id'] = $schedule->id;
         $attributes['leave_id'] = $leaveDay->leaveId;
 
+        // Overtime (Phase 4b): the approved request for this work date, if any,
+        // credited from the same paired punches. Status and timing above are
+        // already decided and don't look at it.
+        $request = ($overtime ?? $this->approvedOvertimeBetween($employee, $workDate, $workDate))
+            ->first(fn (OvertimeRequest $request) => $request->date->isSameDay($workDate));
+        $attributes += $this->overtime->calculate(
+            $request, $firstIn?->punched_at, $lastOut?->punched_at, $schedule, $workDate,
+            $isWorkday, $isHoliday, $leaveDay, OvertimeSettings::current(),
+        )->attributes();
+
         // Not updateOrCreate(): work_date has a 'date' cast, which formats
         // through the connection's full datetime format when set on the
         // model but is compared here as a plain 'Y-m-d' string — on SQLite
@@ -210,7 +229,7 @@ class DailySummaryBuilder
         $first = Carbon::instance($from)->startOfDay()->subDay()->max($employee->join_date->copy()->startOfDay());
         $last = Carbon::instance($to ?? $from)->startOfDay()->addDay()->min(today());
 
-        return $this->buildRange($employee, $first, $last);
+        return $this->buildDates($employee, $first, $last);
     }
 
     /**
@@ -242,7 +261,7 @@ class DailySummaryBuilder
             return 0;
         }
 
-        return $this->buildRange($employee, $first, $last);
+        return $this->buildDates($employee, $first, $last);
     }
 
     /**
@@ -262,7 +281,21 @@ class DailySummaryBuilder
             return 0;
         }
 
-        return $this->buildRange($employee, $first, $last);
+        return $this->buildDates($employee, $first, $last);
+    }
+
+    /**
+     * An overtime request's work date, after it's approved or cancelled
+     * (Phase 4c calls this). Just that date: overtime after midnight belongs
+     * to its work date, and a decision changes no punch, so no adjacent day's
+     * pairing can change. Clamped like rebuildBetween() — a future date
+     * builds nothing.
+     *
+     * @return int the number of days built (0 or 1)
+     */
+    public function rebuildOvertimeDate(OvertimeRequest $request): int
+    {
+        return $this->rebuildBetween($request->employee, $request->date, $request->date);
     }
 
     /**
@@ -281,13 +314,48 @@ class DailySummaryBuilder
             ->get();
     }
 
-    private function buildRange(Employee $employee, Carbon $first, Carbon $last): int
+    /**
+     * The employee's approved overtime requests with a work date in
+     * $from..$to, in one query (Phase 4b) — passed to build() like the leaves.
+     *
+     * @return Collection<int, OvertimeRequest>
+     */
+    public function approvedOvertimeBetween(Employee $employee, CarbonInterface $from, CarbonInterface $to): Collection
+    {
+        return OvertimeRequest::query()
+            ->where('employee_id', $employee->id)
+            ->where('status', OvertimeStatus::Approved->value)
+            ->whereBetween('date', [$from->format('Y-m-d'), $to->format('Y-m-d')])
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * Builds $first..$last exactly as given — no clamping; the rebuild*()
+     * methods clamp first — with the range's approved leaves and overtime
+     * loaded once. The one way every multi-date build runs: the rebuild*()
+     * methods, attendance:build-daily and a holiday change. $each gets every
+     * build()'s result (null for a date the employee wasn't employed on).
+     *
+     * @param  (callable(?DailyAttendance): void)|null  $each
+     * @return int the number of days built
+     */
+    public function buildDates(Employee $employee, CarbonInterface $first, CarbonInterface $last, ?callable $each = null): int
     {
         $built = 0;
+        $first = Carbon::instance($first)->startOfDay();
+        $last = Carbon::instance($last)->startOfDay();
         $leaves = $this->approvedLeavesBetween($employee, $first, $last);
+        $overtime = $this->approvedOvertimeBetween($employee, $first, $last);
 
         for ($day = $first->copy(); $day->lte($last); $day->addDay()) {
-            if ($this->build($employee, $day, $leaves) !== null) {
+            $row = $this->build($employee, $day, $leaves, $overtime);
+
+            if ($each !== null) {
+                $each($row);
+            }
+
+            if ($row !== null) {
                 $built++;
             }
         }

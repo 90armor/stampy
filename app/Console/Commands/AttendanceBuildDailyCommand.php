@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Exceptions\NoScheduleAssignmentException;
+use App\Models\DailyAttendance;
 use App\Models\Employee;
 use App\Services\Attendance\DailySummaryBuilder;
 use App\Support\StrictDate;
@@ -45,26 +46,22 @@ class AttendanceBuildDailyCommand extends Command
             // join_date is the only hire/start-date column on employees —
             // don't build days before someone was hired.
             $date = $employee->join_date->gt($from) ? $employee->join_date->copy() : $from->copy();
-            // Once per employee for the whole run, not per day (Phase 3d).
-            $leaves = $builder->approvedLeavesBetween($employee, $date, $to);
 
             try {
-                while ($date->lte($to)) {
-                    $row = $builder->build($employee, $date, $leaves);
-                    $date = $date->copy()->addDay();
-
+                // Leaves and overtime are loaded once per employee for the whole run, not per day (Phase 3d, 4b).
+                $builder->buildDates($employee, $date, $to, function (?DailyAttendance $row) use (&$notEmployed, &$created, &$updated, &$byStatus) {
                     // After left_on: the builder removed any row instead.
                     if ($row === null) {
                         $notEmployed++;
 
-                        continue;
+                        return;
                     }
 
                     $row->wasRecentlyCreated ? $created++ : $updated++;
 
                     $statusValue = $row->status->value;
                     $byStatus[$statusValue] = ($byStatus[$statusValue] ?? 0) + 1;
-                }
+                });
             } catch (NoScheduleAssignmentException) {
                 // Caught per employee, not around the whole loop: one
                 // employee with zero assignment rows (a data-integrity bug,

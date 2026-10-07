@@ -210,11 +210,11 @@ class AttendanceImportCommandTest extends TestCase
         {
             public int $builds = 0;
 
-            public function build(Employee $employee, CarbonInterface $date, ?Collection $leaves = null): ?DailyAttendance
+            public function build(Employee $employee, CarbonInterface $date, ?Collection $leaves = null, ?Collection $overtime = null): ?DailyAttendance
             {
                 $this->builds++;
 
-                return parent::build($employee, $date, $leaves);
+                return parent::build($employee, $date, $leaves, $overtime);
             }
         };
         $this->app->instance(DailySummaryBuilder::class, $counter);

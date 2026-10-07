@@ -143,7 +143,7 @@ class Index extends Component
 
         Employee::query()
             ->activeOn($day)
-            ->each(fn (Employee $employee) => $builder->build($employee, $day));
+            ->each(fn (Employee $employee) => $builder->buildDates($employee, $day, $day));
     }
 
     public function render()
