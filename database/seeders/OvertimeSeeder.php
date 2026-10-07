@@ -107,12 +107,14 @@ class OvertimeSeeder extends DemoSeeder
             $this->approved($this->claim($suMyat, $day, '17:00', '19:00', OvertimeCompensation::TimeOff, 'Inventory'));
         }
 
-        // Kaung Kaung Htun (EMP-0012): approved, but the day's out-punch turned
-        // out to be someone else's and was voided — nothing credited.
-        $kaung = $this->employee('EMP-0012');
-        if ($day = $this->recentPresentDay($kaung)) {
-            $this->voidOutPunch($kaung, $day);
-            $this->approved($this->claim($kaung, $day, '17:00', '19:00', OvertimeCompensation::Pay, 'Client call'));
+        // Phyo Phyo Aye (EMP-0014, who also has a planned request ahead):
+        // approved, but the day's out-punch turned out to be someone else's and
+        // was voided — nothing credited. Someone with no seeded leave: at the
+        // year's end LeaveSeeder gives Kaung Kaung Htun a pending leave across
+        // New Year, which blocks overtime on those days.
+        if ($day = $this->recentPresentDay($phyo)) {
+            $this->voidOutPunch($phyo, $day);
+            $this->approved($this->claim($phyo, $day, '17:00', '19:00', OvertimeCompensation::Pay, 'Client call'));
         }
 
         // Hnin Hnin Wai (EMP-0017): last Sunday, the weekly rest day, 09:00–13:00
