@@ -104,6 +104,11 @@
         <x-card :padding="false" class="order-5 lg:col-span-12">
             <livewire:employees.leave-card :employee="$employee" :key="'leave-card-'.$employee->id" />
         </x-card>
+
+        {{-- Overtime (Phase 4d): full width, under Leave. --}}
+        <x-card :padding="false" class="order-6 lg:col-span-12">
+            <livewire:employees.overtime-card :employee="$employee" :key="'overtime-card-'.$employee->id" />
+        </x-card>
     </div>
 
     <livewire:employees.form-modal />

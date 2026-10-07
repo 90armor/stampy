@@ -167,8 +167,11 @@ class LeaveCard extends Component
                     'toilRemainder' => $type->toilRemainderFor($this->employee),
                 ])->values()->all(),
             'requests' => $this->requests($counter),
+            // An admin's corrections only: what time off in lieu settlement
+            // posted is on the Overtime card, linked to its request.
             'adjustments' => LeaveAdjustment::query()
                 ->where('employee_id', $this->employee->id)
+                ->whereNull('overtime_request_id')
                 ->with(['leaveType', 'createdBy'])
                 ->latest('id')
                 ->get(),
