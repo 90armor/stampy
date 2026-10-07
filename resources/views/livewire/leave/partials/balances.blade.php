@@ -1,6 +1,7 @@
 {{-- The balance table for one employee and year — Time off and the
 employee profile's Leave card (Phase 3e). $balanceRows: list of
-['type' => LeaveType, 'balance' => Balance, 'earnedSoFar' => ?int]. --}}
+['type' => LeaveType, 'balance' => Balance, 'earnedSoFar' => ?int,
+'toilRemainder' => ?int (Time off in lieu's saved minutes, Phase 4d)]. --}}
 @php
     use App\Support\DisplayDate;
     use App\Support\LeaveDays;
@@ -12,6 +13,8 @@ employee profile's Leave card (Phase 3e). $balanceRows: list of
         .($row['earnedSoFar'] !== null ? ' · '.LeaveDays::label($row['earnedSoFar']).' earned so far' : '');
     // A leaver's last year: the allowance pro-rated to their last day (EntitlementCalculator::earnedToLastDay()).
     $earnedLine = fn ($balance) => $balance->earnedToLastDay !== null ? 'Earned to last day: '.LeaveDays::label($balance->earnedToLastDay) : null;
+    // Time off in lieu: the overtime saved below a full half day (TimeOffInLieuReconciler::remainderMinutes()).
+    $toilLine = fn ($row) => ($row['toilRemainder'] ?? 0) > 0 ? \App\Support\Duration::format($row['toilRemainder']).' toward the next half day' : null;
 @endphp
 
 @if ($balanceRows === [])
@@ -30,6 +33,9 @@ employee profile's Leave card (Phase 3e). $balanceRows: list of
                 </div>
                 @if ($earnedLine($balance))
                     <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $earnedLine($balance) }}</p>
+                @endif
+                @if ($toilLine($row))
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $toilLine($row) }}</p>
                 @endif
                 @if ($balance->usableFrom !== null)
                     <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $usableLine($balance, $row) }}</p>
@@ -69,6 +75,9 @@ employee profile's Leave card (Phase 3e). $balanceRows: list of
                             {{ $row['type']->name }}
                             @if ($earnedLine($balance))
                                 <span class="block text-xs font-normal text-slate-500 dark:text-slate-400">{{ $earnedLine($balance) }}</span>
+                            @endif
+                            @if ($toilLine($row))
+                                <span class="block text-xs font-normal text-slate-500 dark:text-slate-400">{{ $toilLine($row) }}</span>
                             @endif
                         </td>
                         @if ($balance->usableFrom !== null)

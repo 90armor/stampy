@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Enums\LeaveStatus;
+use App\Livewire\Leave\TimeOff;
 use App\Models\Employee;
 use App\Models\Leave;
 use App\Models\LeaveType;
@@ -58,7 +59,7 @@ final class EmployeeDashboard
             'next' => $next !== null ? $withDays($next) : null,
             'balances' => LeaveType::query()
                 ->where('is_active', true)
-                ->withBalance()
+                ->shownFor($employee)
                 ->orderBy('id')
                 ->get()
                 ->map(function (LeaveType $type) use ($employee, $balances, $calculator) {
@@ -69,6 +70,7 @@ final class EmployeeDashboard
                         'available' => $balance->available(),
                         'usableFrom' => $balance->usableFrom,
                         'earnedSoFar' => $calculator->earnedSoFar($employee, $type, today()),
+                        'toilRemainder' => TimeOff::toilRemainder($employee, $type),
                     ];
                 })
                 ->all(),

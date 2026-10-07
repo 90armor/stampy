@@ -151,6 +151,19 @@ class LeaveType extends Model
         $query->whereIn('balance_source', [LeaveBalanceSource::Yearly->value, LeaveBalanceSource::Earned->value]);
     }
 
+    /**
+     * Types with a balance worth showing $employee (Phase 4d): every yearly
+     * one, and an earned one (Time off in lieu) only once they've had an
+     * adjustment of it — otherwise everyone who never did overtime would see
+     * "Time off in lieu 0".
+     */
+    public function scopeShownFor(Builder $query, Employee $employee): void
+    {
+        $query->withBalance()->where(fn (Builder $query) => $query
+            ->where('balance_source', '!=', LeaveBalanceSource::Earned->value)
+            ->orWhereHas('adjustments', fn (Builder $adjustments) => $adjustments->where('employee_id', $employee->id)));
+    }
+
     public function deductsFrom(): BelongsTo
     {
         return $this->belongsTo(self::class, 'deducts_from_leave_type_id');

@@ -82,6 +82,23 @@ class TimeOffInLieuReconciler
     }
 
     /**
+     * The time saved toward the next half day — the minutes (after the ratio)
+     * below a full block, which the target leaves out and carries (Phase 4d:
+     * "30m toward the next half day", so 4h 30m worked reads as 0.5 day plus
+     * 30m, not as 30m lost). Null without a TOIL type.
+     */
+    public function remainderMinutes(Employee $employee): ?int
+    {
+        $settings = OvertimeSettings::current();
+
+        if ($settings->toil_leave_type_id === null) {
+            return null;
+        }
+
+        return intdiv($this->creditedMinutes($employee) * $settings->toil_ratio_percent, 100) % $settings->toil_block_minutes;
+    }
+
+    /**
      * The employees among $employeeIds with anything to reconcile — any
      * time_off request, whatever its status (a cancelled one may still need
      * its credit taken back). One query, for attendance:build-daily.
@@ -102,7 +119,13 @@ class TimeOffInLieuReconciler
     /** The target in tenths of a day. */
     private function target(Employee $employee, OvertimeSettings $settings): int
     {
-        $minutes = (int) DailyAttendance::query()
+        return intdiv($this->creditedMinutes($employee) * $settings->toil_ratio_percent, 100 * $settings->toil_block_minutes) * self::BLOCK_TENTHS;
+    }
+
+    /** All-time credited minutes on the employee's approved time_off requests. */
+    private function creditedMinutes(Employee $employee): int
+    {
+        return (int) DailyAttendance::query()
             ->join('overtime_requests', 'overtime_requests.id', '=', 'daily_attendances.overtime_request_id')
             ->where('daily_attendances.employee_id', $employee->id)
             ->where('overtime_requests.employee_id', $employee->id)
@@ -110,8 +133,6 @@ class TimeOffInLieuReconciler
             ->where('overtime_requests.compensation', OvertimeCompensation::TimeOff->value)
             ->sum(DB::raw('daily_attendances.overtime_workday_minutes + daily_attendances.overtime_night_minutes'
                 .' + daily_attendances.overtime_rest_day_minutes + daily_attendances.overtime_holiday_minutes'));
-
-        return intdiv($minutes * $settings->toil_ratio_percent, 100 * $settings->toil_block_minutes) * self::BLOCK_TENTHS;
     }
 
     private function systemAdjustments(Employee $employee, OvertimeSettings $settings)

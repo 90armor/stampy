@@ -322,7 +322,12 @@
                                 <div class="{{ $row }}">
                                     <dt class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $balance['name'] }}</dt>
                                     @if ($balance['usableFrom'] === null)
-                                        <dd class="text-sm tabular-nums text-slate-500 dark:text-slate-400"><span class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ \App\Support\LeaveDays::format($balance['available']) }}</span> available</dd>
+                                        <dd class="text-right text-sm tabular-nums text-slate-500 dark:text-slate-400">
+                                            <span class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ \App\Support\LeaveDays::format($balance['available']) }}</span> available
+                                            @if (($balance['toilRemainder'] ?? 0) > 0)
+                                                <span class="block text-xs">{{ \App\Support\Duration::format($balance['toilRemainder']) }} toward the next half day</span>
+                                            @endif
+                                        </dd>
                                     @else
                                         <dd class="text-right text-sm text-slate-500 dark:text-slate-400">{{ 'Usable from '.\App\Support\DisplayDate::compact($balance['usableFrom']).($balance['earnedSoFar'] !== null ? ' · '.\App\Support\LeaveDays::label($balance['earnedSoFar']).' earned so far' : '') }}</dd>
                                     @endif

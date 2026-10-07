@@ -31,6 +31,11 @@ enum LeaveBalanceSource: string
         };
     }
 
+    public function isEarned(): bool
+    {
+        return $this === self::Earned;
+    }
+
     public function hasBalance(): bool
     {
         return $this !== self::None;

@@ -3,6 +3,7 @@
 namespace App\Livewire\Employees;
 
 use App\Enums\LeaveBalanceSource;
+use App\Livewire\Leave\TimeOff;
 use App\Models\Employee;
 use App\Models\Leave;
 use App\Models\LeaveAdjustment;
@@ -157,11 +158,16 @@ class LeaveCard extends Component
 
         return view('livewire.employees.leave-card', [
             'years' => $years,
-            'balanceRows' => $types->map(fn (LeaveType $type) => [
-                'type' => $type,
-                'balance' => $balances->for($this->employee, $type, $this->year),
-                'earnedSoFar' => $calculator->earnedSoFar($this->employee, $type, today()),
-            ])->all(),
+            // An earned type (Time off in lieu) only once they've earned some
+            // (LeaveType::shownFor()); the adjustment form still offers it.
+            'balanceRows' => $types->filter(fn (LeaveType $type) => ! $type->balance_source->isEarned()
+                || $type->adjustments()->where('employee_id', $this->employee->id)->exists())
+                ->map(fn (LeaveType $type) => [
+                    'type' => $type,
+                    'balance' => $balances->for($this->employee, $type, $this->year),
+                    'earnedSoFar' => $calculator->earnedSoFar($this->employee, $type, today()),
+                    'toilRemainder' => TimeOff::toilRemainder($this->employee, $type),
+                ])->values()->all(),
             'requests' => $this->requests($counter),
             'adjustments' => LeaveAdjustment::query()
                 ->where('employee_id', $this->employee->id)
