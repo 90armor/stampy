@@ -156,7 +156,7 @@
                     <x-card class="order-first">
                         <h2 class="{{ $cardTitle }}">Pending approvals</h2>
                         <p class="mt-2 flex items-baseline gap-x-2">
-                            <span class="text-3xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ $waitingApprovals }}</span> <span class="text-sm text-slate-500 dark:text-slate-400">leave {{ $waitingApprovals === 1 ? 'request' : 'requests' }} waiting on you</span>
+                            <span class="text-3xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ $waitingApprovals }}</span> <span class="text-sm text-slate-500 dark:text-slate-400">{{ $waitingApprovals === 1 ? 'request' : 'requests' }} waiting on you</span>
                         </p>
                         <x-button :href="route('approvals.index')" variant="secondary" wire:navigate class="mt-4">
                             Review requests
@@ -294,12 +294,16 @@
                             <p class="{{ $cardMeta }}">{{ count($mine['decided']) }} new</p>
                         </div>
                         <ul class="mt-4">
-                            @foreach ($mine['decided'] as $leave)
-                                @php $decision = \App\Support\LeaveDecisions::note($leave); @endphp
+                            @foreach ($mine['decided'] as $decided)
+                                @php $decision = \App\Support\RequestDecisions::note($decided); @endphp
                                 <li class="border-t border-slate-divider py-2.5 first:border-t-0 first:pt-0 last:pb-0">
                                     <div class="flex flex-wrap items-center gap-2">
-                                        <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $leave->leaveType->name }} · <span class="tabular-nums">{{ $leave->displayDates() }}</span></p>
-                                        <x-badge :color="$leave->status->badgeColor()">{{ $leave->status->label() }}</x-badge>
+                                        @if ($decided instanceof \App\Models\OvertimeRequest)
+                                            <p class="text-sm font-medium text-slate-700 dark:text-slate-200">Overtime · <span class="tabular-nums">{{ $decided->displayDateAndWindow() }}</span></p>
+                                        @else
+                                            <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $decided->leaveType->name }} · <span class="tabular-nums">{{ $decided->displayDates() }}</span></p>
+                                        @endif
+                                        <x-badge :color="$decided->status->badgeColor()">{{ $decided->status->label() }}</x-badge>
                                     </div>
                                     @if ($decision)
                                         <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">“{{ $decision->note }}” <span class="text-slate-500 dark:text-slate-400">— {{ $decision->decidedBy?->name ?? 'an approver' }}</span></p>
@@ -307,7 +311,15 @@
                                 </li>
                             @endforeach
                         </ul>
-                        <div class="mt-4"><a href="{{ route('time-off.index') }}" wire:navigate class="{{ $link }}">See them on Time off</a></div>
+                        @php $decidedOvertime = collect($mine['decided'])->contains(fn ($decided) => $decided instanceof \App\Models\OvertimeRequest); @endphp
+                        <div class="mt-4 flex flex-wrap gap-x-4 gap-y-2">
+                            @if (collect($mine['decided'])->contains(fn ($decided) => $decided instanceof \App\Models\Leave))
+                                <a href="{{ route('time-off.index') }}" wire:navigate class="{{ $link }}">See them on Time off</a>
+                            @endif
+                            @if ($decidedOvertime)
+                                <a href="{{ route('overtime.index') }}" wire:navigate class="{{ $link }}">See overtime</a>
+                            @endif
+                        </div>
                     </x-card>
                 @endif
 
@@ -347,9 +359,10 @@
                 <x-card>
                     <div class="{{ $cardHeader }}">
                         <h2 class="{{ $cardTitle }}">Upcoming</h2>
-                        @if (count($mine['pending']))<p class="{{ $cardMeta }}">{{ count($mine['pending']) }} waiting</p>@endif
+                        @php $waiting = count($mine['pending']) + collect($mine['overtime'])->where('status', \App\Enums\OvertimeStatus::Pending)->count(); @endphp
+                        @if ($waiting)<p class="{{ $cardMeta }}">{{ $waiting }} waiting</p>@endif
                     </div>
-                    @if (count($mine['pending']) || $mine['next'])
+                    @if (count($mine['pending']) || $mine['next'] || count($mine['overtime']))
                         <ul class="mt-4">
                             @foreach ($mine['pending'] as $item)
                                 <li class="border-t border-slate-divider py-2.5 first:border-t-0 first:pt-0 last:pb-0">
@@ -358,6 +371,16 @@
                                         <x-badge :color="$item['leave']->status->badgeColor()">{{ $item['leave']->status->label() }}</x-badge>
                                     </div>
                                     <p class="mt-0.5 text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ \App\Support\LeaveDays::label($item['days']).' · '.$item['leave']->waitingLabel() }}</p>
+                                </li>
+                            @endforeach
+                            {{-- Overtime: waiting for a decision, then approved and still ahead. --}}
+                            @foreach ($mine['overtime'] as $request)
+                                <li class="border-t border-slate-divider py-2.5 first:border-t-0 first:pt-0 last:pb-0">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <p class="text-sm font-medium text-slate-700 dark:text-slate-200">Overtime · <span class="tabular-nums">{{ $request->displayDateAndWindow() }}</span></p>
+                                        <x-badge :color="$request->status->badgeColor()">{{ $request->status->label() }}</x-badge>
+                                    </div>
+                                    <p class="mt-0.5 text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ implode(' · ', array_filter([$request->compensation->label(), $request->waitingLabel() ?? $request->startsLabel()])) }}</p>
                                 </li>
                             @endforeach
                             @if ($mine['next'])
@@ -371,7 +394,12 @@
                                 </li>
                             @endif
                         </ul>
-                        <div class="mt-4"><a href="{{ route('time-off.index') }}" wire:navigate class="{{ $link }}">See all requests on Time off</a></div>
+                        <div class="mt-4 flex flex-wrap gap-x-4 gap-y-2">
+                            <a href="{{ route('time-off.index') }}" wire:navigate class="{{ $link }}">See all requests on Time off</a>
+                            @if (count($mine['overtime']))
+                                <a href="{{ route('overtime.index') }}" wire:navigate class="{{ $link }}">See overtime</a>
+                            @endif
+                        </div>
                     @else
                         <p class="mt-4 text-sm text-slate-500 dark:text-slate-400">No leave requested or coming up.</p>
                     @endif
@@ -400,11 +428,12 @@
                                 </div>
                             @endforeach
                         </dl>
-                        @if ($month['leave_tenths'] > 0 || $month['total_worked_minutes'] > 0)
+                        @if ($month['leave_tenths'] > 0 || $month['total_worked_minutes'] > 0 || $mine['overtimeThisMonth'] > 0)
                             <p class="mt-4 border-t border-slate-divider pt-3 text-xs text-slate-500 dark:text-slate-400">
                                 {{ implode(' · ', array_filter([
                                     $month['leave_tenths'] > 0 ? 'Leave taken: '.\App\Support\LeaveDays::label($month['leave_tenths']) : null,
                                     $month['total_worked_minutes'] > 0 ? 'Worked: '.\App\Support\Duration::format($month['total_worked_minutes']) : null,
+                                    $mine['overtimeThisMonth'] > 0 ? 'Overtime: '.\App\Support\Duration::format($mine['overtimeThisMonth']).' credited' : null,
                                 ])) }}
                             </p>
                         @endif

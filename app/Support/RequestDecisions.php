@@ -57,9 +57,10 @@ final class RequestDecisions
 
     /**
      * When someone other than $user last decided the request: the latest
-     * approved or rejected step they recorded, or a cancellation.
+     * approved or rejected step they recorded, or a cancellation — what the
+     * dashboard orders leave and overtime decisions by together.
      */
-    private static function decidedAt($request, User $user): ?CarbonInterface
+    public static function decidedAt($request, User $user): ?CarbonInterface
     {
         $times = $request->approvalSteps
             ->filter(fn (ApprovalStep $step) => in_array($step->outcome, [ApprovalOutcome::Approved, ApprovalOutcome::Rejected], true) && $step->decided_by !== $user->id)
