@@ -16,6 +16,7 @@ use App\Models\OvertimeRequest;
 use App\Models\OvertimeSettings;
 use App\Services\Approval\ApprovalInbox;
 use App\Services\Leave\EntitlementCalculator;
+use App\Services\Overtime\OvertimeRequestService;
 use App\Services\Overtime\TimeOffInLieuReconciler;
 use App\Support\LeaveDays;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -167,6 +168,16 @@ class DatabaseSeederTest extends TestCase
         $this->assertTrue(OvertimeRequest::where('kind', 'claim')->exists() && OvertimeRequest::where('kind', 'planned')->exists());
         $this->assertTrue(OvertimeRequest::all()->contains(fn (OvertimeRequest $r) => $r->starts_at->format('H:i') < '22:00' && $r->ends_at->gt($r->date->copy()->setTime(22, 0))), 'No request crossing 22:00.');
         $this->assertTrue(OvertimeRequest::all()->contains(fn (OvertimeRequest $r) => $r->date->isSaturday()), 'No Saturday request.');
+        // Phase 4d: every state the screens show — approved and fully, partly
+        // or not at all credited (no out-punch), a Sunday, a visible time-off remainder.
+        $approvedDays = DailyAttendance::whereIn('overtime_request_id', OvertimeRequest::where('status', 'approved')->select('id'))->get();
+        $credited = fn (DailyAttendance $day) => $day->overtime_workday_minutes + $day->overtime_night_minutes + $day->overtime_rest_day_minutes + $day->overtime_holiday_minutes;
+        $approvedMinutes = fn (DailyAttendance $day) => app(OvertimeRequestService::class)->approvedMinutes(OvertimeRequest::find($day->overtime_request_id));
+        $this->assertTrue($approvedDays->contains(fn ($day) => $credited($day) > 0 && $credited($day) === $approvedMinutes($day)), 'No fully credited request.');
+        $this->assertTrue($approvedDays->contains(fn ($day) => $credited($day) > 0 && $credited($day) < $approvedMinutes($day)), 'No partly credited request.');
+        $this->assertTrue($approvedDays->contains(fn ($day) => $day->last_out === null && $credited($day) === 0), 'No approved request without an out-punch.');
+        $this->assertTrue($approvedDays->contains(fn ($day) => $day->overtime_rest_day_minutes > 0), 'No Sunday (rest-day) overtime.');
+        $this->assertTrue(Employee::all()->contains(fn (Employee $employee) => app(TimeOffInLieuReconciler::class)->remainderMinutes($employee) > 0), 'No time-off remainder.');
         $this->assertSame(0, OvertimeRequest::whereIn('status', ['approved', 'rejected'])->doesntHave('approvalSteps')->count());
 
         // Approved past overtime was credited, and its time off posted.
