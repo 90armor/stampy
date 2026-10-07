@@ -2,9 +2,12 @@
 
 namespace App\Services\Approval;
 
+use App\Contracts\Approvable;
 use App\Enums\LeaveStatus;
+use App\Enums\OvertimeStatus;
 use App\Models\Employee;
 use App\Models\Leave;
+use App\Models\OvertimeRequest;
 use App\Models\User;
 use App\Services\Attendance\LeaveDay;
 use App\Support\DisplayDate;
@@ -23,8 +26,11 @@ use Illuminate\Support\Collection;
  *   manager's place — including any whose chain has nobody eligible left.
  *   Stuck ones (isStuck()) first, then by start date.
  *
- * Every group is sorted by start date, soonest first. Never the user's own
- * requests.
+ * Every group holds leave and overtime requests together (Phase 4c), sorted
+ * by the date each is about (Approvable::approvalDate()), soonest first.
+ * Never the user's own requests. Nothing here branches on the type: the
+ * dates come through Approvable, and each item is decided through its own
+ * type's service and policy.
  *
  * count() is what waits on this user — the sidebar badge, the menu-button
  * dot and the dashboard's Pending approvals card: step 1 for their team, and
@@ -36,26 +42,32 @@ use Illuminate\Support\Collection;
 class ApprovalInbox
 {
     /**
-     * @return array{stepOne: Collection<int, Leave>, stepTwo: Collection<int, Leave>, overrides: Collection<int, Leave>}
+     * @return array{stepOne: Collection<int, Approvable>, stepTwo: Collection<int, Approvable>, overrides: Collection<int, Approvable>}
      */
     public static function for(User $user): array
     {
         $ownEmployeeId = $user->employee?->id;
-        $pending = fn (int $step) => Leave::query()
-            ->where('status', LeaveStatus::Pending->value)
-            ->where('current_step', $step)
-            ->when($ownEmployeeId !== null, fn ($query) => $query->where('employee_id', '!=', $ownEmployeeId))
-            ->with(['employee', 'leaveType'])
-            ->orderBy('start_date')
-            ->orderBy('id');
-
         $managed = $user->hasAnyRole(['manager', 'admin']) && $user->employee !== null
             ? $user->employee->subordinateIds()
             : [];
 
-        $stepOne = $managed === []
-            ? collect()
-            : $pending(ApprovalFlow::MANAGER_STEP)->whereIn('employee_id', $managed)->get();
+        // Both types' pending requests at $step (only $employeeIds', when given), soonest first.
+        $pending = function (int $step, ?array $employeeIds = null) use ($ownEmployeeId): Collection {
+            $query = fn ($query) => $query
+                ->where('current_step', $step)
+                ->when($ownEmployeeId !== null, fn ($query) => $query->where('employee_id', '!=', $ownEmployeeId))
+                ->when($employeeIds !== null, fn ($query) => $query->whereIn('employee_id', $employeeIds));
+
+            return Leave::query()->where('status', LeaveStatus::Pending->value)->tap($query)->with(['employee', 'leaveType'])->get()
+                ->concat(OvertimeRequest::query()->where('status', OvertimeStatus::Pending->value)->tap($query)->with('employee')->get())
+                ->sortBy([
+                    fn (Approvable $a, Approvable $b) => $a->approvalDate() <=> $b->approvalDate(),
+                    fn (Approvable $a, Approvable $b) => $a->created_at <=> $b->created_at,
+                ])
+                ->values();
+        };
+
+        $stepOne = $managed === [] ? collect() : $pending(ApprovalFlow::MANAGER_STEP, $managed);
 
         if (! $user->hasRole('admin')) {
             return ['stepOne' => $stepOne, 'stepTwo' => collect(), 'overrides' => collect()];
@@ -63,10 +75,11 @@ class ApprovalInbox
 
         return [
             'stepOne' => $stepOne,
-            'stepTwo' => $pending(ApprovalFlow::ADMIN_STEP)->get(),
-            // sortBy is stable, so the start-date order holds within each half.
-            'overrides' => $pending(ApprovalFlow::MANAGER_STEP)->whereNotIn('id', $stepOne->pluck('id'))->get()
-                ->sortBy(fn (Leave $leave) => self::isStuck($leave) ? 0 : 1)
+            'stepTwo' => $pending(ApprovalFlow::ADMIN_STEP),
+            // sortBy is stable, so the date order holds within each half.
+            'overrides' => $pending(ApprovalFlow::MANAGER_STEP)
+                ->reject(fn (Approvable $item) => $stepOne->contains(fn (Approvable $mine) => $mine->is($item)))
+                ->sortBy(fn (Approvable $item) => self::isStuck($item) ? 0 : 1)
                 ->values(),
         ];
     }
@@ -77,7 +90,7 @@ class ApprovalInbox
 
         return $inbox['stepOne']->count()
             + $inbox['stepTwo']->count()
-            + $inbox['overrides']->filter(fn (Leave $leave) => self::isStuck($leave))->count();
+            + $inbox['overrides']->filter(fn (Approvable $item) => self::isStuck($item))->count();
     }
 
     /**
@@ -90,31 +103,33 @@ class ApprovalInbox
      *   a Friday from Tuesday;
      * - or it starts within two working days — on or before the second
      *   working day after today (on a Friday: Monday or Tuesday) — or has
-     *   already started;
+     *   already started (Approvable::approvalStartsOn(): an overtime claim has
+     *   no start left, so only the other two tests apply to it);
      * - or everyone who could decide step 1 is away (awayReason()) and none
      *   of them is back before the day the start rule above would make it
      *   stuck (stuckDeadline()) — the most common reason a request stalls;
      *   an absence that ends in time doesn't count.
      */
-    public static function isStuck(Leave $leave, ?CarbonInterface $today = null): bool
+    public static function isStuck(Approvable $item, ?CarbonInterface $today = null): bool
     {
         $today = ($today ?? today())->copy()->startOfDay();
-        $deadline = self::stuckDeadline($leave);
+        $deadline = self::stuckDeadline($item);
 
-        if ($deadline->lte($today)) {
+        if ($deadline !== null && $deadline->lte($today)) {
             return true;
         }
 
-        if (self::workdaysAfter($leave, $leave->created_at->copy()->startOfDay(), 2)->lte($today)) {
+        if (self::workdaysAfter($item, $item->created_at->copy()->startOfDay(), 2)->lte($today)) {
             return true;
         }
 
         // Away only blocks the request if nobody who can decide it is back
         // before the deadline: a manager back two weeks before it starts
-        // decides it then, and an admin's override would pre-empt them.
-        $away = self::away($leave, $today);
+        // decides it then, and an admin's override would pre-empt them. With
+        // no start (a claim), being away blocks it until they're back at all.
+        $away = self::away($item, $today);
 
-        return $away !== null && $away['backOn']->gte($deadline);
+        return $away !== null && ($deadline === null || $away['backOn']->gte($deadline));
     }
 
     /**
@@ -126,9 +141,9 @@ class ApprovalInbox
      * someone can decide today, and with no approvers at all: that request
      * is waiting on an admin anyway.
      */
-    public static function awayReason(Leave $leave, ?CarbonInterface $today = null): ?string
+    public static function awayReason(Approvable $item, ?CarbonInterface $today = null): ?string
     {
-        return self::away($leave, ($today ?? today())->copy()->startOfDay())['reason'] ?? null;
+        return self::away($item, ($today ?? today())->copy()->startOfDay())['reason'] ?? null;
     }
 
     /**
@@ -137,9 +152,9 @@ class ApprovalInbox
      *
      * @return array{reason: string, backOn: CarbonInterface}|null
      */
-    private static function away(Leave $leave, CarbonInterface $today): ?array
+    private static function away(Approvable $item, CarbonInterface $today): ?array
     {
-        $approvers = app(ApprovalFlow::class)->stepOneApprovers($leave);
+        $approvers = app(ApprovalFlow::class)->stepOneApprovers($item);
 
         if ($approvers->isEmpty()) {
             return null;
@@ -201,15 +216,21 @@ class ApprovalInbox
      * The day a request becomes stuck by its start: the second of the
      * requester's working days before it — from then on it starts within two
      * working days (on a Friday, a Tuesday start). A request already under
-     * way is past it. Capped at a month.
+     * way is past it. Capped at a month. Null with no start (a claim).
      */
-    private static function stuckDeadline(Leave $leave): CarbonInterface
+    private static function stuckDeadline(Approvable $item): ?CarbonInterface
     {
-        $day = $leave->start_date->copy()->startOfDay();
+        $start = $item->approvalStartsOn();
+
+        if ($start === null) {
+            return null;
+        }
+
+        $day = $start->copy()->startOfDay();
 
         for ($found = 0, $step = 0; $found < 2 && $step < 31; $step++) {
             $day = $day->subDay();
-            $found += WorkdayCalendar::isWorkday($leave->employee, $day) ? 1 : 0;
+            $found += WorkdayCalendar::isWorkday($item->approvalSubject(), $day) ? 1 : 0;
         }
 
         return $day;
@@ -219,13 +240,13 @@ class ApprovalInbox
      * The $count-th working day of the requester after $from. Capped at a
      * month, so a schedule with no working days can't loop.
      */
-    private static function workdaysAfter(Leave $leave, CarbonInterface $from, int $count): CarbonInterface
+    private static function workdaysAfter(Approvable $item, CarbonInterface $from, int $count): CarbonInterface
     {
         $day = $from->copy();
 
         for ($found = 0, $step = 0; $found < $count && $step < 31; $step++) {
             $day = $day->addDay();
-            $found += WorkdayCalendar::isWorkday($leave->employee, $day) ? 1 : 0;
+            $found += WorkdayCalendar::isWorkday($item->approvalSubject(), $day) ? 1 : 0;
         }
 
         return $day;

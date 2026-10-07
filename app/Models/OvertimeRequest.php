@@ -9,7 +9,10 @@ use App\Enums\OvertimeStatus;
 use App\Exceptions\InvalidOvertimeRequestException;
 use App\Exceptions\InvalidOvertimeTransitionException;
 use App\Policies\OvertimePolicy;
+use App\Support\EmployeeScope;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\UsePolicy;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -151,5 +154,24 @@ class OvertimeRequest extends Model implements Approvable
     public function currentApprovalStep(): ?int
     {
         return $this->current_step;
+    }
+
+    public function approvalDate(): CarbonInterface
+    {
+        return $this->date;
+    }
+
+    /** A planned request starts on its date; a claim has nothing left to start. */
+    public function approvalStartsOn(): ?CarbonInterface
+    {
+        return $this->kind === OvertimeKind::Planned ? $this->date : null;
+    }
+
+    /** The requests a user may see in a list — EmployeeScope's rule, as Leave::scopeVisibleTo(). */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        $ids = EmployeeScope::for($user, 'Overtime list')->ids;
+
+        return $ids === null ? $query : $query->whereIn('employee_id', $ids);
     }
 }

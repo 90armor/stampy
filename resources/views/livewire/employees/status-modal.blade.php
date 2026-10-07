@@ -40,8 +40,12 @@
                 {{-- The first Deactivate lists what it will do to leave after the last day;
                 the second writes it (Employees\StatusModal). --}}
                 @if ($affectedLeaves !== [])
+                    @php
+                        $kinds = collect($affectedLeaves)->pluck('kind')->unique()->sort()->values()->all();
+                        $what = match ($kinds) { ['leave'] => 'Leave', ['overtime'] => 'Overtime', default => 'Leave and overtime' };
+                    @endphp
                     <div class="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-200 dark:ring-amber-500/30">
-                        <p class="font-medium">Leave after their last day will change:</p>
+                        <p class="font-medium">{{ $what }} after their last day will change:</p>
                         <ul class="mt-2 space-y-1">
                             @foreach ($affectedLeaves as $affected)
                                 @php
@@ -74,7 +78,8 @@
                         @if ($action === 'reactivate')
                             Reactivate
                         @elseif ($affectedLeaves !== [])
-                            Deactivate and adjust {{ count($affectedLeaves) }} {{ Str::plural('leave', count($affectedLeaves)) }}
+                            @php $onlyLeave = collect($affectedLeaves)->every(fn ($affected) => $affected['kind'] === 'leave'); @endphp
+                            Deactivate and adjust {{ count($affectedLeaves) }} {{ Str::plural($onlyLeave ? 'leave' : 'request', count($affectedLeaves)) }}
                         @else
                             Deactivate
                         @endif

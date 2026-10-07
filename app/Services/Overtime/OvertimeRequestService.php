@@ -8,6 +8,7 @@ use App\Enums\OvertimeCompensation;
 use App\Enums\OvertimeKind;
 use App\Enums\OvertimeStatus;
 use App\Exceptions\OvertimeValidationException;
+use App\Exceptions\StaleDecisionException;
 use App\Models\Employee;
 use App\Models\Leave;
 use App\Models\OvertimeRequest;
@@ -26,6 +27,7 @@ use App\Support\Duration;
 use App\Support\WorkdayCalendar;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -124,6 +126,232 @@ class OvertimeRequestService
         });
 
         return ['request' => $request, 'rebuildError' => $request->status === OvertimeStatus::Approved ? $this->rebuild($request, 'approval') : null];
+    }
+
+    /**
+     * Approves the step the request is waiting at, as leave does: a manager's
+     * step 1 moves it to step 2 (or self_approved for a sole admin's own); an
+     * admin at step 1 completes both; step 2 completes it. $expectedStep is
+     * the step the actor saw (StaleDecisionException if it moved on).
+     *
+     * - $compensation: the approver may change pay ↔ time off (rule 4); the
+     *   step's note says so ("Compensation changed: pay → time off"), the
+     *   actor's note after it. Approving a time_off request needs a TOIL type.
+     * - The decision that completes the request re-checks the daily limits
+     *   (settings or leave may have changed since it was filed): over a
+     *   limit, it needs an admin's override reason — $overrideReason, or the
+     *   one already on the request. A manager's step 1 isn't re-checked; the
+     *   admin sees the problem at step 2. (A sole admin's own request,
+     *   self-approved after step 1, was checked when they filed it.)
+     * - Once approved, a past or today's date is rebuilt and time off in lieu
+     *   reconciled; a future one is picked up by the regular builds on the day.
+     *
+     * @return array{request: OvertimeRequest, rebuildError: ?string}
+     *
+     * @throws OvertimeValidationException|StaleDecisionException
+     */
+    public function approve(
+        OvertimeRequest $request,
+        User $actor,
+        ?string $note = null,
+        ?OvertimeCompensation $compensation = null,
+        ?int $expectedStep = null,
+        ?string $overrideReason = null,
+    ): array {
+        $request = $this->decide($request, $actor, $expectedStep, function (OvertimeRequest $request) use ($actor, $note, $compensation, $overrideReason) {
+            $errors = new ValidationErrors;
+            $compensation ??= $request->compensation;
+            $final = $this->flow->decidesBothSteps($actor, $request) || $request->current_step === ApprovalFlow::ADMIN_STEP;
+
+            $this->checkCompensation($errors, $compensation);
+            $override = null;
+
+            if ($final) {
+                $day = $this->day($request->employee, $request->date->copy());
+                $creditable = $this->creditableMinutes($day, $request->starts_at, $request->ends_at);
+                $override = $this->checkLimits($errors, $day, $creditable, $actor, $overrideReason ?? $request->limit_override_reason);
+            }
+
+            $errors->throwIfAny();
+
+            if ($compensation !== $request->compensation) {
+                $changed = 'Compensation changed: '.strtolower($request->compensation->label()).' → '.strtolower($compensation->label());
+                $note = filled($note) ? "{$changed}. {$note}" : $changed;
+                $request->update(['compensation' => $compensation]);
+            }
+
+            if ($override !== null) {
+                $request->update(['limit_override_reason' => $override]);
+            }
+
+            if ($this->flow->decidesBothSteps($actor, $request)) {
+                $this->flow->record($request, ApprovalFlow::MANAGER_STEP, ApprovalOutcome::Approved, $actor, $note);
+                $this->flow->record($request, ApprovalFlow::ADMIN_STEP, ApprovalOutcome::Approved, $actor, $note);
+                $request->update(['status' => OvertimeStatus::Approved, 'current_step' => null]);
+
+                return;
+            }
+
+            $this->flow->record($request, $request->current_step, ApprovalOutcome::Approved, $actor, $note);
+
+            if ($request->current_step === ApprovalFlow::MANAGER_STEP) {
+                $this->moveToStepTwo($request);
+
+                return;
+            }
+
+            $request->update(['status' => OvertimeStatus::Approved, 'current_step' => null]);
+        });
+
+        return ['request' => $request, 'rebuildError' => $request->status === OvertimeStatus::Approved ? $this->rebuild($request, 'approval') : null];
+    }
+
+    /**
+     * Rejects at the step the request is waiting at, which ends it. A note is
+     * required — the employee is owed the reason. Nothing to rebuild: a
+     * pending request never touched attendance.
+     *
+     * @throws OvertimeValidationException|StaleDecisionException
+     */
+    public function reject(OvertimeRequest $request, User $actor, ?string $note, ?int $expectedStep = null): OvertimeRequest
+    {
+        if (trim((string) $note) === '') {
+            throw new OvertimeValidationException(['note' => ['Say why the overtime is rejected.']]);
+        }
+
+        return $this->decide($request, $actor, $expectedStep, function (OvertimeRequest $request) use ($actor, $note) {
+            $this->flow->record($request, $request->current_step, ApprovalOutcome::Rejected, $actor, trim($note));
+            $request->update(['status' => OvertimeStatus::Rejected, 'current_step' => null]);
+        });
+    }
+
+    /**
+     * Cancels a pending or approved request (OvertimePolicy::cancel: the
+     * requester before it starts, an admin any time). Its steps stay as they
+     * are. A cancelled approved request rebuilds its date if it's past or
+     * today, which takes its time off in lieu back.
+     *
+     * There is no edit: an approved window that turns out wrong (they stayed
+     * until 21:00, not 20:00) is corrected by an admin cancelling it and
+     * filing the right one, which is final on submit — the history shows
+     * both, and a cancelled request doesn't hold its date.
+     *
+     * @return array{request: OvertimeRequest, rebuildError: ?string}
+     */
+    public function cancel(OvertimeRequest $request, User $actor): array
+    {
+        $wasApproved = false;
+
+        $request = DB::transaction(function () use ($request, $actor, &$wasApproved) {
+            $request = $this->lock($request);
+
+            if (! in_array($request->status, [OvertimeStatus::Pending, OvertimeStatus::Approved], true)) {
+                throw StaleDecisionException::noLongerPending($request->status->value);
+            }
+
+            Gate::forUser($actor)->authorize('cancel', $request);
+
+            $wasApproved = $request->status === OvertimeStatus::Approved;
+            $this->markCancelled($request, $actor);
+
+            return $request;
+        });
+
+        return ['request' => $request, 'rebuildError' => $wasApproved ? $this->rebuild($request, 'cancellation') : null];
+    }
+
+    /**
+     * The employee's pending and approved requests dated after $leftOn — all
+     * cancelled by a deactivation (the work can't happen), listed for the
+     * admin first (Employees\StatusModal, through EmployeeLifecycle) in the
+     * shape LeaveRequestService::deactivationEffects() uses, kind 'overtime'.
+     *
+     * @return list<array{kind: string, id: int, type: string, dates: string, status: string, action: string, end: null}>
+     */
+    public function deactivationEffects(Employee $employee, CarbonInterface $leftOn): array
+    {
+        return OvertimeRequest::query()
+            ->where('employee_id', $employee->id)
+            ->whereIn('status', [OvertimeStatus::Pending->value, OvertimeStatus::Approved->value])
+            ->whereDate('date', '>', $leftOn->format('Y-m-d'))
+            ->orderBy('date')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (OvertimeRequest $request) => [
+                'kind' => 'overtime',
+                'id' => $request->id,
+                'type' => 'Overtime',
+                'dates' => DisplayDate::compact($request->date).', '.AttendanceTime::format($request->starts_at).' – '.AttendanceTime::format($request->ends_at),
+                'status' => $request->status->value,
+                'action' => 'cancel',
+                'end' => null,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Cancels them, inside the caller's transaction (the employee row
+     * already locked — EmployeeLifecycle::deactivate()). The rebuild that
+     * follows the deactivation removes their days, which takes any time off
+     * in lieu they credited back: the work never happened.
+     */
+    public function applyDeactivation(Employee $employee, CarbonInterface $leftOn, ?User $actor): void
+    {
+        foreach ($this->deactivationEffects($employee, $leftOn) as $effect) {
+            $this->markCancelled(OvertimeRequest::query()->lockForUpdate()->findOrFail($effect['id']), $actor);
+        }
+    }
+
+    /**
+     * The shared shape of approve() and reject(), as for leave: lock, check
+     * the request is still where the actor saw it, authorize, apply. A double
+     * decision that slips past the check hits approval_steps' unique index,
+     * reported the same way.
+     */
+    private function decide(OvertimeRequest $request, User $actor, ?int $expectedStep, callable $apply): OvertimeRequest
+    {
+        return DB::transaction(function () use ($request, $actor, $expectedStep, $apply) {
+            $request = $this->lock($request);
+
+            if ($request->status !== OvertimeStatus::Pending) {
+                throw StaleDecisionException::noLongerPending($request->status->value);
+            }
+
+            if ($expectedStep !== null && $request->current_step !== $expectedStep) {
+                throw StaleDecisionException::movedOn();
+            }
+
+            Gate::forUser($actor)->authorize('approve', $request);
+
+            try {
+                $apply($request);
+            } catch (UniqueConstraintViolationException) {
+                throw StaleDecisionException::movedOn();
+            }
+
+            return $request;
+        });
+    }
+
+    /** The employee row first, then the request — always in that order. */
+    private function lock(OvertimeRequest $request): OvertimeRequest
+    {
+        $employee = Employee::query()->lockForUpdate()->findOrFail($request->employee_id);
+        $request = OvertimeRequest::query()->lockForUpdate()->findOrFail($request->id);
+        $request->setRelation('employee', $employee);
+
+        return $request;
+    }
+
+    private function markCancelled(OvertimeRequest $request, ?User $actor): void
+    {
+        $request->update([
+            'status' => OvertimeStatus::Cancelled,
+            'current_step' => null,
+            'cancelled_by' => $actor?->id,
+            'cancelled_at' => now(),
+        ]);
     }
 
     /**

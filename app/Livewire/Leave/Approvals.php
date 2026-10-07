@@ -104,7 +104,9 @@ class Approvals extends Component
         $this->authorize('decideAny', Leave::class);
 
         $user = auth()->user();
-        $inbox = ApprovalInbox::for($user);
+        // The inbox holds overtime requests too since Phase 4c; their cards come
+        // with Phase 4d's UI, so for now this page shows the leave ones.
+        $inbox = array_map(fn (Collection $items) => $items->filter(fn ($item) => $item instanceof Leave)->values(), ApprovalInbox::for($user));
         $visible = EmployeeScope::for($user, 'Approvals')->ids;
         $describe = fn (Collection $leaves) => $leaves->map(fn (Leave $leave) => $this->describe($leave, $balances, $counter, $visible))->all();
         // Only the override group says "Stuck": it's why an admin steps in there.
