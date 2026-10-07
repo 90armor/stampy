@@ -118,6 +118,7 @@ Don't swap this for Livewire's own `@teleport`/`@endteleport` either, expecting 
 - **`DatabaseSeederTest` runs the real `DatabaseSeeder`** (`$this->seed()`, ~3s) and asserts every resulting employee has at least one schedule assignment — a regression test for the exact bug `DatabaseSeeder`'s `WithoutModelEvents` caused (see Roles & authorization's Authorization convention and the Database schema section above): it silently suppressed `Employee::booted()`'s listener, seeding 35 employees with zero assignments and no error anywhere. Confirmed to actually catch it (not just superficially): temporarily reintroducing the trait fails this test, listing all 35 employees by code. If this test ever needs `WorkSchedule::factory()` or similar test setup added ahead of it, that's a sign something *else* now also depends on seed order — don't just silence the assertion.
 - **A seeder that needs reproducible randomness draws from its own engine** (`new Randomizer(new Mt19937($seed))`, as `AttendanceLogSeeder` does), **never PHP's global `mt_rand()`/`array_rand()` state**, and decides nothing by a database id. Both once made the seed differ inside the suite from a standalone run (Phase 3f): rolled-back inserts advance AUTO_INCREMENT, and `Faker\Generator::__destruct()` reseeds the global generator at random whenever an old generator is garbage-collected. `DatabaseSeederTest`'s seed-twice pair checks both.
 - **Factory defaults that keep the Phase 3a invariants out of the way** (both deliberate): `EmployeeFactory` gives an `['status' => 'inactive']` employee `left_on = join_date` — valid, and outside every recent date, so they behave like the "gone" employees older tests meant; use `->inactive('Y-m-d')` for a real last day. `WorkScheduleFactory` leaves `break_start` null, because a default of 12:00 would fail break_start's own rule on any test schedule with other hours or no break; use `->withBreakStart()` when a test needs one.
+- **Every seeder is either configuration or demo, and the demo ones refuse to run in production** (Phase 4a). `DatabaseSeeder` and every seeder that writes demo rows (`AdminUserSeeder`, `DepartmentSeeder`, `PositionSeeder`, `EmployeeSeeder`, `HolidaySeeder`, `AttendanceLogSeeder`, `LeaveSeeder`) extend `Database\Seeders\DemoSeeder`, whose `__invoke()` — the path both `db:seed` and `$this->call()` take — throws `DemoSeedInProductionException` before writing anything when `app()->isProduction()`, `--force` or not; the message names the configuration seeders and `docs/GO_LIVE.md`. The configuration seeders (`DemoSeeder::CONFIGURATION`: `RoleSeeder`, `LeaveTypeSeeder`, `WorkScheduleSeeder`) extend `Seeder` and still run there. **A new seeder extends `DemoSeeder` or joins `CONFIGURATION`** — `DemoSeederProductionTest` fails on one that does neither. Configuration production needs regardless of seeding (the `overtime_settings` row) is inserted by its migration instead.
 - **`php artisan make:seeder` generates a class with `use WithoutModelEvents;` by default.** That trait is exactly what caused the bug `DatabaseSeederTest` (above) now guards against — any *new* seeder that creates `Employee` rows and keeps the generated trait will silently skip `Employee::booted()`'s auto-assignment listener the same way, and `DatabaseSeederTest` only covers `DatabaseSeeder` itself, not a seeder added later. Delete the `use WithoutModelEvents;` line (and its `use Illuminate\Database\Console\Seeds\WithoutModelEvents;` import) from any new seeder that touches `employees`, or write that seeder's own regression test the way `DatabaseSeederTest` does.
 
 ## Database schema
@@ -271,9 +272,11 @@ Also a plain, **non-unique** index on `(voided_at, punched_at)` (`attendance_log
 | work_date | date | |
 | work_schedule_id | bigint FK → work_schedules, nullable | `nullOnDelete`; the schedule actually used for *this day's* calculation — resolved by `Employee::scheduleOn(work_date)` at build time (Phase 2.5b), since an employee's schedule can change over time and a later reassignment must never change what an already-built day used |
 | leave_id | bigint FK → leaves, nullable | Phase 3d, alter-migration, `nullOnDelete`, indexed: the approved leave covering this date, set by the builder **whatever the status** — off, holiday, present and half-day days included — so a view can annotate any covered day without a second query. **One leave only**: on a date with both an AM and a PM leave it's the AM one, so a view listing a day's leave (3e's day modal — "AM Medical + PM Annual" is a realistic mix) must query every approved leave covering the date, as `DailyAttendance::leaveDay()` does, not just this one |
+| overtime_request_id | bigint FK → overtime_requests, nullable | Phase 4a, alter-migration, `nullOnDelete`, indexed: the approved overtime request the day's overtime was credited against. Written by the builder from Phase 4b |
 | first_in / last_out | datetime, nullable | the paired punches for the day, per `DailySummaryBuilder`'s 18h pairing window |
 | worked_minutes | unsigned int | default `0` |
 | late_minutes / early_leave_minutes | unsigned int | default `0`; see the "status vs. timing" note below. Since Phase 2.6 `late_minutes` is computed whenever the day has an in-punch (`in_progress`, `incomplete`, `present`); `early_leave_minutes` only on `present` rows (it needs the out-punch). Both are 0 on a holiday or a non-workday, on an out-only day, and on a full-day leave day (Phase 3d); on a half-day leave they're measured against the half worked |
+| overtime_workday_minutes / overtime_night_minutes / overtime_rest_day_minutes / overtime_holiday_minutes | unsigned int | Phase 4a, alter-migration, default `0`: credited overtime per category — every minute in exactly one, holiday > rest day > night > workday (Phase 4 scope, rule 3). Minutes, never rates or money. Written by the builder from Phase 4b |
 | status | string | `AttendanceStatus` value — `present`/`incomplete`/`absent`/`off`/`holiday`/`leave`/`in_progress` |
 | note | string, nullable | |
 | timestamps | | |
@@ -308,10 +311,11 @@ Five create-migrations (Phase 3a); the rules behind them are in the Phase 3 sect
 |---|---|---|
 | id | bigint PK | |
 | name | string, unique | |
-| days_per_year | decimal(4,1), nullable | null = no balance (Special, Maternity, Unpaid). Editing it affects future grants only |
-| min_service_months | unsigned smallint, nullable | null = usable from `join_date`; Annual is 12 |
-| seniority_bonus | bool | default `false`; needs a balance |
-| carry_over_cap | decimal(4,1), nullable | null = no carry-over; needs a balance |
+| balance_source | string (`LeaveBalanceSource`) | Phase 4a, alter-migration, default `yearly`: `yearly` (granted each year — Annual, Medical), `earned` (no grant; the balance is its adjustments — Time off in lieu) or `none` (Special, Maternity, Unpaid). Backfilled from `days_per_year` (`LeaveBalanceSourceBackfill`). Locked once a leave uses the type |
+| days_per_year | decimal(4,1), nullable | required for `yearly`, forbidden otherwise. Editing it affects future grants only |
+| min_service_months | unsigned smallint, nullable | null = usable from `join_date`; Annual is 12. `yearly` only |
+| seniority_bonus | bool | default `false`; `yearly` only |
+| carry_over_cap | decimal(4,1), nullable | null = no carry-over; `yearly` or `earned` |
 | counts | string (`LeaveCounting`) | `workdays` / `calendar_days`. Locked once a leave uses the type |
 | max_days_per_request | decimal(4,1), nullable | |
 | deducts_from_leave_type_id | bigint FK → leave_types, nullable | `restrictOnDelete`; Special → Annual. One level only: not itself, not a type that deducts, and not while another type deducts from this one. Locked once a leave uses the type |
@@ -319,7 +323,9 @@ Five create-migrations (Phase 3a); the rules behind them are in the Phase 3 sect
 | is_paid / is_active | bool | default `true`; deactivate rather than delete |
 | timestamps | | |
 
-**Two different "referenced" tests on `LeaveType`, on purpose** (unlike `WorkSchedule`, which uses one for both). The **lock** (`counts`, `deducts_from_leave_type_id`, `allows_half_day` — `LeaveTypeLockedException`) asks only whether a **leave** uses the type (`isUsedByLeaves()`): those fields change computed results only through leave rows, and an entitlement alone doesn't depend on them. `WorkSchedule` locks on assignments because the builder reads the schedule through them; `LeaveType` has no equivalent, and locking on entitlements would lock Annual and Medical as soon as 3b grants them — before anyone has taken leave, while the type list is still waiting on HR. **Deletion** is blocked by anything that points at the type — a leave, an entitlement, an adjustment, or a type deducting from it (`isReferenced()`, `LeaveTypeInUseException`) — so it fails with a named exception instead of a raw foreign-key error; deactivate instead. Other rules (`InvalidLeaveTypeException`): carry-over and the seniority bonus need a balance; deductions are one level deep.
+**Two different "referenced" tests on `LeaveType`, on purpose** (unlike `WorkSchedule`, which uses one for both). The **lock** (`counts`, `deducts_from_leave_type_id`, `allows_half_day`, and since 4a `balance_source` — `LeaveTypeLockedException`) asks only whether a **leave** uses the type (`isUsedByLeaves()`): those fields change computed results only through leave rows, and an entitlement alone doesn't depend on them. `WorkSchedule` locks on assignments because the builder reads the schedule through them; `LeaveType` has no equivalent, and locking on entitlements would lock Annual and Medical as soon as 3b grants them — before anyone has taken leave, while the type list is still waiting on HR. **Deletion** is blocked by anything that points at the type — a leave, an entitlement, an adjustment, a type deducting from it, or the overtime settings' TOIL pointer (`isReferenced()`, `LeaveTypeInUseException`) — so it fails with a named exception instead of a raw foreign-key error; deactivate instead. Other rules (`InvalidLeaveTypeException`): the balance source's fields (below); deductions are one level deep; the settings' TOIL type stays `earned`.
+
+**`balance_source` (Phase 4a) — why "has a balance" is a column, not `days_per_year`.** Until 4a, a type had a balance exactly when `days_per_year` was set. Time off in lieu broke that: it has a balance but no yearly grant — the balance is what overtime earns, posted as adjustments — and with `days_per_year` standing in, `LeaveGranter` would have created 0-day grant rows for it. So the two questions are separate: `LeaveType::hasBalance()` (`yearly` or `earned`, `scopeWithBalance()`) and `isGrantedYearly()` (`yearly`). Every reader uses one of them — `LeaveBalance`, `EntitlementCalculator`, `LeaveGranter`, `LeaveRequestService`'s balance check and preview, Time off, Approvals, the employee dashboard and the profile's Leave card; none reads `days_per_year` for it. The rules on the model: `yearly` needs `days_per_year`; `earned` and `none` forbid it, the seniority bonus and a service requirement; `none` forbids carry-over (`earned` may carry). The Policies form's **Balance** choice (Yearly grant / Earned from overtime / No balance) shows and saves only the fields that apply.
 
 **`leave_entitlements`** — one leave year's grant (the calendar year): a stored fact; usage and carry-over are derived.
 | Column | Type | Notes |
@@ -343,10 +349,11 @@ Unique on `(employee_id, leave_type_id, year)`.
 | year | unsigned smallint | |
 | days | decimal(5,1) | signed |
 | note | string | required |
+| overtime_request_id | bigint FK → overtime_requests, nullable | Phase 4a, alter-migration, `restrictOnDelete`, indexed: set on a **system-authored** TOIL adjustment (`created_by` null — a linked row with an author is refused, `InvalidLeaveAdjustmentException`). It names the request whose change **triggered** the settlement, not the only request the days were earned from (Phase 4 scope, rule 14) |
 | created_by | bigint FK → users, nullable | `nullOnDelete` |
 | timestamps | | |
 
-Indexed on `(employee_id, leave_type_id, year)`.
+Indexed on `(employee_id, leave_type_id, year)`. Deleting an employee still cascades through a linked adjustment despite the `restrictOnDelete` (tested: `OvertimeModelsTest`), though the app never deletes employees.
 
 **`leaves`** — leave requests. Shape rules on the model (`InvalidLeaveException`): `end_date ≥ start_date`; a half day is a single date (`start_date = end_date`) of a type that allows half days. Overlap, balance and approval rules belong to the request lifecycle (3c).
 | Column | Type | Notes |
@@ -369,7 +376,7 @@ Indexed on `(employee_id, start_date, end_date)` and `(status, current_step)`.
 | Column | Type | Notes |
 |---|---|---|
 | id | bigint PK | |
-| approvable_type / approvable_id | morphs | the type is a morph-map alias — `'leave'` — not a class name (`Relation::morphMap()` in `AppServiceProvider`). Deliberately the non-enforced `morphMap()`: `enforceMorphMap()` would require mapping every morph model, including `User` for spatie/permission's `model_has_roles`, whose rows store `App\Models\User` |
+| approvable_type / approvable_id | morphs | the type is a morph-map alias — `'leave'`, and since 4a `'overtime'` — not a class name (`Relation::morphMap()` in `AppServiceProvider`). Deliberately the non-enforced `morphMap()`: `enforceMorphMap()` would require mapping every morph model, including `User` for spatie/permission's `model_has_roles`, whose rows store `App\Models\User` |
 | step | unsigned tinyint | |
 | outcome | string (`ApprovalOutcome`) | `approved`/`rejected`/`skipped`/`self_approved` |
 | decided_by | bigint FK → users, nullable | `nullOnDelete`; null for an automatic skip |
@@ -391,11 +398,11 @@ No schema change; services in `App\Services\Leave` (the rules are Phase 3's Poli
 
 **`LeaveDayCounter`** — what a leave costs, **split by calendar year** (`[2026 => 20, 2027 => 10]` for Wed 30 Dec – Sun 3 Jan): a `workdays` type counts `WorkdayCalendar::isWorkday()` dates, so a schedule reassignment mid-leave is handled per date; a `calendar_days` type (Maternity) counts every date; a half day counts 5 if its date counts. Derived, never stored — a holiday added inside an approved leave refunds the day with no other step.
 
-**`EntitlementCalculator`** — the grant for (employee, type, year), pure (no writes; depends on `join_date`, the type and the year only). Returns an `Entitlement`: `noBalance()` (no `days_per_year`), `notEligible(eligibleOn)` (a year before the eligibility year), or `grant(days, eligibleOn)`. A year's allowance is `days_per_year` plus the seniority bonus (+1 per 3 completed years as of 31 Dec, which is simply year − join year); a partial year is pro-rated by days employed ÷ the real year length (366 in a leap year) and rounded up to the half day, each year on its own. `eligibleOn` is `join_date->addMonthsNoOverflow(min_service_months)` (29 Feb → 28 Feb), or `join_date` with no requirement; the eligibility year's grant folds in the join year pro-rated, any full years between and the eligibility year in full (1 Mar 2026 → 33.5 in 2027). `earnedToLastDay()` is the same calculation cut at `left_on`, for display: for a leaver before eligibility it folds in every year since joining (days earned but never usable). Its partial last year pro-rates the whole allowance, seniority included.
+**`EntitlementCalculator`** — the grant for (employee, type, year), pure (no writes; depends on `join_date`, the type and the year only). Returns an `Entitlement`: `noBalance()` (not granted yearly — `balance_source` `earned` or `none`), `notEligible(eligibleOn)` (a year before the eligibility year), or `grant(days, eligibleOn)`. A year's allowance is `days_per_year` plus the seniority bonus (+1 per 3 completed years as of 31 Dec, which is simply year − join year); a partial year is pro-rated by days employed ÷ the real year length (366 in a leap year) and rounded up to the half day, each year on its own. `eligibleOn` is `join_date->addMonthsNoOverflow(min_service_months)` (29 Feb → 28 Feb), or `join_date` with no requirement; the eligibility year's grant folds in the join year pro-rated, any full years between and the eligibility year in full (1 Mar 2026 → 33.5 in 2027). `earnedToLastDay()` is the same calculation cut at `left_on`, for display: for a leaver before eligibility it folds in every year since joining (days earned but never usable). Its partial last year pro-rates the whole allowance, seniority included.
 
-**`LeaveBalance`** — a `Balance` for (employee, type, year): `entitled` (the grant row, or 0), `carriedIn`, `adjustments`, `used` (approved), `pending`, `available()` = entitled + carried in + adjustments − used − pending; `usedFromCarry`/`usedFromGrant` (FIFO — usage takes the carry first); `usedByType`/`pendingByType`; `usableFrom` (the eligibility date while it's in the future); `earnedToLastDay` (a leaver's last year). A type without `days_per_year` has no balance (`hasBalance` false); a deducting type's leaves (Special) count in its target's (Annual) `used`/`pending`. **Carry-over is derived:** into year Y, min(cap, what was left of Y−1), where left = entitled + carried in + adjustments − **approved** usage, never below 0; no cap → no carry; the eligibility year's remainder carries **uncapped** (its grant may arrive with weeks left), the cap applying from the next year; the chain stops at the first year with no grant row. So cancelling last year's approved leave raises this year's carry with no other step.
+**`LeaveBalance`** — a `Balance` for (employee, type, year): `entitled` (the grant row, or 0), `carriedIn`, `adjustments`, `used` (approved), `pending`, `available()` = entitled + carried in + adjustments − used − pending; `usedFromCarry`/`usedFromGrant` (FIFO — usage takes the carry first); `usedByType`/`pendingByType`; `usableFrom` (the eligibility date while it's in the future); `earnedToLastDay` (a leaver's last year). A type with `balance_source` `none` has no balance (`hasBalance` false); an `earned` one has `entitled` 0, its balance being its adjustments; a deducting type's leaves (Special) count in its target's (Annual) `used`/`pending`. **Carry-over is derived:** into year Y, min(cap, what was left of Y−1), where left = entitled + carried in + adjustments − **approved** usage, never below 0; no cap → no carry; the eligibility year's remainder carries **uncapped** (its grant may arrive with weeks left), the cap applying from the next year; the chain stops at the first year with no grant row — for an `earned` type, which never has one, it runs back to the employee's first year with an adjustment instead, quiet years in between carrying min(cap, what's left), so nothing lapses that no one configured to (owner, Phase 4a). So cancelling last year's approved leave raises this year's carry with no other step.
 
-**`LeaveGranter`** — the one place a grant row is created automatically. For (employee, year, as-of date) it creates each missing grant for every **active** type with a balance whose `Entitlement::isGrantableOn(asOf)`; existing rows are skipped (idempotent). It skips an employee not active on the as-of date, and an early (later-year) grant for anyone with a `left_on`. Used by:
+**`LeaveGranter`** — the one place a grant row is created automatically. For (employee, year, as-of date) it creates each missing grant for every **active** type granted yearly (`balance_source` `yearly`, never `earned` or `none`) whose `Entitlement::isGrantableOn(asOf)`; existing rows are skipped (idempotent). It skips an employee not active on the as-of date, and an early (later-year) grant for anyone with a `left_on`. Used by:
 - **`leave:grant {--year=}`**, scheduled **daily at 00:05** by `App\Console\LeaveSchedule` (wired in `bootstrap/app.php` next to `AttendanceSchedule`, the same way: `withoutOverlapping(30)`, a fixed output file, a non-zero exit logged). Daily, not only on 1 Jan, because eligibility dates fall all year — and because it checks "eligible and no row", a missed run catches up the next day. `--year=<next year>` grants early. A past year is refused: grants are only ever created for the current year or later, so balances from before the system went live go in as admin adjustments.
 - **`Employee::booted()`**: a new employee gets this year's grants in the same transaction as the insert (with no leave types configured it creates nothing and doesn't throw — unlike a missing default schedule). A changed `join_date` re-grants (`regrantAfterJoinDateChange()`): the automatic rows (`granted_by` null) for the current and later years are deleted and granted again from the new date, in the same transaction as the update — `Employee::save()` wraps an update that changes `join_date` for this; earlier years, admin-entered grants and adjustments are untouched; a leaver is re-granted as of their last day.
 
@@ -473,9 +480,42 @@ One alter-migration (`users.time_off_seen_at`, above). Presentation and wiring o
 
 **Shared pieces:** `LeaveDecisions` (the "New" rule: decided by someone else after `time_off_seen_at`; a request the user cancelled themself isn't news), `ApprovalBadge` (the waiting count, once per request), `AttendanceSummary` (the month's counts), `Leave::displayDates()` / `waitingLabel()` / `startsLabel()`, `LeaveStatus::badgeColor()` (`docs/DESIGN_SYSTEM.md`, Leave request status badges), `LeaveDays::label()`, `EntitlementCalculator::earnedSoFar()`, `WorkdayCalendar::holidayNamesBetween()` (the builder's holiday lookup, names included — the views use it rather than querying holidays themselves), and the balance table partial (`livewire/leave/partials/balances`) shared by Time off and the profile.
 
-### Phase 4 (scoped, not yet migrated)
+### Phase 4a (built) — overtime tables
 
-`overtime_requests`, `overtime_settings`, and alter-migrations on `daily_attendances` (overtime columns) and `leave_adjustments` (`overtime_request_id`) — the planned columns are in "Phase 4 — Overtime", Schema, below. They're moved into this section, table by table, as 4a builds them. The approval history goes in `approval_steps` (above), under a new morph alias, so `overtime_requests` has no `approved_by` of its own.
+Two create-migrations and three alter-migrations: `overtime_requests` and `overtime_settings` below; `daily_attendances.overtime_request_id` and its four category minute columns, `leave_adjustments.overtime_request_id` and `leave_types.balance_source` in their tables above. Status-like columns are strings backed by PHP enums (`OvertimeKind`, `OvertimeCompensation`, `OvertimeStatus`). The rules behind them are the Phase 4 scope below; 4a builds the structure only — the builder writes no overtime until 4b, and nothing creates a request until 4c's service.
+
+**`overtime_requests`** (`OvertimeRequest`) — an approved window on a work date. An `Approvable` under the morph alias `'overtime'`, the same way as `Leave`; its approval history is in `approval_steps`.
+| Column | Type | Notes |
+|---|---|---|
+| id | bigint PK | |
+| employee_id | bigint FK → employees | `cascadeOnDelete` |
+| date | date | the work date |
+| starts_at / ends_at | datetime | the approved window; may end after midnight |
+| kind | string (`OvertimeKind`) | `planned` / `claim` |
+| compensation | string (`OvertimeCompensation`) | `pay` / `time_off` |
+| reason | text, nullable | |
+| status | string (`OvertimeStatus`) | default `pending`; `pending`/`approved`/`rejected`/`cancelled` — its own enum, the same values as `LeaveStatus` (the approval engine reads neither) |
+| current_step | unsigned tinyint, nullable | the step waiting for a decision; null once none is |
+| requested_by / cancelled_by | bigint FK → users, nullable | `nullOnDelete` |
+| cancelled_at | timestamp, nullable | |
+| limit_override_reason | text, nullable | an admin's reason for exceeding a daily limit (4c) |
+| timestamps | | |
+
+Indexed on `(employee_id, date)` and `(status, current_step)`. **One active (non-cancelled, non-rejected) request per employee per date is not an index** — MySQL has no partial unique index; 4c's service enforces it under the employee row lock. On the model: the window ends after it starts, starts on its `date`, and is at most 12 hours (`MAX_WINDOW_HOURS`, a sanity bound, not a policy — `InvalidOvertimeRequestException`); the status transitions are a leave's (`InvalidOvertimeTransitionException`), `current_step` set exactly while pending.
+
+**`overtime_settings`** (`OvertimeSettings`) — the overtime policy, **one row, inserted by its migration** (production needs it and can't run the demo seed). Every number in the policy is a column here, never a constant in code; whole numbers throughout (the TOIL ratio is a percentage, 100 = 1:1).
+| Column | Type | Default |
+|---|---|---|
+| workday_rate_percent / night_rate_percent / rest_day_rate_percent / holiday_rate_percent | unsigned smallint | 150 / 200 / 200 / 200 |
+| night_starts / night_ends | time | 22:00 / 05:00 |
+| max_overtime_minutes_per_day | unsigned smallint | 120 |
+| max_work_minutes_per_day | unsigned smallint | 600 |
+| claim_window_days | unsigned smallint | 7 |
+| toil_ratio_percent | unsigned smallint | 100 |
+| toil_block_minutes | unsigned smallint | 240 |
+| toil_leave_type_id | bigint FK → leave_types, nullable | `restrictOnDelete`; set by `LeaveTypeSeeder` to "Time off in lieu" only while empty, never overwriting an admin's choice |
+
+On the model (`InvalidOvertimeSettingsException`): every number positive; **holiday ≥ rest day ≥ night ≥ workday ≥ 100%** — the category precedence relies on it never to pay less, and the message says so; `toil_block_minutes` a multiple of 30; the TOIL type `earned`. The row itself (`OvertimeSettingsRowException`): no second row, no deleting it, and `OvertimeSettings::current()` — cached per request in the container, cleared by a save — throws if it's missing.
 
 ## Roles & authorization
 
@@ -528,14 +568,14 @@ Enforced in four places, none of which is optional:
 1. **Foundation** (complete) — project setup, auth, roles/permissions, departments, positions, employees, layout/navigation. Closed out with a full codebase audit (see `AUDIT.md`) — all Critical/High/Medium findings fixed.
 2. **Attendance & device integration** (complete) — `attendance_logs` ingestion (CSV import for now — see "ZKTeco device ingestion" below), processing into `daily_attendances`, attendance dashboards/reports, effective-dated schedules, holidays, row-level manager scoping.
 3. **Leave management** (complete — "Phase 3 — Leave management" below) — `leave_types`, `leaves`, request/approval workflow, balances, the leave UI, and the go-live checklist (`docs/GO_LIVE.md`).
-4. **Overtime** (scoped 7 Oct 2026, not yet built — "Phase 4 — Overtime" below) — `overtime_requests`, request/approval workflow reusing `approval_steps` and `ApprovalFlow`, integration with processed attendance.
+4. **Overtime** (in progress — scoped 7 Oct 2026, 4a built; "Phase 4 — Overtime" below) — `overtime_requests`, request/approval workflow reusing `approval_steps` and `ApprovalFlow`, integration with processed attendance.
 5. **Reporting & polish** — cross-cutting reports (attendance/leave/overtime), exports, UX polish, performance pass. Carried in from the final design review (4 Oct 2026), deliberately deferred to here:
    - Pending chart bars below a 3:1 floor: the trend's pending bar is 1.33:1 (dark) / 1.52:1 (light) against the card, the Department card's 1.13:1 (dark) against its track.
    - At 390px: the Organization tab bar clips "Schedules" with no sign that it scrolls; the 403 page's topbar title wraps onto two lines.
    - `dashboard-chart.js` imports all of Chart.js (152 KB, 53 KB gzipped) for one bar chart.
    - Disabled states: "Bulk Reassign" is disabled with only one schedule and doesn't say why; the sidebar's "Soon" items (exempt from the contrast minimum as inactive controls) could still be easier to read.
 
-A new phase's scope is written into this file *before* it's built, same as Phases 2 and 3 were — Phase 4 has had it (7 Oct 2026, "Phase 4 — Overtime" below); its build starts with 4a.
+A new phase's scope is written into this file *before* it's built, same as Phases 2 and 3 were — Phase 4 has had it (7 Oct 2026, "Phase 4 — Overtime" below), and 4a is built.
 
 **Phase 2, complete.** What shipped, at the level someone picking this up needs — the Database schema and Design system sections above already have the full detail, this is the map, not a re-explanation:
 - **Ingestion:** CSV import (`attendance:import`) — see "ZKTeco device ingestion" immediately below for why, and exactly where a real device plugs in later.
@@ -789,7 +829,7 @@ The checklist an admin follows before real use is **`docs/GO_LIVE.md`**: environ
 - **Opening balances are entered by hand** (fewer than 50 employees). A CSV import is worth adding if headcount grows well past 50.
 - **The calendar cell and the day modal still name holidays in fuchsia** — the holiday *status* colour, which is right on a `holiday` day but reads as a status on a worked holiday. 3f moved the tables' annotation to muted text; the calendar's was left as built and goes to the Phase 5 polish list.
 
-## Phase 4 — Overtime (scope, not yet built)
+## Phase 4 — Overtime (in progress: 4a built)
 
 Scoped 7 Oct 2026. Owner decisions are marked **(owner)**; the rest are recommendations the owner accepted. Rates and limits follow the Cambodian Labour Law and Prakas 112/25 (6 May 2025) until HR confirms the company's policy **(owner)**. Like leave types, every number below is a setting in Policies, never a constant in code.
 
@@ -843,7 +883,7 @@ Scoped 7 Oct 2026. Owner decisions are marked **(owner)**; the rest are recommen
     - The adjustment's `overtime_request_id` is the request whose change **triggered** it, and its `year` is that request's work-date year. The link means "triggered by", not "earned from only this request" — a block can be filled by several requests.
     - **Idempotent:** running it twice posts nothing the second time.
 15. **Cancelling approved TOIL overtime** whose days are already taken may push the TOIL balance negative. That's allowed and shown, like an over-used Annual; HR decides.
-16. **The TOIL leave type** is seeded: no yearly grant, a balance built only from adjustments, half days allowed, workdays. Carry-over cap and expiry are HR settings.
+16. **The TOIL leave type** is seeded: no yearly grant, a balance built only from adjustments (`balance_source` `earned`, Phase 4a), half days allowed, workdays. Carry-over cap and expiry are HR settings; the cap is **seeded as 5 days, a placeholder** — not null, because null means no carry-over and a half day earned on 30 Dec would lapse the next day, time already worked (owner, 4a).
 
 ### Approval and authorization
 
@@ -877,9 +917,21 @@ Scoped 7 Oct 2026. Owner decisions are marked **(owner)**; the rest are recommen
 - **4d — UI:** Overtime page, Approvals, Policies, annotations, monthly report. Screenshot review stop as in 3e.
 - **4e — Closeout:** docs, GO_LIVE.md additions, pinned instants (add 21:59/22:01 and 04:59/05:01).
 
+**Phase 4a, built:** the production guard and the schema, in four commits — the scope (categories, TOIL reconciliation), the demo seeders' production guard, `leave_types.balance_source`, the overtime tables and models — plus this documentation pass (all in Database schema, Phase 4a, and Testing notes).
+- **Owner decisions while building:** overtime minutes are stored per category, not per rate (the 4a task text still had standard/premium); an earned balance carries from the employee's first adjustment year, quiet years included, rather than stopping at the first year with neither a grant nor an adjustment — under that rule a year with only usage would have lost what was left; the TOIL cap is seeded as 5, not null.
+- **Phase 3 tests changed, with the owner's approval:** `EntitlementCalculatorTest`'s no-balance type now says `balance_source` `none` (an unsaved type defaults to `yearly`); `LeaveTypesPageTest` checks the Balance choice (a yearly type without days is a field error; "No balance" hides carry-over and the seniority bonus) instead of the old model message; `LeaveModelsTest`'s seeder list gained "Time off in lieu".
+- **Not in 4a:** the approval engine itself needs nothing for overtime (`Approvable` and `ApprovalFlow` have nothing leave-specific), but `ApprovalInbox` and the Approvals page query `Leave` directly — 4c/4d generalise them. Time off and the profile's Leave card already list "Time off in lieu" (it has a balance), at 0 until 4c credits it.
+
+Verified:
+- **Hash proof:** a pinned seed (Fri 2 Oct 2026 12:00) hashed before any code change and after the last commit: every pre-existing table identical with the new columns excluded (`daily_attendances`: 2,100 rows); `leave_types`' five original rows identical without `balance_source`, which reads `yearly` for Annual and Medical and `none` for Special, Maternity and Unpaid. The seed adds "Time off in lieu" (`earned`, cap 5) and the settings row points at it.
+- **Schema dump diff:** additions only — the two tables, the five `daily_attendances` columns, `leave_adjustments.overtime_request_id`, `leave_types.balance_source`.
+- **Rollback:** rolling back the five migrations (and removing the seeded TOIL row) restored the baseline schema and every table's hash exactly; migrating forward over that data backfilled `balance_source` correctly, left every table's data as it was, and gave the same schema as a fresh run.
+- **Tests:** 870 pass in fixed order and three random orders (seeds 1105, 4242, 90210), and at all 21 pinned instants (`storage/app/pinned-runs/20261007-103506/`). The `DemoSeederProductionTest` guard was shown to fail with one demo seeder extending `Seeder` again.
+
 ### Still open (HR)
 
 - Rates, limits and the claim window as company policy.
 - TOIL ratio, whether rest-day TOIL must be taken the following week, carry-over and expiry.
 - Overtime on half-day leave days.
 - Whether overtime needs both approval steps or the manager alone.
+- TOIL carry-over cap (seeded 5 as a placeholder).
