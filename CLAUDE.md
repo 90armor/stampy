@@ -473,20 +473,9 @@ One alter-migration (`users.time_off_seen_at`, above). Presentation and wiring o
 
 **Shared pieces:** `LeaveDecisions` (the "New" rule: decided by someone else after `time_off_seen_at`; a request the user cancelled themself isn't news), `ApprovalBadge` (the waiting count, once per request), `AttendanceSummary` (the month's counts), `Leave::displayDates()` / `waitingLabel()` / `startsLabel()`, `LeaveStatus::badgeColor()` (`docs/DESIGN_SYSTEM.md`, Leave request status badges), `LeaveDays::label()`, `EntitlementCalculator::earnedSoFar()`, `WorkdayCalendar::holidayNamesBetween()` (the builder's holiday lookup, names included — the views use it rather than querying holidays themselves), and the balance table partial (`livewire/leave/partials/balances`) shared by Time off and the profile.
 
-### Future phases (not yet migrated — kept here so later migrations stay consistent with this plan)
+### Phase 4 (scoped, not yet migrated)
 
-**`overtime_requests`** (Phase 4) — its approval history goes in `approval_steps` (above), under a new morph alias; it needs no `approved_by` of its own.
-| Column | Type | Notes |
-|---|---|---|
-| id | bigint PK | |
-| employee_id | bigint FK → employees | |
-| date | date | |
-| hours | decimal | |
-| status | enum | pending/approved/rejected |
-| approved_by | bigint FK → users, nullable | |
-| timestamps | | |
-
-Exact columns for Phase 4 will be refined when it is scoped in detail — this is a planning skeleton, not a final spec.
+`overtime_requests`, `overtime_settings`, and alter-migrations on `daily_attendances` (overtime columns) and `leave_adjustments` (`overtime_request_id`) — the planned columns are in "Phase 4 — Overtime", Schema, below. They're moved into this section, table by table, as 4a builds them. The approval history goes in `approval_steps` (above), under a new morph alias, so `overtime_requests` has no `approved_by` of its own.
 
 ## Roles & authorization
 
@@ -539,14 +528,14 @@ Enforced in four places, none of which is optional:
 1. **Foundation** (complete) — project setup, auth, roles/permissions, departments, positions, employees, layout/navigation. Closed out with a full codebase audit (see `AUDIT.md`) — all Critical/High/Medium findings fixed.
 2. **Attendance & device integration** (complete) — `attendance_logs` ingestion (CSV import for now — see "ZKTeco device ingestion" below), processing into `daily_attendances`, attendance dashboards/reports, effective-dated schedules, holidays, row-level manager scoping.
 3. **Leave management** (complete — "Phase 3 — Leave management" below) — `leave_types`, `leaves`, request/approval workflow, balances, the leave UI, and the go-live checklist (`docs/GO_LIVE.md`).
-4. **Overtime** (next, not yet scoped) — `overtime_requests`, request/approval workflow reusing `approval_steps` and `ApprovalFlow`, integration with processed attendance.
+4. **Overtime** (scoped 7 Oct 2026, not yet built — "Phase 4 — Overtime" below) — `overtime_requests`, request/approval workflow reusing `approval_steps` and `ApprovalFlow`, integration with processed attendance.
 5. **Reporting & polish** — cross-cutting reports (attendance/leave/overtime), exports, UX polish, performance pass. Carried in from the final design review (4 Oct 2026), deliberately deferred to here:
    - Pending chart bars below a 3:1 floor: the trend's pending bar is 1.33:1 (dark) / 1.52:1 (light) against the card, the Department card's 1.13:1 (dark) against its track.
    - At 390px: the Organization tab bar clips "Schedules" with no sign that it scrolls; the 403 page's topbar title wraps onto two lines.
    - `dashboard-chart.js` imports all of Chart.js (152 KB, 53 KB gzipped) for one bar chart.
    - Disabled states: "Bulk Reassign" is disabled with only one schedule and doesn't say why; the sidebar's "Soon" items (exempt from the contrast minimum as inactive controls) could still be easier to read.
 
-A new phase's scope is written into this file *before* it's built, same as Phases 2 and 3 were — Phase 4 hasn't had that pass yet, so nothing under it should start until it does.
+A new phase's scope is written into this file *before* it's built, same as Phases 2 and 3 were — Phase 4 has had it (7 Oct 2026, "Phase 4 — Overtime" below); its build starts with 4a.
 
 **Phase 2, complete.** What shipped, at the level someone picking this up needs — the Database schema and Design system sections above already have the full detail, this is the map, not a re-explanation:
 - **Ingestion:** CSV import (`attendance:import`) — see "ZKTeco device ingestion" immediately below for why, and exactly where a real device plugs in later.
@@ -789,6 +778,18 @@ Verified:
 
 The checklist an admin follows before real use is **`docs/GO_LIVE.md`**: environment and timezone, the production seed (never plain `db:seed` — `DatabaseSeeder` is the demo system), the first admin, schedules with "Break starts", HR's confirmation of the leave types, managers with the manager role, admins linked to employee records, opening balances by hand as adjustments, and the scheduler with `leave:grant`.
 
+### Still open
+
+- **HR to confirm the leave-type list** — Medical's 30 days and pay, whether Special is paid or made up, anything company-specific. This is a seed-data change only.
+- **HR to confirm the first-eligible-year carry-over** (rule 5: uncapped once, then the cap). It's a single rule in the balance calculator.
+- **HR to confirm whether Medical (and the others) also need a service period.** If so, it's just a `min_service_months` value.
+- **Payroll and `late_minutes` on incomplete days** — carried to Phase 5 (exports); it only matters once payroll is in scope.
+- **Medical certificate upload** — deferred; the reason text only for now.
+- **The demo seeders have no production guard** (from 3f's go-live pass). Only `AdminUserSeeder` refuses to run in production; `docs/GO_LIVE.md` says never to run plain `db:seed` there and lists the configuration seeders to run by class. A guard in `DatabaseSeeder` itself would make that mistake impossible rather than documented — scheduled as Phase 4a's first step.
+- **No command creates the first admin** — `docs/GO_LIVE.md` gives a tinker snippet. Worth a small `user:create-admin` command if installs become routine.
+- **Opening balances are entered by hand** (fewer than 50 employees). A CSV import is worth adding if headcount grows well past 50.
+- **The calendar cell and the day modal still name holidays in fuchsia** — the holiday *status* colour, which is right on a `holiday` day but reads as a status on a worked holiday. 3f moved the tables' annotation to muted text; the calendar's was left as built and goes to the Phase 5 polish list.
+
 ## Phase 4 — Overtime (scope, not yet built)
 
 Scoped 7 Oct 2026. Owner decisions are marked **(owner)**; the rest are recommendations the owner accepted. Rates and limits follow the Cambodian Labour Law and Prakas 112/25 (6 May 2025) until HR confirms the company's policy **(owner)**. Like leave types, every number below is a setting in Policies, never a constant in code.
@@ -800,22 +801,23 @@ Scoped 7 Oct 2026. Owner decisions are marked **(owner)**; the rest are recommen
    - **Claim:** submitted after the fact, for unplanned overtime, up to **7 days** back (setting). Admins may go back further, as with leave.
    A request whose start time has passed when it's submitted is a claim. Both go through the same approval.
 2. **Approval authorizes; punches decide the hours.** A request approves a window (date, start, end). The hours actually credited are the time the employee was punched in **inside that approved window and outside their expected working window**, never more than approved. Approve 18:00–20:00, leave at 19:20 → 1h 20m. Leave at 21:00 → 2h. No punches → nothing.
-3. **Rates** (settings; Labour Law §139, §164):
+3. **Categories and rates** (settings; Labour Law §139, §164). Every overtime minute belongs to **exactly one category**, and each category has its own rate:
 
-   | When | Rate |
-   |---|---|
-   | Workday, outside night hours | 150% |
-   | Night hours, 22:00–05:00 | 200% |
-   | Weekly rest day (a non-workday of the schedule) | 200% |
-   | Public holiday | 200% |
+   | Category | When | Rate |
+   |---|---|---|
+   | `holiday` | a public holiday | 200% |
+   | `rest_day` | a weekly rest day (a non-workday of the schedule) | 200% |
+   | `night` | night hours, 22:00–05:00 | 200% |
+   | `workday` | any other overtime minute | 150% |
 
-   - A window crossing 22:00 or 05:00 is split by the minute: 21:00–23:00 on a workday is 1h at 150% and 1h at 200%.
-   - Rates don't stack: a holiday on a weekend at night is 200%, once.
-   - The system records minutes per rate. It never computes money: there's no wage data, and payroll is outside this app.
+   - **Fixed precedence: holiday > rest day > night > workday.** A night minute on a holiday is a holiday minute; a holiday on a weekend at night is a holiday minute, once — categories never stack.
+   - A window crossing 22:00 or 05:00 is split by the minute: 21:00–23:00 on a workday is 1h `workday` and 1h `night`.
+   - **So the precedence never pays less, the rates must satisfy holiday ≥ rest day ≥ night ≥ workday ≥ 100%** — `OvertimeSettings` enforces it, and its error says the ordering is what the category precedence relies on.
+   - The system stores **minutes per category**, never per rate, so HR can change a rate (or set two categories apart) without any stored minute changing. It never computes money: there's no wage data, and payroll is outside this app. The monthly report multiplies minutes by the current rates.
 4. **Pay or time off, chosen by the employee on the request** **(owner)**. The approver can change it when deciding (the step history records the change).
 5. **Time off in lieu (TOIL)** **(owner)**:
    - **1:1.** One hour of overtime earns one hour off, whatever the rate (ratio is a setting).
-   - Credited minutes accumulate per employee. **Every full 4 hours becomes 0.5 day** in a "Time off in lieu" leave type; the remainder keeps accumulating.
+   - Credited minutes accumulate per employee, **across years**. **Every full 4 hours becomes 0.5 day** in a "Time off in lieu" leave type; the remainder keeps accumulating (rule 14 has the exact settlement).
    - TOIL is taken exactly like Annual — same request flow, balance, half days.
    - The law expects a day off within the following week for rest-day work taken as time off (§151–152); the system shows the balance but doesn't enforce timing. HR to confirm.
 6. **Limits** (settings; §137 and Prakas 112/25): at most **2 hours of overtime a day**, and at most **10 hours of work a day** including overtime. A request that would exceed either is refused for employees and managers; **an admin may override with a required reason** **(owner)**, recorded on the request.
@@ -823,8 +825,8 @@ Scoped 7 Oct 2026. Owner decisions are marked **(owner)**; the rest are recommen
 
 ### Attendance integration
 
-8. **The builder computes overtime**, so it stays derived and recomputable. New columns on `daily_attendances`: `overtime_request_id`, `overtime_minutes_standard` (150%), `overtime_minutes_premium` (200%). Approving, cancelling, or correcting a punch rebuilds the day.
-9. **Outside the expected window** means outside `ExpectedWindow` for a workday. On a weekly rest day or holiday there is no expected window, so all approved, punched time counts (at 200%).
+8. **The builder computes overtime**, so it stays derived and recomputable. New columns on `daily_attendances`: `overtime_request_id` and one minutes column per category (rule 3) — `overtime_workday_minutes`, `overtime_night_minutes`, `overtime_rest_day_minutes`, `overtime_holiday_minutes`. Approving, cancelling, or correcting a punch rebuilds the day.
+9. **Outside the expected window** means outside `ExpectedWindow` for a workday. On a weekly rest day or holiday there is no expected window, so all approved, punched time counts (as `rest_day` or `holiday` minutes).
 10. **Early arrival** counts only if an approved window covers it. Arriving at 07:00 for an 08:00 schedule isn't overtime by itself.
 11. **Overnight:** overtime past midnight belongs to the work date of its in-punch, within the existing 18h pairing window. A window may end after midnight (e.g. 20:00–01:00).
 12. **Leave days:**
@@ -834,7 +836,13 @@ Scoped 7 Oct 2026. Owner decisions are marked **(owner)**; the rest are recommen
 
 ### TOIL settlement
 
-14. **TOIL credit follows the computed minutes, not the request.** When a day's overtime minutes change (approval, cancellation, punch correction), the employee's TOIL total is recalculated and the difference is posted as an **append-only, system-authored `leave_adjustments` row** linked to the overtime request. Never an edit.
+14. **TOIL credit follows the computed minutes, not the request — a reconciliation, not a per-request ledger.** After any change that can move an employee's credited minutes (approval, cancellation, a rebuild that changes credited minutes):
+    - **target** = floor(the employee's total credited minutes on `time_off` overtime, all time, × the TOIL ratio ÷ `toil_block_minutes`) × 0.5 day — the ratio is applied to the minutes first;
+    - **posted** = the sum of that employee's system-authored TOIL adjustments;
+    - if target − posted is non-zero, it's posted as **one append-only, system-authored `leave_adjustments` row** (`created_by` null). Never an edit.
+    - The remainder below a block carries across years: the target is all-time.
+    - The adjustment's `overtime_request_id` is the request whose change **triggered** it, and its `year` is that request's work-date year. The link means "triggered by", not "earned from only this request" — a block can be filled by several requests.
+    - **Idempotent:** running it twice posts nothing the second time.
 15. **Cancelling approved TOIL overtime** whose days are already taken may push the TOIL balance negative. That's allowed and shown, like an over-used Annual; HR decides.
 16. **The TOIL leave type** is seeded: no yearly grant, a balance built only from adjustments, half days allowed, workdays. Carry-over cap and expiry are HR settings.
 
@@ -846,11 +854,11 @@ Scoped 7 Oct 2026. Owner decisions are marked **(owner)**; the rest are recommen
 
 ### Schema
 
-**`overtime_requests`** — `employee_id`, `date`, `starts_at`/`ends_at` (datetime), `kind` (`planned`/`claim`), `compensation` (`pay`/`time_off`), `reason`, `status` (`pending`/`approved`/`rejected`/`cancelled`), `current_step`, `requested_by`, `cancelled_by`/`cancelled_at`, `limit_override_reason` nullable, timestamps. One non-cancelled, non-rejected request per employee per date.
+**`overtime_requests`** — `employee_id`, `date`, `starts_at`/`ends_at` (datetime), `kind` (`planned`/`claim`), `compensation` (`pay`/`time_off`), `reason`, `status` (`pending`/`approved`/`rejected`/`cancelled`), `current_step`, `requested_by`, `cancelled_by`/`cancelled_at`, `limit_override_reason` nullable, timestamps. One non-cancelled, non-rejected request per employee per date — not expressible as a MySQL unique index (no partial indexes), so enforced in the request service under the employee row lock, as leave overlap is.
 
-**`overtime_settings`** — one row: rates, night window, daily overtime cap, daily total cap, claim window days, TOIL ratio, TOIL block minutes, TOIL leave type id. Changing a rate applies to days rebuilt afterwards; already-paid months are payroll's history, not this table's.
+**`overtime_settings`** — one row: one rate per category (`workday_rate_percent` 150, `night_rate_percent` 200, `rest_day_rate_percent` 200, `holiday_rate_percent` 200; holiday ≥ rest day ≥ night ≥ workday ≥ 100), night window, daily overtime cap, daily total cap, claim window days, TOIL ratio, TOIL block minutes, TOIL leave type id. Changing a rate changes no stored minute (rule 3); already-paid months are payroll's history, not this table's.
 
-**`daily_attendances`** — alter-migration adding the three overtime columns.
+**`daily_attendances`** — alter-migration adding `overtime_request_id` and the four category minute columns (unsigned int, default 0).
 
 **`leave_adjustments`** — alter-migration adding nullable `overtime_request_id`.
 
@@ -860,7 +868,7 @@ Scoped 7 Oct 2026. Owner decisions are marked **(owner)**; the rest are recommen
 - **Approvals:** overtime items alongside leave, with planned window, actual punches once known, and compensation choice.
 - **Policies → Overtime:** the settings above.
 - **Attendance views:** credited overtime as an annotation on the day (`OT 1h 20m`), never a status colour.
-- **Monthly overtime report** (admin): per employee, minutes at 150% and 200%, paid vs TOIL, with a CSV download for payroll. This is the one report Phase 4 needs; the rest stays in Phase 5.
+- **Monthly overtime report** (admin): per employee, minutes per category with the current rates, paid vs TOIL, with a CSV download for payroll. This is the one report Phase 4 needs; the rest stays in Phase 5.
 
 ### Build order
 
@@ -876,15 +884,3 @@ Scoped 7 Oct 2026. Owner decisions are marked **(owner)**; the rest are recommen
 - TOIL ratio, whether rest-day TOIL must be taken the following week, carry-over and expiry.
 - Overtime on half-day leave days.
 - Whether overtime needs both approval steps or the manager alone.
-
-### Still open
-
-- **HR to confirm the leave-type list** — Medical's 30 days and pay, whether Special is paid or made up, anything company-specific. This is a seed-data change only.
-- **HR to confirm the first-eligible-year carry-over** (rule 5: uncapped once, then the cap). It's a single rule in the balance calculator.
-- **HR to confirm whether Medical (and the others) also need a service period.** If so, it's just a `min_service_months` value.
-- **Payroll and `late_minutes` on incomplete days** — carried to Phase 5 (exports); it only matters once payroll is in scope.
-- **Medical certificate upload** — deferred; the reason text only for now.
-- **The demo seeders have no production guard** (from 3f's go-live pass). Only `AdminUserSeeder` refuses to run in production; `docs/GO_LIVE.md` says never to run plain `db:seed` there and lists the configuration seeders to run by class. A guard in `DatabaseSeeder` itself would make that mistake impossible rather than documented.
-- **No command creates the first admin** — `docs/GO_LIVE.md` gives a tinker snippet. Worth a small `user:create-admin` command if installs become routine.
-- **Opening balances are entered by hand** (fewer than 50 employees). A CSV import is worth adding if headcount grows well past 50.
-- **The calendar cell and the day modal still name holidays in fuchsia** — the holiday *status* colour, which is right on a `holiday` day but reads as a status on a worked holiday. 3f moved the tables' annotation to muted text; the calendar's was left as built and goes to the Phase 5 polish list.
