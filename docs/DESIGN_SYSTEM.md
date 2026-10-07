@@ -62,7 +62,7 @@ Attendance color is model-driven. `DailyAttendance::displayVariant()` is the sou
 
 **Color = status only; co-occurring attributes are annotations.** A cell or badge color encodes one value per record — its status. Attributes that can co-occur with that status on the same record (attendance timing exceptions now, partial leave later) are annotations inside the cell, never the cell or badge color. For attendance timing the annotation is the timing text color (`amber-700` light, `amber-300` dark, medium weight) on the specific value; see [Attendance UI](ATTENDANCE_UI.md). In dense grids (the attendance calendar) **fill emphasizes exceptions**: the common, expected status (Present) uses the neutral surface with a colored number and icon, and only exception statuses get a tinted fill; a non-working state (Off) is quieter still — no fill and a dashed boundary.
 
-**Leave request status badges.** A leave request has its own status, separate from attendance, and one badge per request from `LeaveStatus::badgeColor()` — the only place it's chosen:
+**Request status badges.** A leave or overtime request has its own status, separate from attendance, and one badge per request from its status enum's `badgeColor()` — `LeaveStatus::badgeColor()` and `OvertimeStatus::badgeColor()`, the only places it's chosen, with the same mapping:
 
 | Request status | Badge | Why |
 |---|---|---|
@@ -71,12 +71,12 @@ Attendance color is model-driven. `DailyAttendance::displayVariant()` is the sou
 | Rejected | `red` | Done, against it; the decision's note is shown beside it |
 | Cancelled | `slate` | No longer in effect — the quietest |
 
-Annotations stay separate badges, never a recolouring of the status: `New` (`primary`) on a request decided since the employee last opened Time off, and `Stuck` (`amber`, the same alert role as Pending) on an override an admin should step in on.
+Annotations stay separate badges, never a recolouring of the status: `New` (`primary`) on a request decided since the employee last opened Time off (leave) or Overtime (overtime), and `Stuck` (`amber`, the same alert role as Pending) on an override an admin should step in on.
 
 **Why Pending's amber doesn't clash with timing's amber.** Amber has two roles, kept apart by form and by place:
 - **The timing annotation is amber *text*** (`amber-700` / `amber-300`, medium weight) on one value — a late In time, a Late or Early figure — and only in attendance views. It is never a badge and never a fill.
-- **An amber *badge*** (tinted pill, ring, label) is the alert role: something is waiting on someone. Pending and Stuck are this role, and they appear only on leave requests (Time off, Approvals, the dashboard), never in an attendance cell.
-- **An amber *callout*** is the warning panel: `bg-amber-50 ring-1 ring-inset ring-amber-600/20` with `text-amber-900`/`-800` and a 20px icon (dark: `bg-amber-900/20 text-amber-200`/`-300 ring-amber-500/30`). It says a form or figure is constrained — a locked schedule's or leave type's settings, attendance calculated only up to a date, a rebuild that failed partway. It is the one warning pattern; don't introduce another, and don't use it for errors (red) or for success (green).
+- **An amber *badge*** (tinted pill, ring, label) is the alert role: something is waiting on someone. Pending and Stuck are this role, and they appear only on requests — Time off, Overtime, Approvals, the dashboard, the profile's Leave and Overtime cards, and the day modal's Leave and Overtime sections — never in an attendance cell or table row.
+- **An amber *callout*** is the warning panel: `bg-amber-50 ring-1 ring-inset ring-amber-600/20` with `text-amber-900`/`-800` and a 20px icon (dark: `bg-amber-900/20 text-amber-200`/`-300 ring-amber-500/30`). It says a form or figure is constrained — a locked schedule's or leave type's settings, the time off in lieu settings once credited, a month the overtime report says is still open, attendance calculated only up to a date, a rebuild that failed partway. It is the one warning pattern; don't introduce another, and don't use it for errors (red) or for success (green).
 
 The two can't meet on one record: a pending request never reaches attendance at all (the builder reads approved leave only), and approved leave shows in attendance as the accent `Leave` status, not as a request badge. A reader who sees amber text on a time reads "timing"; one who sees an amber pill that says "Pending" reads "waiting" — the label always says which. For the same reason a request's green Approved never sits beside attendance's green Present: on the attendance side, that leave is accent.
 
@@ -270,7 +270,7 @@ Navigation visibility must match destination authorization. UI hiding is present
 
 ## Overlays
 
-Dropdowns and popovers are opaque, elevated content surfaces. Modals use `<x-modal>` and remain teleported to `<body>`; do not nest a hand-built fixed overlay in page content. Escape and backdrop click close dismissible overlays. Opening a modal always moves focus into it — the visible field marked `autofocus`, else the first focusable element (the calendar's day modal lands on **Add punch**, or **Close** for a viewer who can't add punches) — focus is trapped while it is open, and closing returns it to the trigger, or, when the trigger lost focus before the modal opened (`wire:loading` disables it during the round trip), to the last element focused outside any modal (`ModalFocusTest`). Confirmation dialogs follow the same visual surface rules.
+Dropdowns and popovers are opaque, elevated content surfaces. Modals use `<x-modal>` and remain teleported to `<body>`; do not nest a hand-built fixed overlay in page content. Escape and backdrop click close dismissible overlays. Opening a modal always moves focus into it — the visible field marked `autofocus`, else the first focusable element (the calendar's day modal lands on **Add punch**, or **Close** for a viewer who can't add punches — both marked `autofocus`, so a link in its Leave or Overtime section above them doesn't take focus first) — focus is trapped while it is open, and closing returns it to the trigger, or, when the trigger lost focus before the modal opened (`wire:loading` disables it during the round trip), to the last element focused outside any modal (`ModalFocusTest`). Confirmation dialogs follow the same visual surface rules.
 
 ## Loading states
 
