@@ -239,14 +239,16 @@ class Approvals extends Component
             $categories = $credit === null ? [] : array_filter([
                 'workday' => $credit->workday, 'night' => $credit->night, 'rest_day' => $credit->restDay, 'holiday' => $credit->holiday,
             ]);
+            // Which categories, for pay only: time off is earned 1:1 whatever the category.
+            $which = $request->compensation === OvertimeCompensation::Pay && $categories !== []
+                ? ' ('.collect($categories)->keys()->map(fn ($key) => strtolower(OvertimeSummary::CATEGORIES[$key][0]))->implode(', ').')'
+                : '';
             $worked = match (true) {
-                $would === null || ($would['in'] === null && $would['out'] === null) => 'No punches on record for this day yet.',
-                $would['out'] === null => 'Punched in '.AttendanceTime::format($would['in']).', no out-punch yet → nothing would be credited.',
+                $would === null || ($would['in'] === null && $would['out'] === null) => 'No punches on record for this day yet: nothing would be credited until they\'re added.',
+                $would['out'] === null => 'Punched in '.AttendanceTime::format($would['in']).'. No out-punch: nothing would be credited until it\'s added.',
                 default => 'Punched '.AttendanceTime::format($would['in']).' – '.AttendanceTime::format($would['out'])
                     .($would['out']->isSameDay($request->date) ? '' : ' (+1)')
-                    .' → '.($credit->total() > 0
-                        ? Duration::format($credit->total()).' would be credited ('.collect($categories)->keys()->map(fn ($key) => strtolower(OvertimeSummary::CATEGORIES[$key][0]))->implode(', ').')'
-                        : 'nothing would be credited'),
+                    .' → '.($credit->total() > 0 ? Duration::format($credit->total()).' would be credited'.$which : 'nothing would be credited'),
             };
         }
 

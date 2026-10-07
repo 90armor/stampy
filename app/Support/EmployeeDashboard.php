@@ -5,7 +5,6 @@ namespace App\Support;
 use App\Enums\LeaveStatus;
 use App\Enums\OvertimeKind;
 use App\Enums\OvertimeStatus;
-use App\Livewire\Leave\TimeOff;
 use App\Models\Employee;
 use App\Models\Leave;
 use App\Models\LeaveType;
@@ -83,9 +82,11 @@ final class EmployeeDashboard
             'next' => $next !== null ? $withDays($next) : null,
             'balances' => LeaveType::query()
                 ->where('is_active', true)
-                ->shownFor($employee)
+                ->withBalance()
                 ->orderBy('id')
                 ->get()
+                ->filter(fn (LeaveType $type) => $type->isShownFor($employee))
+                ->values()
                 ->map(function (LeaveType $type) use ($employee, $balances, $calculator) {
                     $balance = $balances->for($employee, $type, today()->year);
 
@@ -94,7 +95,7 @@ final class EmployeeDashboard
                         'available' => $balance->available(),
                         'usableFrom' => $balance->usableFrom,
                         'earnedSoFar' => $calculator->earnedSoFar($employee, $type, today()),
-                        'toilRemainder' => TimeOff::toilRemainder($employee, $type),
+                        'toilRemainder' => $type->toilRemainderFor($employee),
                     ];
                 })
                 ->all(),

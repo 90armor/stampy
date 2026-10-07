@@ -158,6 +158,7 @@ class OvertimeRequestService
         $checked = $this->validate($employee, $date, $startsAt, $endsAt, $compensation, $actor, $overrideReason, deferAdminLimits: true);
         $day = $checked['day'];
         $window = new OvertimeRequest(['date' => $date, 'starts_at' => $startsAt, 'ends_at' => $endsAt]);
+        $window->setRelation('employee', $employee);
         $settings = OvertimeSettings::current();
         $immutable = fn (int $timestamp) => CarbonImmutable::createFromTimestamp($timestamp, $date->getTimezone());
 
@@ -169,6 +170,7 @@ class OvertimeRequestService
         $isClaim = ! $startsAt->gt(now());
 
         $row = $isClaim ? $employee->dailyAttendances()->whereDate('work_date', $date->format('Y-m-d'))->first() : null;
+        $punchCredit = $row !== null ? $this->creditFromPunches($window, $row->first_in, $row->last_out, $day) : null;
         $toil = null;
 
         if ($compensation === OvertimeCompensation::TimeOff) {
@@ -192,6 +194,7 @@ class OvertimeRequestService
             limitProblems: $checked['override'] === null ? $checked['limitProblems'] : [],
             overrideReason: $checked['override'],
             punches: $row !== null ? ['in' => $row->first_in?->toImmutable(), 'out' => $row->last_out?->toImmutable()] : null,
+            punchCredit: $punchCredit,
             toil: $toil,
             approvedOnSubmit: $onBehalf,
             reviewers: $onBehalf ? '' : $this->reviewers($employee, ! $isClaim),
@@ -225,14 +228,30 @@ class OvertimeRequestService
             return null;
         }
 
-        $day = $this->day($request->employee, $request->date->copy());
-        $leaveDay = LeaveDay::on($this->leavesOn($request->employee, $request->date->copy(), [LeaveStatus::Approved]), $request->date);
-
         return [
             'in' => $row->first_in,
             'out' => $row->last_out,
-            'credit' => $this->calculator->calculate($request, $row->first_in, $row->last_out, $day['schedule'], $request->date, $day['isScheduledWorkday'], $day['isHoliday'], $leaveDay, OvertimeSettings::current()),
+            'credit' => $this->creditFromPunches($request, $row->first_in, $row->last_out, $this->day($request->employee, $request->date->copy()))
+                ?? new OvertimeCredit($request->id),
         ];
+    }
+
+    /**
+     * What a window would credit with the day's real punches — the builder's
+     * own calculation (approved leave included) — or null without both.
+     *
+     * @param  array<string, mixed>  $day  day()
+     */
+    private function creditFromPunches(OvertimeRequest $window, ?CarbonInterface $firstIn, ?CarbonInterface $lastOut, array $day): ?OvertimeCredit
+    {
+        if ($firstIn === null || $lastOut === null) {
+            return null;
+        }
+
+        $employee = $window->employee ?? Employee::find($window->employee_id);
+        $leaveDay = $employee !== null ? LeaveDay::on($this->leavesOn($employee, $day['date']->copy(), [LeaveStatus::Approved]), $day['date']) : LeaveDay::none();
+
+        return $this->calculator->calculate($window, $firstIn, $lastOut, $day['schedule'], $day['date'], $day['isScheduledWorkday'], $day['isHoliday'], $leaveDay, OvertimeSettings::current());
     }
 
     /**

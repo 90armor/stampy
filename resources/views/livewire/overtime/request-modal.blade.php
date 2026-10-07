@@ -90,7 +90,7 @@
                 <div class="space-y-1.5 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-200">
                     <p>{{ $summary['kind'] }}</p>
                     @if ($summary['counts'])<p>{{ $summary['counts'] }}</p>@endif
-                    <p class="tabular-nums">{{ $summary['split'] }}</p>
+                    @if ($summary['split'])<p class="tabular-nums">{{ $summary['split'] }}</p>@endif
                     @if ($summary['toil'])<p>{{ $summary['toil'] }}</p>@endif
                     @if ($summary['punches'])<p>{{ $summary['punches'] }}</p>@endif
                 </div>

@@ -26,7 +26,11 @@ use Carbon\CarbonImmutable;
  * The chain stops at the first year with no grant.
  *
  * An earned type (LeaveBalanceSource::Earned — Time off in lieu) has no grant:
- * entitled is always 0 and its balance is its adjustments. Its carry-over
+ * its balance is its adjustments. What overtime earned — the system-posted
+ * ones (created_by null, overtime_request_id set) — is shown as its
+ * entitlement ("earned from overtime", Phase 4d), and adjustments keeps only
+ * the rest (an admin's corrections), so a posted half day doesn't read as a
+ * manual HR change; available() is the same either way. Its carry-over
  * chain can't stop at "no grant", since there never is one; it runs back to
  * the employee's first year with an adjustment, and every year after it
  * carries min(cap, what was left) — a quiet year included, so nothing lapses
@@ -68,13 +72,22 @@ class LeaveBalance
         $used = $approved[$year] ?? 0;
         $usedFromCarry = min($used, $carriedIn);
 
+        // An earned type: this year's system-posted days are its entitlement.
+        $earned = ! $type->balance_source->isEarned() ? 0 : LeaveDays::fromDecimal((string) LeaveAdjustment::query()
+            ->where('employee_id', $employee->id)
+            ->where('leave_type_id', $type->id)
+            ->where('year', $year)
+            ->whereNull('created_by')
+            ->whereNotNull('overtime_request_id')
+            ->sum('days'));
+
         return new Balance(
             type: $type,
             year: $year,
             hasBalance: true,
-            entitled: $entitlements[$year] ?? 0,
+            entitled: ($entitlements[$year] ?? 0) + $earned,
             carriedIn: $carriedIn,
-            adjustments: $adjustments[$year] ?? 0,
+            adjustments: ($adjustments[$year] ?? 0) - $earned,
             used: $used,
             pending: $pending[$year] ?? 0,
             usedFromCarry: $usedFromCarry,

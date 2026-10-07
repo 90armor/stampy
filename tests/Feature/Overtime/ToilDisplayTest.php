@@ -7,12 +7,14 @@ use App\Livewire\Employees\LeaveCard;
 use App\Livewire\Leave\TimeOff;
 use App\Models\AttendanceLog;
 use App\Models\Employee;
+use App\Models\LeaveAdjustment;
 use App\Models\LeaveType;
 use App\Models\OvertimeRequest;
 use App\Models\OvertimeSettings;
 use App\Models\User;
 use App\Models\WorkSchedule;
 use App\Services\Attendance\DailySummaryBuilder;
+use App\Services\Leave\LeaveBalance;
 use App\Services\Overtime\TimeOffInLieuReconciler;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -108,6 +110,19 @@ class ToilDisplayTest extends TestCase
 
         Livewire::actingAs($admin)->test(LeaveCard::class, ['employee' => $this->employee])
             ->assertSee('30m toward the next half day');
+    }
+
+    /** What overtime earned is the entitlement, not an adjustment: that column is an admin's corrections. */
+    public function test_posted_time_off_in_lieu_is_entitled_and_adjustments_are_only_an_admins(): void
+    {
+        $this->earnFourAndAHalfHours();
+        $toil = LeaveType::where('name', 'Time off in lieu')->sole();
+        LeaveAdjustment::factory()->create(['employee_id' => $this->employee->id, 'leave_type_id' => $toil->id, 'year' => 2026, 'days' => '1.0', 'created_by' => User::factory()->create()->id]);
+
+        $balance = app(LeaveBalance::class)->for($this->employee, $toil, 2026);
+
+        $this->assertSame([5, 10, 15], [$balance->entitled, $balance->adjustments, $balance->available()]);
+        Livewire::actingAs($this->employee->user)->test(TimeOff::class)->assertSee('earned from overtime');
     }
 
     public function test_paid_overtime_earns_no_toil_row(): void

@@ -63,7 +63,8 @@
                         <div class="{{ $row }}">
                             <dt class="text-sm text-slate-500 dark:text-slate-400">
                                 {{ $label }}
-                                <span class="block text-xs">{{ OvertimeSummary::categoryLine($month[$key]) }}</span>
+                                {{-- Rates belong to pay only: time off is earned 1:1. --}}
+                                @if ($key === 'pay')<span class="block text-xs">{{ OvertimeSummary::categoryLine($month[$key]) }}</span>@endif
                             </dt>
                             <dd class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ Duration::format(array_sum($month[$key])) }}</dd>
                         </div>

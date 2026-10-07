@@ -9,7 +9,9 @@ use Carbon\CarbonImmutable;
  * One leave type's balance for one employee and year (LeaveBalance). Every
  * amount is integer tenths of a day (LeaveDays).
  *
- * available = entitled + carriedIn + adjustments − used − pending. used and
+ * available = entitled + carriedIn + adjustments − used − pending. For an
+ * earned type (Time off in lieu) entitled is what overtime earned — the
+ * system-posted adjustments — and adjustments only an admin's corrections. used and
  * pending include leaves of types that deduct from this one (Special from
  * Annual); usedByType/pendingByType break both down by the leave's own type.
  * Usage consumes the carry first (FIFO): usedFromCarry + usedFromGrant = used.

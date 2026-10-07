@@ -9,7 +9,6 @@ use App\Models\OvertimeRequest;
 use App\Models\OvertimeSettings;
 use App\Services\Leave\LeaveBalance;
 use App\Services\Overtime\OvertimeRequestService;
-use App\Services\Overtime\TimeOffInLieuReconciler;
 use App\Support\DisplayDate;
 use App\Support\OvertimeResult;
 use App\Support\OvertimeSummary;
@@ -75,7 +74,7 @@ class Index extends Component
         $this->warning = $result['rebuildError'];
     }
 
-    public function render(OvertimeRequestService $service, LeaveBalance $balances, TimeOffInLieuReconciler $reconciler)
+    public function render(OvertimeRequestService $service, LeaveBalance $balances)
     {
         $this->authorize('viewAny', OvertimeRequest::class);
 
@@ -83,13 +82,10 @@ class Index extends Component
         $employee = $user->employee;
         $settings = OvertimeSettings::current();
 
-        // Time off in lieu once they have any — a balance (an adjustment, ever)
-        // or time saved toward a half day — never "0" for someone who has
-        // never done overtime (LeaveType::shownFor()'s rule).
+        // Time off in lieu by the one rule every view uses (LeaveType::isShownFor()).
         $toilType = $settings->toilLeaveType;
-        $saved = $employee !== null ? ($reconciler->remainderMinutes($employee) ?? 0) : 0;
-        $toil = $employee !== null && $toilType !== null && ($saved > 0 || $toilType->adjustments()->where('employee_id', $employee->id)->exists())
-            ? ['name' => $toilType->name, 'available' => $balances->for($employee, $toilType, today()->year)->available(), 'saved' => $saved]
+        $toil = $employee !== null && $toilType !== null && $toilType->isShownFor($employee)
+            ? ['name' => $toilType->name, 'available' => $balances->for($employee, $toilType, today()->year)->available(), 'saved' => $toilType->toilRemainderFor($employee) ?? 0]
             : null;
 
         return view('livewire.overtime.index', [

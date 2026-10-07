@@ -7,6 +7,7 @@ use App\Enums\LeaveCounting;
 use App\Exceptions\InvalidLeaveTypeException;
 use App\Exceptions\LeaveTypeInUseException;
 use App\Exceptions\LeaveTypeLockedException;
+use App\Services\Overtime\TimeOffInLieuReconciler;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -152,16 +153,33 @@ class LeaveType extends Model
     }
 
     /**
-     * Types with a balance worth showing $employee (Phase 4d): every yearly
-     * one, and an earned one (Time off in lieu) only once they've had an
-     * adjustment of it — otherwise everyone who never did overtime would see
-     * "Time off in lieu 0".
+     * Whether this balance is worth showing $employee — the one rule every
+     * view applies (Time off, the profile, the dashboard, Overtime; Phase 4d):
+     * a yearly type always; an earned one (Time off in lieu) once they've
+     * ever had an adjustment of it, or have time saved toward the next half
+     * day — never "0" for someone who has never done overtime, and never
+     * hidden from someone whose overtime hasn't filled a block yet.
      */
-    public function scopeShownFor(Builder $query, Employee $employee): void
+    public function isShownFor(Employee $employee): bool
     {
-        $query->withBalance()->where(fn (Builder $query) => $query
-            ->where('balance_source', '!=', LeaveBalanceSource::Earned->value)
-            ->orWhereHas('adjustments', fn (Builder $adjustments) => $adjustments->where('employee_id', $employee->id)));
+        if (! $this->balance_source->isEarned()) {
+            return true;
+        }
+
+        return $this->adjustments()->where('employee_id', $employee->id)->exists()
+            || ($this->toilRemainderFor($employee) ?? 0) > 0;
+    }
+
+    /**
+     * The time saved toward the next half day, when this is the overtime
+     * settings' TOIL type (TimeOffInLieuReconciler::remainderMinutes()); null
+     * for any other type.
+     */
+    public function toilRemainderFor(Employee $employee): ?int
+    {
+        return OvertimeSettings::current()->toil_leave_type_id === $this->id
+            ? app(TimeOffInLieuReconciler::class)->remainderMinutes($employee)
+            : null;
     }
 
     public function deductsFrom(): BelongsTo

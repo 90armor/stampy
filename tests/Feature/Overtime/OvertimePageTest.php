@@ -4,6 +4,7 @@ namespace Tests\Feature\Overtime;
 
 use App\Enums\OvertimeCompensation;
 use App\Enums\OvertimeStatus;
+use App\Livewire\Leave\TimeOff;
 use App\Livewire\Overtime\Index;
 use App\Livewire\Overtime\RequestModal;
 use App\Models\AttendanceLog;
@@ -117,7 +118,9 @@ class OvertimePageTest extends TestCase
         Livewire::actingAs($this->employee->user)->test(Index::class)
             ->assertSee('6h 30m')
             ->assertSee('Workday (150%) 1h 00m · Night (200%) 1h 00m')
-            ->assertSee('Workday (150%) 4h 30m')
+            // Time off is earned 1:1: its total, no rates.
+            ->assertDontSee('Workday (150%) 4h 30m')
+            ->assertSee('4h 30m')
             ->assertSee('1 request')
             ->assertSee('Time off in lieu')
             ->assertSee('30m toward the next half day');
@@ -128,6 +131,21 @@ class OvertimePageTest extends TestCase
         Livewire::actingAs($this->employee->user)->test(Index::class)
             ->assertSee('None yet')
             ->assertDontSee('Time off in lieu');
+    }
+
+    /**
+     * One rule everywhere (LeaveType::isShownFor()): time saved toward a half
+     * day shows Time off in lieu even before anything is posted.
+     */
+    public function test_time_saved_toward_a_half_day_shows_the_toil_row_on_time_off_too(): void
+    {
+        $this->worked('2026-06-09', '08:00:00', '18:20:00');
+        $this->approved('2026-06-09', '17:00', '19:00', OvertimeCompensation::TimeOff);
+
+        Livewire::actingAs($this->employee->user)->test(TimeOff::class)
+            ->assertSee('Time off in lieu')
+            ->assertSee('1h 20m toward the next half day');
+        $this->actingAs($this->employee->user)->get(route('dashboard'))->assertSee('1h 20m toward the next half day');
     }
 
     public function test_each_request_says_what_it_has_credited(): void
@@ -196,7 +214,7 @@ class OvertimePageTest extends TestCase
             ->assertSet('step', 'review')
             ->assertSee('This is planned: it hasn\'t started yet.')
             ->assertSee('Only 5:00 PM – 7:00 PM counts. 4:00 PM – 5:00 PM is normal working hours.')
-            ->assertSee('Workday (150%) 2h 00m')
+            ->assertDontSee('Workday (150%)')
             ->assertSee('Adds 2h 00m toward time off in lieu.')
             ->assertSee('Aye Aye Mon reviews it first, then an admin.')
             ->call('submit')
@@ -222,10 +240,29 @@ class OvertimePageTest extends TestCase
             ->set('date', '2026-06-12')->set('start_time', '17:00')->set('end_time', '19:00')->set('compensation', 'time_off')
             ->call('review')
             ->assertSee('This is a claim: the time has already started.')
-            ->assertSee('You punched in at 8:02 AM and out at 7:05 PM.')
+            ->assertSee('With your punches (out 7:05 PM), all 2h 00m would be credited.')
             // A claim has already started: only an admin can cancel it now.
             ->assertSee('Aye Aye Mon reviews it first, then an admin.')
             ->assertDontSee('You can cancel it until it starts.');
+    }
+
+    public function test_a_claim_says_what_the_real_punches_would_credit(): void
+    {
+        // Out at 5:08 PM against a 5–6 PM claim: 8 minutes, not an hour.
+        $this->worked('2026-06-12', '08:00:00', '17:08:00');
+        $this->worked('2026-06-11', '08:00:00', null);
+        app(DailySummaryBuilder::class)->rebuildAround($this->employee, Carbon::parse('2026-06-11'), Carbon::parse('2026-06-12'));
+
+        $this->modal()
+            ->set('date', '2026-06-12')->set('start_time', '17:00')->set('end_time', '18:00')
+            ->call('review')
+            ->assertSee('Workday (150%) 1h 00m')
+            ->assertSee('With your punches (out 5:08 PM), 8m would be credited. If you forgot to punch out, ask an admin to correct the punch first.');
+
+        $this->modal()
+            ->set('date', '2026-06-11')->set('start_time', '17:00')->set('end_time', '18:00')
+            ->call('review')
+            ->assertSee("No out-punch: nothing would be credited until it's added.");
     }
 
     public function test_an_overnight_end_is_the_next_day(): void

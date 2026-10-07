@@ -252,18 +252,24 @@ class RequestModal extends Component
 
         $time = fn ($at) => AttendanceTime::format($at);
         $span = fn (array $span) => $time($span[0]).' – '.$time($span[1]);
-        $you = $this->forOthers ? 'They' : 'You';
+        $your = $this->forOthers ? 'their' : 'your';
         $settings = OvertimeSettings::current();
 
+        // A claim: what the day's real punches would credit if it were
+        // approved — the window can promise more than they stayed for.
         $punches = null;
         if ($preview->kind === OvertimeKind::Claim) {
             $in = $preview->punches['in'] ?? null;
             $out = $preview->punches['out'] ?? null;
+            $credited = $preview->punchCredit?->total();
             $punches = match (true) {
-                $in !== null && $out !== null => "{$you} punched in at {$time($in)} and out at {$time($out)}".($out->isSameDay($preview->date) ? '' : ' (+1)').'.',
-                $in !== null => "{$you} punched in at {$time($in)}; there's no out-punch yet.",
-                $out !== null => "{$you} punched out at {$time($out)}; there's no in-punch.",
-                default => 'No punches on record for '.DisplayDate::compact($preview->date).' yet.',
+                $in === null && $out === null => 'No punches on record for '.DisplayDate::compact($preview->date).' yet: nothing would be credited until they\'re added.',
+                $out === null => 'No out-punch: nothing would be credited until it\'s added.',
+                $in === null => 'No in-punch: nothing would be credited until it\'s added.',
+                $credited >= $preview->credit->total() => 'With '.$your.' punches (out '.$time($out).($out->isSameDay($preview->date) ? '' : ' (+1)').'), all '.Duration::format($credited).' would be credited.',
+                default => 'With '.$your.' punches (out '.$time($out).($out->isSameDay($preview->date) ? '' : ' (+1)').'), '
+                    .($credited > 0 ? Duration::format($credited).' would be credited' : 'nothing would be credited')
+                    .'. If '.($this->forOthers ? 'they' : 'you').' forgot to punch out, ask an admin to correct the punch first.',
             };
         }
 
@@ -290,10 +296,11 @@ class RequestModal extends Component
             'counts' => $preview->normal !== null
                 ? 'Only '.collect($preview->counted)->map($span)->implode(' and ').' counts. '.$span($preview->normal).' is normal working hours.'
                 : null,
-            'split' => OvertimeSummary::categoryLine([
+            // Rates belong to pay only: time off is earned 1:1 whatever the category.
+            'split' => $preview->compensation === OvertimeCompensation::Pay ? OvertimeSummary::categoryLine([
                 'workday' => $preview->credit->workday, 'night' => $preview->credit->night,
                 'rest_day' => $preview->credit->restDay, 'holiday' => $preview->credit->holiday,
-            ]),
+            ]) : null,
             'toil' => $toil,
             'limitProblems' => $preview->limitProblems,
             'punches' => $punches,

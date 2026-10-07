@@ -116,7 +116,7 @@ class OvertimeApprovalsPageTest extends TestCase
 
         Livewire::actingAs($this->manager->user)->test(Approvals::class)
             ->assertSee('Punched 8:02 AM – 7:05 PM → 2h 00m would be credited (workday)')
-            ->assertSee('No punches on record for this day yet.')
+            ->assertSee('No punches on record for this day yet: nothing would be credited until they\'re added.')
             ->assertSee('Already worked');
     }
 

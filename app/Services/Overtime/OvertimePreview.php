@@ -17,7 +17,10 @@ use Carbon\CarbonImmutable;
  *   inside normal working hours (null when none is).
  * - limitProblems: an admin over a daily limit with no override reason yet
  *   (anyone else is refused before a review exists).
- * - punches: the day's paired punches for a claim, when it has a row.
+ * - punches: the day's paired punches for a claim, when it has a row, and
+ *   punchCredit: what those punches would credit if it were approved (the
+ *   builder's own calculation) — null without both punches. A claim for
+ *   5–6 PM by someone who punched out at 5:08 PM credits 8m, not 1h.
  * - toil: for time off — the minutes it adds (after the ratio), the minutes
  *   already saved toward the next half day, and how many half days it would
  *   complete.
@@ -44,6 +47,7 @@ final readonly class OvertimePreview
         public array $limitProblems,
         public ?string $overrideReason,
         public ?array $punches,
+        public ?OvertimeCredit $punchCredit,
         public ?array $toil,
         public bool $approvedOnSubmit,
         public string $reviewers,

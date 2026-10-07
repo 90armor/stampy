@@ -8,13 +8,11 @@ use App\Models\Employee;
 use App\Models\Leave;
 use App\Models\LeaveEntitlement;
 use App\Models\LeaveType;
-use App\Models\OvertimeSettings;
 use App\Services\Leave\Balance;
 use App\Services\Leave\EntitlementCalculator;
 use App\Services\Leave\LeaveBalance;
 use App\Services\Leave\LeaveDayCounter;
 use App\Services\Leave\LeaveRequestService;
-use App\Services\Overtime\TimeOffInLieuReconciler;
 use App\Support\LeaveDecisions;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\On;
@@ -116,8 +114,8 @@ class TimeOff extends Component
     }
 
     /**
-     * One row per active type with a balance worth showing (LeaveType::
-     * shownFor(): an earned one only once they've earned some).
+     * One row per active type with a balance worth showing
+     * (LeaveType::isShownFor()).
      *
      * @return list<array{type: LeaveType, balance: Balance, earnedSoFar: ?int, toilRemainder: ?int}>
      */
@@ -125,28 +123,18 @@ class TimeOff extends Component
     {
         return LeaveType::query()
             ->where('is_active', true)
-            ->shownFor($employee)
+            ->withBalance()
             ->orderBy('id')
             ->get()
+            ->filter(fn (LeaveType $type) => $type->isShownFor($employee))
             ->map(fn (LeaveType $type) => [
                 'type' => $type,
                 'balance' => $balances->for($employee, $type, $this->year),
                 'earnedSoFar' => $calculator->earnedSoFar($employee, $type, today()),
-                'toilRemainder' => self::toilRemainder($employee, $type),
+                'toilRemainder' => $type->toilRemainderFor($employee),
             ])
+            ->values()
             ->all();
-    }
-
-    /**
-     * The time saved toward the next half day, for the TOIL type's row only
-     * (TimeOffInLieuReconciler::remainderMinutes()) — shared with the profile's
-     * Leave card and the dashboard.
-     */
-    public static function toilRemainder(Employee $employee, LeaveType $type): ?int
-    {
-        return OvertimeSettings::current()->toil_leave_type_id === $type->id
-            ? app(TimeOffInLieuReconciler::class)->remainderMinutes($employee)
-            : null;
     }
 
     /**
