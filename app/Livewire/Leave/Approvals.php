@@ -140,7 +140,7 @@ class Approvals extends Component
         $balanceType = $leave->leaveType->deductsFrom ?? $leave->leaveType;
 
         // Pending leave is already reserved, so available() is the balance after this request.
-        $after = $balanceType->days_per_year === null ? [] : collect(array_keys($cost))
+        $after = ! $balanceType->hasBalance() ? [] : collect(array_keys($cost))
             ->map(fn (int $year) => ['year' => $year, 'available' => LeaveDays::format($balances->for($employee, $balanceType, $year)->available())])
             ->all();
 

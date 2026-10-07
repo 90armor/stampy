@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\LeaveBalanceSource;
 use App\Enums\LeaveCounting;
 use App\Models\LeaveType;
 use Illuminate\Database\Seeder;
@@ -22,6 +23,7 @@ class LeaveTypeSeeder extends Seeder
     public function run(): void
     {
         $annual = LeaveType::updateOrCreate(['name' => 'Annual'], [
+            'balance_source' => LeaveBalanceSource::Yearly,
             'days_per_year' => 18,
             // Usable only after 12 months of service (Labour Law).
             'min_service_months' => 12,
@@ -36,6 +38,7 @@ class LeaveTypeSeeder extends Seeder
         ]);
 
         LeaveType::updateOrCreate(['name' => 'Medical'], [
+            'balance_source' => LeaveBalanceSource::Yearly,
             'days_per_year' => 30,
             'min_service_months' => null,
             'seniority_bonus' => false,
@@ -50,6 +53,7 @@ class LeaveTypeSeeder extends Seeder
         // Family events (marriage, birth, illness or death of a spouse, child
         // or parent): up to 7 days a request, taken from the Annual balance.
         LeaveType::updateOrCreate(['name' => 'Special'], [
+            'balance_source' => LeaveBalanceSource::None,
             'days_per_year' => null,
             'min_service_months' => null,
             'seniority_bonus' => false,
@@ -64,6 +68,7 @@ class LeaveTypeSeeder extends Seeder
         // 90 calendar days a request, weekends and holidays included, by law;
         // paid at 50%, which is payroll's concern, not this app's.
         LeaveType::updateOrCreate(['name' => 'Maternity'], [
+            'balance_source' => LeaveBalanceSource::None,
             'days_per_year' => null,
             'min_service_months' => null,
             'seniority_bonus' => false,
@@ -76,6 +81,7 @@ class LeaveTypeSeeder extends Seeder
         ]);
 
         LeaveType::updateOrCreate(['name' => 'Unpaid'], [
+            'balance_source' => LeaveBalanceSource::None,
             'days_per_year' => null,
             'min_service_months' => null,
             'seniority_bonus' => false,

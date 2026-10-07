@@ -2,6 +2,7 @@
 
 namespace App\Exceptions;
 
+use App\Enums\LeaveBalanceSource;
 use InvalidArgumentException;
 
 /**
@@ -9,8 +10,10 @@ use InvalidArgumentException;
  * (LeaveType::booted()), never a question of what references it (see
  * LeaveTypeLockedException/InUseException for that).
  *
- * - carry_over_cap or seniority_bonus on a type with no balance
- *   (days_per_year null): there is nothing to carry over or add to.
+ * - the balance source's fields (LeaveBalanceSource): a yearly type needs
+ *   days_per_year; an earned or no-balance type has no yearly grant, so no
+ *   days_per_year, seniority_bonus or min_service_months; a type with no
+ *   balance can't carry over either (an earned one can).
  * - deducting from itself.
  * - a deduction chain: deducting from a type that itself deducts from
  *   another, or deducting at all while another type deducts from this one.
@@ -18,9 +21,25 @@ use InvalidArgumentException;
  */
 class InvalidLeaveTypeException extends InvalidArgumentException
 {
+    public static function yearlyWithoutDays(): self
+    {
+        return new self('A yearly balance needs days per year.');
+    }
+
+    public static function daysWithoutYearlyGrant(LeaveBalanceSource $source): self
+    {
+        return new self('Days per year are only for a yearly balance; '
+            .($source === LeaveBalanceSource::Earned ? 'a balance earned from overtime' : 'a type with no balance').' has no yearly grant.');
+    }
+
     public static function balanceOptionsWithoutBalance(): self
     {
-        return new self('Carry-over and the seniority bonus need a yearly balance (days per year).');
+        return new self('A type with no balance can\'t carry over or add a seniority bonus: those need a yearly balance (carry-over also works with an earned one).');
+    }
+
+    public static function yearlyOptionsWithoutYearlyGrant(): self
+    {
+        return new self('The seniority bonus and a service requirement need a yearly balance (days per year).');
     }
 
     public static function deductsFromItself(): self

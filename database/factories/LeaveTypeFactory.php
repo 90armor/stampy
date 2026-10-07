@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\LeaveBalanceSource;
 use App\Enums\LeaveCounting;
 use App\Models\LeaveType;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -20,6 +21,7 @@ class LeaveTypeFactory extends Factory
     {
         return [
             'name' => ucfirst($this->faker->unique()->words(2, true)),
+            'balance_source' => LeaveBalanceSource::Yearly,
             'days_per_year' => 12,
             'min_service_months' => null,
             'seniority_bonus' => false,
@@ -33,10 +35,28 @@ class LeaveTypeFactory extends Factory
         ];
     }
 
-    /** No yearly balance (Unpaid, Maternity). */
+    /** No balance (Unpaid, Maternity). */
     public function withoutBalance(): static
     {
-        return $this->state(['days_per_year' => null, 'carry_over_cap' => null, 'seniority_bonus' => false]);
+        return $this->state([
+            'balance_source' => LeaveBalanceSource::None,
+            'days_per_year' => null,
+            'min_service_months' => null,
+            'carry_over_cap' => null,
+            'seniority_bonus' => false,
+        ]);
+    }
+
+    /** A balance built from adjustments only (Time off in lieu), no carry-over. */
+    public function earned(): static
+    {
+        return $this->state([
+            'balance_source' => LeaveBalanceSource::Earned,
+            'days_per_year' => null,
+            'min_service_months' => null,
+            'carry_over_cap' => null,
+            'seniority_bonus' => false,
+        ]);
     }
 
     public function calendarDays(): static

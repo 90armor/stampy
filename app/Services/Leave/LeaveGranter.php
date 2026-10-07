@@ -2,6 +2,7 @@
 
 namespace App\Services\Leave;
 
+use App\Enums\LeaveBalanceSource;
 use App\Models\Employee;
 use App\Models\LeaveEntitlement;
 use App\Models\LeaveType;
@@ -15,7 +16,8 @@ use Illuminate\Support\Collection;
  * by leave:grant (daily) and by Employee::booted() when an employee is
  * created or their join_date is corrected. For an employee, a year and an
  * as-of date it creates each missing grant the employee is eligible for,
- * for every active type with a yearly balance, at what EntitlementCalculator
+ * for every active type granted yearly (LeaveBalanceSource::Yearly — never an
+ * earned or no-balance type), at what EntitlementCalculator
  * says. Idempotent: existing rows are skipped, so a missed day is caught up
  * the next time it runs ("eligible and no row", not "today is the day").
  *
@@ -103,7 +105,7 @@ class LeaveGranter
     {
         return LeaveType::query()
             ->where('is_active', true)
-            ->whereNotNull('days_per_year')
+            ->where('balance_source', LeaveBalanceSource::Yearly->value)
             ->orderBy('id')
             ->get();
     }

@@ -4,14 +4,17 @@
     $days = fn (?string $decimal) => LeaveDays::label(LeaveDays::fromDecimal($decimal));
     // One line on the allowance, one on how requests work — built as strings,
     // so no directive sits between the separators.
-    $allowance = fn ($type) => $type->days_per_year === null
-        ? ($type->deductsFrom ? 'Deducted from '.$type->deductsFrom->name : 'No yearly balance')
-        : implode(' · ', array_filter([
+    $carry = fn ($type) => $type->carry_over_cap !== null ? 'carry over up to '.$days($type->carry_over_cap) : 'no carry-over';
+    $allowance = fn ($type) => match ($type->balance_source) {
+        \App\Enums\LeaveBalanceSource::None => $type->deductsFrom ? 'Deducted from '.$type->deductsFrom->name : 'No balance',
+        \App\Enums\LeaveBalanceSource::Earned => 'Earned from overtime · '.$carry($type),
+        \App\Enums\LeaveBalanceSource::Yearly => implode(' · ', array_filter([
             $days($type->days_per_year).' a year',
             $type->seniority_bonus ? '+1 day per 3 years of service' : null,
-            $type->carry_over_cap !== null ? 'carry over up to '.$days($type->carry_over_cap) : 'no carry-over',
+            $carry($type),
             $type->min_service_months ? 'usable after '.$type->min_service_months.' '.Str::plural('month', $type->min_service_months).' of service' : null,
-        ]));
+        ])),
+    };
     $rules = fn ($type) => implode(' · ', array_filter([
         'Counts '.Str::lower($type->counts->label()),
         $type->allows_half_day ? 'half days allowed' : 'whole days only',

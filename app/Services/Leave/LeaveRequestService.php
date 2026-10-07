@@ -152,7 +152,7 @@ class LeaveRequestService
 
         $balances = [];
 
-        if ($balanceType->days_per_year !== null) {
+        if ($balanceType->hasBalance()) {
             foreach ($cost as $year => $days) {
                 $before = $this->balances->for($employee, $balanceType, $year)->available();
                 $balances[$year] = ['before' => $before, 'after' => $before - $days];
@@ -544,7 +544,7 @@ class LeaveRequestService
         // 6. Balance, per year of the cost, against the type that holds it.
         $balanceType = $type->deductsFrom ?? $type;
 
-        if ($balanceType->days_per_year !== null) {
+        if ($balanceType->hasBalance()) {
             foreach ($cost as $year => $days) {
                 $available = $this->balances->for($employee, $balanceType, $year)->available();
 

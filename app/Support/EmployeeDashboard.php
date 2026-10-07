@@ -58,7 +58,7 @@ final class EmployeeDashboard
             'next' => $next !== null ? $withDays($next) : null,
             'balances' => LeaveType::query()
                 ->where('is_active', true)
-                ->whereNotNull('days_per_year')
+                ->withBalance()
                 ->orderBy('id')
                 ->get()
                 ->map(function (LeaveType $type) use ($employee, $balances, $calculator) {

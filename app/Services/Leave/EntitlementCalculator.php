@@ -30,7 +30,7 @@ class EntitlementCalculator
 {
     public function forYear(Employee $employee, LeaveType $type, int $year): Entitlement
     {
-        if ($type->days_per_year === null) {
+        if (! $type->isGrantedYearly()) {
             return Entitlement::noBalance();
         }
 
@@ -73,7 +73,7 @@ class EntitlementCalculator
     {
         $leftOn = $employee->left_on;
 
-        if ($type->days_per_year === null || $leftOn === null || $leftOn->year !== $year) {
+        if (! $type->isGrantedYearly() || $leftOn === null || $leftOn->year !== $year) {
             return null;
         }
 
@@ -92,7 +92,7 @@ class EntitlementCalculator
      */
     public function earnedSoFar(Employee $employee, LeaveType $type, CarbonInterface $asOf): ?int
     {
-        if ($type->days_per_year === null || $this->eligibleOn($employee, $type)->lte($asOf)) {
+        if (! $type->isGrantedYearly() || $this->eligibleOn($employee, $type)->lte($asOf)) {
             return null;
         }
 
