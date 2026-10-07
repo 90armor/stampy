@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\LeaveBalanceSource;
 use App\Enums\LeaveStatus;
 use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
@@ -9,6 +10,7 @@ use App\Models\Employee;
 use App\Models\Leave;
 use App\Models\LeaveEntitlement;
 use App\Models\LeaveType;
+use App\Models\OvertimeSettings;
 use App\Services\Approval\ApprovalInbox;
 use App\Services\Leave\EntitlementCalculator;
 use App\Support\LeaveDays;
@@ -141,6 +143,23 @@ class DatabaseSeederTest extends TestCase
             ->whereColumn('leaves.end_date', '>=', 'daily_attendances.work_date'));
         $this->assertSame((clone $covered)->count(), (clone $covered)->whereNotNull('leave_id')->count());
         $this->assertSame((clone $covered)->count(), DailyAttendance::whereNotNull('leave_id')->count());
+    }
+
+    /**
+     * Phase 4: the overtime settings row (inserted by its migration) exists
+     * after a full seed and points at the seeded "Time off in lieu" type, which
+     * earns its balance and has no grants.
+     */
+    public function test_the_overtime_settings_point_at_the_seeded_toil_type(): void
+    {
+        $this->seed();
+
+        $toil = LeaveType::where('name', 'Time off in lieu')->sole();
+
+        $this->assertSame(1, OvertimeSettings::count());
+        $this->assertSame($toil->id, OvertimeSettings::current()->toil_leave_type_id);
+        $this->assertSame(LeaveBalanceSource::Earned, $toil->balance_source);
+        $this->assertSame(0, LeaveEntitlement::where('leave_type_id', $toil->id)->count());
     }
 
     /**

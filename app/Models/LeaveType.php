@@ -114,6 +114,10 @@ class LeaveType extends Model
             throw InvalidLeaveTypeException::yearlyOptionsWithoutYearlyGrant();
         }
 
+        if ($this->exists && $source !== LeaveBalanceSource::Earned && $this->isToilType()) {
+            throw InvalidLeaveTypeException::toilTypeMustBeEarned($this->name);
+        }
+
         if ($this->deducts_from_leave_type_id === null) {
             return;
         }
@@ -178,12 +182,19 @@ class LeaveType extends Model
         return $this->leaves()->exists();
     }
 
+    /** Whether the overtime settings credit time off in lieu to this type (Phase 4). */
+    public function isToilType(): bool
+    {
+        return OvertimeSettings::query()->where('toil_leave_type_id', $this->id)->exists();
+    }
+
     /** Whether anything points at this type — the deletion test. */
     public function isReferenced(): bool
     {
         return $this->isUsedByLeaves()
             || $this->entitlements()->exists()
             || $this->adjustments()->exists()
-            || $this->deductedBy()->exists();
+            || $this->deductedBy()->exists()
+            || $this->isToilType();
     }
 }

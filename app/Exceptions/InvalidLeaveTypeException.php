@@ -14,6 +14,8 @@ use InvalidArgumentException;
  *   days_per_year; an earned or no-balance type has no yearly grant, so no
  *   days_per_year, seniority_bonus or min_service_months; a type with no
  *   balance can't carry over either (an earned one can).
+ * - the overtime settings' TOIL type (OvertimeSettings::toil_leave_type_id)
+ *   changing to anything but earned.
  * - deducting from itself.
  * - a deduction chain: deducting from a type that itself deducts from
  *   another, or deducting at all while another type deducts from this one.
@@ -40,6 +42,11 @@ class InvalidLeaveTypeException extends InvalidArgumentException
     public static function yearlyOptionsWithoutYearlyGrant(): self
     {
         return new self('The seniority bonus and a service requirement need a yearly balance (days per year).');
+    }
+
+    public static function toilTypeMustBeEarned(string $name): self
+    {
+        return new self("{$name} is the overtime settings' time-off-in-lieu type, so its balance must stay earned from overtime.");
     }
 
     public static function deductsFromItself(): self

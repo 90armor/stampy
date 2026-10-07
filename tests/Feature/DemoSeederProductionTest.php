@@ -45,6 +45,8 @@ class DemoSeederProductionTest extends TestCase
     public function test_every_demo_seeder_refuses_in_production_even_with_force_and_writes_nothing(): void
     {
         $this->app['env'] = 'production';
+        // Migrations may insert configuration rows (overtime_settings, Phase 4).
+        $before = $this->rowsInAllTables();
 
         foreach (self::DEMO as $seeder) {
             try {
@@ -57,7 +59,7 @@ class DemoSeederProductionTest extends TestCase
             }
         }
 
-        $this->assertSame(0, $this->rowsInAllTables());
+        $this->assertSame($before, $this->rowsInAllTables());
     }
 
     public function test_plain_db_seed_refuses_in_production(): void

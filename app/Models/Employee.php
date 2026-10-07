@@ -252,6 +252,11 @@ class Employee extends Model
         return $this->hasMany(LeaveAdjustment::class);
     }
 
+    public function overtimeRequests(): HasMany
+    {
+        return $this->hasMany(OvertimeRequest::class);
+    }
+
     /**
      * The schedule in force on a given date — the employee's latest
      * assignment whose effective_from is on or before it, so a later

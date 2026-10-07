@@ -26,11 +26,16 @@ class DailyAttendance extends Model
         'work_date',
         'work_schedule_id',
         'leave_id',
+        'overtime_request_id',
         'first_in',
         'last_out',
         'worked_minutes',
         'late_minutes',
         'early_leave_minutes',
+        'overtime_workday_minutes',
+        'overtime_night_minutes',
+        'overtime_rest_day_minutes',
+        'overtime_holiday_minutes',
         'status',
         'note',
     ];
@@ -42,6 +47,10 @@ class DailyAttendance extends Model
             'first_in' => 'datetime',
             'last_out' => 'datetime',
             'status' => AttendanceStatus::class,
+            'overtime_workday_minutes' => 'integer',
+            'overtime_night_minutes' => 'integer',
+            'overtime_rest_day_minutes' => 'integer',
+            'overtime_holiday_minutes' => 'integer',
         ];
     }
 
@@ -64,6 +73,15 @@ class DailyAttendance extends Model
     public function leave(): BelongsTo
     {
         return $this->belongsTo(Leave::class);
+    }
+
+    /**
+     * The approved overtime request this day's overtime minutes were credited
+     * against (Phase 4) — written by the builder from Phase 4b on.
+     */
+    public function overtimeRequest(): BelongsTo
+    {
+        return $this->belongsTo(OvertimeRequest::class);
     }
 
     /**
