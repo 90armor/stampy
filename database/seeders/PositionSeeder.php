@@ -3,9 +3,8 @@
 namespace Database\Seeders;
 
 use App\Models\Position;
-use Illuminate\Database\Seeder;
 
-class PositionSeeder extends Seeder
+class PositionSeeder extends DemoSeeder
 {
     public function run(): void
     {

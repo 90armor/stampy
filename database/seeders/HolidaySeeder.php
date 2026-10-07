@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use App\Models\Holiday;
 use Carbon\Carbon;
-use Illuminate\Database\Seeder;
 
 /**
  * DEMO DATA, not a calendar — do not read a date here as authoritative.
@@ -29,7 +28,7 @@ use Illuminate\Database\Seeder;
  * these already; otherwise those dates would first be built as plain
  * absent/present.
  */
-class HolidaySeeder extends Seeder
+class HolidaySeeder extends DemoSeeder
 {
     /** [month, day, name] */
     private const FIXED = [

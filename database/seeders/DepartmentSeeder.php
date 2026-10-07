@@ -3,9 +3,8 @@
 namespace Database\Seeders;
 
 use App\Models\Department;
-use Illuminate\Database\Seeder;
 
-class DepartmentSeeder extends Seeder
+class DepartmentSeeder extends DemoSeeder
 {
     public function run(): void
     {

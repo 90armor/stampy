@@ -785,7 +785,6 @@ The checklist an admin follows before real use is **`docs/GO_LIVE.md`**: environ
 - **HR to confirm whether Medical (and the others) also need a service period.** If so, it's just a `min_service_months` value.
 - **Payroll and `late_minutes` on incomplete days** — carried to Phase 5 (exports); it only matters once payroll is in scope.
 - **Medical certificate upload** — deferred; the reason text only for now.
-- **The demo seeders have no production guard** (from 3f's go-live pass). Only `AdminUserSeeder` refuses to run in production; `docs/GO_LIVE.md` says never to run plain `db:seed` there and lists the configuration seeders to run by class. A guard in `DatabaseSeeder` itself would make that mistake impossible rather than documented — scheduled as Phase 4a's first step.
 - **No command creates the first admin** — `docs/GO_LIVE.md` gives a tinker snippet. Worth a small `user:create-admin` command if installs become routine.
 - **Opening balances are entered by hand** (fewer than 50 employees). A CSV import is worth adding if headcount grows well past 50.
 - **The calendar cell and the day modal still name holidays in fuchsia** — the holiday *status* colour, which is right on a `holiday` day but reads as a status on a worked holiday. 3f moved the tables' annotation to muted text; the calendar's was left as built and goes to the Phase 5 polish list.

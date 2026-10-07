@@ -10,7 +10,7 @@ The checklist an admin works through before anyone uses Stampy for real. Do the 
 
 ## 2. Database and the production seed
 
-Run `php artisan migrate --force`. **Never run plain `db:seed` in production.** `DatabaseSeeder` builds the demo system: 35 made-up employees with the password `password`, two months of invented punches, demo holidays on invented dates (`HolidaySeeder`), and demo leave requests (`LeaveSeeder`). Only the admin account seeder refuses to run in production; the demo seeders don't check.
+Run `php artisan migrate --force`. **Never run plain `db:seed` in production.** `DatabaseSeeder` builds the demo system: 35 made-up employees with the password `password`, two months of invented punches, demo holidays on invented dates (`HolidaySeeder`), and demo leave requests (`LeaveSeeder`). Every demo seeder — `DatabaseSeeder` and each seeder it calls except the three below — refuses to run in production, even with `--force`, and stops before writing anything (`DemoSeeder`); the error names the seeders that are allowed.
 
 The production seed is the configuration seeders only, run by class:
 

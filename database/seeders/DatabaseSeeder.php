@@ -3,10 +3,9 @@
 namespace Database\Seeders;
 
 use Carbon\Carbon;
-use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Artisan;
 
-class DatabaseSeeder extends Seeder
+class DatabaseSeeder extends DemoSeeder
 {
     /**
      * Seed the application's database.

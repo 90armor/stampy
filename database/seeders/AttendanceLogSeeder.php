@@ -10,12 +10,11 @@ use App\Models\WorkSchedule;
 use App\Services\Attendance\PunchIngestor;
 use App\Services\Attendance\SampleAttendanceSource;
 use Carbon\Carbon;
-use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
 use Random\Engine\Mt19937;
 use Random\Randomizer;
 
-class AttendanceLogSeeder extends Seeder
+class AttendanceLogSeeder extends DemoSeeder
 {
     /**
      * Fixed so sample data is reproducible across runs. Every draw below
