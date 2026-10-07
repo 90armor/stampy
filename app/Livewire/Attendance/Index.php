@@ -8,7 +8,9 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Support\DashboardAttendance;
 use App\Support\EmployeeScope;
+use App\Support\WorkdayCalendar;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -58,6 +60,15 @@ class Index extends Component
      */
     #[Url(as: 'timing', history: true)]
     public array $timingFilters = [];
+
+    /**
+     * Only days worked on approved leave (DailyAttendance::workedOnLeave()) —
+     * how an admin finds past cases, now that the dashboard's Needs attention
+     * lists only today's (Phase 3e). Neither a status nor timing: its own
+     * filter.
+     */
+    #[Url(as: 'worked-on-leave', history: true)]
+    public bool $workedOnLeave = false;
 
     public function mount(): void
     {
@@ -156,6 +167,12 @@ class Index extends Component
         $this->resetPage();
     }
 
+    public function toggleWorkedOnLeave(): void
+    {
+        $this->workedOnLeave = ! $this->workedOnLeave;
+        $this->resetPage();
+    }
+
     public function toggleTimingFilter(string $timing): void
     {
         if (in_array($timing, $this->timingFilters, true)) {
@@ -216,6 +233,7 @@ class Index extends Component
         $this->departmentFilter = '';
         $this->statuses = $this->defaultStatuses();
         $this->timingFilters = [];
+        $this->workedOnLeave = false;
         $this->resetPage();
     }
 
@@ -295,7 +313,33 @@ class Index extends Component
                         $query->orWhere('daily_attendances.early_leave_minutes', '>', 0);
                     }
                 })
+            )
+            ->when(
+                $this->workedOnLeave,
+                fn (Builder $query) => $query->whereIn('daily_attendances.id', $this->workedOnLeaveIds())
             );
+    }
+
+    /**
+     * The rows in range (and scope) that were worked on approved leave,
+     * decided by DailyAttendance::workedOnLeave() itself rather than a
+     * second definition in SQL. SQL only narrows to the candidates — a row
+     * with a leave and a punch — which are few.
+     *
+     * @return list<int>
+     */
+    private function workedOnLeaveIds(): array
+    {
+        $candidates = DailyAttendance::query()
+            ->whereBetween('work_date', [$this->fromDate, $this->toDate])
+            ->when($this->scopedEmployeeIds() !== null, fn (Builder $query) => $query->whereIn('employee_id', $this->scopedEmployeeIds() ?? []))
+            ->whereNotNull('leave_id')
+            ->where(fn (Builder $query) => $query->whereNotNull('first_in')->orWhereNotNull('last_out'))
+            ->with('workSchedule')
+            ->get();
+        DailyAttendance::withLeaveDays($candidates);
+
+        return $candidates->filter(fn (DailyAttendance $row) => $row->workedOnLeave())->pluck('id')->values()->all();
     }
 
     /**
@@ -378,10 +422,12 @@ class Index extends Component
 
         $attendances = $this->baseQuery()
             ->select('daily_attendances.*')
-            ->with(['employee.department'])
+            ->with(['employee.department', 'workSchedule'])
             ->orderBy('daily_attendances.work_date', 'desc')
             ->orderBy('employees.full_name')
             ->paginate(self::PER_PAGE);
+        // The page's leave annotations read leaveDay(): one query for the page.
+        DailyAttendance::withLeaveDays($attendances->getCollection());
 
         $summary = $this->summary();
 
@@ -404,6 +450,8 @@ class Index extends Component
                 : null,
             'maxBuiltDate' => DailyAttendance::max('work_date'),
             'allStatuses' => AttendanceStatus::cases(),
+            // Holiday names for the annotation, from the builder's own lookup.
+            'holidays' => WorkdayCalendar::holidayNamesBetween(Carbon::parse($this->fromDate), Carbon::parse($this->toDate)),
             'presetRanges' => $this->presetRanges(),
             'scopeHasNoEmployeeRecord' => $this->scope()->hasNoEmployeeRecord,
         ])->layout('layouts.app', ['header' => 'Attendance']);

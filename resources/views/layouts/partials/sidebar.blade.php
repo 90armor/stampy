@@ -3,13 +3,17 @@ $navItems = [
     ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'home', 'visible' => true, 'enabled' => true],
     ['label' => 'Employees', 'route' => 'employees.index', 'icon' => 'users', 'visible' => auth()->user()->hasAnyRole(['admin', 'manager']), 'enabled' => true],
     ['label' => 'Organization', 'route' => 'organization.index', 'icon' => 'building-office', 'visible' => auth()->user()->hasRole('admin'), 'enabled' => true],
+    // Policy, not structure (Phase 3e): leave types now, overtime rules in Phase 4.
+    ['label' => 'Policies', 'route' => 'policies.index', 'icon' => 'scale', 'visible' => auth()->user()->can('viewAny', \App\Models\LeaveType::class), 'enabled' => true],
     // 'Attendance' and 'My attendance' share the 'attendance.' route-name
     // prefix but must not both light up together, so each gets an explicit
     // pattern instead of the derived 'prefix.*' every other item uses.
     ['label' => 'Attendance', 'route' => 'attendance.index', 'icon' => 'clock', 'visible' => auth()->user()->hasAnyRole(['admin', 'manager']), 'enabled' => true, 'activePatterns' => ['attendance.index', 'attendance.show']],
     ['label' => 'My attendance', 'route' => 'attendance.mine', 'icon' => 'user-circle', 'visible' => true, 'enabled' => true, 'activePatterns' => ['attendance.mine']],
-    ['label' => 'Time off', 'icon' => 'calendar-days', 'visible' => true, 'enabled' => false],
-    ['label' => 'Reports', 'icon' => 'document-text', 'visible' => auth()->user()->hasAnyRole(['admin', 'manager']), 'enabled' => false],
+    // Gated by the ability each page itself checks, never a role list (CLAUDE.md, Roles & authorization).
+    ['label' => 'Time off', 'route' => 'time-off.index', 'icon' => 'calendar-days', 'visible' => auth()->user()->can('timeOff', \App\Models\Leave::class), 'enabled' => true, 'activePatterns' => ['time-off.*']],
+    ['label' => 'Approvals', 'route' => 'approvals.index', 'icon' => 'inbox', 'visible' => auth()->user()->can('decideAny', \App\Models\Leave::class), 'enabled' => true, 'activePatterns' => ['approvals.*'], 'badge' => \App\Support\ApprovalBadge::count(auth()->user())],
+        ['label' => 'Reports', 'icon' => 'document-text', 'visible' => auth()->user()->hasAnyRole(['admin', 'manager']), 'enabled' => false],
 ];
 @endphp
 
@@ -44,6 +48,9 @@ $navItems = [
                     @endif
                     <x-icon :name="$item['icon']" class="w-5 h-5 shrink-0 {{ $active ? 'text-primary-700 dark:text-primary-300' : 'text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200' }}" />
                     {{ $item['label'] }}
+                    @if (($item['badge'] ?? 0) > 0)
+                        <span class="ml-auto rounded-md bg-primary-600 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-white dark:bg-primary-500" aria-label="{{ $item['badge'] }} waiting">{{ $item['badge'] }}</span>
+                    @endif
                 </a>
             @else
                 <div

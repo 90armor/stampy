@@ -72,6 +72,10 @@ class AttendanceImportCommand extends Command
             $this->line('Unknown device IDs: '.implode(', ', $summary->unknownDeviceIds));
         }
 
+        if ($summary->outsideEmployment > 0) {
+            $this->warn("Outside employment: {$summary->outsideEmployment} punch(es) dated before the employee's join date or after their last day — kept, but they build no attendance.");
+        }
+
         if ($rebuilt !== null) {
             $this->line("Rebuilt daily attendance: {$rebuilt['from']} to {$rebuilt['to']} ({$rebuilt['employees']} employee(s), {$rebuilt['days']} day(s)).");
         } elseif (! $dryRun && $rebuildFailure === null) {
@@ -94,7 +98,8 @@ class AttendanceImportCommand extends Command
 
     /**
      * Once, at the end: from the earliest to the latest newly imported punch,
-     * for every active employee (so a person with no punches in the window is
+     * for every employee active on any date in that window (Employee::
+     * scopeActiveBetween(); so a person with no punches in the window is
      * marked absent rather than left "not calculated"). The window is widened
      * by a day each side and clamped to each employee's history by
      * DailySummaryBuilder::rebuildAround() — the same rule manual punches use.
@@ -103,7 +108,9 @@ class AttendanceImportCommand extends Command
      */
     private function rebuild(DailySummaryBuilder $builder, IngestionSummary $summary): array
     {
-        $employees = Employee::query()->where('status', 'active')->get();
+        $employees = Employee::query()
+            ->activeBetween($summary->earliestImported->copy()->subDay(), $summary->latestImported->copy()->addDay())
+            ->get();
         $days = 0;
 
         foreach ($employees as $employee) {

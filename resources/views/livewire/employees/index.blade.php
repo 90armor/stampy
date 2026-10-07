@@ -180,13 +180,7 @@
                                             <span class="group/action relative inline-flex">
                                                 <button
                                                     type="button"
-                                                    @click.stop="$dispatch('confirm-dialog', {
-                                                        title: 'Deactivate employee',
-                                                        message: @js('Deactivate '.$employee->full_name.'? They will no longer appear in active lists. Attendance history is preserved.'),
-                                                        confirmText: 'Deactivate',
-                                                        method: 'deactivate',
-                                                        args: [{{ $employee->id }}],
-                                                    })"
+                                                    wire:click.stop="$dispatch('deactivate-employee', { id: {{ $employee->id }} })"
                                                     class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-red-900/30 dark:hover:text-red-400"
                                                     aria-label="Deactivate {{ $employee->full_name }}"
                                                 >
@@ -198,13 +192,7 @@
                                             <span class="group/action relative inline-flex">
                                                 <button
                                                     type="button"
-                                                    @click.stop="$dispatch('confirm-dialog', {
-                                                        title: 'Reactivate employee',
-                                                        message: @js('Reactivate '.$employee->full_name.'? They will appear in active lists again.'),
-                                                        confirmText: 'Reactivate',
-                                                        method: 'reactivate',
-                                                        args: [{{ $employee->id }}],
-                                                    })"
+                                                    wire:click.stop="$dispatch('reactivate-employee', { id: {{ $employee->id }} })"
                                                     class="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-primary-600/35 dark:hover:text-primary-400"
                                                     aria-label="Reactivate {{ $employee->full_name }}"
                                                 >
@@ -235,5 +223,5 @@
 
     <livewire:employees.form-modal />
 
-    <x-confirm-dialog />
+    <livewire:employees.status-modal />
 </div>

@@ -27,6 +27,10 @@ class DatabaseSeeder extends Seeder
             WorkScheduleSeeder::class,
             DepartmentSeeder::class,
             PositionSeeder::class,
+            // Before EmployeeSeeder: each employee's creation grants this
+            // year's leave (Employee::booted(), LeaveGranter), which needs the
+            // types to exist. Real configuration, not demo data — see the seeder.
+            LeaveTypeSeeder::class,
             EmployeeSeeder::class,
             // Before AttendanceLogSeeder/build-daily below — holidays must
             // already exist when the builder first runs, or the seeded
@@ -47,5 +51,9 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $this->command?->info(trim(Artisan::output()));
+
+        // Demo leave requests, after the build: a past leave is placed by what
+        // its day was built as (see the seeder), and approving one rebuilds it.
+        $this->call(LeaveSeeder::class);
     }
 }

@@ -122,17 +122,37 @@ class AttendanceBuildDailyCommandTest extends TestCase
         $this->assertSame([$other->id], DailyAttendance::pluck('employee_id')->all());
     }
 
-    public function test_an_unknown_or_inactive_employee_is_reported_as_no_active_employee(): void
+    public function test_an_unknown_employee_is_reported(): void
     {
-        $inactive = Employee::factory()->create(['status' => 'inactive', 'employee_code' => 'EMP-0001']);
-
-        foreach ([(string) $inactive->id, 'EMP-0001', '999999', 'NOPE-1'] as $selector) {
+        foreach (['999999', 'NOPE-1'] as $selector) {
             $this->artisan('attendance:build-daily', ['--date' => '2026-02-02', '--employee' => $selector])
-                ->expectsOutputToContain("No active employee found matching \"{$selector}\".")
+                ->expectsOutputToContain("No employee found matching \"{$selector}\".")
                 ->assertFailed();
         }
 
         $this->assertSame(0, DailyAttendance::count());
+    }
+
+    /**
+     * A named employee is taken whatever their status — that's the heal
+     * command a failed deactivation rebuild prints — and a date after their
+     * left_on keeps no row.
+     */
+    public function test_a_named_inactive_employee_is_built_up_to_left_on_and_has_no_rows_after_it(): void
+    {
+        $inactive = Employee::factory()->inactive('2026-02-03')->create(['employee_code' => 'EMP-0001']);
+        DailyAttendance::factory()->create(['employee_id' => $inactive->id, 'work_date' => '2026-02-04']);
+
+        foreach ([(string) $inactive->id, 'EMP-0001'] as $selector) {
+            $this->artisan('attendance:build-daily', ['--from' => '2026-02-02', '--to' => '2026-02-05', '--employee' => $selector])
+                ->expectsOutputToContain('Not employed (no row kept): 2')
+                ->assertSuccessful();
+        }
+
+        $this->assertSame(
+            ['2026-02-02', '2026-02-03'],
+            DailyAttendance::where('employee_id', $inactive->id)->orderBy('work_date')->get()->map(fn ($row) => $row->work_date->format('Y-m-d'))->all()
+        );
     }
 
     public function test_inactive_employees_are_left_out_of_a_default_run(): void

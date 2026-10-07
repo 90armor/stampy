@@ -28,6 +28,18 @@ class EmployeeFactory extends Factory
             'join_date' => '2020-01-01',
             'device_user_id' => $this->faker->unique()->numerify('####'),
             'status' => 'active',
+            // An inactive employee needs a last day (Employee::booted()). A
+            // plain ['status' => 'inactive'] left on their join date, so they
+            // are outside every recent date — use inactive() for a real one.
+            'left_on' => fn (array $attributes) => $attributes['status'] === 'inactive' ? $attributes['join_date'] : null,
         ];
+    }
+
+    public function inactive(?string $leftOn = null): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => 'inactive',
+            'left_on' => $leftOn ?? $attributes['join_date'],
+        ]);
     }
 }

@@ -23,6 +23,7 @@ delete click in one tab silently arms the other tab's (hidden) dialog too. --}}
         title: '',
         message: '',
         confirmText: 'Confirm',
+        cancelText: 'Cancel',
         method: null,
         args: [],
         triggerEl: null,
@@ -67,6 +68,7 @@ delete click in one tab silently arms the other tab's (hidden) dialog too. --}}
         title = $event.detail.title;
         message = $event.detail.message ?? '';
         confirmText = $event.detail.confirmText ?? 'Confirm';
+        cancelText = $event.detail.cancelText ?? 'Cancel';
         method = $event.detail.method;
         args = $event.detail.args ?? [];
         open = true;
@@ -106,7 +108,7 @@ delete click in one tab silently arms the other tab's (hidden) dialog too. --}}
                 </div>
 
                 <div class="mt-5 flex items-center justify-end gap-3">
-                    <x-button x-ref="cancel" type="button" variant="secondary" @click="close()">Cancel</x-button>
+                    <x-button x-ref="cancel" type="button" variant="secondary" @click="close()"><span x-text="cancelText">Cancel</span></x-button>
                     <x-button type="button" variant="danger" x-on:click="proceed">
                         <span x-text="confirmText"></span>
                     </x-button>

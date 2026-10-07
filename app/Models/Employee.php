@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Exceptions\InvalidEmploymentPeriodException;
 use App\Exceptions\NoDefaultWorkScheduleException;
 use App\Exceptions\NoScheduleAssignmentException;
+use App\Services\Leave\LeaveGranter;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -37,17 +40,34 @@ class Employee extends Model
         'device_user_id',
         'manager_id',
         'status',
+        'left_on',
     ];
 
     /**
      * Assigns a freshly-created employee the current default schedule,
      * effective from their join_date — every employee must have at least
-     * one employee_work_schedules row from this point on (see scheduleOn()).
-     * save() below wraps this in the same transaction as the employee insert
-     * itself, so a missing default leaves neither row behind.
+     * one employee_work_schedules row from this point on (see scheduleOn()) —
+     * and this year's leave grants (LeaveGranter). save() below wraps both in
+     * the same transaction as the employee insert itself, so a missing default
+     * or a failed grant leaves no row behind. With no leave types configured
+     * the grant simply creates nothing; leave:grant catches up daily.
+     *
+     * A corrected join_date re-grants the automatic grants it was computed
+     * from (LeaveGranter::regrantAfterJoinDateChange()), in the same
+     * transaction as the update.
      */
     protected static function booted(): void
     {
+        // Status and the employment period must agree on every write, not
+        // only in the deactivate form — see InvalidEmploymentPeriodException.
+        static::saving(function (self $employee) {
+            if ($employee->exists && ! $employee->isDirty(['status', 'left_on', 'join_date'])) {
+                return;
+            }
+
+            $employee->validateEmploymentPeriod();
+        });
+
         static::created(function (self $employee) {
             $default = WorkSchedule::default() ?? throw new NoDefaultWorkScheduleException($employee);
 
@@ -56,21 +76,39 @@ class Employee extends Model
                 'effective_from' => $employee->join_date,
                 'created_by' => auth()->id(),
             ]);
+
+            app(LeaveGranter::class)->grant($employee, today()->year, today());
+        });
+
+        static::updated(function (self $employee) {
+            if ($employee->wasChanged('join_date')) {
+                app(LeaveGranter::class)->regrantAfterJoinDateChange($employee);
+            }
+        });
+
+        // The reporting tree changed, so every memoized subordinateIds() may be
+        // stale — approval eligibility is evaluated when someone decides, and
+        // must see a move made earlier in the same request.
+        static::saved(function (self $employee) {
+            if ($employee->wasRecentlyCreated || $employee->wasChanged('manager_id')) {
+                self::forgetSubordinateIds();
+            }
         });
     }
 
     /**
-     * Only a brand-new row is wrapped: the created() listener above inserts
-     * this employee's initial schedule assignment as part of this very same
-     * save() call (Eloquent fires model events synchronously, inside the
-     * call that triggered them), and the two must succeed or fail together
-     * — without this, a missing default would leave a committed employee row
-     * with no schedule at all, the exact state scheduleOn() must never see.
-     * An update never touches that invariant, so it isn't wrapped.
+     * A brand-new row is wrapped: the created() listener above inserts
+     * this employee's initial schedule assignment and leave grants as part of
+     * this very same save() call (Eloquent fires model events synchronously,
+     * inside the call that triggered them), and they must succeed or fail
+     * together — without this, a missing default would leave a committed
+     * employee row with no schedule at all, the exact state scheduleOn() must
+     * never see. An update that changes join_date is wrapped too, for the
+     * re-grant the updated() listener does. Any other update isn't.
      */
     public function save(array $options = []): bool
     {
-        if ($this->exists) {
+        if ($this->exists && ! $this->isDirty('join_date')) {
             return parent::save($options);
         }
 
@@ -81,7 +119,74 @@ class Employee extends Model
     {
         return [
             'join_date' => 'date',
+            'left_on' => 'date',
         ];
+    }
+
+    /**
+     * @throws InvalidEmploymentPeriodException
+     */
+    private function validateEmploymentPeriod(): void
+    {
+        $inactive = $this->status === 'inactive';
+
+        if ($inactive && $this->left_on === null) {
+            throw InvalidEmploymentPeriodException::inactiveWithoutLeftOn();
+        }
+
+        if (! $inactive && $this->left_on !== null) {
+            throw InvalidEmploymentPeriodException::activeWithLeftOn();
+        }
+
+        if ($this->left_on === null) {
+            return;
+        }
+
+        if ($this->join_date !== null && $this->left_on->lt($this->join_date)) {
+            throw InvalidEmploymentPeriodException::leftBeforeJoining();
+        }
+
+        if ($this->left_on->gt(today())) {
+            throw InvalidEmploymentPeriodException::leftInFuture();
+        }
+    }
+
+    /**
+     * Employed on $date: join_date ≤ $date and (no left_on, or $date ≤
+     * left_on). The one definition of "active on a date" — isActiveOn() is
+     * the same rule for a loaded instance, and EmployeeTest checks the two
+     * agree at every boundary. It deliberately ignores `status`: the
+     * invariants above keep status and left_on in step, and a date question
+     * needs the date, not today's flag.
+     */
+    public function scopeActiveOn(Builder $query, CarbonInterface $date): Builder
+    {
+        $day = $date->format('Y-m-d');
+
+        return $query->whereDate('join_date', '<=', $day)
+            ->where(fn (Builder $q) => $q->whereNull('left_on')->orWhereDate('left_on', '>=', $day));
+    }
+
+    /**
+     * Active on at least one date in $from..$to — the employees a build over
+     * that range has to visit (attendance:build-daily, an import's rebuild).
+     * The same rule as scopeActiveOn(), widened to a range; per date, the
+     * builder still asks isActiveOn().
+     */
+    public function scopeActiveBetween(Builder $query, CarbonInterface $from, CarbonInterface $to): Builder
+    {
+        return $query->whereDate('join_date', '<=', $to->format('Y-m-d'))
+            ->where(fn (Builder $q) => $q->whereNull('left_on')->orWhereDate('left_on', '>=', $from->format('Y-m-d')));
+    }
+
+    /**
+     * scopeActiveOn() for a loaded instance — same rule, see there.
+     */
+    public function isActiveOn(CarbonInterface $date): bool
+    {
+        $day = Carbon::instance($date)->startOfDay();
+
+        return $this->join_date->lte($day) && ($this->left_on === null || $day->lte($this->left_on));
     }
 
     public function user(): BelongsTo
@@ -132,6 +237,21 @@ class Employee extends Model
         return $this->hasMany(DailyAttendance::class);
     }
 
+    public function leaves(): HasMany
+    {
+        return $this->hasMany(Leave::class);
+    }
+
+    public function leaveEntitlements(): HasMany
+    {
+        return $this->hasMany(LeaveEntitlement::class);
+    }
+
+    public function leaveAdjustments(): HasMany
+    {
+        return $this->hasMany(LeaveAdjustment::class);
+    }
+
     /**
      * The schedule in force on a given date — the employee's latest
      * assignment whose effective_from is on or before it, so a later
@@ -180,6 +300,12 @@ class Employee extends Model
     public function subordinateIds(): array
     {
         return self::$subordinateIdsCache[$this->id] ??= $this->resolveSubordinateIds();
+    }
+
+    /** Drops every memoized subordinateIds() result (see booted()). */
+    public static function forgetSubordinateIds(): void
+    {
+        self::$subordinateIdsCache = [];
     }
 
     public function isManagerOf(self $other): bool

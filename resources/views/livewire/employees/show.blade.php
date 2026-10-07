@@ -22,12 +22,31 @@
             </div>
         </div>
 
-        @can('update', $employee)
-            <x-button type="button" variant="secondary" wire:click="$dispatch('edit-employee', { id: {{ $employee->id }} })" class="self-start sm:self-auto">
-                <x-icon name="pencil" class="w-5 h-5" />
-                Edit employee
-            </x-button>
-        @endcan
+        {{-- Each button is gated by the ability its own action checks
+        (FormModal: update; StatusModal: deactivate, or update to reactivate). --}}
+        <div class="flex flex-wrap items-center gap-3 self-start sm:self-auto">
+            @can('update', $employee)
+                <x-button type="button" variant="secondary" wire:click="$dispatch('edit-employee', { id: {{ $employee->id }} })">
+                    <x-icon name="pencil" class="w-5 h-5" />
+                    Edit employee
+                </x-button>
+            @endcan
+            @if ($employee->status === 'active')
+                @can('deactivate', $employee)
+                    <x-button type="button" variant="secondary" wire:click="$dispatch('deactivate-employee', { id: {{ $employee->id }} })">
+                        <x-icon name="user-x" class="w-5 h-5" />
+                        Deactivate
+                    </x-button>
+                @endcan
+            @else
+                @can('update', $employee)
+                    <x-button type="button" variant="secondary" wire:click="$dispatch('reactivate-employee', { id: {{ $employee->id }} })">
+                        <x-icon name="check" class="w-5 h-5" />
+                        Reactivate
+                    </x-button>
+                @endcan
+            @endif
+        </div>
     </header>
 
     <div class="grid items-start gap-6 lg:grid-cols-12">
@@ -80,7 +99,13 @@
         <x-card class="order-4 lg:col-span-8 lg:row-start-2">
             <livewire:employees.schedule-assignments :employee="$employee" :key="'schedule-assignments-'.$employee->id" />
         </x-card>
+
+        {{-- Leave (Phase 3e): full width, under the rest — the balance table needs it. --}}
+        <x-card :padding="false" class="order-5 lg:col-span-12">
+            <livewire:employees.leave-card :employee="$employee" :key="'leave-card-'.$employee->id" />
+        </x-card>
     </div>
 
     <livewire:employees.form-modal />
+    <livewire:employees.status-modal />
 </div>

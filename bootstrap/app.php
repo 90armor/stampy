@@ -1,6 +1,7 @@
 <?php
 
 use App\Console\AttendanceSchedule;
+use App\Console\LeaveSchedule;
 use App\Http\Middleware\EnsureMustChangePassword;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
@@ -25,7 +26,10 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-    ->withSchedule(fn (Schedule $schedule) => AttendanceSchedule::register($schedule))
+    ->withSchedule(function (Schedule $schedule): void {
+        AttendanceSchedule::register($schedule);
+        LeaveSchedule::register($schedule);
+    })
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'role' => RoleMiddleware::class,

@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use RuntimeException;
 
@@ -26,5 +27,19 @@ abstract class TestCase extends BaseTestCase
         }
 
         return $app;
+    }
+
+    /**
+     * The pinned-instants check (scripts/pinned-instants.sh): with PIN_NOW
+     * set, every test starts at that instant. Unset, this does nothing. A
+     * test class that pins its own clock does so after this, and wins.
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        if (($pin = getenv('PIN_NOW')) !== false && $pin !== '') {
+            $this->travelTo(Carbon::parse($pin));
+        }
     }
 }

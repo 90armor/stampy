@@ -3,6 +3,7 @@
 namespace Tests\Feature\Attendance;
 
 use App\Enums\AttendanceStatus;
+use App\Enums\PunchType;
 use App\Livewire\Attendance\Show;
 use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
@@ -82,11 +83,11 @@ class ManualPunchTest extends TestCase
     public function test_raw_punch_badges_are_neutral_for_both_directions(): void
     {
         $employee = Employee::factory()->create();
-        \App\Models\AttendanceLog::factory()->create(['employee_id' => $employee->id, 'punch_type' => \App\Enums\PunchType::In, 'punched_at' => Carbon::parse('2026-03-02 08:00:00')]);
-        \App\Models\AttendanceLog::factory()->create(['employee_id' => $employee->id, 'punch_type' => \App\Enums\PunchType::Out, 'punched_at' => Carbon::parse('2026-03-02 17:00:00')]);
+        AttendanceLog::factory()->create(['employee_id' => $employee->id, 'punch_type' => PunchType::In, 'punched_at' => Carbon::parse('2026-03-02 08:00:00')]);
+        AttendanceLog::factory()->create(['employee_id' => $employee->id, 'punch_type' => PunchType::Out, 'punched_at' => Carbon::parse('2026-03-02 17:00:00')]);
 
         $html = Livewire::actingAs($this->admin())
-            ->test(\App\Livewire\Attendance\Show::class, ['employee' => $employee])
+            ->test(Show::class, ['employee' => $employee])
             ->set('month', '2026-03')
             ->call('openDay', '2026-03-02')
             ->html();
@@ -123,9 +124,37 @@ class ManualPunchTest extends TestCase
 
         $component->call('addPunch')->assertHasErrors(['newPunchDate']);
 
-        $this->assertStringContainsString("before this employee's start date (Mon 2 Feb)", $component->errors()->first('newPunchDate'));
+        $this->assertSame("A punch must fall within this employee's employment (from Mon 2 Feb).", $component->errors()->first('newPunchDate'));
         $this->assertSame(0, AttendanceLog::where('employee_id', $employee->id)->count());
         $this->assertSame(0, DailyAttendance::where('employee_id', $employee->id)->count());
+    }
+
+    /**
+     * After their last day, a manual punch is refused with the period named
+     * — up to and including left_on it's an ordinary correction.
+     */
+    public function test_a_punch_dated_after_the_employees_last_day_is_rejected_and_nothing_is_written(): void
+    {
+        $employee = Employee::factory()->inactive('2026-03-31')->create(['join_date' => '2026-02-02']);
+
+        $form = fn (string $date) => Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', substr($date, 0, 7))
+            ->call('startAddingPunch', $date)
+            ->set('newPunchDate', $date)
+            ->set('newPunchTime', '08:00')
+            ->set('newPunchType', 'in');
+
+        $rejected = $form('2026-04-01')->call('addPunch')->assertHasErrors(['newPunchDate']);
+
+        $this->assertSame("A punch must fall within this employee's employment (2 Feb – 31 Mar).", $rejected->errors()->first('newPunchDate'));
+        $this->assertSame(0, AttendanceLog::where('employee_id', $employee->id)->count());
+
+        $form('2026-03-31')->call('addPunch')->assertHasNoErrors();
+
+        $this->assertSame(1, AttendanceLog::where('employee_id', $employee->id)->count());
+        $this->assertTrue(DailyAttendance::where('employee_id', $employee->id)->whereDate('work_date', '2026-03-31')->exists());
+        $this->assertFalse(DailyAttendance::where('employee_id', $employee->id)->whereDate('work_date', '2026-04-01')->exists());
     }
 
     public function test_a_punch_today_on_the_hire_date_creates_no_row_before_hire_or_for_tomorrow(): void

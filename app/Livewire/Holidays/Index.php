@@ -121,7 +121,8 @@ class Index extends Component
     }
 
     /**
-     * Rebuilds one date for every active employee — adding, editing or
+     * Rebuilds one date for every employee active on it
+     * (Employee::scopeActiveOn()) — adding, editing or
      * deleting a holiday changes how that date's punches (or lack of them)
      * are interpreted, for everyone, not just whoever happens to view their
      * own attendance page next.
@@ -141,7 +142,7 @@ class Index extends Component
         $day = Carbon::parse($date);
 
         Employee::query()
-            ->where('status', 'active')
+            ->activeOn($day)
             ->each(fn (Employee $employee) => $builder->build($employee, $day));
     }
 

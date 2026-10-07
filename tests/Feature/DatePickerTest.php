@@ -3,9 +3,12 @@
 namespace Tests\Feature;
 
 use App\Livewire\Attendance\Show;
+use App\Livewire\Leave\RequestModal;
 use App\Models\Employee;
+use App\Models\LeaveType;
 use App\Models\User;
 use App\Models\WorkSchedule;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Livewire\Livewire;
@@ -76,15 +79,39 @@ class DatePickerTest extends TestCase
         $this->assertStringNotContainsString($clear, (string) $this->blade('<x-date-picker id="d" model="date" label="Date" />'));
         $this->assertStringContainsString($clear, (string) $this->blade('<x-date-picker id="d" model="date" label="Date" clearable />'));
 
-        // Every date field's rule today is `required` (holiday date, join date,
-        // both effective dates, punch date), so none of them may offer Clear.
-        // When a nullable date field is added, pass `clearable` and add a test
-        // that clearing it persists null.
+        // Every other date field's rule is `required` (holiday date, join date,
+        // both effective dates, punch date, last day), so none of them may offer
+        // Clear. The one nullable field is the leave request's "To" (blank means
+        // the same day as "From"), tested below. A new nullable date field
+        // passes `clearable`, joins this list and gets the same kind of test.
+        $nullable = ['request-modal.blade.php'];
+
         foreach (File::allFiles(resource_path('views')) as $file) {
-            if (str_contains($file->getContents(), '<x-date-picker ')) {
+            if (str_contains($file->getContents(), '<x-date-picker ') && ! in_array($file->getFilename(), $nullable, true)) {
                 $this->assertDoesNotMatchRegularExpression('/<x-date-picker\b[^>]*\bclearable\b/', $file->getContents(), $file->getFilename());
             }
         }
+    }
+
+    public function test_clearing_the_leave_requests_to_date_persists_null_and_means_the_same_day(): void
+    {
+        Role::firstOrCreate(['name' => 'employee']);
+        WorkSchedule::factory()->create(['is_default' => true]);
+        $this->travelTo(Carbon::parse('2026-06-15 12:00:00'));
+        $type = LeaveType::factory()->withoutBalance()->create(['name' => 'Unpaid']);
+        $employee = Employee::factory()->create(['user_id' => User::factory()->create()->assignRole('employee')->id]);
+
+        Livewire::actingAs($employee->user)->test(RequestModal::class)
+            ->call('open')
+            ->set('leave_type_id', $type->id)
+            ->set('start_date', '2026-06-22')
+            ->set('end_date', '2026-06-24')
+            ->set('end_date', null)
+            ->assertSet('end_date', null)
+            ->call('review')
+            ->assertHasNoErrors()
+            ->assertSee('Mon 22 Jun')
+            ->assertSee('1 day');
     }
 
     public function test_no_date_field_uses_a_bare_native_date_input(): void
@@ -140,4 +167,3 @@ class DatePickerTest extends TestCase
         $this->assertMatchesRegularExpression('/this\.focused = this\.initialFocus\(\);[\s\S]{0,600}querySelector\(`\[data-date="\$\{this\.focused\}"\]`\)[\s\S]{0,120}cell\.focus\(\)/', $js);
     }
 }
-

@@ -6,7 +6,9 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Position;
 use App\Models\User;
+use App\Support\DisplayDate;
 use App\Support\TemporaryPassword;
+use Carbon\Carbon;
 use Closure;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
@@ -41,8 +43,6 @@ class FormModal extends Component
 
     public string $device_user_id = '';
 
-    public string $status = 'active';
-
     public bool $create_user = false;
 
     public string $username = '';
@@ -72,9 +72,10 @@ class FormModal extends Component
             'department_id' => ['required', 'exists:departments,id'],
             'position_id' => ['required', 'exists:positions,id'],
             'manager_id' => ['nullable', 'exists:employees,id', $this->managerIsNotACycle()],
-            'join_date' => ['required', 'date'],
+            // An inactive employee's join date can't move past their last day
+            // (Employee::booted()'s employment-period invariant).
+            'join_date' => ['required', 'date', $this->joinDateIsNotAfterLeftOn()],
             'device_user_id' => ['nullable', 'string', 'max:50', 'unique:employees,device_user_id,'.$employeeId],
-            'status' => ['required', 'in:active,inactive'],
             'create_user' => ['boolean'],
             'username' => ['required_if:create_user,true', 'nullable', 'string', 'max:255', 'unique:users,username'],
             'email' => ['required_if:create_user,true', 'nullable', 'email', 'max:255', 'unique:users,email'],
@@ -118,6 +119,17 @@ class FormModal extends Component
         };
     }
 
+    private function joinDateIsNotAfterLeftOn(): Closure
+    {
+        return function (string $attribute, $value, Closure $fail) {
+            $leftOn = $this->editing?->left_on;
+
+            if ($leftOn !== null && strtotime((string) $value) !== false && Carbon::parse($value)->startOfDay()->gt($leftOn)) {
+                $fail('The join date can\'t be after this employee\'s last day ('.DisplayDate::compact($leftOn).').');
+            }
+        };
+    }
+
     #[On('create-employee')]
     public function create(): void
     {
@@ -144,7 +156,6 @@ class FormModal extends Component
         $this->manager_id = $employee->manager_id;
         $this->join_date = $employee->join_date?->format('Y-m-d') ?? '';
         $this->device_user_id = $employee->device_user_id ?? '';
-        $this->status = $employee->status;
         $this->showModal = true;
     }
 
@@ -169,7 +180,6 @@ class FormModal extends Component
             'manager_id' => $this->manager_id,
             'join_date' => $this->join_date,
             'device_user_id' => $this->device_user_id ?: null,
-            'status' => $this->status,
         ];
 
         if ($this->create_user && ! ($this->editing?->user_id)) {
@@ -253,7 +263,6 @@ class FormModal extends Component
             'join_date', 'device_user_id', 'create_user', 'username', 'email', 'generatedPassword',
             'resetPasswordValue',
         ]);
-        $this->status = 'active';
         $this->role = 'employee';
         $this->resetErrorBag();
     }

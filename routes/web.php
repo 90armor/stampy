@@ -5,10 +5,13 @@ use App\Livewire\Attendance\Index as AttendanceIndex;
 use App\Livewire\Attendance\Show as AttendanceShow;
 use App\Livewire\Employees\Index as EmployeesIndex;
 use App\Livewire\Employees\Show as ShowEmployee;
+use App\Livewire\Leave\Approvals;
+use App\Livewire\Leave\TimeOff;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Position;
 use App\Support\DashboardAttendance;
+use App\Support\EmployeeDashboard;
 use App\Support\EmployeeScope;
 use Illuminate\Support\Facades\Route;
 
@@ -44,8 +47,10 @@ Route::get('/dashboard', function () {
                 ->count(),
         ];
 
+        // Employees active today (Employee::scopeActiveOn()) — the Department
+        // card's "N / M", so M must match DashboardAttendance's own count.
         $departments = Department::withCount(['employees' => fn ($query) => $query
-            ->where('status', 'active')
+            ->activeOn(today())
             ->when($employeeIds !== null, fn ($q) => $q->whereIn('id', $employeeIds)),
         ])
             ->orderBy('name')
@@ -71,7 +76,13 @@ Route::get('/dashboard', function () {
         ];
     }
 
-    return view('dashboard', ['stats' => $stats, 'attendance' => $attendance]);
+    // Without the team figures: their own leave and attendance (Phase 3e),
+    // for anyone with an employee record.
+    $mine = $stats === null && auth()->user()->employee !== null
+        ? EmployeeDashboard::for(auth()->user()->employee, auth()->user())
+        : null;
+
+    return view('dashboard', ['stats' => $stats, 'attendance' => $attendance, 'mine' => $mine]);
 })->middleware('auth')->name('dashboard');
 
 Route::middleware('auth')->group(function () {
@@ -83,6 +94,13 @@ Route::middleware('auth')->group(function () {
     // regardless of role). Row-level scoping, not route middleware, is what
     // keeps this from exposing anyone else's data.
     Route::get('/my-attendance', AttendanceShow::class)->name('attendance.mine');
+
+    // Leave (Phase 3e). No role middleware: who may open each page is a
+    // LeavePolicy ability (timeOff), checked in the component's mount() and
+    // render(), and the same ability gates the sidebar item (timeOff,
+    // decideAny).
+    Route::get('/time-off', TimeOff::class)->name('time-off.index');
+    Route::get('/approvals', Approvals::class)->name('approvals.index');
 });
 
 Route::middleware(['auth', 'role:admin|manager'])->group(function () {
@@ -96,6 +114,10 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::get('/organization', function () {
         return view('organization');
     })->name('organization.index');
+    // Policy rather than structure (Phase 3e): Leave types now, OT rules in Phase 4.
+    Route::get('/policies', function () {
+        return view('policies');
+    })->name('policies.index');
 });
 
 require __DIR__.'/auth.php';

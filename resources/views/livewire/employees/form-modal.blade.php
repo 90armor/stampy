@@ -172,19 +172,6 @@
                                     </div>
                                 </div>
 
-                                <div class="flex flex-col gap-2 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
-                                    <div class="sm:max-w-[240px]">
-                                        <x-input-label for="emp_status" value="Status" class="!mb-0" />
-                                    </div>
-                                    <div class="sm:w-[320px] sm:shrink-0">
-                                        <x-select id="emp_status" wire:model="status">
-                                            <option value="active">Active</option>
-                                            <option value="inactive">Inactive</option>
-                                        </x-select>
-                                        <x-input-error :messages="$errors->get('status')" class="mt-1" />
-                                    </div>
-                                </div>
-
                                 @if ($editing?->user_id)
                                     <div class="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between">
                                         <div class="flex items-start gap-2">
@@ -283,8 +270,9 @@
 @endif
 
 {{-- Own event name, not the default 'confirm-dialog': this component is
-embedded on both Employees\Index and Employees\Show, and Index already
-mounts its own <x-confirm-dialog> for deactivate/reactivate — sharing the
-default event would pop both dialogs at once for a single dispatch. --}}
+embedded on both Employees\Index and Employees\Show, next to other
+components that may mount their own <x-confirm-dialog> — sharing the default
+event would pop every one of them for a single dispatch. No Status field:
+deactivating and reactivating happen only through Employees\StatusModal. --}}
 <x-confirm-dialog event="confirm-dialog-form-modal" />
 </div>

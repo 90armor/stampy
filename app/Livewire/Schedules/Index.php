@@ -3,6 +3,7 @@
 namespace App\Livewire\Schedules;
 
 use App\Exceptions\BulkReassignmentTooFarBackException;
+use App\Exceptions\HalfDayLeaveNeedsBreakException;
 use App\Exceptions\InvalidWorkScheduleException;
 use App\Exceptions\WorkScheduleInUseException;
 use App\Exceptions\WorkScheduleIsDefaultException;
@@ -31,6 +32,9 @@ class Index extends Component
     public int $grace_minutes = 0;
 
     public int $break_minutes = 0;
+
+    /** 'HH:MM', or '' for none — the morning/afternoon boundary for half-day leave. */
+    public string $break_start = '';
 
     /** @var int[] */
     public array $workdays = [1, 2, 3, 4, 5];
@@ -71,6 +75,7 @@ class Index extends Component
         $this->end_time = substr($schedule->end_time, 0, 5);
         $this->grace_minutes = $schedule->grace_minutes;
         $this->break_minutes = $schedule->break_minutes;
+        $this->break_start = $schedule->break_start !== null ? substr($schedule->break_start, 0, 5) : '';
         $this->workdays = $schedule->workdays;
         $this->is_default = $schedule->is_default;
         $this->resetErrorBag();
@@ -87,6 +92,7 @@ class Index extends Component
             'end_time' => ['required', 'date_format:H:i'],
             'grace_minutes' => ['required', 'integer', 'min:0', 'max:65535'],
             'break_minutes' => ['required', 'integer', 'min:0'],
+            'break_start' => ['nullable', 'date_format:H:i'],
             'workdays' => ['required', 'array', 'min:1'],
             'workdays.*' => ['integer', 'between:1,7'],
         ]);
@@ -97,6 +103,7 @@ class Index extends Component
             'end_time' => $this->end_time.':00',
             'grace_minutes' => $this->grace_minutes,
             'break_minutes' => $this->break_minutes,
+            'break_start' => $this->break_start !== '' ? $this->break_start.':00' : null,
             'workdays' => array_values(array_map('intval', $this->workdays)),
             'is_default' => $this->is_default,
         ];
@@ -180,14 +187,14 @@ class Index extends Component
         // after the clock ticks past midnight), not the primary check.
         try {
             $this->bulkResult = $assigner->bulkReassign($from, $to, Carbon::parse($this->bulk_effective_from));
-        } catch (BulkReassignmentTooFarBackException $e) {
+        } catch (BulkReassignmentTooFarBackException|HalfDayLeaveNeedsBreakException $e) {
             $this->addError('form', $e->getMessage());
         }
     }
 
     private function resetForm(): void
     {
-        $this->reset(['editing', 'name', 'grace_minutes', 'break_minutes', 'is_default']);
+        $this->reset(['editing', 'name', 'grace_minutes', 'break_minutes', 'break_start', 'is_default']);
         $this->start_time = '08:00';
         $this->end_time = '17:00';
         $this->workdays = [1, 2, 3, 4, 5];
@@ -231,6 +238,8 @@ class Index extends Component
             'allSchedules' => WorkSchedule::query()->orderBy('name')->get(),
             'assignedCounts' => $this->currentAssignmentCounts(),
             'editingIsLocked' => $this->editing?->isReferenced() ?? false,
+            // Locked schedules still take a first break start (WorkSchedule::LOCKED_FIELDS).
+            'breakStartIsLocked' => $this->editing?->breakStartIsLocked() ?? false,
             // Who the bulk-reassign modal would actually move, shown once a
             // source schedule is picked and before the admin confirms — the
             // same selection bulkReassign() itself uses (employeesCurrentlyOn()),
