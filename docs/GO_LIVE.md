@@ -1,6 +1,6 @@
 # Going live
 
-The checklist an admin works through before anyone uses Stampy for real. Do the steps in order: later ones depend on earlier ones (balances need leave types, approvals need managers). Commands are `php artisan …`; under this repo's Docker setup, prefix them with `docker compose exec app`.
+The checklist an admin works through before anyone uses Stampy for real. Do the steps in order: later ones depend on earlier ones (balances need leave types, approvals need managers, time off in lieu needs its settings). Commands are `php artisan …`; under this repo's Docker setup, prefix them with `docker compose exec app`.
 
 ## 1. Environment and timezone
 
@@ -75,7 +75,27 @@ With fewer than 50 employees this is done by hand, from each employee's profile.
 
 If headcount grows well past 50, a CSV import for opening balances would be worth adding.
 
-## 7. The scheduler
+## 7. Overtime
+
+**HR confirms the overtime settings in Policies → Overtime before anyone requests time off in lieu.** The defaults follow the Labour Law and Prakas 112/25, not company policy:
+
+- Rates: workday 150%, night 200%, the weekly rest day (Sunday) 200%, holiday 200%. They must run holiday ≥ rest day ≥ night ≥ workday ≥ 100%.
+- Night is 22:00–05:00. A day off other than the weekly rest day (Saturday) earns the workday rate.
+- Limits: 2 hours of overtime a day on a day with scheduled hours, 10 hours of work a day in all. An admin can go over either with a reason.
+- Claims go back at most 7 days. An admin can file further back.
+- Time off in lieu: 1:1 (ratio 100%), half a day for every 240 minutes, credited to the "Time off in lieu" leave type.
+
+Settle the three **time off in lieu** settings (ratio, block, leave type) first. **They lock as soon as any time off in lieu is credited**, because every half day is worked out again from all the overtime ever credited, and changing them afterwards is a data operation, not a settings edit. Rates, the night window, the rest day and the limits stay editable. A rate changes only the report's arithmetic. A new night window or rest day applies to days built from then on; to apply it to a past period, run `php artisan attendance:build-daily --from=YYYY-MM-DD --to=YYYY-MM-DD`.
+
+**Time off in lieu's carry-over cap is a placeholder (5 days)** in Policies → Leave types. HR sets the real one. Without a cap, a half day earned on 30 December would lapse the next day.
+
+To pay overtime only, set "Credited to" to "No time off in lieu". The request form then offers Pay only.
+
+**Who approves:** overtime uses the same two steps as leave. The employee's manager (with the manager role) decides first, then an admin. The managers set up in step 5 are the overtime approvers too.
+
+**Payroll:** Reports → Overtime shows a month's approved, credited overtime per employee: pay minutes by category, time off minutes as a total, and pay-equivalent hours (the minutes × today's rates ÷ 60, pay only — payroll multiplies by the hourly wage). **Download CSV** saves the same table. The filename and the first line say when it was exported. A month still in progress says so on the page and in the file: until the month ends, a late claim or a cancellation can still change it. Export after the month closes, and keep the file payroll was run from.
+
+## 8. The scheduler
 
 Attendance and leave depend on scheduled tasks. In production, cron runs the scheduler every minute:
 
@@ -90,10 +110,13 @@ Under this repo's Docker setup, the `scheduler` service runs `schedule:work` ins
 - the last 7 days, daily at 02:10;
 - **`leave:grant`, daily at 00:05.** It creates each year's grants on 1 January, and first-year grants on the day someone completes their service requirement.
 
+Each `attendance:build-daily` run also credits time off in lieu for whoever has earned it, and puts right any crediting that failed earlier.
+
 If `leave:grant` doesn't run, nobody gets next year's leave and new joiners never become eligible. Its output is logged; a failure is logged as an error. Check `storage/logs` after the first night.
 
-## 8. Before opening it up
+## 9. Before opening it up
 
 - Sign in as a manager and as an employee (temporary passwords from the employee form) and look at Time off, Approvals and the dashboard.
-- File one test request, approve it at both steps, then cancel it. The balance should return.
+- File one test leave request, approve it at both steps, then cancel it. The balance should return.
+- File one test overtime claim for a past day with both punches, approve it at both steps, and check its credited time on the Overtime page and in Reports → Overtime. Then cancel it.
 - Delete nothing to clean up afterwards: cancelled leave is history, and history is kept.

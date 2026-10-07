@@ -33,7 +33,7 @@
     @endif
 
     {{-- This month and last: pay by category with its rates, time off as a plain total (1:1). --}}
-    <div class="mt-3 grid grid-cols-1 gap-x-6 sm:grid-cols-2">
+    <div class="mt-3 grid grid-cols-1 sm:grid-cols-2">
         @foreach ($months as $month)
             @php $summary = $month['summary']; @endphp
             <section class="border-t border-slate-divider px-4 py-4 sm:px-6 sm:[&:nth-child(2)]:border-l">
