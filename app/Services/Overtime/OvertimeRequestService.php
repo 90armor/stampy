@@ -194,7 +194,7 @@ class OvertimeRequestService
             punches: $row !== null ? ['in' => $row->first_in?->toImmutable(), 'out' => $row->last_out?->toImmutable()] : null,
             toil: $toil,
             approvedOnSubmit: $onBehalf,
-            reviewers: $onBehalf ? '' : $this->reviewers($employee),
+            reviewers: $onBehalf ? '' : $this->reviewers($employee, ! $isClaim),
         );
     }
 
@@ -249,8 +249,12 @@ class OvertimeRequestService
         return $this->limitProblems($day, $this->creditableMinutes($day, $request->starts_at, $request->ends_at));
     }
 
-    /** Who reviews a new request of $employee's, in words. */
-    private function reviewers(Employee $employee): string
+    /**
+     * Who reviews a new request of $employee's, in words — and, for a planned
+     * one, that it can be cancelled until it starts (a claim has started, so
+     * only an admin can cancel it).
+     */
+    private function reviewers(Employee $employee, bool $planned): string
     {
         $probe = new OvertimeRequest;
         $probe->setRelation('employee', $employee);
@@ -262,7 +266,7 @@ class OvertimeRequestService
 
         $names = $this->flow->stepOneApprovers($probe)->map(fn (User $user) => $user->employee?->full_name ?? $user->name)->implode(' or ');
 
-        return "{$names} reviews it first, then an admin. You can cancel it until it starts.";
+        return "{$names} reviews it first, then an admin.".($planned ? ' You can cancel it until it starts.' : '');
     }
 
     /**

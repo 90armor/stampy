@@ -83,14 +83,19 @@ class Index extends Component
         $employee = $user->employee;
         $settings = OvertimeSettings::current();
 
+        // Time off in lieu once they have any — a balance (an adjustment, ever)
+        // or time saved toward a half day — never "0" for someone who has
+        // never done overtime (LeaveType::shownFor()'s rule).
+        $toilType = $settings->toilLeaveType;
+        $saved = $employee !== null ? ($reconciler->remainderMinutes($employee) ?? 0) : 0;
+        $toil = $employee !== null && $toilType !== null && ($saved > 0 || $toilType->adjustments()->where('employee_id', $employee->id)->exists())
+            ? ['name' => $toilType->name, 'available' => $balances->for($employee, $toilType, today()->year)->available(), 'saved' => $saved]
+            : null;
+
         return view('livewire.overtime.index', [
             'employee' => $employee,
             'month' => $employee !== null ? OvertimeSummary::forMonth($employee, today()) : null,
-            'toil' => $employee !== null && $settings->toilLeaveType !== null ? [
-                'name' => $settings->toilLeaveType->name,
-                'available' => $balances->for($employee, $settings->toilLeaveType, today()->year)->available(),
-                'saved' => $reconciler->remainderMinutes($employee) ?? 0,
-            ] : null,
+            'toil' => $toil,
             'requests' => $employee !== null ? $this->rows($employee, $service) : collect(),
             'canFileForOthers' => $user->can('fileForOthers', OvertimeRequest::class),
         ])->layout('layouts.app', ['header' => 'Overtime']);

@@ -123,6 +123,13 @@ class OvertimePageTest extends TestCase
             ->assertSee('30m toward the next half day');
     }
 
+    public function test_the_toil_line_waits_until_there_is_some(): void
+    {
+        Livewire::actingAs($this->employee->user)->test(Index::class)
+            ->assertSee('None yet')
+            ->assertDontSee('Time off in lieu');
+    }
+
     public function test_each_request_says_what_it_has_credited(): void
     {
         $this->worked('2026-06-08', '08:00:00', '19:00:00');
@@ -215,7 +222,10 @@ class OvertimePageTest extends TestCase
             ->set('date', '2026-06-12')->set('start_time', '17:00')->set('end_time', '19:00')->set('compensation', 'time_off')
             ->call('review')
             ->assertSee('This is a claim: the time has already started.')
-            ->assertSee('You punched in at 8:02 AM and out at 7:05 PM.');
+            ->assertSee('You punched in at 8:02 AM and out at 7:05 PM.')
+            // A claim has already started: only an admin can cancel it now.
+            ->assertSee('Aye Aye Mon reviews it first, then an admin.')
+            ->assertDontSee('You can cancel it until it starts.');
     }
 
     public function test_an_overnight_end_is_the_next_day(): void

@@ -59,14 +59,15 @@ class OvertimeSeeder extends DemoSeeder
             $this->approved($this->claim($aung, $day, '17:00', '19:00', OvertimeCompensation::Pay, 'Month-end invoices'));
         }
 
-        // Yin Yin Htwe (EMP-0034): last Saturday, 08:00–13:00 taken as time
-        // off — 4 hours after the break, so half a day of time off in lieu.
+        // Yin Yin Htwe (EMP-0034): last Saturday, 08:00–14:00 taken as time
+        // off — 5 hours after the break: half a day of time off in lieu, and
+        // 1h toward the next (Time off shows it, now that she has a balance).
         $yin = $this->employee('EMP-0034');
         // The most recent Saturday before today: 1–7 days back, inside the claim window.
         $saturday = $today->copy()->previous(CarbonInterface::SATURDAY);
         $this->punch($yin, $saturday->copy()->setTime(8, 0), PunchType::In);
-        $this->punch($yin, $saturday->copy()->setTime(13, 0), PunchType::Out);
-        $this->approved($this->claim($yin, $saturday, '08:00', '13:00', OvertimeCompensation::TimeOff, 'Stock count'));
+        $this->punch($yin, $saturday->copy()->setTime(14, 0), PunchType::Out);
+        $this->approved($this->claim($yin, $saturday, '08:00', '14:00', OvertimeCompensation::TimeOff, 'Stock count'));
 
         // Nandar Hlaing (EMP-0028): a claim still waiting for Ohnmar Kyaw.
         $nandar = $this->employee('EMP-0028');
