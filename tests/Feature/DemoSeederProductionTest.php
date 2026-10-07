@@ -12,6 +12,7 @@ use Database\Seeders\EmployeeSeeder;
 use Database\Seeders\HolidaySeeder;
 use Database\Seeders\LeaveSeeder;
 use Database\Seeders\LeaveTypeSeeder;
+use Database\Seeders\OvertimeSeeder;
 use Database\Seeders\PositionSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\WorkScheduleSeeder;
@@ -40,6 +41,7 @@ class DemoSeederProductionTest extends TestCase
         HolidaySeeder::class,
         AttendanceLogSeeder::class,
         LeaveSeeder::class,
+        OvertimeSeeder::class,
     ];
 
     public function test_every_demo_seeder_refuses_in_production_even_with_force_and_writes_nothing(): void
