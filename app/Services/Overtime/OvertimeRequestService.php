@@ -1,0 +1,414 @@
+<?php
+
+namespace App\Services\Overtime;
+
+use App\Enums\ApprovalOutcome;
+use App\Enums\LeaveStatus;
+use App\Enums\OvertimeCompensation;
+use App\Enums\OvertimeKind;
+use App\Enums\OvertimeStatus;
+use App\Exceptions\OvertimeValidationException;
+use App\Models\Employee;
+use App\Models\Leave;
+use App\Models\OvertimeRequest;
+use App\Models\OvertimeSettings;
+use App\Models\User;
+use App\Models\WorkSchedule;
+use App\Services\Approval\ApprovalFlow;
+use App\Services\Attendance\DailySummaryBuilder;
+use App\Services\Attendance\EmployeeScheduleAssigner;
+use App\Services\Attendance\ExpectedWindow;
+use App\Services\Attendance\LeaveDay;
+use App\Services\Attendance\OvertimeCalculator;
+use App\Support\AttendanceTime;
+use App\Support\DisplayDate;
+use App\Support\Duration;
+use App\Support\WorkdayCalendar;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
+use Throwable;
+
+/**
+ * The overtime request lifecycle (CLAUDE.md, Phase 4, rules 1, 4–7, 12,
+ * 17–19) — LeaveRequestService's twin, on the same mechanisms: every
+ * mutation locks the employee's row first, so two submits for the same
+ * employee serialize their read-then-write checks; refusals are an
+ * OvertimeValidationException keyed by field; authorization goes through
+ * OvertimePolicy here too; the steps go through ApprovalFlow; and write
+ * first, then rebuild — a rebuild failure never undoes the decision, it's
+ * returned as rebuildError, logged, and names the command that heals it.
+ */
+class OvertimeRequestService
+{
+    /**
+     * How far ahead a planned request may be dated (Claude's choice, Phase
+     * 4c): far enough to plan a month, near enough that the schedule and the
+     * holidays it will be measured against are known.
+     */
+    public const PLANNED_DAYS_AHEAD = 31;
+
+    public function __construct(
+        private ApprovalFlow $flow,
+        private OvertimeCalculator $calculator,
+        private DailySummaryBuilder $builder,
+        private EmployeeScheduleAssigner $assigner,
+    ) {}
+
+    /**
+     * Files a request. Its kind is decided here: planned when it starts after
+     * now, otherwise a claim. An admin filing for someone else is final on
+     * submit — approved, both steps theirs — and a past or today's date is
+     * rebuilt (and time off in lieu reconciled) at once. Otherwise it starts
+     * at step 1, or records the skip and moves on, exactly as leave does.
+     *
+     * @return array{request: OvertimeRequest, rebuildError: ?string}
+     *
+     * @throws OvertimeValidationException
+     */
+    public function submit(
+        Employee $employee,
+        CarbonInterface $date,
+        CarbonInterface $startsAt,
+        CarbonInterface $endsAt,
+        OvertimeCompensation $compensation,
+        ?string $reason,
+        User $actor,
+        ?string $overrideReason = null,
+    ): array {
+        Gate::forUser($actor)->authorize('create', [OvertimeRequest::class, $employee]);
+
+        $date = Carbon::instance($date)->startOfDay();
+        $startsAt = Carbon::instance($startsAt);
+        $endsAt = Carbon::instance($endsAt);
+
+        $request = DB::transaction(function () use ($employee, $date, $startsAt, $endsAt, $compensation, $reason, $actor, $overrideReason) {
+            $employee = Employee::query()->lockForUpdate()->findOrFail($employee->id);
+
+            $override = $this->validate($employee, $date, $startsAt, $endsAt, $compensation, $actor, $overrideReason);
+            $onBehalf = $actor->hasRole('admin') && ! $actor->is($employee->user);
+
+            $request = new OvertimeRequest([
+                'date' => $date->format('Y-m-d'),
+                'starts_at' => $startsAt,
+                'ends_at' => $endsAt,
+                'kind' => $startsAt->gt(now()) ? OvertimeKind::Planned : OvertimeKind::Claim,
+                'compensation' => $compensation,
+                'reason' => $reason,
+                'status' => $onBehalf ? OvertimeStatus::Approved : OvertimeStatus::Pending,
+                'current_step' => $onBehalf ? null : ApprovalFlow::MANAGER_STEP,
+                'requested_by' => $actor->id,
+                'limit_override_reason' => $override,
+            ]);
+            $request->employee()->associate($employee);
+            $request->save();
+
+            if ($onBehalf) {
+                $this->flow->record($request, ApprovalFlow::MANAGER_STEP, ApprovalOutcome::Approved, $actor, 'Filed by an admin on the employee\'s behalf.');
+                $this->flow->record($request, ApprovalFlow::ADMIN_STEP, ApprovalOutcome::Approved, $actor, 'Filed by an admin on the employee\'s behalf.');
+
+                return $request;
+            }
+
+            $skipReason = $this->flow->stepOneSkipReason($request);
+
+            if ($skipReason !== null) {
+                $this->flow->record($request, ApprovalFlow::MANAGER_STEP, ApprovalOutcome::Skipped, null, $skipReason);
+                $this->moveToStepTwo($request);
+            }
+
+            return $request;
+        });
+
+        return ['request' => $request, 'rebuildError' => $request->status === OvertimeStatus::Approved ? $this->rebuild($request, 'approval') : null];
+    }
+
+    /**
+     * Every rule a new request must meet, in stages; the first stage with a
+     * failure throws (OvertimeValidationException).
+     *
+     * @return ?string the override reason to store — only when a limit is exceeded and an admin gave one
+     *
+     * @throws OvertimeValidationException
+     */
+    private function validate(
+        Employee $employee,
+        Carbon $date,
+        Carbon $startsAt,
+        Carbon $endsAt,
+        OvertimeCompensation $compensation,
+        User $actor,
+        ?string $overrideReason,
+    ): ?string {
+        $errors = new ValidationErrors;
+
+        // 1. Employment.
+        if (! $employee->isActiveOn($date)) {
+            $errors->add('date', $employee->left_on !== null && $date->gt($employee->left_on)
+                ? "Overtime can't be after {$employee->full_name}'s last day (".DisplayDate::compact($employee->left_on).').'
+                : "Overtime can't be before {$employee->full_name} joined (".DisplayDate::compact($employee->join_date).').');
+        }
+
+        $errors->throwIfAny();
+
+        // 2. The window's shape, and how far back or ahead it may be.
+        if ($endsAt->lte($startsAt)) {
+            $errors->add('ends_at', 'The overtime must end after it starts.');
+        } elseif ($endsAt->gt($startsAt->copy()->addHours(OvertimeRequest::MAX_WINDOW_HOURS))) {
+            $errors->add('ends_at', 'An overtime window can\'t be longer than '.OvertimeRequest::MAX_WINDOW_HOURS.' hours.');
+        }
+
+        if (! $startsAt->isSameDay($date)) {
+            $errors->add('starts_at', 'The overtime must start on its date.');
+        }
+
+        $settings = OvertimeSettings::current();
+
+        if ($startsAt->gt(now())) {
+            $latest = today()->addDays(self::PLANNED_DAYS_AHEAD);
+
+            if ($date->gt($latest)) {
+                $errors->add('date', 'Overtime can be planned at most '.self::PLANNED_DAYS_AHEAD.' days ahead — up to '.DisplayDate::compact($latest).'.');
+            }
+        } elseif (! $actor->hasRole('admin')) {
+            $earliest = today()->subDays($settings->claim_window_days);
+
+            if ($date->lt($earliest)) {
+                $errors->add('date', "Overtime can be claimed at most {$settings->claim_window_days} days back — from ".DisplayDate::compact($earliest).'.');
+            }
+        }
+
+        $errors->throwIfAny();
+
+        // 3. Something in the window must count as overtime — the builder's own
+        // definition (OvertimeCalculator), as if all of it were worked.
+        $day = $this->day($employee, $date);
+        $creditable = $this->creditableMinutes($day, $startsAt, $endsAt);
+
+        if ($creditable === 0) {
+            $errors->add('starts_at', $day['hasHours']
+                ? 'This is within normal working hours ('.AttendanceTime::format($day['window']->start).' – '.AttendanceTime::format($day['window']->end).').'
+                : 'None of this window counts as overtime — it\'s all break time.');
+        }
+
+        $errors->throwIfAny();
+
+        // 4. Full-day leave, approved or pending: a pending one may yet be
+        // approved, and the builder would then credit nothing.
+        $leave = $this->fullDayLeave($employee, $date);
+
+        if ($leave !== null) {
+            $whose = $actor->employee?->is($employee) ? 'your' : "{$employee->full_name}'s";
+            $errors->add('date', DisplayDate::compact($date)." is covered by {$whose} {$leave->status->value} {$leave->leaveType->name} leave ("
+                .($leave->start_date->eq($leave->end_date) ? DisplayDate::compact($leave->start_date) : DisplayDate::range($leave->start_date, $leave->end_date)).').');
+        }
+
+        // 5. One active request per date.
+        $active = OvertimeRequest::query()
+            ->where('employee_id', $employee->id)
+            ->whereDate('date', $date->format('Y-m-d'))
+            ->whereIn('status', [OvertimeStatus::Pending->value, OvertimeStatus::Approved->value])
+            ->first();
+
+        if ($active !== null) {
+            $errors->add('date', 'There is already '.($active->status === OvertimeStatus::Pending ? 'a pending' : 'an approved').' overtime request on '.DisplayDate::compact($date)
+                .' ('.AttendanceTime::format($active->starts_at).' – '.AttendanceTime::format($active->ends_at).'). Cancel it first to file a different one.');
+        }
+
+        $errors->throwIfAny();
+
+        // 6. The daily limits.
+        $override = $this->checkLimits($errors, $day, $creditable, $actor, $overrideReason);
+
+        // 7. Time off needs somewhere to credit it.
+        $this->checkCompensation($errors, $compensation);
+
+        $errors->throwIfAny();
+
+        return $override;
+    }
+
+    /**
+     * The limits (rule 6) on a window's creditable minutes: on a day with
+     * scheduled hours, at most max_overtime_minutes_per_day of overtime, and
+     * the scheduled minutes (less the half on leave) plus the overtime at
+     * most max_work_minutes_per_day. On a day with none — a non-workday or a
+     * holiday — only the total applies (Claude's decision, open to the
+     * owner's veto: the 2-hour cap is about extending a normal day, and would
+     * forbid an ordinary 8-hour Saturday). Over a limit, only an admin's
+     * override reason lets it through.
+     *
+     * @param  array<string, mixed>  $day  day()
+     * @return ?string the override reason to store, if one was needed
+     */
+    private function checkLimits(ValidationErrors $errors, array $day, int $creditable, User $actor, ?string $overrideReason): ?string
+    {
+        $settings = OvertimeSettings::current();
+        $problems = [];
+
+        if ($day['hasHours'] && $creditable > $settings->max_overtime_minutes_per_day) {
+            $problems[] = 'This is '.Duration::format($creditable).' of overtime; the limit is '.Duration::format($settings->max_overtime_minutes_per_day).' a day.';
+        }
+
+        $total = $day['scheduledMinutes'] + $creditable;
+
+        if ($total > $settings->max_work_minutes_per_day) {
+            $problems[] = ($day['scheduledMinutes'] > 0
+                ? 'With '.Duration::format($day['scheduledMinutes']).' of scheduled work this makes '.Duration::format($total)
+                : 'This is '.Duration::format($total).' of work').'; the limit is '.Duration::format($settings->max_work_minutes_per_day).' a day.';
+        }
+
+        if ($problems === []) {
+            return null;
+        }
+
+        $reason = trim((string) $overrideReason);
+
+        if ($actor->hasRole('admin') && $reason !== '') {
+            return $reason;
+        }
+
+        foreach ($problems as $problem) {
+            $errors->add('overtime', $problem);
+        }
+
+        if ($actor->hasRole('admin')) {
+            $errors->add('limit_override_reason', 'To go over the limit, give an override reason.');
+        }
+
+        return null;
+    }
+
+    private function checkCompensation(ValidationErrors $errors, OvertimeCompensation $compensation): void
+    {
+        if ($compensation === OvertimeCompensation::TimeOff && OvertimeSettings::current()->toil_leave_type_id === null) {
+            $errors->add('compensation', 'Overtime can\'t be taken as time off until a time-off-in-lieu leave type is set in Policies → Overtime.');
+        }
+    }
+
+    /**
+     * What a date is for an employee: their schedule and its full window,
+     * whether it has scheduled hours (a workday that isn't a holiday), and
+     * the scheduled minutes — the window less the break, or the half worked
+     * on an approved half-day leave.
+     *
+     * @return array{schedule: WorkSchedule, date: Carbon, window: ExpectedWindow, isScheduledWorkday: bool, isHoliday: bool, hasHours: bool, scheduledMinutes: int}
+     */
+    private function day(Employee $employee, Carbon $date): array
+    {
+        $schedule = $employee->scheduleOn($date);
+        $isScheduledWorkday = WorkdayCalendar::isScheduledWorkday($schedule, $date);
+        $isHoliday = WorkdayCalendar::isHoliday($date);
+        $hasHours = $isScheduledWorkday && ! $isHoliday;
+        $window = ExpectedWindow::for($schedule, $date);
+        $scheduledMinutes = 0;
+
+        if ($hasHours) {
+            $leaveDay = LeaveDay::on($this->leavesOn($employee, $date, [LeaveStatus::Approved]), $date);
+            $worked = $leaveDay->isHalfDay() && $schedule->break_start !== null ? ExpectedWindow::for($schedule, $date, $leaveDay->half) : $window;
+            $seconds = $worked->end->getTimestamp() - $worked->start->getTimestamp();
+            $scheduledMinutes = $leaveDay->isHalfDay()
+                ? intdiv($seconds - $worked->breakOverlapSeconds($worked->start, $worked->end), 60)
+                : intdiv($seconds, 60) - $schedule->break_minutes;
+        }
+
+        return compact('schedule', 'date', 'window', 'isScheduledWorkday', 'isHoliday', 'hasHours', 'scheduledMinutes');
+    }
+
+    /**
+     * The window's overtime minutes if all of it were worked — OvertimeCalculator
+     * with the window as the punches, so "creditable" has one definition.
+     *
+     * @param  array<string, mixed>  $day  day()
+     */
+    private function creditableMinutes(array $day, Carbon $startsAt, Carbon $endsAt): int
+    {
+        $window = new OvertimeRequest(['date' => $day['date'], 'starts_at' => $startsAt, 'ends_at' => $endsAt]);
+
+        return $this->calculator->calculate(
+            $window, $startsAt, $endsAt, $day['schedule'], $day['date'],
+            $day['isScheduledWorkday'], $day['isHoliday'], LeaveDay::none(), OvertimeSettings::current(),
+        )->total();
+    }
+
+    /** An approved or pending leave making $date a full day off (an AM and a PM one together count), if any. */
+    private function fullDayLeave(Employee $employee, Carbon $date): ?Leave
+    {
+        $leaves = $this->leavesOn($employee, $date, [LeaveStatus::Approved, LeaveStatus::Pending]);
+
+        if (! LeaveDay::on($leaves, $date)->fullDay) {
+            return null;
+        }
+
+        return $leaves->first(fn (Leave $leave) => $leave->half === null) ?? $leaves->first();
+    }
+
+    /**
+     * @param  list<LeaveStatus>  $statuses
+     * @return Collection<int, Leave>
+     */
+    private function leavesOn(Employee $employee, Carbon $date, array $statuses)
+    {
+        return Leave::query()
+            ->where('employee_id', $employee->id)
+            ->whereIn('status', array_map(fn (LeaveStatus $status) => $status->value, $statuses))
+            ->whereDate('start_date', '<=', $date->format('Y-m-d'))
+            ->whereDate('end_date', '>=', $date->format('Y-m-d'))
+            ->with('leaveType')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * Step 1 is done: wait for an admin, or — when the requester is the only
+     * admin — record step 2 as self_approved and approve.
+     */
+    private function moveToStepTwo(OvertimeRequest $request): void
+    {
+        if ($this->flow->isSelfApprovedAtStepTwo($request)) {
+            $this->flow->record($request, ApprovalFlow::ADMIN_STEP, ApprovalOutcome::SelfApproved, $this->flow->requester($request), 'The requester is the only admin.');
+            $request->update(['status' => OvertimeStatus::Approved, 'current_step' => null]);
+
+            return;
+        }
+
+        $request->update(['current_step' => ApprovalFlow::ADMIN_STEP]);
+    }
+
+    /**
+     * The request's work date rebuilt (DailySummaryBuilder::rebuildOvertimeDate()
+     * — nothing for a future date), then time off in lieu reconciled for a
+     * time_off request. The rebuild reconciles by itself when the credited
+     * minutes changed; the explicit call also covers a decision that moved
+     * no minute (a request that credits nothing yet). A failure never undoes
+     * the decision: it's logged and returned.
+     */
+    private function rebuild(OvertimeRequest $request, string $action): ?string
+    {
+        $employee = $request->employee;
+
+        if ($request->date->gt(today())) {
+            return null;
+        }
+
+        try {
+            $this->builder->rebuildOvertimeDate($request);
+
+            if ($request->compensation === OvertimeCompensation::TimeOff) {
+                $this->builder->reconcileToil($employee, $request);
+                $this->builder->reportToil();
+            }
+
+            return null;
+        } catch (Throwable $e) {
+            $message = $this->assigner->rebuildRecoveryMessage($request->date, "--employee={$employee->employee_code}", $request->date);
+
+            Log::error("Overtime request #{$request->id} {$action} for {$employee->employee_code}: rebuild failed partway ({$e->getMessage()}). {$message}");
+
+            return $message;
+        }
+    }
+}

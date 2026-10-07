@@ -8,6 +8,8 @@ use App\Enums\OvertimeKind;
 use App\Enums\OvertimeStatus;
 use App\Exceptions\InvalidOvertimeRequestException;
 use App\Exceptions\InvalidOvertimeTransitionException;
+use App\Policies\OvertimePolicy;
+use Illuminate\Database\Eloquent\Attributes\UsePolicy;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,8 +23,11 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
  * enforced here; rules that need other rows or settings — the daily limits,
  * the claim window, one active request per date, who may approve — belong to
  * the request service. Goes through the shared approval engine as an
- * Approvable (ApprovalFlow), under the morph alias 'overtime'.
+ * Approvable (ApprovalFlow), under the morph alias 'overtime'. Its policy is
+ * OvertimePolicy (named for the feature, so bound here rather than found by
+ * the OvertimeRequestPolicy naming convention).
  */
+#[UsePolicy(OvertimePolicy::class)]
 class OvertimeRequest extends Model implements Approvable
 {
     use HasFactory;
