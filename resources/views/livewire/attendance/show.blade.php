@@ -298,11 +298,14 @@
                             // and punches in leave time — never the cell colour.
                             $cellHalf = $record && $record->leaveDay()->isHalfDay() ? $record->leaveDay()->half->label() : null;
                             $cellWorkedOnLeave = $record && $record->workedOnLeave();
+                            // Credited overtime (Phase 4d): an annotation like the leave notes.
+                            $cellOvertime = $record?->overtimeLabel();
                             $cellAriaLabel = \App\Support\DisplayDate::long($cell['date']).', '.$statusLabel
                                 .($lateArrival ? ', arrived '.$lateMinutesLabel.' late' : '')
                                 .($earlyDeparture ? ', left '.$earlyMinutesLabel.' early' : '')
                                 .($cellHalf ? ', '.$cellHalf.' leave' : '')
                                 .($cellWorkedOnLeave ? ', worked on leave' : '')
+                                .($cellOvertime ? ', '.str_replace('OT ', 'overtime ', $cellOvertime) : '')
                                 .($holiday ? ', Holiday: '.$holiday : '');
                         @endphp
 
@@ -376,8 +379,8 @@
                                 like the holiday name; below sm just the half ("AM"), where a
                                 full phrase can't fit — the cell's label and the day modal
                                 say the rest. --}}
-                                @if ($cellHalf || $cellWorkedOnLeave)
-                                    <span class="hidden w-full text-[10px] font-medium leading-tight text-slate-600 dark:text-slate-400 sm:block">{{ implode(' · ', array_filter([$cellHalf ? $cellHalf.' leave' : null, $cellWorkedOnLeave ? 'Worked on leave' : null])) }}</span>
+                                @if ($cellHalf || $cellWorkedOnLeave || $cellOvertime)
+                                    <span class="hidden w-full text-[10px] font-medium leading-tight text-slate-600 dark:text-slate-400 sm:block">{{ implode(' · ', array_filter([$cellHalf ? $cellHalf.' leave' : null, $cellWorkedOnLeave ? 'Worked on leave' : null, $cellOvertime])) }}</span>
                                     @if ($cellHalf)
                                         <span class="text-[10px] font-medium leading-tight text-slate-600 dark:text-slate-400 sm:hidden" aria-hidden="true">{{ $cellHalf }}</span>
                                     @endif
@@ -773,6 +776,43 @@
                             @if ($modalRecord?->workedOnLeave())
                                 <p class="mt-2 text-xs text-slate-600 dark:text-slate-300">Worked on leave: there are punches in leave time. The leave stands unless an admin cancels it.</p>
                             @endif
+                        </div>
+                    @endif
+
+                    {{-- Overtime (Phase 4d): the day's request and what it credited — by
+                    category for pay only (time off is earned 1:1) — or why nothing
+                    was (OvertimeResult). An annotation of the day, never its status. --}}
+                    @if ($dayOvertime)
+                        @php
+                            $viewer = auth()->user();
+                            $dayRequest = $dayOvertime['request'];
+                            // Gated by each destination's own ability: the profile for whoever
+                            // may open it, else the employee's own Overtime page.
+                            [$overtimeLinkUrl, $overtimeLinkLabel] = match (true) {
+                                $viewer->can('viewAny', \App\Models\Employee::class) && $viewer->can('view', $employee) => [route('employees.show', $employee), 'View on profile'],
+                                $viewer->employee?->is($employee) && $viewer->can('viewAny', \App\Models\OvertimeRequest::class) => [route('overtime.index'), 'View in Overtime'],
+                                default => [null, null],
+                            };
+                            $creditedLine = $dayRequest->compensation === \App\Enums\OvertimeCompensation::Pay && array_sum($dayOvertime['minutes']) > 0
+                                ? \App\Support\OvertimeSummary::categoryLine($dayOvertime['minutes'])
+                                : null;
+                        @endphp
+                        <div class="mt-5 border-t border-slate-divider pt-4">
+                            <h4 class="text-xs font-medium text-slate-500 dark:text-slate-400">Overtime</h4>
+                            <div class="mt-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                                <div class="min-w-0">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <p class="text-sm font-medium tabular-nums text-slate-900 dark:text-slate-100">{{ $dayRequest->displayWindow() }}</p>
+                                        <x-badge :color="$dayRequest->status->badgeColor()">{{ $dayRequest->status->label() }}</x-badge>
+                                    </div>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ $dayRequest->kind->label() }} · {{ $dayRequest->compensation->label() }}</p>
+                                    @if ($dayOvertime['result'])<p class="mt-1 text-sm text-slate-700 dark:text-slate-200">{{ $dayOvertime['result'] }}</p>@endif
+                                    @if ($creditedLine)<p class="text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ $creditedLine }}</p>@endif
+                                </div>
+                                @if ($overtimeLinkUrl)
+                                    <a href="{{ $overtimeLinkUrl }}" wire:navigate class="rounded text-sm font-medium text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-2 hover:decoration-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:decoration-primary-700 dark:hover:decoration-primary-400">{{ $overtimeLinkLabel }}</a>
+                                @endif
+                            </div>
                         </div>
                     @endif
 

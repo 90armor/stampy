@@ -70,6 +70,13 @@ class Index extends Component
     #[Url(as: 'worked-on-leave', history: true)]
     public bool $workedOnLeave = false;
 
+    /**
+     * Only days with credited overtime (Phase 4d) — an annotation, so its own
+     * filter, like Worked on leave.
+     */
+    #[Url(as: 'overtime', history: true)]
+    public bool $overtime = false;
+
     public function mount(): void
     {
         // Attendance visibility is gated the same as the employee directory
@@ -173,6 +180,12 @@ class Index extends Component
         $this->resetPage();
     }
 
+    public function toggleOvertime(): void
+    {
+        $this->overtime = ! $this->overtime;
+        $this->resetPage();
+    }
+
     public function toggleTimingFilter(string $timing): void
     {
         if (in_array($timing, $this->timingFilters, true)) {
@@ -234,6 +247,7 @@ class Index extends Component
         $this->statuses = $this->defaultStatuses();
         $this->timingFilters = [];
         $this->workedOnLeave = false;
+        $this->overtime = false;
         $this->resetPage();
     }
 
@@ -317,6 +331,10 @@ class Index extends Component
             ->when(
                 $this->workedOnLeave,
                 fn (Builder $query) => $query->whereIn('daily_attendances.id', $this->workedOnLeaveIds())
+            )
+            ->when(
+                $this->overtime,
+                fn (Builder $query) => $query->whereRaw('(daily_attendances.overtime_workday_minutes + daily_attendances.overtime_night_minutes + daily_attendances.overtime_rest_day_minutes + daily_attendances.overtime_holiday_minutes) > 0')
             );
     }
 

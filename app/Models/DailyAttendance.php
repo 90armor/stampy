@@ -75,6 +75,22 @@ class DailyAttendance extends Model
         return $this->belongsTo(Leave::class);
     }
 
+    /** The day's credited overtime, every category together (Phase 4d). */
+    public function overtimeMinutes(): int
+    {
+        return (int) $this->overtime_workday_minutes + (int) $this->overtime_night_minutes
+            + (int) $this->overtime_rest_day_minutes + (int) $this->overtime_holiday_minutes;
+    }
+
+    /**
+     * "OT 2h 00m" — credited overtime as the attendance views annotate a day,
+     * or null with none. An annotation, never a status or colour.
+     */
+    public function overtimeLabel(): ?string
+    {
+        return $this->overtimeMinutes() > 0 ? 'OT '.Duration::format($this->overtimeMinutes()) : null;
+    }
+
     /**
      * The approved overtime request this day's overtime minutes were credited
      * against (Phase 4) — written by the builder from Phase 4b on.

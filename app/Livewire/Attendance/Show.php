@@ -3,16 +3,20 @@
 namespace App\Livewire\Attendance;
 
 use App\Enums\LeaveStatus;
+use App\Enums\OvertimeStatus;
 use App\Enums\PunchSource;
 use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
 use App\Models\Employee;
 use App\Models\Leave;
+use App\Models\OvertimeRequest;
 use App\Services\Attendance\DailySummaryBuilder;
 use App\Services\Leave\LeaveDayCounter;
+use App\Services\Overtime\OvertimeRequestService;
 use App\Support\AttendanceSummary;
 use App\Support\AttendanceTime;
 use App\Support\DisplayDate;
+use App\Support\OvertimeResult;
 use App\Support\WorkdayCalendar;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
@@ -501,6 +505,47 @@ class Show extends Component
             ->all();
     }
 
+    /**
+     * The day the modal is open on, for overtime (Phase 4d): the request — the
+     * approved one the day was credited against, else a pending or approved
+     * one for that date — what it credited by category, and in words what
+     * it has credited or why nothing (OvertimeResult: no out-punch, left
+     * before the window, on leave). Null without a request.
+     *
+     * @return array{request: OvertimeRequest, minutes: array<string, int>, result: ?string}|null
+     */
+    private function dayOvertime(?DailyAttendance $record): ?array
+    {
+        if ($this->viewingDay === null) {
+            return null;
+        }
+
+        $request = $record?->overtime_request_id !== null
+            ? OvertimeRequest::find($record->overtime_request_id)
+            : OvertimeRequest::query()
+                ->where('employee_id', $this->employee->id)
+                ->whereDate('date', $this->viewingDay)
+                ->whereIn('status', [OvertimeStatus::Pending->value, OvertimeStatus::Approved->value])
+                ->latest('id')
+                ->first();
+
+        if ($request === null) {
+            return null;
+        }
+
+        $request->setRelation('employee', $this->employee);
+        $credited = $record?->overtime_request_id === $request->id;
+
+        return [
+            'request' => $request,
+            'minutes' => $credited ? [
+                'workday' => $record->overtime_workday_minutes, 'night' => $record->overtime_night_minutes,
+                'rest_day' => $record->overtime_rest_day_minutes, 'holiday' => $record->overtime_holiday_minutes,
+            ] : [],
+            'result' => OvertimeResult::line($request, $record, $request->status === OvertimeStatus::Approved ? app(OvertimeRequestService::class)->approvedMinutes($request) : 0),
+        ];
+    }
+
     private function holidaysByDate(): Collection
     {
         $start = $this->monthStart();
@@ -577,6 +622,7 @@ class Show extends Component
             'overnightPunches' => $this->overnightPunches($existing),
             'holidaysByDate' => $this->holidaysByDate(),
             'dayLeaves' => $this->dayLeaves(),
+            'dayOvertime' => $this->viewingDay !== null ? $this->dayOvertime($existing->get($this->viewingDay)) : null,
             'lastBuiltInMonth' => $lastBuiltInMonth,
             'monthFullyBuilt' => $lastBuiltInMonth === $days->last()['date']->format('Y-m-d'),
             // Same reasoning as $layoutData just above: nobody reaches
