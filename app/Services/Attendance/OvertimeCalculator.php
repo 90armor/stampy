@@ -25,20 +25,22 @@ use Illuminate\Support\Facades\Log;
  *   FULL window, start_time–end_time, is subtracted — not ExpectedWindow's
  *   half-day shrink: half-day leave doesn't make normal hours overtime (rule
  *   12). The break lies inside that window, so it never counts either.
- * - On a weekly rest day or a holiday there is no normal window: the whole
- *   span counts, less its overlap with the schedule's break window
- *   (break_start + break_minutes; nothing without break_start) — a Saturday
- *   worked 08:00–17:00 is 8 hours, not 9. Claude's decision, open to the
- *   owner's veto (Phase 4b).
+ * - On a day with no scheduled hours — a non-workday of the schedule, or a
+ *   holiday — there is no normal window: the whole span counts, less its
+ *   overlap with the schedule's break window (break_start + break_minutes;
+ *   nothing without break_start) — a Saturday worked 08:00–17:00 is 8 hours,
+ *   not 9. Claude's decision, open to the owner's veto (Phase 4b).
  * - A full-day approved leave on the date credits 0 and logs a warning: 4c
  *   refuses such a request, so this is a defence.
  *
  * Categories, highest precedence first — each counted second in exactly one:
- * holiday (the WORK DATE is a holiday), rest day (the work date isn't a
- * workday of its schedule), night (the second itself falls in the settings'
- * night window, on whichever calendar day it is — the window may wrap
- * midnight), workday. Overtime after midnight belongs to its work date (rule
- * 11), so 23:00–01:00 after a holiday is all holiday minutes.
+ * holiday (the WORK DATE is a holiday), rest day (the work date's weekday is
+ * the settings' weekly_rest_day — Sunday; owner, Phase 4c's commit 0: only
+ * the weekly rest day earns the premium, so a Saturday is workday or night),
+ * night (the second itself falls in the settings' night window, on whichever
+ * calendar day it is — the window may wrap midnight), workday. Overtime after
+ * midnight belongs to its work date (rule 11), so 23:00–01:00 after a holiday
+ * is all holiday minutes.
  *
  * Minutes truncate, never round (owner, Phase 4b — one rule for every minute
  * figure, as late and early minutes do): the total is intdiv(seconds, 60).
@@ -94,7 +96,7 @@ class OvertimeCalculator
         // Highest precedence first, so the rounding shortfall below goes to the first one present.
         if ($isHoliday) {
             $byCategory = ['holiday' => $seconds];
-        } elseif (! $isScheduledWorkday) {
+        } elseif ($workDate->dayOfWeekIso === $settings->weekly_rest_day) {
             $byCategory = ['restDay' => $seconds];
         } else {
             $night = 0;

@@ -318,6 +318,20 @@ class OvertimeModelsTest extends TestCase
         $this->assertSame(175, OvertimeSettings::current()->night_rate_percent);
     }
 
+    public function test_the_weekly_rest_day_is_an_iso_weekday(): void
+    {
+        $this->assertSame(7, OvertimeSettings::current()->weekly_rest_day);
+
+        foreach ([0, 8] as $day) {
+            try {
+                OvertimeSettings::current()->update(['weekly_rest_day' => $day]);
+                $this->fail("Accepted weekly_rest_day {$day}.");
+            } catch (InvalidOvertimeSettingsException $e) {
+                $this->assertStringContainsString('ISO weekday', $e->getMessage());
+            }
+        }
+    }
+
     public function test_the_toil_block_is_whole_half_hours(): void
     {
         OvertimeSettings::current()->fresh()->update(['toil_block_minutes' => 210]);

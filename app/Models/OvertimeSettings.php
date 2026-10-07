@@ -50,12 +50,13 @@ class OvertimeSettings extends Model
         ...self::POSITIVE,
         'night_starts',
         'night_ends',
+        'weekly_rest_day',
         'toil_leave_type_id',
     ];
 
     protected function casts(): array
     {
-        return array_fill_keys(self::POSITIVE, 'integer');
+        return [...array_fill_keys(self::POSITIVE, 'integer'), 'weekly_rest_day' => 'integer'];
     }
 
     /**
@@ -115,6 +116,10 @@ class OvertimeSettings extends Model
             && $this->night_rate_percent >= $this->workday_rate_percent
             && $this->workday_rate_percent >= 100)) {
             throw InvalidOvertimeSettingsException::ratesOutOfOrder();
+        }
+
+        if ($this->weekly_rest_day !== null && ($this->weekly_rest_day < 1 || $this->weekly_rest_day > 7)) {
+            throw InvalidOvertimeSettingsException::restDayNotAWeekday();
         }
 
         if ($this->toil_block_minutes % 30 !== 0) {

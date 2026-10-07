@@ -28,6 +28,8 @@ class OvertimeCalculatorTest extends TestCase
 
     private const SATURDAY = '2026-02-07';
 
+    private const SUNDAY = '2026-02-08';
+
     private WorkSchedule $schedule;
 
     protected function setUp(): void
@@ -126,19 +128,43 @@ class OvertimeCalculatorTest extends TestCase
         $this->assertSame([120, 0, 0, 0], $this->minutes($this->credit($morning, '2026-02-03', '06:00:00', '17:00:00')));
     }
 
-    public function test_a_rest_day_counts_the_whole_span_less_the_break(): void
+    /**
+     * Only the weekly rest day (Sunday) is the rest-day category (owner,
+     * Phase 4c's commit 0); a Saturday has no normal window either, so the
+     * whole span less the break counts, but as workday minutes.
+     */
+    public function test_a_saturday_is_workday_minutes_and_a_sunday_is_rest_day_both_less_the_break(): void
     {
-        $request = $this->request(self::SATURDAY, '08:00', '17:00');
+        $saturday = $this->request(self::SATURDAY, '08:00', '17:00');
+        $this->assertSame([480, 0, 0, 0], $this->minutes($this->credit($saturday, self::SATURDAY, '07:50:00', '17:10:00', workday: false)));
 
-        $this->assertSame([0, 0, 480, 0], $this->minutes($this->credit($request, self::SATURDAY, '07:50:00', '17:10:00', workday: false)));
+        $sunday = $this->request(self::SUNDAY, '08:00', '17:00');
+        $this->assertSame([0, 0, 480, 0], $this->minutes($this->credit($sunday, self::SUNDAY, '07:50:00', '17:10:00', workday: false)));
     }
 
-    public function test_a_rest_day_on_a_schedule_without_a_break_start_subtracts_nothing(): void
+    public function test_a_saturday_evening_is_workday_then_night(): void
+    {
+        $request = $this->request(self::SATURDAY, '20:00', '23:00');
+
+        $this->assertSame([120, 60, 0, 0], $this->minutes($this->credit($request, self::SATURDAY, '19:55:00', '23:05:00', workday: false)));
+    }
+
+    public function test_the_weekly_rest_day_is_a_setting(): void
+    {
+        OvertimeSettings::current()->update(['weekly_rest_day' => 6]);
+        $saturday = $this->request(self::SATURDAY, '08:00', '17:00');
+        $sunday = $this->request(self::SUNDAY, '08:00', '17:00');
+
+        $this->assertSame([0, 0, 480, 0], $this->minutes($this->credit($saturday, self::SATURDAY, '08:00:00', '17:00:00', workday: false)));
+        $this->assertSame([480, 0, 0, 0], $this->minutes($this->credit($sunday, self::SUNDAY, '08:00:00', '17:00:00', workday: false)));
+    }
+
+    public function test_a_non_workday_on_a_schedule_without_a_break_start_subtracts_nothing(): void
     {
         $this->schedule = WorkSchedule::factory()->create(['start_time' => '08:00:00', 'end_time' => '17:00:00', 'break_minutes' => 60, 'break_start' => null]);
-        $request = $this->request(self::SATURDAY, '08:00', '17:00');
+        $request = $this->request(self::SUNDAY, '08:00', '17:00');
 
-        $this->assertSame([0, 0, 540, 0], $this->minutes($this->credit($request, self::SATURDAY, '08:00:00', '17:00:00', workday: false)));
+        $this->assertSame([0, 0, 540, 0], $this->minutes($this->credit($request, self::SUNDAY, '08:00:00', '17:00:00', workday: false)));
     }
 
     public function test_a_holiday_counts_the_whole_span_less_the_break_as_holiday(): void
@@ -148,7 +174,7 @@ class OvertimeCalculatorTest extends TestCase
         $this->assertSame([0, 0, 0, 480], $this->minutes($this->credit($request, self::MONDAY, '08:00:00', '17:00:00', holiday: true)));
     }
 
-    public function test_a_holiday_on_a_weekend_is_holiday(): void
+    public function test_a_holiday_on_a_saturday_is_holiday(): void
     {
         $request = $this->request(self::SATURDAY, '08:00', '17:00');
 
@@ -161,8 +187,8 @@ class OvertimeCalculatorTest extends TestCase
         $holiday = $this->request(self::MONDAY, '20:00', '01:00');
         $this->assertSame([0, 0, 0, 300], $this->minutes($this->credit($holiday, self::MONDAY, '19:55:00', '+1 01:00:00', holiday: true)));
 
-        $restDay = $this->request(self::SATURDAY, '20:00', '01:00');
-        $this->assertSame([0, 0, 300, 0], $this->minutes($this->credit($restDay, self::SATURDAY, '19:55:00', '+1 01:00:00', workday: false)));
+        $restDay = $this->request(self::SUNDAY, '20:00', '01:00');
+        $this->assertSame([0, 0, 300, 0], $this->minutes($this->credit($restDay, self::SUNDAY, '19:55:00', '+1 01:00:00', workday: false)));
     }
 
     public function test_half_day_leave_makes_only_time_outside_the_full_schedule_overtime(): void

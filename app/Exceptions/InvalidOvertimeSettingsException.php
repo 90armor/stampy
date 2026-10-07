@@ -13,6 +13,7 @@ use InvalidArgumentException;
  *   applies — holiday, then rest day, then night, then workday — so the
  *   precedence never pays less only while holiday ≥ rest day ≥ night ≥
  *   workday ≥ 100%.
+ * - a weekly rest day that isn't an ISO weekday (1–7).
  * - a TOIL block that isn't a whole number of half hours.
  * - a TOIL leave type that isn't earned (LeaveBalanceSource::Earned): TOIL is
  *   credited as adjustments, which only an earned balance is built from.
@@ -27,6 +28,11 @@ class InvalidOvertimeSettingsException extends InvalidArgumentException
     public static function ratesOutOfOrder(): self
     {
         return new self('Overtime rates must be ordered holiday ≥ rest day ≥ night ≥ workday ≥ 100%. Each minute counts in the first category that applies — holiday, then rest day, then night — and that precedence relies on this ordering never to pay less.');
+    }
+
+    public static function restDayNotAWeekday(): self
+    {
+        return new self('The weekly rest day must be an ISO weekday, 1 (Monday) to 7 (Sunday).');
     }
 
     public static function blockNotHalfHours(): self

@@ -510,6 +510,7 @@ Indexed on `(employee_id, date)` and `(status, current_step)`. **One active (non
 |---|---|---|
 | workday_rate_percent / night_rate_percent / rest_day_rate_percent / holiday_rate_percent | unsigned smallint | 150 / 200 / 200 / 200 |
 | night_starts / night_ends | time | 22:00 / 05:00 |
+| weekly_rest_day | unsigned tinyint | 7 (Sunday). Phase 4c's commit 0, alter-migration: the ISO weekday whose overtime is `rest_day`; 1–7. Editable — a change applies to days built afterwards, like the night window |
 | max_overtime_minutes_per_day | unsigned smallint | 120 |
 | max_work_minutes_per_day | unsigned smallint | 600 |
 | claim_window_days | unsigned smallint | 7 |
@@ -528,10 +529,10 @@ No schema change. Overtime is one more builder input, like approved leave in 3d:
 - **Both punches** are needed (rule 13): no `last_out`, nothing credited.
 - **The counted span** is [`first_in`, `last_out`] ∩ [`starts_at`, `ends_at`] — approval authorizes, punches decide, never more than approved. Intermediate punches aren't looked at (as for worked minutes): someone out 17:00–18:00 inside a 17:00–20:00 window is still credited from the day's first in to its last out.
 - **Workday** (a scheduled workday that isn't a holiday): the schedule's **full** window, `start_time`–`end_time`, is subtracted — not `ExpectedWindow`'s half-day shrink, so half-day leave doesn't make normal hours overtime (rule 12).
-- **Weekly rest day or holiday:** no normal window, so the whole span counts **less its overlap with the schedule's break window** (`break_start` + `break_minutes`, the half-day overlap rule; nothing without `break_start`). **Claude's decision, open to the owner's veto:** a Saturday worked 08:00–17:00 is 8 hours, not 9 — without it a full rest-day shift is credited an hour of lunch. On a workday the break lies inside the subtracted window anyway.
+- **A day with no scheduled hours** (a non-workday of the schedule — Saturday, Sunday — or a holiday): no normal window, so the whole span counts **less its overlap with the schedule's break window** (`break_start` + `break_minutes`, the half-day overlap rule; nothing without `break_start`). **Claude's decision, open to the owner's veto:** a Saturday worked 08:00–17:00 is 8 hours, not 9 — without it a full rest-day shift is credited an hour of lunch. On a workday the break lies inside the subtracted window anyway.
 - **Full-day approved leave** on the date: 0, with a warning naming the request (4c refuses such a request; this is a defence).
 - **No re-capping:** the approved window is the cap. The daily limits (2h / 10h) are checked at submission in 4c, where an admin can override them, and the builder must not undo an approved override.
-- **Categories**, each counted second in exactly one, by precedence: **holiday** (the work date is a holiday), **rest day** (the work date isn't a workday of `scheduleOn(date)`), **night** (the second itself falls in the settings' night window, on whichever calendar day — the window wraps midnight), **workday**. Holiday and rest day go by the **work date**, so 23:00–01:00 after a holiday is all holiday minutes (rule 11).
+- **Categories**, each counted second in exactly one, by precedence: **holiday** (the work date is a holiday), **rest day** (the work date's weekday is the settings' `weekly_rest_day`, Sunday — not every non-workday; a Saturday is `workday`/`night`, Phase 4c's commit 0), **night** (the second itself falls in the settings' night window, on whichever calendar day — the window wraps midnight), **workday**. Holiday and rest day go by the **work date**, so 23:00–01:00 after a holiday is all holiday minutes (rule 11).
 - **Truncation** — see "Overtime minutes truncate too" above.
 
 **The builder** loads the employee's approved requests **once per range** (`approvedOvertimeBetween()`, like `approvedLeavesBetween()`) and writes `overtime_request_id` and the four columns on every build — null and 0s without an approved request. **`buildDates()`** is now the one multi-date path: the `rebuild*()` methods, `attendance:build-daily` and a holiday change (`Holidays\Index`) all go through it. **`rebuildOvertimeDate($request)`** rebuilds a request's work date only (a decision changes no punch, so no neighbour's pairing), for 4c's approve and cancel; a punch change already rebuilds D-1..D+1.
@@ -878,9 +879,12 @@ Scoped 7 Oct 2026. Owner decisions are marked **(owner)**; the rest are recommen
    | Category | When | Rate |
    |---|---|---|
    | `holiday` | a public holiday | 200% |
-   | `rest_day` | a weekly rest day (a non-workday of the schedule) | 200% |
+   | `rest_day` | **the weekly rest day — Sunday** (`weekly_rest_day`) **(owner)** | 200% |
    | `night` | night hours, 22:00–05:00 | 200% |
-   | `workday` | any other overtime minute | 150% |
+   | `workday` | any other overtime minute — a Saturday's included | 150% |
+
+   - **Only the weekly rest day earns the rest-day premium (owner, corrected in Phase 4c's commit 0):** Saturday is a non-working day at 150%, Sunday the weekly rest day at 200%, as the law gives the premium to the weekly rest day only. A Saturday has no normal window either, so all its approved, punched time counts — as `workday`, or `night` after 22:00. A holiday still wins on any day, so a Saturday holiday is `holiday` (200%).
+   - **No separate Saturday column, on purpose:** if HR later wants a Saturday rate, it's a new category column plus a rebuild — cheap, because `daily_attendances` is derived.
 
    - **Fixed precedence: holiday > rest day > night > workday.** A night minute on a holiday is a holiday minute; a holiday on a weekend at night is a holiday minute, once — categories never stack.
    - A window crossing 22:00 or 05:00 is split by the minute: 21:00–23:00 on a workday is 1h `workday` and 1h `night`.
@@ -898,7 +902,7 @@ Scoped 7 Oct 2026. Owner decisions are marked **(owner)**; the rest are recommen
 ### Attendance integration
 
 8. **The builder computes overtime**, so it stays derived and recomputable. New columns on `daily_attendances`: `overtime_request_id` and one minutes column per category (rule 3) — `overtime_workday_minutes`, `overtime_night_minutes`, `overtime_rest_day_minutes`, `overtime_holiday_minutes`. Approving, cancelling, or correcting a punch rebuilds the day.
-9. **Outside the expected window** means outside `ExpectedWindow` for a workday. On a weekly rest day or holiday there is no expected window, so all approved, punched time counts (as `rest_day` or `holiday` minutes).
+9. **Outside the expected window** means outside `ExpectedWindow` for a workday. On a day with no scheduled hours — a non-workday of the schedule, or a holiday — there is no expected window, so all approved, punched time counts: `holiday` on a holiday, `rest_day` on the weekly rest day, otherwise `workday`/`night` (rule 3).
 10. **Early arrival** counts only if an approved window covers it. Arriving at 07:00 for an 08:00 schedule isn't overtime by itself.
 11. **Overnight:** overtime past midnight belongs to the work date of its in-punch, within the existing 18h pairing window. A window may end after midnight (e.g. 20:00–01:00).
 12. **Leave days:**
@@ -978,4 +982,5 @@ Verified:
 - Overtime on half-day leave days.
 - Whether overtime needs both approval steps or the manager alone.
 - TOIL carry-over cap (seeded 5 as a placeholder).
+- Sunday at 200% and Saturday at 150% as company policy (`weekly_rest_day` = Sunday), and a Saturday holiday at 200%.
 - Whether the break is subtracted from rest-day and holiday overtime (built that way, Claude's decision — Phase 4b).

@@ -94,13 +94,21 @@ class OvertimeBuilderTest extends TestCase
         $this->assertSame([null, 0, 0, 0, 0], $this->overtime($this->build('2026-02-03')));
     }
 
-    public function test_a_rest_day_and_a_holiday_come_from_the_schedule_and_the_holidays_table(): void
+    public function test_non_workdays_the_rest_day_and_a_holiday_come_from_the_schedule_settings_and_holidays(): void
     {
+        // Saturday: not a workday of the schedule, not the weekly rest day — workday minutes.
         $saturday = $this->request(self::SATURDAY, '08:00', '17:00');
         $this->punch(self::SATURDAY.' 07:55:00', 'in');
         $this->punch(self::SATURDAY.' 17:05:00', 'out');
 
-        $this->assertSame([$saturday->id, 0, 0, 480, 0], $this->overtime($this->build(self::SATURDAY)));
+        $this->assertSame([$saturday->id, 480, 0, 0, 0], $this->overtime($this->build(self::SATURDAY)));
+
+        // Sunday: the weekly rest day.
+        $sunday = $this->request('2026-02-08', '08:00', '17:00');
+        $this->punch('2026-02-08 08:00:00', 'in');
+        $this->punch('2026-02-08 17:00:00', 'out');
+
+        $this->assertSame([$sunday->id, 0, 0, 480, 0], $this->overtime($this->build('2026-02-08')));
 
         $monday = $this->request(self::MONDAY, '08:00', '17:00');
         $this->punch(self::MONDAY.' 08:00:00', 'in');
