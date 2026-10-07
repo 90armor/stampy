@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\LeaveBalanceSource;
 use App\Exceptions\InvalidOvertimeSettingsException;
+use App\Exceptions\OvertimeSettingsLockedException;
 use App\Exceptions\OvertimeSettingsRowException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,6 +21,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class OvertimeSettings extends Model
 {
+    /**
+     * Locked once a system TOIL adjustment exists (OvertimeSettingsLockedException):
+     * the reconciler recomputes from all-time minutes with these. Rates and the
+     * night window stay editable — rates only feed the report's arithmetic, and
+     * a new night window changes categories only for days built afterwards.
+     */
+    private const TOIL_FIELDS = ['toil_ratio_percent', 'toil_block_minutes', 'toil_leave_type_id'];
+
     /** Container key for current()'s per-request cache. */
     private const CURRENT = 'overtime.settings';
 
@@ -67,9 +76,17 @@ class OvertimeSettings extends Model
     protected static function booted(): void
     {
         // saving fires before creating, so the one-row check comes first here.
+        // The cache is dropped first: a save the checks refuse must not leave
+        // current() handing out an instance that holds the refused values.
         static::saving(function (self $settings) {
+            app()->forgetInstance(self::CURRENT);
+
             if (! $settings->exists && static::query()->exists()) {
                 throw OvertimeSettingsRowException::second();
+            }
+
+            if ($settings->exists && $settings->isDirty(self::TOIL_FIELDS) && self::toilCredited()) {
+                throw new OvertimeSettingsLockedException;
             }
 
             $settings->validate();
@@ -111,6 +128,12 @@ class OvertimeSettings extends Model
                 throw InvalidOvertimeSettingsException::toilTypeNotEarned($type->name);
             }
         }
+    }
+
+    /** Whether any system-authored TOIL adjustment exists — what locks TOIL_FIELDS. */
+    public static function toilCredited(): bool
+    {
+        return LeaveAdjustment::query()->whereNull('created_by')->whereNotNull('overtime_request_id')->exists();
     }
 
     /** The leave type TOIL is credited to (an earned one), if set. */
