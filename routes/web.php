@@ -15,6 +15,7 @@ use App\Models\Position;
 use App\Support\DashboardAttendance;
 use App\Support\EmployeeDashboard;
 use App\Support\EmployeeScope;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -114,10 +115,19 @@ Route::middleware(['auth', 'role:admin|manager'])->group(function () {
 });
 
 Route::middleware(['auth', 'role:admin'])->group(function () {
-    Route::get('/organization', function () {
+    // Structure only: Departments and Positions. Schedules and Holidays moved
+    // to Policies (owner decision, after Phase 4): an old bookmark to their
+    // Organization tab lands on the same tab there. Behind role:admin like
+    // before, so anyone else following one is still forbidden, not redirected.
+    Route::get('/organization', function (Request $request) {
+        if (in_array($request->query('tab'), ['schedules', 'holidays'], true)) {
+            return redirect()->route('policies.index', ['tab' => $request->query('tab')]);
+        }
+
         return view('organization');
     })->name('organization.index');
-    // Policy rather than structure (Phase 3e): Leave types now, OT rules in Phase 4.
+    // The rules attendance, leave and overtime are counted by (Phase 3e):
+    // Schedules, Holidays, Leave types, Overtime.
     Route::get('/policies', function () {
         return view('policies');
     })->name('policies.index');
