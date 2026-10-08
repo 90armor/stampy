@@ -267,6 +267,13 @@ class OvertimePageTest extends TestCase
             ->assertSee('Requested: Workday (150%) 1h 00m')
             ->assertSee("No out-punch: nothing would be credited until it's added.");
 
+        // The time-off line too: it describes the request, said so above the lower figure.
+        $this->modal()
+            ->set('date', '2026-06-12')->set('start_time', '17:00')->set('end_time', '18:00')->set('compensation', 'time_off')
+            ->call('review')
+            ->assertSee('Requested: adds 1h 00m toward time off in lieu')
+            ->assertSee('With your punches (out 5:08 PM), 8m would be credited.');
+
         // Punches that cover the whole window: the split is what will be credited, no prefix.
         $this->worked('2026-06-10', '08:00:00', '18:30:00');
         app(DailySummaryBuilder::class)->rebuildAround($this->employee, Carbon::parse('2026-06-10'));

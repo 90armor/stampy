@@ -278,7 +278,8 @@ class RequestModal extends Component
         $toil = null;
         if ($preview->toil !== null) {
             ['adds' => $adds, 'saved' => $saved, 'completes' => $completes] = $preview->toil;
-            $toil = 'Adds '.Duration::format($adds).' toward time off in lieu'
+            // Like the split: above a lower punch-based figure, it's the request's effect.
+            $toil = ($punchesDiffer ? 'Requested: adds ' : 'Adds ').Duration::format($adds).' toward time off in lieu'
                 .($saved > 0 || $completes > 0 ? ' ('
                     .($saved > 0 ? 'you have '.Duration::format($saved).' saved' : '')
                     .($saved > 0 && $completes > 0 ? ' — ' : '')
