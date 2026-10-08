@@ -64,11 +64,11 @@
         destination checks" note. --}}
         @can('create', \App\Models\WorkSchedule::class)
             <a
-                href="{{ route('organization.index') }}?tab=schedules"
+                href="{{ route('policies.index', ['tab' => 'schedules']) }}"
                 wire:navigate
                 class="inline-block rounded text-xs text-slate-500 underline decoration-slate-300 decoration-1 underline-offset-2 transition hover:text-primary-700 hover:decoration-primary-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:decoration-slate-600 dark:hover:text-primary-400"
             >
-                Moving more than one employee? Bulk reassign on the Schedules tab
+                Moving more than one employee? Bulk reassign in Policies → Schedules
             </a>
         @endcan
     </div>

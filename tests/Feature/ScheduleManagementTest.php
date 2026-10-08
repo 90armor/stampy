@@ -312,11 +312,11 @@ class ScheduleManagementTest extends TestCase
         $this->assertDatabaseMissing('work_schedules', ['name' => 'Direct Save']);
     }
 
-    public function test_employee_role_cannot_reach_the_organization_route_at_all(): void
+    public function test_employee_role_cannot_reach_the_policies_route_at_all(): void
     {
         $employee = User::factory()->create()->assignRole('employee');
 
-        $this->actingAs($employee)->get('/organization')->assertForbidden();
+        $this->actingAs($employee)->get('/policies?tab=schedules')->assertForbidden();
     }
 
     public function test_bulk_reassign_moves_everyone_on_one_schedule_to_another(): void

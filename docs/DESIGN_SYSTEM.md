@@ -53,7 +53,7 @@ This document is the source of truth for Stampy's visual interface. It records c
 
 **Muted text rule, measured.** Readable muted text depends on what it sits on; light `slate-400` (and dark `slate-500`) are for decorative icons only.
 - **Light, on a white card:** `text-slate-500` — 4.80:1 on white, 4.59:1 on a `slate-50` row hover.
-- **Light, on the `slate-100` page background or a tinted fill:** `text-slate-600` — 6.99:1 on the page (page subtitles, "Back to …" links, inactive Organization tabs, section intros, the employee header line), at least 6.96:1 on the calendar's exception fills (`red`/`violet`/`blue`/`fuchsia`/`accent-50`), where `slate-500` measured 4.37–4.47:1 and `slate-500` on the page 4.40:1.
+- **Light, on the `slate-100` page background or a tinted fill:** `text-slate-600` — 6.99:1 on the page (page subtitles, "Back to …" links, inactive section tabs, section intros, the employee header line), at least 6.96:1 on the calendar's exception fills (`red`/`violet`/`blue`/`fuchsia`/`accent-50`), where `slate-500` measured 4.37–4.47:1 and `slate-500` on the page 4.40:1.
 - **Dark, everywhere:** `text-slate-400` — 5.81:1 on the card, 4.90:1 on overlays and controls (`slate-750`), 5.28:1 on a hovered row, 6.91:1 on the page, at least 4.90:1 on the calendar's `900/20` fills.
 - **The time's AM/PM suffix** (`<x-time>`) is readable text too: it takes these colours, not a lowered opacity — `text-slate-600 dark:text-slate-400` (the light value works on cards, tints and the page alike), while a marked time's suffix keeps its amber (at least 4.58:1 / 8.71:1). At 70% opacity it measured 2.6–4.3:1.
 - Disabled controls (the sidebar's "Soon" items, a disabled button) are exempt from the contrast minimum and keep their quieter tones (a Phase 5 item). Decorative marks that carry no information — the table em-dash, a day outside the shown month, a disabled picker option — may use `slate-300`.
@@ -265,6 +265,8 @@ Keep touch targets at least 44px high for primary auth controls and small-screen
 ## Navigation
 
 The desktop sidebar is fixed-width at `242px`; the topbar is sticky. Both are shell surfaces and may remain glass. Active navigation uses a primary tint, primary text/icon, and a persistent leading marker. Mobile navigation is a modal drawer with a dismissible backdrop. Breadcrumbs collapse nonessential ancestors at small widths.
+
+**Section tabs** (Organization, Policies) are one component, `<x-tab-bar>`: an underline bar of buttons whose state is the page's `tab` (`?tab=` opens one; anything unknown falls back to the first). On a phone the bar runs to the screen edges and scrolls sideways rather than wrapping or clipping: the active tab is scrolled into view on load and on every change, clear of the fade (`scroll-px-10`), and an edge **fades out while more tabs lie beyond it** — a mask, not an overlay, so it fades to whatever backdrop is behind it (`.tab-bar-scroller`, `tabBar` in `resources/js/app.js`). Inactive tabs are `text-slate-600` (the page-background muted rule), the active one primary with a primary underline; the focus ring is inset, so neither the scroll container nor the fade clips it. Never hand-roll another tab nav (`TabBarTest`).
 
 Navigation visibility must match destination authorization. UI hiding is presentation only and never replaces route middleware or policy checks.
 

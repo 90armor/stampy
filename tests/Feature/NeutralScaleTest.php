@@ -158,9 +158,9 @@ class NeutralScaleTest extends TestCase
                 }
             }
         }
-        // Sections laid directly on the page: Organization's tabs and each tab's intro.
-        $organization = File::get(resource_path('views/organization.blade.php'));
-        $this->assertStringNotContainsString("font-medium text-slate-500 hover:border-slate-border", $organization);
+        // Sections laid directly on the page: the section tabs (Organization, Policies) and each tab's intro.
+        $tabBar = File::get(resource_path('views/components/tab-bar.blade.php'));
+        $this->assertStringContainsString("font-medium text-slate-600 hover:border-slate-border", $tabBar);
         foreach (['departments', 'positions', 'holidays', 'schedules'] as $tab) {
             $view = File::get(resource_path("views/livewire/{$tab}/index.blade.php"));
             $this->assertMatchesRegularExpression('/<h2\b[^>]*>.*?<\/h2>\s*<p class="mt-1 text-sm text-slate-600 dark:text-slate-400">/s', $view, "{$tab} intro");

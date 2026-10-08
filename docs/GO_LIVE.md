@@ -24,7 +24,7 @@ php artisan db:seed --class=WorkScheduleSeeder --force # "Default", Mon–Fri 08
 
 Departments, positions and holidays are entered in the app (step 3), not seeded: `DepartmentSeeder` and `PositionSeeder` are sample names.
 
-## 3. The first admin, then the organization
+## 3. The first admin, then the organization and working time
 
 There is no sign-up. Create the first admin from tinker (`php artisan tinker`), then change the password at first login:
 
@@ -39,8 +39,8 @@ If this admin will also take leave, link them to an employee record (step 6). An
 Then, as that admin:
 
 - **Organization → Departments and Positions:** the real ones.
-- **Organization → Schedules:** the company's working hours. **Every schedule needs "Break starts" set**, or half-day leave is refused on it. "Break starts" is the morning/afternoon boundary, 12:00 on the seeded Default. A schedule's hours lock once anyone is assigned to it, so get them right before adding employees.
-- **Organization → Holidays:** this year's public holidays. The Khmer-calendar ones (Khmer New Year, Pchum Ben, the Water Festival) are announced each year and have to be entered by hand.
+- **Policies → Schedules:** the company's working hours. **Every schedule needs "Break starts" set**, or half-day leave is refused on it. "Break starts" is the morning/afternoon boundary, 12:00 on the seeded Default. A schedule's hours lock once anyone is assigned to it, so get them right before adding employees.
+- **Policies → Holidays:** this year's public holidays. The Khmer-calendar ones (Khmer New Year, Pchum Ben, the Water Festival) are announced each year and have to be entered by hand.
 
 ## 4. Leave types
 

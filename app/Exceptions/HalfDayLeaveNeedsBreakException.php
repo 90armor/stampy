@@ -10,8 +10,9 @@ use RuntimeException;
  * and the builder could only treat it as an ordinary day (a punchless PM-leave
  * morning would build as absent). Refused before anything is written
  * (EmployeeScheduleAssigner, Employees\ScheduleAssignments::deleteAssignment()).
- * The fix is to set "Break starts" on that schedule first — allowed even on a
- * locked one, once.
+ * The fix is to set "Break starts" on that schedule first (Policies →
+ * Schedules) — allowed even on a locked one, once. Only admins change
+ * assignments, so the message names where.
  */
 class HalfDayLeaveNeedsBreakException extends RuntimeException
 {
@@ -22,7 +23,7 @@ class HalfDayLeaveNeedsBreakException extends RuntimeException
     {
         parent::__construct(
             "Schedule \"{$scheduleName}\" has no break time set, so it can't take half-day leave — and this change would put "
-            .implode('; ', $leaves).' on it. Set "Break starts" on that schedule first.'
+            .implode('; ', $leaves).' on it. Set "Break starts" on that schedule in Policies → Schedules first.'
         );
     }
 }
