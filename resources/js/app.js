@@ -38,6 +38,45 @@ document.addEventListener('alpine:init', () => {
             el.classList.toggle('table-pin-overflowing', el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
         },
     }));
+
+    // A page's section tabs (<x-tab-bar>, put on its scroll container). Fades
+    // whichever edge has more tabs beyond it (.tab-bar-scroller in
+    // resources/css/app.css), and keeps the active tab — the page's `tab` —
+    // in view: on load, and whenever it changes. Scrolls only this container,
+    // never the page (scrollIntoView could move the page vertically too).
+    window.Alpine.data('tabBar', () => ({
+        init() {
+            this.observer = new ResizeObserver(() => this.measure());
+            this.observer.observe(this.$el);
+            this.observer.observe(this.$el.firstElementChild);
+            this.$nextTick(() => this.reveal());
+            this.$watch('tab', () => this.$nextTick(() => this.reveal()));
+        },
+        destroy() {
+            this.observer?.disconnect();
+        },
+        reveal() {
+            const el = this.$el;
+            const active = el.querySelector('[aria-current="page"]');
+            if (active) {
+                // The scroll-padding (scroll-px-10) keeps it clear of the fade.
+                const padding = parseFloat(getComputedStyle(el).scrollPaddingLeft) || 0;
+                const start = active.offsetLeft - padding;
+                const end = active.offsetLeft + active.offsetWidth + padding;
+                if (start < el.scrollLeft) {
+                    el.scrollLeft = start;
+                } else if (end > el.scrollLeft + el.clientWidth) {
+                    el.scrollLeft = end - el.clientWidth;
+                }
+            }
+            this.measure();
+        },
+        measure() {
+            const el = this.$el;
+            el.classList.toggle('tab-bar-more-before', el.scrollLeft > 1);
+            el.classList.toggle('tab-bar-more-after', el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+        },
+    }));
 });
 
 // Date picker (docs/ATTENDANCE_UI.md, "Date picker"). One component, two modes,

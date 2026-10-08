@@ -183,3 +183,21 @@ input:-webkit-autofill:focus {
         opacity: 1;
     }
 }
+
+/* Section tabs (<x-tab-bar>): while more tabs lie beyond an edge of the bar,
+   that edge fades out, so a phone shows the bar scrolls instead of simply
+   clipping a tab. A mask, not a gradient overlay, so it fades to whatever is
+   behind it — the shell's backdrop isn't one flat colour. tabBar in
+   resources/js/app.js sets the two classes; with neither, the mask is solid. */
+.tab-bar-scroller {
+    --tab-fade-before: 0px;
+    --tab-fade-after: 0px;
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--tab-fade-before), #000 calc(100% - var(--tab-fade-after)), transparent);
+    mask-image: linear-gradient(to right, transparent, #000 var(--tab-fade-before), #000 calc(100% - var(--tab-fade-after)), transparent);
+}
+.tab-bar-more-before {
+    --tab-fade-before: 2.5rem;
+}
+.tab-bar-more-after {
+    --tab-fade-after: 2.5rem;
+}
