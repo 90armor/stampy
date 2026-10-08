@@ -128,7 +128,7 @@ class EmployeeScheduleAssignmentsComponentTest extends TestCase
 
     public function test_admin_sees_a_bulk_reassign_hint_but_a_manager_does_not(): void
     {
-        // The hint links to the Schedules tab, which is
+        // The hint links to Policies → Schedules, which is
         // WorkSchedulePolicy::create (admin-only) — same ability
         // Schedules\Index::openBulkReassign() itself checks, so nobody who
         // can't actually reach it is shown a link to it.
@@ -136,8 +136,8 @@ class EmployeeScheduleAssignmentsComponentTest extends TestCase
 
         Livewire::actingAs($this->admin())
             ->test(ScheduleAssignments::class, ['employee' => $employee])
-            ->assertSee('Bulk reassign on the Schedules tab')
-            ->assertSeeHtml('organization?tab=schedules');
+            ->assertSee('Bulk reassign in Policies → Schedules')
+            ->assertSeeHtml('href="'.route('policies.index', ['tab' => 'schedules']).'"');
 
         $managerEmployee = Employee::factory()->create();
         $manager = $this->managerUser($managerEmployee);
@@ -145,7 +145,7 @@ class EmployeeScheduleAssignmentsComponentTest extends TestCase
 
         Livewire::actingAs($manager)
             ->test(ScheduleAssignments::class, ['employee' => $report])
-            ->assertDontSee('Bulk reassign on the Schedules tab');
+            ->assertDontSee('Bulk reassign in Policies → Schedules');
     }
 
     public function test_current_schedule_is_presented_before_assignment_history(): void

@@ -182,7 +182,7 @@ class HolidayManagementTest extends TestCase
         $manager = User::factory()->create()->assignRole('manager');
 
         $this->actingAs($manager)
-            ->get(route('organization.index'))
+            ->get(route('policies.index', ['tab' => 'holidays']))
             ->assertForbidden();
     }
 
