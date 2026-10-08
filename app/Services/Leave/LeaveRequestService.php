@@ -501,8 +501,14 @@ class LeaveRequestService
                 $add('half', "{$type->name} leave can't be taken as a half day.");
             } elseif (! $start->eq($end)) {
                 $add('half', 'A half day covers a single date.');
-            } elseif ($employee->scheduleOn($start)->break_start === null) {
-                $add('half', "{$employee->full_name}'s schedule on ".DisplayDate::compact($start).' has no break time set, so the day can\'t be split into halves.');
+            } elseif (($schedule = $employee->scheduleOn($start))->break_start === null) {
+                // The fix is an admin's (Policies → Schedules), so only an admin
+                // is told how; anyone else is told whom to ask.
+                $own = (bool) $actor->employee?->is($employee);
+                $add('half', $actor->hasRole('admin')
+                    ? ($own ? 'Your' : "{$employee->full_name}'s").' schedule on '.DisplayDate::compact($start).' has no break time set, so the day can\'t be split into halves. '
+                        ."Set \"Break starts\" on the {$schedule->name} schedule in Policies → Schedules first."
+                    : 'Half-day leave isn\'t available on '.($own ? 'your' : 'this employee\'s').' schedule yet. Ask HR to set it up.');
             }
         }
 

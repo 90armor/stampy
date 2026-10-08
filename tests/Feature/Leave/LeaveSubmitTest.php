@@ -267,9 +267,28 @@ class LeaveSubmitTest extends TestCase
 
         $errors = $this->refused(fn () => $this->submit('2026-06-22', '2026-06-22', half: LeaveHalf::Pm, employee: $this->employee->fresh()));
 
-        $this->assertSame(["Employee's schedule on Mon 22 Jun has no break time set, so the day can't be split into halves."], $errors['half']);
+        // Only an admin can fix it, so only an admin is told how.
+        $this->assertSame(["Half-day leave isn't available on your schedule yet. Ask HR to set it up."], $errors['half']);
+        $errors = $this->refused(fn () => $this->submit('2026-06-22', '2026-06-22', half: LeaveHalf::Pm, employee: $this->employee->fresh(), actor: $this->admin));
+        $this->assertSame(["Employee's schedule on Mon 22 Jun has no break time set, so the day can't be split into halves. Set \"Break starts\" on the No break schedule in Policies → Schedules first."], $errors['half']);
         // The week before, on the old schedule, is fine.
         $this->assertSame(LeaveHalf::Pm, $this->submit('2026-06-19', '2026-06-19', half: LeaveHalf::Pm, employee: $this->employee->fresh())->half);
+    }
+
+    public function test_the_missing_break_message_suits_whoever_files_their_own_half_day(): void
+    {
+        $noBreak = WorkSchedule::factory()->create(['name' => 'No break', 'break_minutes' => 0]);
+        $manager = $this->person('Second Manager', 'manager');
+        $admin = $this->person('Staff Admin', 'admin');
+        foreach ([$manager, $admin] as $person) {
+            $person->scheduleAssignments()->create(['work_schedule_id' => $noBreak->id, 'effective_from' => '2026-06-22']);
+        }
+
+        $errors = $this->refused(fn () => $this->submit('2026-06-22', '2026-06-22', half: LeaveHalf::Am, employee: $manager->fresh()));
+        $this->assertSame(["Half-day leave isn't available on your schedule yet. Ask HR to set it up."], $errors['half']);
+
+        $errors = $this->refused(fn () => $this->submit('2026-06-22', '2026-06-22', half: LeaveHalf::Am, employee: $admin->fresh()));
+        $this->assertSame(["Your schedule on Mon 22 Jun has no break time set, so the day can't be split into halves. Set \"Break starts\" on the No break schedule in Policies → Schedules first."], $errors['half']);
     }
 
     // ── Cost ───────────────────────────────────────────────────────────

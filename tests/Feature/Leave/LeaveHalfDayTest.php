@@ -256,7 +256,7 @@ class LeaveHalfDayTest extends TestCase
         } catch (HalfDayLeaveNeedsBreakException $e) {
             $this->assertStringContainsString('Schedule "No break" has no break time set', $e->getMessage());
             $this->assertStringContainsString('pending half day on Mon 22 Jun (AM)', $e->getMessage());
-            $this->assertStringContainsString('Set "Break starts" on that schedule first.', $e->getMessage());
+            $this->assertStringContainsString('Set "Break starts" on that schedule in Policies → Schedules first.', $e->getMessage());
         }
 
         $this->assertSame(1, $this->employee->scheduleAssignments()->count());
@@ -277,6 +277,7 @@ class LeaveHalfDayTest extends TestCase
             $this->fail('The bulk move must be refused.');
         } catch (HalfDayLeaveNeedsBreakException $e) {
             $this->assertStringContainsString('approved half day on Mon 22 Jun (PM)', $e->getMessage());
+            $this->assertStringContainsString('in Policies → Schedules first.', $e->getMessage());
         }
 
         $this->assertSame(0, EmployeeWorkSchedule::where('work_schedule_id', $noBreak->id)->count());
