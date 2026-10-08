@@ -3,8 +3,10 @@
 namespace App\Console\Commands;
 
 use App\Exceptions\NoScheduleAssignmentException;
+use App\Models\DailyAttendance;
 use App\Models\Employee;
 use App\Services\Attendance\DailySummaryBuilder;
+use App\Services\Overtime\TimeOffInLieuReconciler;
 use App\Support\StrictDate;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
@@ -21,7 +23,7 @@ class AttendanceBuildDailyCommand extends Command
 
     protected $description = 'Recompute daily_attendances from attendance_logs. Defaults to yesterday and today.';
 
-    public function handle(DailySummaryBuilder $builder): int
+    public function handle(DailySummaryBuilder $builder, TimeOffInLieuReconciler $reconciler): int
     {
         [$from, $to] = $this->resolveRange();
 
@@ -35,6 +37,11 @@ class AttendanceBuildDailyCommand extends Command
             return self::FAILURE;
         }
 
+        // Time off in lieu is reconciled for everyone built here who has any
+        // time-off overtime, changed or not (Phase 4b): idempotent, so this is
+        // how the scheduled runs heal a reconciliation that failed earlier.
+        $toilEmployees = $reconciler->employeesWithTimeOffOvertime($employees->pluck('id')->all());
+
         $created = 0;
         $updated = 0;
         $notEmployed = 0;
@@ -45,25 +52,25 @@ class AttendanceBuildDailyCommand extends Command
             // join_date is the only hire/start-date column on employees —
             // don't build days before someone was hired.
             $date = $employee->join_date->gt($from) ? $employee->join_date->copy() : $from->copy();
-            // Once per employee for the whole run, not per day (Phase 3d).
-            $leaves = $builder->approvedLeavesBetween($employee, $date, $to);
 
             try {
-                while ($date->lte($to)) {
-                    $row = $builder->build($employee, $date, $leaves);
-                    $date = $date->copy()->addDay();
-
+                // Leaves and overtime are loaded once per employee for the whole run, not per day (Phase 3d, 4b).
+                $builder->buildDates($employee, $date, $to, reconcile: false, each: function (?DailyAttendance $row) use (&$notEmployed, &$created, &$updated, &$byStatus) {
                     // After left_on: the builder removed any row instead.
                     if ($row === null) {
                         $notEmployed++;
 
-                        continue;
+                        return;
                     }
 
                     $row->wasRecentlyCreated ? $created++ : $updated++;
 
                     $statusValue = $row->status->value;
                     $byStatus[$statusValue] = ($byStatus[$statusValue] ?? 0) + 1;
+                });
+
+                if (in_array($employee->id, $toilEmployees, true)) {
+                    $builder->reconcileToil($employee);
                 }
             } catch (NoScheduleAssignmentException) {
                 // Caught per employee, not around the whole loop: one
@@ -88,6 +95,10 @@ class AttendanceBuildDailyCommand extends Command
 
         foreach ($byStatus as $status => $count) {
             $this->line("  {$status}: {$count}");
+        }
+
+        if (($unconfigured = $builder->reportToil()) > 0) {
+            $this->warn("{$unconfigured} employee(s) have time-off overtime but no TOIL leave type is set (overtime_settings.toil_leave_type_id) — nothing was credited.");
         }
 
         if ($skipped !== []) {

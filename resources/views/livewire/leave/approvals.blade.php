@@ -7,7 +7,7 @@
 <div class="space-y-6">
     <div>
         <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Approvals</h1>
-        <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">Leave requests waiting for a decision.</p>
+        <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">Leave and overtime requests waiting for a decision.</p>
     </div>
 
     @if ($notice)
@@ -19,7 +19,7 @@
 
     @if ($nothing)
         <x-card>
-            <x-empty-state icon="inbox" title="Nothing waiting for you" description="Leave requests that need your decision appear here." />
+            <x-empty-state icon="inbox" title="Nothing waiting for you" description="Leave and overtime requests that need your decision appear here." />
         </x-card>
     @else
         @if ($stepOne !== [] || ! $isAdmin)
@@ -33,7 +33,7 @@
                 @else
                     <ul class="mt-3">
                         @foreach ($stepOne as $item)
-                            @include('livewire.leave.partials.approval-item', ['item' => $item])
+                            @include($item['type'] === 'overtime' ? 'livewire.leave.partials.approval-overtime-item' : 'livewire.leave.partials.approval-item', ['item' => $item])
                         @endforeach
                     </ul>
                 @endif
@@ -51,7 +51,7 @@
                 @else
                     <ul class="mt-3">
                         @foreach ($stepTwo as $item)
-                            @include('livewire.leave.partials.approval-item', ['item' => $item])
+                            @include($item['type'] === 'overtime' ? 'livewire.leave.partials.approval-overtime-item' : 'livewire.leave.partials.approval-item', ['item' => $item])
                         @endforeach
                     </ul>
                 @endif
@@ -71,7 +71,7 @@
                     @if ($showOverrides)
                         <ul class="border-t border-slate-divider">
                             @foreach ($overrides as $item)
-                                @include('livewire.leave.partials.approval-item', ['item' => $item])
+                                @include($item['type'] === 'overtime' ? 'livewire.leave.partials.approval-overtime-item' : 'livewire.leave.partials.approval-item', ['item' => $item])
                             @endforeach
                         </ul>
                     @endif
@@ -84,14 +84,50 @@
         <x-modal name="leave-decision-modal" :show="true" entangle="showDecision" backdrop="bg-slate-900/50" maxWidth="md" panelClass="mt-6 sm:mt-16">
             <form wire:submit="decide">
                 <div class="mx-4 border-b border-slate-divider py-4 sm:mx-6 sm:py-5">
-                    <h3 class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ $decision === 'reject' ? 'Reject' : 'Approve' }} {{ $deciding->employee->full_name }}'s {{ $deciding->leaveType->name }} leave</h3>
+                    <h3 class="text-base font-semibold text-slate-900 dark:text-slate-100">
+                        {{ $decision === 'reject' ? 'Reject' : 'Approve' }} {{ $deciding->employee->full_name }}'s
+                        {{ $deciding instanceof \App\Models\OvertimeRequest ? 'overtime on '.$deciding->displayDateAndWindow() : $deciding->leaveType->name.' leave' }}
+                    </h3>
                 </div>
                 <div class="space-y-4 px-4 py-4 sm:px-6">
                     @if ($decision === 'approve' && $decidesBoth)
                         <p class="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
                             <x-icon name="info" class="mt-0.5 h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" />
-                            <span>As an admin acting at the manager's step, approving completes both steps — the leave is approved straight away.</span>
+                            <span>As an admin acting at the manager's step, approving completes both steps — the request is approved straight away.</span>
                         </p>
+                    @endif
+                    @if ($deciding instanceof \App\Models\OvertimeRequest && $decision === 'approve')
+                        <div>
+                            <x-input-label for="decision_compensation" value="Compensation" />
+                            <x-select id="decision_compensation" wire:model="compensation">
+                                <option value="pay">Pay</option>
+                                @if ($timeOffOffered || $compensation === 'time_off')
+                                    <option value="time_off">Time off in lieu</option>
+                                @endif
+                            </x-select>
+                            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Requested as {{ strtolower($deciding->compensation->label()) }}. A change is noted on your decision.</p>
+                            <x-input-error :messages="$errors->get('compensation')" class="mt-1" />
+                        </div>
+                        @if ($limitProblems !== [])
+                            <div class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-200 dark:ring-amber-500/30">
+                                <p class="font-medium">Over the daily limit</p>
+                                <ul class="mt-1 space-y-0.5">
+                                    @foreach ($limitProblems as $problem)
+                                        <li>{{ $problem }}</li>
+                                    @endforeach
+                                </ul>
+                                @unless ($needsOverride)
+                                    <p class="mt-1">You can approve it; the admin decides at the next step.</p>
+                                @endunless
+                            </div>
+                            @if ($needsOverride)
+                                <div>
+                                    <x-input-label for="decision_override" value="Reason to go over the limit" />
+                                    <x-textarea id="decision_override" rows="2" maxlength="1000" wire:model="override_reason">{{ $override_reason }}</x-textarea>
+                                    <x-input-error :messages="array_merge($errors->get('limit_override_reason'), $errors->get('overtime'))" class="mt-1" />
+                                </div>
+                            @endif
+                        @endif
                     @endif
                     <div>
                         <x-input-label for="decision_note" :value="$decision === 'reject' ? 'Reason for rejecting' : 'Note (optional)'" />

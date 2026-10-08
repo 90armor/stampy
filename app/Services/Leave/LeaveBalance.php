@@ -24,6 +24,17 @@ use Carbon\CarbonImmutable;
  * the eligibility year's whole remainder carries over uncapped (its grant can
  * arrive with weeks left to use it); the cap applies from the next year on.
  * The chain stops at the first year with no grant.
+ *
+ * An earned type (LeaveBalanceSource::Earned — Time off in lieu) has no grant:
+ * its balance is its adjustments. What overtime earned — the system-posted
+ * ones (created_by null, overtime_request_id set) — is shown as its
+ * entitlement ("earned from overtime", Phase 4d), and adjustments keeps only
+ * the rest (an admin's corrections), so a posted half day doesn't read as a
+ * manual HR change; available() is the same either way. Its carry-over
+ * chain can't stop at "no grant", since there never is one; it runs back to
+ * the employee's first year with an adjustment, and every year after it
+ * carries min(cap, what was left) — a quiet year included, so nothing lapses
+ * that no one configured to lapse (owner, Phase 4a).
  */
 class LeaveBalance
 {
@@ -34,11 +45,11 @@ class LeaveBalance
 
     public function for(Employee $employee, LeaveType $type, int $year): Balance
     {
-        if ($type->days_per_year === null) {
+        if (! $type->hasBalance()) {
             return new Balance($type, $year, hasBalance: false);
         }
 
-        $entitlements = LeaveEntitlement::query()
+        $entitlements = ! $type->isGrantedYearly() ? [] : LeaveEntitlement::query()
             ->where('employee_id', $employee->id)
             ->where('leave_type_id', $type->id)
             ->get()
@@ -61,13 +72,22 @@ class LeaveBalance
         $used = $approved[$year] ?? 0;
         $usedFromCarry = min($used, $carriedIn);
 
+        // An earned type: this year's system-posted days are its entitlement.
+        $earned = ! $type->balance_source->isEarned() ? 0 : LeaveDays::fromDecimal((string) LeaveAdjustment::query()
+            ->where('employee_id', $employee->id)
+            ->where('leave_type_id', $type->id)
+            ->where('year', $year)
+            ->whereNull('created_by')
+            ->whereNotNull('overtime_request_id')
+            ->sum('days'));
+
         return new Balance(
             type: $type,
             year: $year,
             hasBalance: true,
-            entitled: $entitlements[$year] ?? 0,
+            entitled: ($entitlements[$year] ?? 0) + $earned,
             carriedIn: $carriedIn,
-            adjustments: $adjustments[$year] ?? 0,
+            adjustments: ($adjustments[$year] ?? 0) - $earned,
             used: $used,
             pending: $pending[$year] ?? 0,
             usedFromCarry: $usedFromCarry,
@@ -131,12 +151,16 @@ class LeaveBalance
      */
     private function carriedInto(int $year, LeaveType $type, array $entitlements, array $adjustments, array $approved, CarbonImmutable $eligibleOn): int
     {
-        if ($type->carry_over_cap === null || ! isset($entitlements[$year - 1])) {
+        $previous = $year - 1;
+        $inChain = $type->isGrantedYearly()
+            ? isset($entitlements[$previous])
+            : $adjustments !== [] && $previous >= min(array_keys($adjustments));
+
+        if ($type->carry_over_cap === null || ! $inChain) {
             return 0;
         }
 
-        $previous = $year - 1;
-        $left = max(0, $entitlements[$previous]
+        $left = max(0, ($entitlements[$previous] ?? 0)
             + $this->carriedInto($previous, $type, $entitlements, $adjustments, $approved, $eligibleOn)
             + ($adjustments[$previous] ?? 0)
             - ($approved[$previous] ?? 0));

@@ -1,6 +1,7 @@
 {{-- The balance table for one employee and year — Time off and the
 employee profile's Leave card (Phase 3e). $balanceRows: list of
-['type' => LeaveType, 'balance' => Balance, 'earnedSoFar' => ?int]. --}}
+['type' => LeaveType, 'balance' => Balance, 'earnedSoFar' => ?int,
+'toilRemainder' => ?int (Time off in lieu's saved minutes, Phase 4d)]. --}}
 @php
     use App\Support\DisplayDate;
     use App\Support\LeaveDays;
@@ -12,6 +13,8 @@ employee profile's Leave card (Phase 3e). $balanceRows: list of
         .($row['earnedSoFar'] !== null ? ' · '.LeaveDays::label($row['earnedSoFar']).' earned so far' : '');
     // A leaver's last year: the allowance pro-rated to their last day (EntitlementCalculator::earnedToLastDay()).
     $earnedLine = fn ($balance) => $balance->earnedToLastDay !== null ? 'Earned to last day: '.LeaveDays::label($balance->earnedToLastDay) : null;
+    // Time off in lieu: the overtime saved below a full half day (TimeOffInLieuReconciler::remainderMinutes()).
+    $toilLine = fn ($row) => ($row['toilRemainder'] ?? 0) > 0 ? \App\Support\Duration::format($row['toilRemainder']).' toward the next half day' : null;
 @endphp
 
 @if ($balanceRows === [])
@@ -31,11 +34,14 @@ employee profile's Leave card (Phase 3e). $balanceRows: list of
                 @if ($earnedLine($balance))
                     <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $earnedLine($balance) }}</p>
                 @endif
+                @if ($toilLine($row))
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $toilLine($row) }}</p>
+                @endif
                 @if ($balance->usableFrom !== null)
                     <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $usableLine($balance, $row) }}</p>
                 @else
                     <dl class="mt-2 grid grid-cols-4 gap-x-3 gap-y-2 text-xs">
-                        @foreach (array_filter(['Entitled' => $balance->entitled, 'Carried' => $balance->carriedIn, 'Adjustments' => $showAdjustments ? $balance->adjustments : null, 'Used' => $balance->used, 'Pending' => $balance->pending], fn ($value) => $value !== null) as $label => $value)
+                        @foreach (array_filter([($row['type']->balance_source->isEarned() ? 'Earned from overtime' : 'Entitled') => $balance->entitled, 'Carried' => $balance->carriedIn, 'Adjustments' => $showAdjustments ? $balance->adjustments : null, 'Used' => $balance->used, 'Pending' => $balance->pending], fn ($value) => $value !== null) as $label => $value)
                             <div>
                                 <dt class="text-slate-500 dark:text-slate-400">{{ $label }}</dt>
                                 <dd class="tabular-nums text-sm text-slate-900 dark:text-slate-100">{{ LeaveDays::format($value) }}</dd>
@@ -70,6 +76,9 @@ employee profile's Leave card (Phase 3e). $balanceRows: list of
                             @if ($earnedLine($balance))
                                 <span class="block text-xs font-normal text-slate-500 dark:text-slate-400">{{ $earnedLine($balance) }}</span>
                             @endif
+                            @if ($toilLine($row))
+                                <span class="block text-xs font-normal text-slate-500 dark:text-slate-400">{{ $toilLine($row) }}</span>
+                            @endif
                         </td>
                         @if ($balance->usableFrom !== null)
                             <td colspan="{{ $showAdjustments ? 6 : 5 }}" class="px-6 py-4 text-right text-slate-500 dark:text-slate-400">
@@ -77,7 +86,11 @@ employee profile's Leave card (Phase 3e). $balanceRows: list of
                                 @unless ($loop->last)<span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-divider"></span>@endunless
                             </td>
                         @else
-                            <td class="px-3 py-4 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ LeaveDays::format($balance->entitled) }}</td>
+                            <td class="px-3 py-4 text-right tabular-nums text-slate-700 dark:text-slate-300">
+                                {{ LeaveDays::format($balance->entitled) }}
+                                {{-- Time off in lieu: what overtime earned, not a yearly grant. --}}
+                                @if ($row['type']->balance_source->isEarned())<span class="block text-xs text-slate-500 dark:text-slate-400">earned from overtime</span>@endif
+                            </td>
                             <td class="px-3 py-4 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ LeaveDays::format($balance->carriedIn) }}</td>
                             @if ($showAdjustments)<td class="px-3 py-4 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ LeaveDays::format($balance->adjustments) }}</td>@endif
                             <td class="px-3 py-4 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ LeaveDays::format($balance->used) }}</td>

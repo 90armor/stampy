@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Leave;
 
+use App\Enums\LeaveBalanceSource;
 use App\Models\Employee;
 use App\Models\LeaveType;
 use App\Services\Leave\EntitlementCalculator;
@@ -125,7 +126,7 @@ class EntitlementCalculatorTest extends TestCase
 
     public function test_a_type_without_a_yearly_balance_grants_nothing(): void
     {
-        $unpaid = new LeaveType(['name' => 'Unpaid', 'days_per_year' => null]);
+        $unpaid = new LeaveType(['name' => 'Unpaid', 'balance_source' => LeaveBalanceSource::None, 'days_per_year' => null]);
 
         $entitlement = $this->calculator->forYear($this->joined('2020-01-01'), $unpaid, 2026);
 

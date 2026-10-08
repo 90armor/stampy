@@ -6,10 +6,9 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Position;
 use App\Models\User;
-use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
-class EmployeeSeeder extends Seeder
+class EmployeeSeeder extends DemoSeeder
 {
     public function run(): void
     {

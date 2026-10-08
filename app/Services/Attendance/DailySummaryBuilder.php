@@ -4,17 +4,23 @@ namespace App\Services\Attendance;
 
 use App\Enums\AttendanceStatus;
 use App\Enums\LeaveStatus;
+use App\Enums\OvertimeCompensation;
+use App\Enums\OvertimeStatus;
 use App\Enums\PunchType;
 use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
 use App\Models\Employee;
 use App\Models\Leave;
+use App\Models\OvertimeRequest;
+use App\Models\OvertimeSettings;
 use App\Models\WorkSchedule;
+use App\Services\Overtime\TimeOffInLieuReconciler;
 use App\Support\WorkdayCalendar;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Computes (or recomputes) one employee's daily_attendances row for one
@@ -24,7 +30,19 @@ use Illuminate\Support\Facades\Log;
  *
  * Approved leave is an input since Phase 3d (LeaveDay): a range build loads
  * the employee's approved leaves once (approvedLeavesBetween()) and passes
- * them to build() for every date; a lone build() loads its own.
+ * them to build() for every date; a lone build() loads its own. Approved
+ * overtime requests are one more since Phase 4b, loaded the same way
+ * (approvedOvertimeBetween()) and credited by OvertimeCalculator — a separate
+ * dimension like late minutes: they never change a day's status. Every
+ * multi-date build goes through buildDates().
+ *
+ * Time off in lieu follows the credited minutes (Phase 4b): when a build
+ * changes the minutes credited to a time_off request, buildDates() reconciles
+ * that employee once, at the end of the range (TimeOffInLieuReconciler). A
+ * reconciliation failure never rolls back or blocks the build — it's logged
+ * with the command that heals it — and attendance:build-daily reconciles
+ * every employee it builds who has time-off overtime, changed or not, so the
+ * scheduled runs heal a failure by themselves.
  *
  * Every attendance_logs query here uses AttendanceLog::notVoided() — a
  * voided punch (e.g. someone else's finger matched the device) must never
@@ -41,6 +59,14 @@ class DailySummaryBuilder
      */
     public const MAX_SHIFT_HOURS = 18;
 
+    /** @var array<int, int> employee id => the time_off request whose credited minutes a build just changed */
+    private array $toilTriggers = [];
+
+    /** @var array<int, string> employee codes reconciled with no TOIL leave type set, until reportToil() */
+    private array $toilUnconfigured = [];
+
+    public function __construct(private OvertimeCalculator $overtime = new OvertimeCalculator) {}
+
     /**
      * Returns null, having removed any existing row, for a date the employee
      * wasn't employed on (Employee::isActiveOn(): before join_date, or after
@@ -48,15 +74,20 @@ class DailySummaryBuilder
      * they were still active behind it, and the builder stays the only writer
      * of daily_attendances — so it's the builder that removes them.
      */
-    public function build(Employee $employee, CarbonInterface $date, ?Collection $leaves = null): ?DailyAttendance
+    public function build(Employee $employee, CarbonInterface $date, ?Collection $leaves = null, ?Collection $overtime = null): ?DailyAttendance
     {
         $workDate = Carbon::instance($date)->startOfDay();
 
         if (! $employee->isActiveOn($workDate)) {
-            DailyAttendance::query()
+            $removed = DailyAttendance::query()
                 ->where('employee_id', $employee->id)
                 ->whereDate('work_date', $workDate)
-                ->delete();
+                ->first();
+
+            if ($removed !== null) {
+                $this->noteToilChange($employee, $removed, OvertimeCredit::none()->attributes(), null);
+                $removed->delete();
+            }
 
             return null;
         }
@@ -157,6 +188,16 @@ class DailySummaryBuilder
         $attributes['work_schedule_id'] = $schedule->id;
         $attributes['leave_id'] = $leaveDay->leaveId;
 
+        // Overtime (Phase 4b): the approved request for this work date, if any,
+        // credited from the same paired punches. Status and timing above are
+        // already decided and don't look at it.
+        $request = ($overtime ?? $this->approvedOvertimeBetween($employee, $workDate, $workDate))
+            ->first(fn (OvertimeRequest $request) => $request->date->isSameDay($workDate));
+        $attributes += $credit = $this->overtime->calculate(
+            $request, $firstIn?->punched_at, $lastOut?->punched_at, $schedule, $workDate,
+            $isWorkday, $isHoliday, $leaveDay, OvertimeSettings::current(),
+        )->attributes();
+
         // Not updateOrCreate(): work_date has a 'date' cast, which formats
         // through the connection's full datetime format when set on the
         // model but is compared here as a plain 'Y-m-d' string — on SQLite
@@ -168,6 +209,8 @@ class DailySummaryBuilder
             ->where('employee_id', $employee->id)
             ->whereDate('work_date', $workDate)
             ->first();
+
+        $this->noteToilChange($employee, $existing, $credit, $request);
 
         if ($existing) {
             $existing->fill($attributes)->save();
@@ -210,7 +253,7 @@ class DailySummaryBuilder
         $first = Carbon::instance($from)->startOfDay()->subDay()->max($employee->join_date->copy()->startOfDay());
         $last = Carbon::instance($to ?? $from)->startOfDay()->addDay()->min(today());
 
-        return $this->buildRange($employee, $first, $last);
+        return $this->buildAndReport($employee, $first, $last);
     }
 
     /**
@@ -242,7 +285,7 @@ class DailySummaryBuilder
             return 0;
         }
 
-        return $this->buildRange($employee, $first, $last);
+        return $this->buildAndReport($employee, $first, $last);
     }
 
     /**
@@ -262,7 +305,21 @@ class DailySummaryBuilder
             return 0;
         }
 
-        return $this->buildRange($employee, $first, $last);
+        return $this->buildAndReport($employee, $first, $last);
+    }
+
+    /**
+     * An overtime request's work date, after it's approved or cancelled
+     * (Phase 4c calls this). Just that date: overtime after midnight belongs
+     * to its work date, and a decision changes no punch, so no adjacent day's
+     * pairing can change. Clamped like rebuildBetween() — a future date
+     * builds nothing.
+     *
+     * @return int the number of days built (0 or 1)
+     */
+    public function rebuildOvertimeDate(OvertimeRequest $request): int
+    {
+        return $this->rebuildBetween($request->employee, $request->date, $request->date);
     }
 
     /**
@@ -281,15 +338,148 @@ class DailySummaryBuilder
             ->get();
     }
 
-    private function buildRange(Employee $employee, Carbon $first, Carbon $last): int
+    /**
+     * The employee's approved overtime requests with a work date in
+     * $from..$to, in one query (Phase 4b) — passed to build() like the leaves.
+     *
+     * @return Collection<int, OvertimeRequest>
+     */
+    public function approvedOvertimeBetween(Employee $employee, CarbonInterface $from, CarbonInterface $to): Collection
+    {
+        return OvertimeRequest::query()
+            ->where('employee_id', $employee->id)
+            ->where('status', OvertimeStatus::Approved->value)
+            ->whereBetween('date', [$from->format('Y-m-d'), $to->format('Y-m-d')])
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * Records the employee for reconciliation when this build changes the
+     * minutes credited to a time_off request: the old row's request, or the
+     * new one, credited time off and the overtime columns differ. Only on a
+     * change does it look the old request up.
+     *
+     * @param  array<string, int|null>  $new  OvertimeCredit::attributes()
+     */
+    private function noteToilChange(Employee $employee, ?DailyAttendance $old, array $new, ?OvertimeRequest $newRequest): void
+    {
+        $columns = array_keys($new);
+        $before = array_combine($columns, array_map(fn (string $column) => $old?->{$column} === null ? null : (int) $old->{$column}, $columns));
+
+        if ($before === $new) {
+            return;
+        }
+
+        $minutes = fn (array $row): int => array_sum(array_map('intval', array_slice($row, 1)));
+        $timeOff = fn (?OvertimeRequest $request): bool => $request?->compensation === OvertimeCompensation::TimeOff;
+
+        if ($minutes($new) > 0 && $timeOff($newRequest)) {
+            $this->toilTriggers[$employee->id] = $newRequest->id;
+
+            return;
+        }
+
+        $oldId = $before['overtime_request_id'];
+
+        if ($oldId !== null && $minutes($before) > 0) {
+            $oldRequest = $oldId === $newRequest?->id ? $newRequest : OvertimeRequest::query()->find($oldId);
+
+            if ($timeOff($oldRequest)) {
+                $this->toilTriggers[$employee->id] = $oldRequest->id;
+            }
+        }
+    }
+
+    /**
+     * Reconciles the employee's time off in lieu — never letting a failure
+     * escape: the build it follows stands, the failure is logged with the
+     * command that heals it (attendance:build-daily reconciles everyone it
+     * builds who has time-off overtime). A deactivated employee isn't built by
+     * the scheduled runs, so their heal is always that command, by hand.
+     */
+    public function reconcileToil(Employee $employee, ?OvertimeRequest $trigger = null): void
+    {
+        try {
+            $result = app(TimeOffInLieuReconciler::class)->reconcile($employee, $trigger);
+
+            if ($result->isNoToilType()) {
+                $this->toilUnconfigured[$employee->id] = $employee->employee_code;
+            }
+        } catch (Throwable $e) {
+            Log::error("Time off in lieu reconciliation for {$employee->employee_code} failed ({$e->getMessage()}). The attendance build stands. "
+                .'Run: php artisan attendance:build-daily --date='.today()->format('Y-m-d')." --employee={$employee->employee_code}");
+        }
+    }
+
+    /**
+     * One summary line for every employee reconciled with no TOIL leave type
+     * set since the last call — not one per employee, which every 15 minutes
+     * would bury the log. Returns how many there were.
+     */
+    public function reportToil(): int
+    {
+        $count = count($this->toilUnconfigured);
+
+        if ($count > 0) {
+            Log::warning("Time off in lieu: {$count} employee(s) have time-off overtime to credit, but no TOIL leave type is set "
+                .'(overtime_settings.toil_leave_type_id) — nothing was credited ('.implode(', ', $this->toilUnconfigured).').');
+        }
+
+        $this->toilUnconfigured = [];
+
+        return $count;
+    }
+
+    /** buildDates() for one employee's rebuild, then its missing-TOIL-type line, if any. */
+    private function buildAndReport(Employee $employee, Carbon $first, Carbon $last): int
+    {
+        $built = $this->buildDates($employee, $first, $last);
+        $this->reportToil();
+
+        return $built;
+    }
+
+    /**
+     * Builds $first..$last exactly as given — no clamping; the rebuild*()
+     * methods clamp first — with the range's approved leaves and overtime
+     * loaded once. The one way every multi-date build runs: the rebuild*()
+     * methods, attendance:build-daily and a holiday change. $each gets every
+     * build()'s result (null for a date the employee wasn't employed on).
+     *
+     * If a build changed the minutes credited to a time_off request, the
+     * employee is reconciled once, after the last date — unless $reconcile is
+     * false, for a caller that reconciles everyone itself (attendance:build-daily).
+     * The caller reports a missing TOIL type with reportToil(), once per run.
+     *
+     * @param  (callable(?DailyAttendance): void)|null  $each
+     * @return int the number of days built
+     */
+    public function buildDates(Employee $employee, CarbonInterface $first, CarbonInterface $last, ?callable $each = null, bool $reconcile = true): int
     {
         $built = 0;
+        $first = Carbon::instance($first)->startOfDay();
+        $last = Carbon::instance($last)->startOfDay();
         $leaves = $this->approvedLeavesBetween($employee, $first, $last);
+        $overtime = $this->approvedOvertimeBetween($employee, $first, $last);
 
         for ($day = $first->copy(); $day->lte($last); $day->addDay()) {
-            if ($this->build($employee, $day, $leaves) !== null) {
+            $row = $this->build($employee, $day, $leaves, $overtime);
+
+            if ($each !== null) {
+                $each($row);
+            }
+
+            if ($row !== null) {
                 $built++;
             }
+        }
+
+        $trigger = $this->toilTriggers[$employee->id] ?? null;
+        unset($this->toilTriggers[$employee->id]);
+
+        if ($reconcile && $trigger !== null) {
+            $this->reconcileToil($employee, OvertimeRequest::query()->find($trigger));
         }
 
         return $built;

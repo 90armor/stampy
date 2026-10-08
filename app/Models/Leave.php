@@ -9,6 +9,7 @@ use App\Exceptions\InvalidLeaveException;
 use App\Exceptions\InvalidLeaveTransitionException;
 use App\Support\DisplayDate;
 use App\Support\EmployeeScope;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -134,6 +135,16 @@ class Leave extends Model implements Approvable
     public function approvalSubject(): Employee
     {
         return $this->employee;
+    }
+
+    public function approvalDate(): CarbonInterface
+    {
+        return $this->start_date;
+    }
+
+    public function approvalStartsOn(): ?CarbonInterface
+    {
+        return $this->start_date;
     }
 
     public function currentApprovalStep(): ?int

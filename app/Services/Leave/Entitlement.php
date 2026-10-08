@@ -8,7 +8,8 @@ use Carbon\CarbonInterface;
 /**
  * EntitlementCalculator's answer for one employee, type and year:
  *
- * - noBalance(): the type has no yearly balance (days_per_year null).
+ * - noBalance(): the type isn't granted yearly (LeaveBalanceSource) — no
+ *   balance, or one earned from overtime.
  * - notEligible(): nothing is granted for this year — it is before the
  *   employee's eligibility year (what they earn meanwhile is folded into
  *   that year's grant). eligibleOn says when it becomes usable.

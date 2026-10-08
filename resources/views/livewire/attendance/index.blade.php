@@ -37,7 +37,8 @@
         || $departmentFilter !== ''
         || $selectedStatuses !== $defaultStatuses
         || $timingFilters !== []
-        || $workedOnLeave;
+        || $workedOnLeave
+        || $overtime;
 @endphp
 
 <div class="space-y-6">
@@ -333,6 +334,22 @@
             >
                 @if ($workedOnLeave)<x-icon name="check" class="h-3.5 w-3.5" />@endif
                 {{ $chipLabel('Worked on leave') }}
+            </button>
+        </div>
+        </fieldset>
+
+        {{-- Credited overtime (Phase 4d): an annotation, so its own filter. --}}
+        <fieldset>
+        <legend class="text-xs font-medium text-slate-700 dark:text-slate-300">Overtime</legend>
+        <div class="mt-2 flex flex-wrap gap-2">
+            <button
+                type="button"
+                wire:click="toggleOvertime"
+                aria-pressed="{{ $overtime ? 'true' : 'false' }}"
+                @class([$chipBase, $chipSelected => $overtime, $chipUnselected => ! $overtime])
+            >
+                @if ($overtime)<x-icon name="check" class="h-3.5 w-3.5" />@endif
+                {{ $chipLabel('Overtime') }}
             </button>
         </div>
         </fieldset>

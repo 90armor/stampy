@@ -6,6 +6,7 @@ use App\Enums\ApprovalOutcome;
 use App\Enums\LeaveCounting;
 use App\Enums\LeaveHalf;
 use App\Enums\LeaveStatus;
+use App\Enums\OvertimeStatus;
 use App\Exceptions\AffectedLeavesChangedException;
 use App\Exceptions\LeaveValidationException;
 use App\Exceptions\StaleLeaveDecisionException;
@@ -14,10 +15,13 @@ use App\Models\Holiday;
 use App\Models\Leave;
 use App\Models\LeaveEntitlement;
 use App\Models\LeaveType;
+use App\Models\OvertimeRequest;
 use App\Models\User;
 use App\Services\Approval\ApprovalFlow;
 use App\Services\Attendance\DailySummaryBuilder;
 use App\Services\Attendance\EmployeeScheduleAssigner;
+use App\Services\Attendance\LeaveDay;
+use App\Support\AttendanceTime;
 use App\Support\DisplayDate;
 use App\Support\LeaveDays;
 use App\Support\WorkdayCalendar;
@@ -152,7 +156,7 @@ class LeaveRequestService
 
         $balances = [];
 
-        if ($balanceType->days_per_year !== null) {
+        if ($balanceType->hasBalance()) {
             foreach ($cost as $year => $days) {
                 $before = $this->balances->for($employee, $balanceType, $year)->available();
                 $balances[$year] = ['before' => $before, 'after' => $before - $days];
@@ -539,12 +543,31 @@ class LeaveRequestService
             }
         }
 
+        // Overtime (Phase 4c): no full day off on a date with pending or
+        // approved overtime — with the leaves already there, an AM and a PM
+        // together included. The builder would credit the overtime nothing.
+        // A half day that leaves the other half worked is fine.
+        $candidate = new Leave(['start_date' => $start, 'end_date' => $end, 'half' => $half]);
+        $overtime = OvertimeRequest::query()
+            ->where('employee_id', $employee->id)
+            ->whereIn('status', [OvertimeStatus::Pending->value, OvertimeStatus::Approved->value])
+            ->whereBetween('date', [$start->format('Y-m-d'), $end->format('Y-m-d')])
+            ->orderBy('date')
+            ->get();
+
+        foreach ($overtime as $request) {
+            if (LeaveDay::on($existing->concat([$candidate]), $request->date)->fullDay) {
+                $add('start_date', DisplayDate::compact($request->date)." has {$whose} {$request->status->value} overtime request ("
+                    .AttendanceTime::format($request->starts_at).' – '.AttendanceTime::format($request->ends_at).'). Cancel it first, or take a half day.');
+            }
+        }
+
         $throwIfAny();
 
         // 6. Balance, per year of the cost, against the type that holds it.
         $balanceType = $type->deductsFrom ?? $type;
 
-        if ($balanceType->days_per_year !== null) {
+        if ($balanceType->hasBalance()) {
             foreach ($cost as $year => $days) {
                 $available = $this->balances->for($employee, $balanceType, $year)->available();
 

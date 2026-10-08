@@ -2,6 +2,7 @@
 
 namespace App\Livewire\LeaveTypes;
 
+use App\Enums\LeaveBalanceSource;
 use App\Enums\LeaveCounting;
 use App\Enums\LeaveStatus;
 use App\Exceptions\InvalidLeaveTypeException;
@@ -29,7 +30,10 @@ class Index extends Component
 
     public string $name = '';
 
-    /** '' = no yearly balance. */
+    /** A LeaveBalanceSource value; decides which balance fields the form shows and saves. */
+    public string $balance_source = 'yearly';
+
+    /** Only for a yearly balance. */
     public string $days_per_year = '';
 
     public string $min_service_months = '';
@@ -71,6 +75,7 @@ class Index extends Component
         $this->resetForm();
         $this->editing = $type;
         $this->name = $type->name;
+        $this->balance_source = $type->balance_source->value;
         $this->days_per_year = self::field($type->days_per_year);
         $this->min_service_months = $type->min_service_months !== null ? (string) $type->min_service_months : '';
         $this->seniority_bonus = $type->seniority_bonus;
@@ -90,7 +95,8 @@ class Index extends Component
         $days = ['nullable', 'numeric', 'decimal:0,1'];
         $this->validate([
             'name' => ['required', 'string', 'max:255', Rule::unique('leave_types', 'name')->ignore($this->editing?->id)],
-            'days_per_year' => [...$days, 'min:0', 'max:365'],
+            'balance_source' => ['required', Rule::enum(LeaveBalanceSource::class)],
+            'days_per_year' => [...$days, 'required_if:balance_source,yearly', 'min:0', 'max:365'],
             'min_service_months' => ['nullable', 'integer', 'min:0', 'max:120'],
             'carry_over_cap' => [...$days, 'min:0', 'max:365'],
             'counts' => ['required', Rule::enum(LeaveCounting::class)],
@@ -98,15 +104,22 @@ class Index extends Component
             'deducts_from_leave_type_id' => ['nullable', 'integer', 'exists:leave_types,id'],
         ], [
             'name.unique' => 'There is already a leave type with this name.',
+            'days_per_year.required_if' => 'A yearly balance needs days per year.',
             '*.decimal' => 'Use whole or tenths of a day, such as 18 or 0.5.',
         ]);
 
+        // Only the fields the chosen balance has — the form hides the others,
+        // and a value left in a hidden field mustn't reach the model.
+        $source = LeaveBalanceSource::from($this->balance_source);
+        $yearly = $source === LeaveBalanceSource::Yearly;
+
         $data = [
             'name' => trim($this->name),
-            'days_per_year' => self::nullable($this->days_per_year),
-            'min_service_months' => self::nullable($this->min_service_months),
-            'seniority_bonus' => $this->seniority_bonus,
-            'carry_over_cap' => self::nullable($this->carry_over_cap),
+            'balance_source' => $source,
+            'days_per_year' => $yearly ? self::nullable($this->days_per_year) : null,
+            'min_service_months' => $yearly ? self::nullable($this->min_service_months) : null,
+            'seniority_bonus' => $yearly && $this->seniority_bonus,
+            'carry_over_cap' => $source->hasBalance() ? self::nullable($this->carry_over_cap) : null,
             'counts' => $this->counts,
             'max_days_per_request' => self::nullable($this->max_days_per_request),
             'deducts_from_leave_type_id' => filled($this->deducts_from_leave_type_id) ? (int) $this->deducts_from_leave_type_id : null,
@@ -164,7 +177,7 @@ class Index extends Component
 
     private function resetForm(): void
     {
-        $this->reset(['editing', 'name', 'days_per_year', 'min_service_months', 'seniority_bonus', 'carry_over_cap', 'counts', 'max_days_per_request', 'deducts_from_leave_type_id', 'allows_half_day', 'is_paid']);
+        $this->reset(['editing', 'name', 'balance_source', 'days_per_year', 'min_service_months', 'seniority_bonus', 'carry_over_cap', 'counts', 'max_days_per_request', 'deducts_from_leave_type_id', 'allows_half_day', 'is_paid']);
         $this->resetErrorBag();
     }
 
@@ -199,7 +212,7 @@ class Index extends Component
         return view('livewire.leave-types.index', [
             'types' => $types,
             // What a type may deduct from: one with a balance that doesn't itself deduct (one level only).
-            'deductTargets' => $types->filter(fn (LeaveType $type) => $type->days_per_year !== null
+            'deductTargets' => $types->filter(fn (LeaveType $type) => $type->hasBalance()
                 && $type->deducts_from_leave_type_id === null
                 && $type->id !== $this->editing?->id)->values(),
             'locked' => $this->editing?->isUsedByLeaves() ?? false,

@@ -141,9 +141,13 @@ class Index extends Component
         $builder = app(DailySummaryBuilder::class);
         $day = Carbon::parse($date);
 
+        // buildDates(): a holiday changes overtime categories, so credited time
+        // off in lieu too (Phase 4b) — reconciled per employee, reported once.
         Employee::query()
             ->activeOn($day)
-            ->each(fn (Employee $employee) => $builder->build($employee, $day));
+            ->each(fn (Employee $employee) => $builder->buildDates($employee, $day, $day));
+
+        $builder->reportToil();
     }
 
     public function render()

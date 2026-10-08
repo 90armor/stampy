@@ -5,7 +5,6 @@ namespace App\Livewire\Employees;
 use App\Exceptions\AffectedLeavesChangedException;
 use App\Models\Employee;
 use App\Services\EmployeeLifecycle;
-use App\Services\Leave\LeaveRequestService;
 use App\Support\DisplayDate;
 use Carbon\Carbon;
 use Livewire\Attributes\On;
@@ -23,11 +22,12 @@ use Livewire\Component;
  * a server-side error on the last-day field (before the join date) nor the
  * rebuild warning EmployeeLifecycle can return.
  *
- * Deactivating can change leave (LeaveRequestService::deactivationEffects()),
- * so it is a two-step confirm when it does: the first Deactivate lists the
- * leaves that will be cancelled or shortened, without writing; the second
- * writes — unless the list changed in between (re-shown, asked again).
- * Changing the date starts over. With no leave affected it's one click.
+ * Deactivating can change leave and overtime (EmployeeLifecycle::
+ * deactivationEffects()), so it is a two-step confirm when it does: the first
+ * Deactivate lists the leaves that will be cancelled or shortened and the
+ * overtime that will be cancelled, without writing; the second writes —
+ * unless the list changed in between (re-shown, asked again). Changing the
+ * date starts over. With nothing affected it's one click.
  */
 class StatusModal extends Component
 {
@@ -49,8 +49,9 @@ class StatusModal extends Component
     public ?string $rebuildError = null;
 
     /**
-     * The affected leaves shown for confirmation, and the last day they were
-     * computed for — empty until a deactivation would change some.
+     * The affected leave and overtime requests shown for confirmation (each
+     * with its kind), and the last day they were computed for — empty until a
+     * deactivation would change some.
      *
      * @var list<array<string, mixed>>
      */
@@ -85,7 +86,7 @@ class StatusModal extends Component
         $this->open($employee, 'reactivate');
     }
 
-    public function confirm(EmployeeLifecycle $lifecycle, LeaveRequestService $leaves): void
+    public function confirm(EmployeeLifecycle $lifecycle): void
     {
         abort_if($this->employee === null, 404);
 
@@ -107,9 +108,9 @@ class StatusModal extends Component
             ]);
 
             $leftOn = Carbon::parse($this->left_on);
-            $effects = $leaves->deactivationEffects($this->employee, $leftOn);
+            $effects = $lifecycle->deactivationEffects($this->employee, $leftOn);
             $alreadyShown = $this->affectedFor === $this->left_on
-                && LeaveRequestService::effectsKey($effects) === LeaveRequestService::effectsKey($this->affectedLeaves);
+                && EmployeeLifecycle::effectsKey($effects) === EmployeeLifecycle::effectsKey($this->affectedLeaves);
 
             if ($effects !== [] && ! $alreadyShown) {
                 $this->affectedLeaves = $effects;

@@ -20,7 +20,7 @@
                     <x-icon name="lock-closed" class="mt-0.5 h-5 w-5 shrink-0" />
                     <div>
                         <p class="text-sm font-semibold">Locked: leave has been taken with this type</p>
-                        <p class="mt-0.5 text-xs leading-[1.125rem]">How days are counted, whether half days are allowed and which balance it draws from decide what existing requests cost, so they can't change. Everything else can.</p>
+                        <p class="mt-0.5 text-xs leading-[1.125rem]">How days are counted, whether half days are allowed, where its balance comes from and which balance it draws from decide what existing requests cost, so they can't change. Everything else can.</p>
                     </div>
                 </div>
             @endif
@@ -33,50 +33,73 @@
                 </section>
 
                 <section class="py-4">
-                    <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Yearly balance</h4>
+                    <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Balance</h4>
                     <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div>
-                            <x-input-label for="leave_type_days" value="Days per year" />
-                            <div class="relative">
-                                <x-text-input id="leave_type_days" type="text" inputmode="decimal" wire:model="days_per_year" placeholder="No balance" class="pr-12" />
-                                <span class="{{ $daysSuffix }}">Days</span>
-                            </div>
+                        <div class="sm:col-span-2" @if ($locked) aria-describedby="leave-type-lock-help" @endif>
+                            <x-input-label for="leave_type_balance" value="Balance" />
+                            <x-select id="leave_type_balance" wire:model.live="balance_source" :disabled="$locked" class="{{ $lockedControl }}">
+                                @foreach (\App\Enums\LeaveBalanceSource::cases() as $source)
+                                    <option value="{{ $source->value }}">{{ $source->label() }}</option>
+                                @endforeach
+                            </x-select>
                             <p class="{{ $hint }}">
-                                @if ($editing)
-                                    A change applies from the next grant; grants already made keep their days.
-                                @else
-                                    Leave empty for leave with no balance, like Unpaid.
-                                @endif
+                                @switch ($balance_source)
+                                    @case ('yearly')
+                                        Granted each year, like Annual.
+                                        @break
+                                    @case ('earned')
+                                        No yearly grant: the balance is what overtime taken as time off earns, plus adjustments.
+                                        @break
+                                    @default
+                                        No balance to check, like Unpaid — or one drawn from another type's, like Special.
+                                @endswitch
                             </p>
-                            <x-input-error :messages="$errors->get('days_per_year')" class="mt-1" />
+                            <x-input-error :messages="$errors->get('balance_source')" class="mt-1" />
                         </div>
-                        <div>
-                            <x-input-label for="leave_type_service" value="Usable after" />
-                            <div class="relative">
-                                <x-text-input id="leave_type_service" type="number" min="0" max="120" wire:model="min_service_months" placeholder="From joining" class="pr-16" />
-                                <span class="{{ $daysSuffix }}">Months</span>
-                            </div>
-                            <p class="{{ $hint }}">
+                        @if ($balance_source === 'yearly')
+                            <div>
+                                <x-input-label for="leave_type_days" value="Days per year" />
+                                <div class="relative">
+                                    <x-text-input id="leave_type_days" type="text" inputmode="decimal" wire:model="days_per_year" class="pr-12" />
+                                    <span class="{{ $daysSuffix }}">Days</span>
+                                </div>
                                 @if ($editing)
-                                    Months of service before it can be used. A change affects grants not yet made; grants already made and approved leave are untouched.
-                                @else
-                                    Months of service before it can be used.
+                                    <p class="{{ $hint }}">A change applies from the next grant; grants already made keep their days.</p>
                                 @endif
-                            </p>
-                            <x-input-error :messages="$errors->get('min_service_months')" class="mt-1" />
-                        </div>
-                        <div>
-                            <x-input-label for="leave_type_carry" value="Carry over up to" />
-                            <div class="relative">
-                                <x-text-input id="leave_type_carry" type="text" inputmode="decimal" wire:model="carry_over_cap" placeholder="No carry-over" class="pr-12" />
-                                <span class="{{ $daysSuffix }}">Days</span>
+                                <x-input-error :messages="$errors->get('days_per_year')" class="mt-1" />
                             </div>
-                            <x-input-error :messages="$errors->get('carry_over_cap')" class="mt-1" />
-                        </div>
-                        <label class="flex items-start gap-2.5 sm:pt-7">
-                            <input type="checkbox" wire:model="seniority_bonus" class="mt-0.5">
-                            <span class="text-sm text-slate-700 dark:text-slate-300">Seniority bonus <span class="block text-xs text-slate-500 dark:text-slate-400">+1 day per 3 completed years of service</span></span>
-                        </label>
+                            <div>
+                                <x-input-label for="leave_type_service" value="Usable after" />
+                                <div class="relative">
+                                    <x-text-input id="leave_type_service" type="number" min="0" max="120" wire:model="min_service_months" placeholder="From joining" class="pr-16" />
+                                    <span class="{{ $daysSuffix }}">Months</span>
+                                </div>
+                                <p class="{{ $hint }}">
+                                    @if ($editing)
+                                        Months of service before it can be used. A change affects grants not yet made; grants already made and approved leave are untouched.
+                                    @else
+                                        Months of service before it can be used.
+                                    @endif
+                                </p>
+                                <x-input-error :messages="$errors->get('min_service_months')" class="mt-1" />
+                            </div>
+                        @endif
+                        @if ($balance_source !== 'none')
+                            <div>
+                                <x-input-label for="leave_type_carry" value="Carry over up to" />
+                                <div class="relative">
+                                    <x-text-input id="leave_type_carry" type="text" inputmode="decimal" wire:model="carry_over_cap" placeholder="No carry-over" class="pr-12" />
+                                    <span class="{{ $daysSuffix }}">Days</span>
+                                </div>
+                                <x-input-error :messages="$errors->get('carry_over_cap')" class="mt-1" />
+                            </div>
+                        @endif
+                        @if ($balance_source === 'yearly')
+                            <label class="flex items-start gap-2.5 sm:pt-7">
+                                <input type="checkbox" wire:model="seniority_bonus" class="mt-0.5">
+                                <span class="text-sm text-slate-700 dark:text-slate-300">Seniority bonus <span class="block text-xs text-slate-500 dark:text-slate-400">+1 day per 3 completed years of service</span></span>
+                            </label>
+                        @endif
                     </div>
                 </section>
 

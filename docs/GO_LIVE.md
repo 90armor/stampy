@@ -1,8 +1,10 @@
 # Going live
 
-The checklist an admin works through before anyone uses Stampy for real. Do the steps in order: later ones depend on earlier ones (balances need leave types, approvals need managers). Commands are `php artisan …`; under this repo's Docker setup, prefix them with `docker compose exec app`.
+The checklist an admin works through before anyone uses Stampy for real. Do the steps in order: later ones depend on earlier ones (balances need leave types, time off in lieu needs its settings before anyone requests overtime, approvals need managers). Commands are `php artisan …`; under this repo's Docker setup, prefix them with `docker compose exec app`.
 
 ## 1. Environment and timezone
+
+Before anything else, take **[`HR_DECISIONS.md`](HR_DECISIONS.md)** to HR: the leave, overtime and time off in lieu policy questions with their current defaults. Steps 4 and 5 enter the answers, and two of them lock once used.
 
 - `APP_ENV=production`, `APP_DEBUG=false`, and a real `APP_KEY` in `.env`.
 - The app timezone is **Asia/Phnom_Penh**, set in `config/app.php` (not in `.env`): every attendance and leave rule is a local-time rule. Check it with `php artisan about` (Environment → Timezone).
@@ -10,7 +12,7 @@ The checklist an admin works through before anyone uses Stampy for real. Do the 
 
 ## 2. Database and the production seed
 
-Run `php artisan migrate --force`. **Never run plain `db:seed` in production.** `DatabaseSeeder` builds the demo system: 35 made-up employees with the password `password`, two months of invented punches, demo holidays on invented dates (`HolidaySeeder`), and demo leave requests (`LeaveSeeder`). Only the admin account seeder refuses to run in production; the demo seeders don't check.
+Run `php artisan migrate --force`. **Never run plain `db:seed` in production.** `DatabaseSeeder` builds the demo system: 35 made-up employees with the password `password`, two months of invented punches, demo holidays on invented dates (`HolidaySeeder`), and demo leave requests (`LeaveSeeder`). Every demo seeder — `DatabaseSeeder` and each seeder it calls except the three below — refuses to run in production, even with `--force`, and stops before writing anything (`DemoSeeder`); the error names the seeders that are allowed.
 
 The production seed is the configuration seeders only, run by class:
 
@@ -32,7 +34,7 @@ $user->forceFill(['must_change_password' => true])->save(); // not mass-assignab
 $user->assignRole('admin');
 ```
 
-If this admin will also take leave, link them to an employee record (step 5). An admin with no employee record is only for a system account.
+If this admin will also take leave, link them to an employee record (step 6). An admin with no employee record is only for a system account.
 
 Then, as that admin:
 
@@ -49,7 +51,27 @@ Then, as that admin:
 
 For each type, check the days per year, the carry-over cap, the service requirement ("Usable after"), the maximum per request, and whether it's paid. How a type counts days, whether it allows half days, and which balance it draws from all lock once the first leave is taken with it. Settle those three first.
 
-## 5. People, logins and managers
+## 5. Overtime
+
+**HR confirms the overtime settings in Policies → Overtime before anyone requests time off in lieu.** The defaults follow the Labour Law and Prakas 112/25, not company policy:
+
+- Rates: workday 150%, night 200%, the weekly rest day (Sunday) 200%, holiday 200%. They must run holiday ≥ rest day ≥ night ≥ workday ≥ 100%.
+- Night is 22:00–05:00. A day off other than the weekly rest day (Saturday) earns the workday rate.
+- Limits: 2 hours of overtime a day on a day with scheduled hours, 10 hours of work a day in all. An admin can go over either with a reason.
+- Claims go back at most 7 days. An admin can file further back.
+- Time off in lieu: 1:1 (ratio 100%), half a day for every 240 minutes, credited to the "Time off in lieu" leave type.
+
+Settle the three **time off in lieu** settings (ratio, block, leave type) first. **They lock as soon as any time off in lieu is credited**, because every half day is worked out again from all the overtime ever credited, and changing them afterwards is a data operation, not a settings edit. Rates, the night window, the rest day and the limits stay editable. A rate changes only the report's arithmetic. A new night window or rest day applies to days built from then on; to apply it to a past period, run `php artisan attendance:build-daily --from=YYYY-MM-DD --to=YYYY-MM-DD`.
+
+**Time off in lieu's carry-over cap is a placeholder (5 days)** in Policies → Leave types. HR sets the real one. Without a cap, a half day earned on 30 December would lapse the next day.
+
+To pay overtime only, set "Credited to" to "No time off in lieu". The request form then offers Pay only.
+
+**Who approves:** overtime uses the same two steps as leave. The employee's manager (with the manager role) decides first, then an admin. The managers set up in the next step are the overtime approvers too.
+
+**Payroll:** Reports → Overtime shows a month's approved, credited overtime per employee: pay minutes by category, time off minutes as a total, and pay-equivalent hours (the minutes × today's rates ÷ 60, pay only — payroll multiplies by the hourly wage). **Download CSV** saves the same table. The filename and the first line say when it was exported. A month still in progress says so on the page and in the file: until the month ends, a late claim or a cancellation can still change it. Export after the month closes, and keep the file payroll was run from.
+
+## 6. People, logins and managers
 
 - **Employees:** add each one with their real join date; it decides their leave grants and service requirements. Fix a wrong join date before any leave is taken against it.
 - **Logins:** give a login to everyone who will request their own leave. Employees without one can still have leave filed for them by an admin.
@@ -58,7 +80,7 @@ For each type, check the days per year, the carry-over cap, the service requirem
 
 Each employee gets this year's leave grants when they're created. Check one with `php artisan leave:balance EMP-0001`.
 
-## 6. Opening balances
+## 7. Opening balances
 
 Leave already taken this year on paper, and days carried in from last year, have to be entered by hand **before employees start requesting**. Years before go-live have no grant rows, so nothing carries into this year on its own. Leave taken on paper isn't in the system either, so without an entry everyone starts with their full allowance.
 
@@ -75,7 +97,7 @@ With fewer than 50 employees this is done by hand, from each employee's profile.
 
 If headcount grows well past 50, a CSV import for opening balances would be worth adding.
 
-## 7. The scheduler
+## 8. The scheduler
 
 Attendance and leave depend on scheduled tasks. In production, cron runs the scheduler every minute:
 
@@ -90,10 +112,13 @@ Under this repo's Docker setup, the `scheduler` service runs `schedule:work` ins
 - the last 7 days, daily at 02:10;
 - **`leave:grant`, daily at 00:05.** It creates each year's grants on 1 January, and first-year grants on the day someone completes their service requirement.
 
+Time off in lieu has no task of its own: each `attendance:build-daily` run also credits it for whoever has earned it, and puts right any crediting that failed earlier. So the list above is complete — check that `leave:grant` and the three attendance tasks are there, and nothing else is needed for overtime.
+
 If `leave:grant` doesn't run, nobody gets next year's leave and new joiners never become eligible. Its output is logged; a failure is logged as an error. Check `storage/logs` after the first night.
 
-## 8. Before opening it up
+## 9. Before opening it up
 
 - Sign in as a manager and as an employee (temporary passwords from the employee form) and look at Time off, Approvals and the dashboard.
-- File one test request, approve it at both steps, then cancel it. The balance should return.
+- File one test leave request, approve it at both steps, then cancel it. The balance should return.
+- File one test overtime claim for a past day with both punches, approve it at both steps, and check its credited time on the Overtime page and in Reports → Overtime. Then cancel it.
 - Delete nothing to clean up afterwards: cancelled leave is history, and history is kept.

@@ -14,7 +14,6 @@ use App\Services\Leave\LeaveRequestService;
 use App\Support\WorkdayCalendar;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
-use Illuminate\Database\Seeder;
 
 /**
  * DEMO DATA — leave requests in every state the Time off and Approvals pages
@@ -37,7 +36,7 @@ use Illuminate\Database\Seeder;
  * A scenario whose day can't be found (a seed run on a weekend with no
  * punches today, say) is skipped with a note, never forced.
  */
-class LeaveSeeder extends Seeder
+class LeaveSeeder extends DemoSeeder
 {
     private LeaveRequestService $service;
 

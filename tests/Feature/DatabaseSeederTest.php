@@ -2,15 +2,22 @@
 
 namespace Tests\Feature;
 
+use App\Enums\LeaveBalanceSource;
 use App\Enums\LeaveStatus;
+use App\Enums\OvertimeStatus;
 use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
 use App\Models\Employee;
 use App\Models\Leave;
+use App\Models\LeaveAdjustment;
 use App\Models\LeaveEntitlement;
 use App\Models\LeaveType;
+use App\Models\OvertimeRequest;
+use App\Models\OvertimeSettings;
 use App\Services\Approval\ApprovalInbox;
 use App\Services\Leave\EntitlementCalculator;
+use App\Services\Overtime\OvertimeRequestService;
+use App\Services\Overtime\TimeOffInLieuReconciler;
 use App\Support\LeaveDays;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -141,6 +148,64 @@ class DatabaseSeederTest extends TestCase
             ->whereColumn('leaves.end_date', '>=', 'daily_attendances.work_date'));
         $this->assertSame((clone $covered)->count(), (clone $covered)->whereNotNull('leave_id')->count());
         $this->assertSame((clone $covered)->count(), DailyAttendance::whereNotNull('leave_id')->count());
+    }
+
+    /**
+     * Phase 4c: OvertimeSeeder leaves a request in every state, a claim and a
+     * planned one, one crossing 22:00 and one on a Saturday — all through the
+     * service, so every decided request has its steps — and the time off in
+     * lieu posted equals the reconciler's own target for everyone.
+     */
+    public function test_seeded_overtime_covers_every_request_state_and_its_time_off_is_settled(): void
+    {
+        $this->seed();
+
+        foreach (OvertimeStatus::cases() as $status) {
+            $this->assertTrue(OvertimeRequest::where('status', $status->value)->exists(), "No seeded {$status->value} overtime.");
+        }
+        $this->assertTrue(OvertimeRequest::where('status', 'pending')->where('current_step', 1)->exists());
+        $this->assertTrue(OvertimeRequest::where('status', 'pending')->where('current_step', 2)->exists());
+        $this->assertTrue(OvertimeRequest::where('kind', 'claim')->exists() && OvertimeRequest::where('kind', 'planned')->exists());
+        $this->assertTrue(OvertimeRequest::all()->contains(fn (OvertimeRequest $r) => $r->starts_at->format('H:i') < '22:00' && $r->ends_at->gt($r->date->copy()->setTime(22, 0))), 'No request crossing 22:00.');
+        $this->assertTrue(OvertimeRequest::all()->contains(fn (OvertimeRequest $r) => $r->date->isSaturday()), 'No Saturday request.');
+        // Phase 4d: every state the screens show — approved and fully, partly
+        // or not at all credited (no out-punch), a Sunday, a visible time-off remainder.
+        $approvedDays = DailyAttendance::whereIn('overtime_request_id', OvertimeRequest::where('status', 'approved')->select('id'))->get();
+        $credited = fn (DailyAttendance $day) => $day->overtime_workday_minutes + $day->overtime_night_minutes + $day->overtime_rest_day_minutes + $day->overtime_holiday_minutes;
+        $approvedMinutes = fn (DailyAttendance $day) => app(OvertimeRequestService::class)->approvedMinutes(OvertimeRequest::find($day->overtime_request_id));
+        $this->assertTrue($approvedDays->contains(fn ($day) => $credited($day) > 0 && $credited($day) === $approvedMinutes($day)), 'No fully credited request.');
+        $this->assertTrue($approvedDays->contains(fn ($day) => $credited($day) > 0 && $credited($day) < $approvedMinutes($day)), 'No partly credited request.');
+        $this->assertTrue($approvedDays->contains(fn ($day) => $day->last_out === null && $credited($day) === 0), 'No approved request without an out-punch.');
+        $this->assertTrue($approvedDays->contains(fn ($day) => $day->overtime_rest_day_minutes > 0), 'No Sunday (rest-day) overtime.');
+        $this->assertTrue(Employee::all()->contains(fn (Employee $employee) => app(TimeOffInLieuReconciler::class)->remainderMinutes($employee) > 0), 'No time-off remainder.');
+        $this->assertSame(0, OvertimeRequest::whereIn('status', ['approved', 'rejected'])->doesntHave('approvalSteps')->count());
+
+        // Approved past overtime was credited, and its time off posted.
+        $this->assertTrue(DailyAttendance::whereNotNull('overtime_request_id')->where('overtime_workday_minutes', '>', 0)->exists());
+        $this->assertTrue(LeaveAdjustment::whereNull('created_by')->whereNotNull('overtime_request_id')->where('days', '>', 0)->exists(), 'No time off in lieu posted.');
+
+        $reconciler = app(TimeOffInLieuReconciler::class);
+        foreach (Employee::whereIn('id', OvertimeRequest::where('compensation', 'time_off')->select('employee_id'))->get() as $employee) {
+            $result = $reconciler->reconcile($employee);
+            $this->assertSame('settled', $result->outcome, "{$employee->employee_code}'s time off in lieu isn't settled.");
+        }
+    }
+
+    /**
+     * Phase 4: the overtime settings row (inserted by its migration) exists
+     * after a full seed and points at the seeded "Time off in lieu" type, which
+     * earns its balance and has no grants.
+     */
+    public function test_the_overtime_settings_point_at_the_seeded_toil_type(): void
+    {
+        $this->seed();
+
+        $toil = LeaveType::where('name', 'Time off in lieu')->sole();
+
+        $this->assertSame(1, OvertimeSettings::count());
+        $this->assertSame($toil->id, OvertimeSettings::current()->toil_leave_type_id);
+        $this->assertSame(LeaveBalanceSource::Earned, $toil->balance_source);
+        $this->assertSame(0, LeaveEntitlement::where('leave_type_id', $toil->id)->count());
     }
 
     /**

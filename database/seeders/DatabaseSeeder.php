@@ -3,10 +3,9 @@
 namespace Database\Seeders;
 
 use Carbon\Carbon;
-use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Artisan;
 
-class DatabaseSeeder extends Seeder
+class DatabaseSeeder extends DemoSeeder
 {
     /**
      * Seed the application's database.
@@ -55,5 +54,9 @@ class DatabaseSeeder extends Seeder
         // Demo leave requests, after the build: a past leave is placed by what
         // its day was built as (see the seeder), and approving one rebuilds it.
         $this->call(LeaveSeeder::class);
+
+        // Demo overtime requests (Phase 4c), after the leave: a case whose date
+        // the leave blocks is skipped rather than forced.
+        $this->call(OvertimeSeeder::class);
     }
 }

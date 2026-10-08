@@ -2,8 +2,6 @@
 
 namespace App\Support;
 
-use App\Enums\ApprovalOutcome;
-use App\Enums\LeaveStatus;
 use App\Models\ApprovalStep;
 use App\Models\Employee;
 use App\Models\Leave;
@@ -12,21 +10,14 @@ use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 
 /**
- * The "New" state on an employee's own requests (Phase 3e) — with no email,
- * it's how they find out a request was decided. One definition, read by Time
- * off (which marks the decisions seen, users.time_off_seen_at) and by the
- * employee dashboard (which shows them until Time off is opened).
+ * The "New" state on an employee's leave requests (Phase 3e) — RequestDecisions'
+ * rule, applied to leave. Read by Time off (which marks the decisions seen,
+ * users.time_off_seen_at) and by the employee dashboard (which shows them
+ * until Time off is opened).
  */
 final class LeaveDecisions
 {
     /**
-     * Requests decided after $seenAt — a step approved or rejected, or the
-     * request cancelled, by someone other than $user — newest decision
-     * first. One the user cancelled themself isn't news, whatever was decided
-     * before: their own last word supersedes it. None at all before the
-     * first visit to Time off ($seenAt null): everything would be "new",
-     * which says nothing.
-     *
      * @return Collection<int, Leave>
      */
     public static function since(Employee $employee, User $user, ?CarbonInterface $seenAt): Collection
@@ -35,42 +26,16 @@ final class LeaveDecisions
             return collect();
         }
 
-        return Leave::query()
-            ->where('employee_id', $employee->id)
-            ->with(['leaveType', 'approvalSteps.decidedBy'])
-            ->get()
-            ->reject(fn (Leave $leave) => $leave->status === LeaveStatus::Cancelled && $leave->cancelled_by === $user->id)
-            ->map(fn (Leave $leave) => ['leave' => $leave, 'at' => self::decidedAt($leave, $user)])
-            ->filter(fn (array $item) => $item['at'] !== null && $item['at']->gt($seenAt))
-            ->sortByDesc(fn (array $item) => $item['at']->getTimestamp())
-            ->pluck('leave')
-            ->values();
+        return RequestDecisions::since(
+            Leave::query()->where('employee_id', $employee->id)->with(['leaveType', 'approvalSteps.decidedBy'])->get(),
+            $user,
+            $seenAt,
+        );
     }
 
-    /**
-     * When someone other than $user last decided the request: the latest
-     * approved or rejected step they recorded, or a cancellation.
-     */
-    private static function decidedAt(Leave $leave, User $user): ?CarbonInterface
-    {
-        $times = $leave->approvalSteps
-            ->filter(fn (ApprovalStep $step) => in_array($step->outcome, [ApprovalOutcome::Approved, ApprovalOutcome::Rejected], true) && $step->decided_by !== $user->id)
-            ->pluck('decided_at');
-
-        if ($leave->status === LeaveStatus::Cancelled && $leave->cancelled_by !== $user->id && $leave->cancelled_at !== null) {
-            $times->push($leave->cancelled_at);
-        }
-
-        return $times->sortByDesc(fn (CarbonInterface $at) => $at->getTimestamp())->first();
-    }
-
-    /**
-     * The decision's own note (approve or reject), the requester's feedback.
-     */
+    /** The decision's own note (approve or reject), the requester's feedback. */
     public static function note(Leave $leave): ?ApprovalStep
     {
-        return $leave->approvalSteps
-            ->filter(fn (ApprovalStep $step) => $step->note !== null && in_array($step->outcome, [ApprovalOutcome::Approved, ApprovalOutcome::Rejected], true))
-            ->last();
+        return RequestDecisions::note($leave);
     }
 }

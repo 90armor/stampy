@@ -1,6 +1,7 @@
 {{-- A day's annotations under its status badge (Phase 3e), in the tables:
 "AM leave" / "PM leave" on a half-day leave day, "Worked on leave" when the
-punches fall in leave time (DailyAttendance::workedOnLeave()), and the
+punches fall in leave time (DailyAttendance::workedOnLeave()), credited
+overtime ("OT 2h 00m", DailyAttendance::overtimeLabel(), Phase 4d), and the
 holiday's name on a holiday the badge doesn't already name — a present day
 on a holiday, so its zero late/early minutes are explained. A view with a
 Note column names the holiday there instead and passes no $holiday. Annotations,
@@ -17,6 +18,7 @@ $record: the day's DailyAttendance. $holiday: the holiday's name, or null. --}}
     $leaveLines = array_filter([
         $leaveDay->isHalfDay() ? $leaveDay->half->label().' leave' : null,
         $record->workedOnLeave() ? 'Worked on leave' : null,
+        $record->overtimeLabel(),
     ]);
     $holidayLine = $holiday !== null && $record->status !== \App\Enums\AttendanceStatus::Holiday ? $holiday : null;
 @endphp

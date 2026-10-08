@@ -313,7 +313,8 @@ class LeaveModelsTest extends TestCase
         $this->seed(LeaveTypeSeeder::class);
         $this->seed(LeaveTypeSeeder::class);
 
-        $this->assertSame(['Annual', 'Maternity', 'Medical', 'Special', 'Unpaid'], LeaveType::orderBy('name')->pluck('name')->all());
+        // Time off in lieu since Phase 4a (OvertimeModelsTest checks its settings).
+        $this->assertSame(['Annual', 'Maternity', 'Medical', 'Special', 'Time off in lieu', 'Unpaid'], LeaveType::orderBy('name')->pluck('name')->all());
 
         $types = LeaveType::all()->keyBy('name');
 

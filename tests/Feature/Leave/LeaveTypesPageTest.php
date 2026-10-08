@@ -76,14 +76,25 @@ class LeaveTypesPageTest extends TestCase
         $study = LeaveType::where('name', 'Study')->sole();
         $this->assertSame(['5.0', '2.5', true], [$study->days_per_year, $study->carry_over_cap, $study->is_active]);
 
-        // Carry-over needs a balance: LeaveType's own rule, on the form.
+        // A yearly balance needs its days (Phase 4a: the form's Balance choice
+        // states LeaveType's rule up front, as a field error).
         Livewire::actingAs($this->admin)->test(Index::class)
             ->call('create')
             ->set('name', 'Odd')
             ->set('carry_over_cap', '3')
             ->call('save')
-            ->assertHasErrors('form')
-            ->assertSee('Carry-over and the seniority bonus need a yearly balance (days per year).');
+            ->assertHasErrors('days_per_year')
+            ->assertSee('A yearly balance needs days per year.');
+
+        // Carry-over and the seniority bonus need a balance: with "No balance"
+        // the form doesn't offer them at all.
+        Livewire::actingAs($this->admin)->test(Index::class)
+            ->call('create')
+            ->assertSee('Carry over up to')
+            ->assertSee('Seniority bonus')
+            ->set('balance_source', 'none')
+            ->assertDontSee('Carry over up to')
+            ->assertDontSee('Seniority bonus');
 
         // Names are unique; amounts are whole or tenths of a day.
         Livewire::actingAs($this->admin)->test(Index::class)

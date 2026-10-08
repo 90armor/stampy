@@ -2,11 +2,13 @@
 
 namespace App\Services;
 
+use App\Exceptions\AffectedLeavesChangedException;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\Attendance\DailySummaryBuilder;
 use App\Services\Attendance\EmployeeScheduleAssigner;
 use App\Services\Leave\LeaveRequestService;
+use App\Services\Overtime\OvertimeRequestService;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -34,7 +36,10 @@ use Throwable;
  * Deactivating also settles the employee's pending and approved leaves after
  * left_on, in the same write (LeaveRequestService::applyDeactivation()): one
  * that starts after it is cancelled, one that spans it is cut to end on it (or
- * cancelled, if nothing working is left). Reactivating doesn't restore them.
+ * cancelled, if nothing working is left) — and, since Phase 4c, cancels their
+ * pending and approved overtime dated after it (OvertimeRequestService::
+ * applyDeactivation()); the rebuild then takes back any time off in lieu that
+ * overtime credited. Reactivating doesn't restore any of them.
  */
 class EmployeeLifecycle
 {
@@ -42,11 +47,37 @@ class EmployeeLifecycle
         private DailySummaryBuilder $builder,
         private EmployeeScheduleAssigner $assigner,
         private LeaveRequestService $leaves,
+        private OvertimeRequestService $overtime,
     ) {}
 
     /**
-     * $expectedLeaveEffects is the list of affected leaves the admin was shown
-     * (LeaveRequestService::deactivationEffects()); if it no longer matches,
+     * Everything deactivating with this last day changes — leave and overtime
+     * requests in one list, each item with its kind — shown to the admin
+     * before they confirm (Employees\StatusModal).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function deactivationEffects(Employee $employee, CarbonInterface $leftOn): array
+    {
+        return [
+            ...array_map(fn (array $effect) => ['kind' => 'leave', ...$effect], $this->leaves->deactivationEffects($employee, $leftOn)),
+            ...$this->overtime->deactivationEffects($employee, $leftOn),
+        ];
+    }
+
+    /**
+     * Two effect lists describe the same change.
+     *
+     * @param  list<array<string, mixed>>  $effects
+     */
+    public static function effectsKey(array $effects): string
+    {
+        return collect($effects)->map(fn (array $effect) => $effect['kind'].':'.$effect['id'].':'.$effect['action'].':'.$effect['end'])->implode('|');
+    }
+
+    /**
+     * $expectedLeaveEffects is the list of affected leave and overtime the
+     * admin was shown (deactivationEffects()); if it no longer matches,
      * nothing is written (AffectedLeavesChangedException). Null skips the check.
      *
      * @param  list<array<string, mixed>>|null  $expectedLeaveEffects
@@ -57,7 +88,14 @@ class EmployeeLifecycle
         DB::transaction(function () use ($employee, $leftOn, $actor, $expectedLeaveEffects) {
             Employee::query()->lockForUpdate()->findOrFail($employee->id);
 
-            $this->leaves->applyDeactivation($employee, $leftOn, $actor, $expectedLeaveEffects);
+            $effects = $this->deactivationEffects($employee, $leftOn);
+
+            if ($expectedLeaveEffects !== null && self::effectsKey($effects) !== self::effectsKey($expectedLeaveEffects)) {
+                throw new AffectedLeavesChangedException($effects);
+            }
+
+            $this->leaves->applyDeactivation($employee, $leftOn, $actor);
+            $this->overtime->applyDeactivation($employee, $leftOn, $actor);
             $employee->update(['status' => 'inactive', 'left_on' => $leftOn->format('Y-m-d')]);
         });
 

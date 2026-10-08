@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Employees;
 
+use App\Enums\LeaveBalanceSource;
 use App\Models\Employee;
 use App\Models\Leave;
 use App\Models\LeaveAdjustment;
@@ -70,7 +71,7 @@ class LeaveCard extends Component
         $this->authorize('adjust', Leave::class);
 
         $this->validate([
-            'adj_leave_type_id' => ['required', Rule::exists('leave_types', 'id')->whereNotNull('days_per_year')],
+            'adj_leave_type_id' => ['required', Rule::exists('leave_types', 'id')->whereIn('balance_source', [LeaveBalanceSource::Yearly->value, LeaveBalanceSource::Earned->value])],
             'adj_year' => ['required', Rule::in(array_map('strval', $this->years()))],
             'adj_days' => ['required', 'numeric', 'decimal:0,1', 'between:-365,365', 'not_in:0,0.0,-0,-0.0'],
             'adj_note' => ['required', 'string', 'max:255'],
@@ -147,7 +148,7 @@ class LeaveCard extends Component
 
         // Types with a balance: the active ones, and any retired one this employee still has a grant or adjustment of.
         $types = LeaveType::query()
-            ->whereNotNull('days_per_year')
+            ->withBalance()
             ->where(fn ($query) => $query->where('is_active', true)
                 ->orWhereHas('entitlements', fn ($q) => $q->where('employee_id', $this->employee->id))
                 ->orWhereHas('adjustments', fn ($q) => $q->where('employee_id', $this->employee->id)))
@@ -156,14 +157,21 @@ class LeaveCard extends Component
 
         return view('livewire.employees.leave-card', [
             'years' => $years,
-            'balanceRows' => $types->map(fn (LeaveType $type) => [
-                'type' => $type,
-                'balance' => $balances->for($this->employee, $type, $this->year),
-                'earnedSoFar' => $calculator->earnedSoFar($this->employee, $type, today()),
-            ])->all(),
+            // Only the balances worth showing (LeaveType::isShownFor()); the
+            // adjustment form still offers every type with a balance.
+            'balanceRows' => $types->filter(fn (LeaveType $type) => $type->isShownFor($this->employee))
+                ->map(fn (LeaveType $type) => [
+                    'type' => $type,
+                    'balance' => $balances->for($this->employee, $type, $this->year),
+                    'earnedSoFar' => $calculator->earnedSoFar($this->employee, $type, today()),
+                    'toilRemainder' => $type->toilRemainderFor($this->employee),
+                ])->values()->all(),
             'requests' => $this->requests($counter),
+            // An admin's corrections only: what time off in lieu settlement
+            // posted is on the Overtime card, linked to its request.
             'adjustments' => LeaveAdjustment::query()
                 ->where('employee_id', $this->employee->id)
+                ->whereNull('overtime_request_id')
                 ->with(['leaveType', 'createdBy'])
                 ->latest('id')
                 ->get(),

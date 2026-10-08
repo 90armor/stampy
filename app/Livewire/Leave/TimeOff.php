@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Leave;
 
+use App\Enums\LeaveBalanceSource;
 use App\Exceptions\StaleLeaveDecisionException;
 use App\Models\Employee;
 use App\Models\Leave;
@@ -93,7 +94,7 @@ class TimeOff extends Component
             'employee' => $employee,
             'years' => $years,
             'balanceRows' => $employee !== null ? $this->balanceRows($employee, $calculator, $balances) : [],
-            'otherTypes' => LeaveType::query()->where('is_active', true)->whereNull('days_per_year')->with('deductsFrom')->orderBy('id')->get(),
+            'otherTypes' => LeaveType::query()->where('is_active', true)->where('balance_source', LeaveBalanceSource::None->value)->with('deductsFrom')->orderBy('id')->get(),
             'requests' => $employee !== null ? $this->requests($employee, $counter) : collect(),
             'canFileForOthers' => $user->can('fileForOthers', Leave::class),
         ])->layout('layouts.app', ['header' => 'Time off']);
@@ -113,22 +114,26 @@ class TimeOff extends Component
     }
 
     /**
-     * One row per active type with a yearly balance.
+     * One row per active type with a balance worth showing
+     * (LeaveType::isShownFor()).
      *
-     * @return list<array{type: LeaveType, balance: Balance, earnedSoFar: ?int}>
+     * @return list<array{type: LeaveType, balance: Balance, earnedSoFar: ?int, toilRemainder: ?int}>
      */
     private function balanceRows(Employee $employee, EntitlementCalculator $calculator, LeaveBalance $balances): array
     {
         return LeaveType::query()
             ->where('is_active', true)
-            ->whereNotNull('days_per_year')
+            ->withBalance()
             ->orderBy('id')
             ->get()
+            ->filter(fn (LeaveType $type) => $type->isShownFor($employee))
             ->map(fn (LeaveType $type) => [
                 'type' => $type,
                 'balance' => $balances->for($employee, $type, $this->year),
                 'earnedSoFar' => $calculator->earnedSoFar($employee, $type, today()),
+                'toilRemainder' => $type->toilRemainderFor($employee),
             ])
+            ->values()
             ->all();
     }
 
