@@ -1,4 +1,4 @@
-FROM php:8.5-fpm-alpine
+FROM php:8.5.12-fpm-alpine
 
 RUN apk add --no-cache \
         bash \
@@ -16,6 +16,8 @@ RUN apk add --no-cache \
         zip
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+COPY docker/php/conf.d/zz-security.ini /usr/local/etc/php/conf.d/zz-security.ini
 
 WORKDIR /var/www/html
 
