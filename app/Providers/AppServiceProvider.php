@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\Leave;
 use App\Models\OvertimeRequest;
+use App\Policies\PoliciesPolicy;
 use App\Policies\ReportPolicy;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Gate;
@@ -26,6 +27,8 @@ class AppServiceProvider extends ServiceProvider
     {
         // Reports aren't models, so their abilities are gates (ReportPolicy).
         Gate::define('reports.overtime', [ReportPolicy::class, 'overtime']);
+        // Nor is the Policies page: any of its tabs, by each tab's own ability.
+        Gate::define('policies.view', [PoliciesPolicy::class, 'view']);
 
         // approval_steps.approvable_type stores 'leave' or 'overtime', not a
         // class name, so renaming or moving a model never strands existing rows. Deliberately morphMap(), not enforceMorphMap():

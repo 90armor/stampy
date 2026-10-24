@@ -347,12 +347,12 @@
                                 {{-- A holiday cell shows its name whatever the attendance
                                 status is (or isn't, yet) — read from $holiday, not from
                                 $record, so an upcoming holiday with no daily_attendances
-                                row yet still renders. Deliberately not tinted with the
-                                'holiday' variant's fuchsia here: that colour belongs to
-                                $style (the cell background), which already reflects the
-                                REAL attendance outcome (holiday/present/off/not
-                                calculated) — this label is just the name, independent of
-                                which of those the cell turned out to be. --}}
+                                row yet still renders. Muted like the leave notes below
+                                (Phase 5a), not the 'holiday' variant's fuchsia: that colour
+                                belongs to $style, which reflects the REAL attendance
+                                outcome (holiday/present/off/not calculated), and a fuchsia
+                                name on a worked holiday's Present cell claimed a status
+                                the day doesn't have. --}}
                                 @if ($holiday)
                                     {{-- line-clamp-2, not truncate (1 line): a name like "Company
                                     Anniversary (demo)" fits in two short lines at this width but
@@ -368,11 +368,11 @@
                                     so the cell shows a small flag instead (the name stays in the
                                     cell's accessible label and in the day modal). A cell whose
                                     status icon is already the holiday flag needs no second one. --}}
-                                    <span class="hidden w-full line-clamp-2 text-[10px] font-medium leading-tight text-fuchsia-700 dark:text-fuchsia-300 sm:block" title="{{ $holiday }}">
+                                    <span class="hidden w-full line-clamp-2 text-[10px] font-medium leading-tight text-slate-600 dark:text-slate-400 sm:block" title="{{ $holiday }}">
                                         {{ $holiday }}
                                     </span>
                                     @unless ($style['icon'] === 'flag')
-                                        <x-icon name="flag" class="h-5 w-5 shrink-0 text-fuchsia-700 dark:text-fuchsia-300 sm:hidden" />
+                                        <x-icon name="flag" class="h-5 w-5 shrink-0 text-slate-600 dark:text-slate-400 sm:hidden" />
                                     @endunless
                                 @endif
                                 {{-- Leave annotations: muted (slate-600 on the tinted fills), 10px
@@ -654,7 +654,9 @@
                             <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100">{{ \App\Support\DisplayDate::long($modalDate) }}</h3>
                             <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{{ $employee->full_name }}</p>
                             @if ($modalHoliday)
-                                <p class="mt-0.5 flex items-center gap-1 text-sm font-medium text-fuchsia-700 dark:text-fuchsia-300">
+                                {{-- Muted, like the calendar cell's name: the status pill on
+                                the right carries the colour (a worked holiday is Present). --}}
+                                <p class="mt-0.5 flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">
                                     <x-icon name="flag" class="h-5 w-5 shrink-0" />
                                     {{ $modalHoliday }}
                                 </p>

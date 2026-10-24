@@ -12,6 +12,7 @@ use App\Livewire\Reports\Overtime as OvertimeReport;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Position;
+use App\Policies\PoliciesPolicy;
 use App\Support\DashboardAttendance;
 use App\Support\EmployeeDashboard;
 use App\Support\EmployeeScope;
@@ -105,6 +106,19 @@ Route::middleware('auth')->group(function () {
     Route::get('/time-off', TimeOff::class)->name('time-off.index');
     Route::get('/approvals', Approvals::class)->name('approvals.index');
     Route::get('/overtime', OvertimeIndex::class)->name('overtime.index');
+
+    // The rules attendance, leave and overtime are counted by (Phase 3e):
+    // Schedules, Holidays, Leave types, Overtime. Its own ability (Phase 5a,
+    // PoliciesPolicy) — any tab the user may see, each by what its component
+    // checks — is the route's gate too, so the route can't drift from the
+    // page; every tab is admin-only today. The page opens on the requested
+    // tab if the user may see it, else on the first one they may.
+    Route::get('/policies', function (Request $request) {
+        $tabs = app(PoliciesPolicy::class)->tabs($request->user());
+        $tab = array_key_exists((string) $request->query('tab'), $tabs) ? $request->query('tab') : array_key_first($tabs);
+
+        return view('policies', ['tabs' => $tabs, 'tab' => $tab]);
+    })->middleware('can:policies.view')->name('policies.index');
 });
 
 Route::middleware(['auth', 'role:admin|manager'])->group(function () {
@@ -126,11 +140,6 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
 
         return view('organization');
     })->name('organization.index');
-    // The rules attendance, leave and overtime are counted by (Phase 3e):
-    // Schedules, Holidays, Leave types, Overtime.
-    Route::get('/policies', function () {
-        return view('policies');
-    })->name('policies.index');
     // Reports (Phase 4d): the page checks its own ability (ReportPolicy); this group is the second layer.
     Route::get('/reports/overtime', OvertimeReport::class)->name('reports.overtime');
 });

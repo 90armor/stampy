@@ -13,10 +13,14 @@
     runs — and layouts.app's sidebar/topbar call auth()->user() directly with
     no null-guard, so using it unconditionally would turn an anonymous 404
     into a 500.
+
+    $header, if given, is a short topbar title for a page whose card title is
+    a sentence: the topbar holds a page name, and at 390px the 403's full
+    sentence wrapped onto two lines (Phase 5a).
 --}}
 @if (auth()->check())
     <x-app-layout>
-        <x-slot name="header">{{ $title }}</x-slot>
+        <x-slot name="header">{{ $header ?? $title }}</x-slot>
 
         <x-card>
             <x-empty-state :icon="$icon" :title="$title" :description="$description">

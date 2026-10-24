@@ -3,8 +3,8 @@ $navItems = [
     ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'home', 'visible' => true, 'enabled' => true],
     ['label' => 'Employees', 'route' => 'employees.index', 'icon' => 'users', 'visible' => auth()->user()->hasAnyRole(['admin', 'manager']), 'enabled' => true],
     ['label' => 'Organization', 'route' => 'organization.index', 'icon' => 'building-office', 'visible' => auth()->user()->hasRole('admin'), 'enabled' => true],
-    // Policy, not structure (Phase 3e): leave types now, overtime rules in Phase 4.
-    ['label' => 'Policies', 'route' => 'policies.index', 'icon' => 'scale', 'visible' => auth()->user()->can('viewAny', \App\Models\LeaveType::class), 'enabled' => true],
+    // Policy, not structure (Phase 3e). Its own ability (Phase 5a): any Policies tab the user may see.
+    ['label' => 'Policies', 'route' => 'policies.index', 'icon' => 'scale', 'visible' => auth()->user()->can('policies.view'), 'enabled' => true],
     // 'Attendance' and 'My attendance' share the 'attendance.' route-name
     // prefix but must not both light up together, so each gets an explicit
     // pattern instead of the derived 'prefix.*' every other item uses.
@@ -57,13 +57,18 @@ $navItems = [
                     @endif
                 </a>
             @else
+                {{-- Not built yet: no link, no hover, a fainter icon and the "Soon"
+                badge say it's inactive; the label and badge still use the readable
+                muted colours (docs/DESIGN_SYSTEM.md, Muted text rule). --}}
                 <div
-                    class="flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-400 dark:text-slate-600 cursor-not-allowed"
+                    role="link"
+                    aria-disabled="true"
+                    class="flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-500 dark:text-slate-400 cursor-not-allowed"
                     title="Coming in a later phase"
                 >
-                    <x-icon :name="$item['icon']" class="w-5 h-5 shrink-0 text-slate-400 dark:text-slate-600" />
+                    <x-icon :name="$item['icon']" class="w-5 h-5 shrink-0 text-slate-300 dark:text-slate-600" />
                     {{ $item['label'] }}
-                    <span class="ml-auto rounded-md bg-slate-100 dark:bg-slate-750 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">Soon</span>
+                    <span class="ml-auto rounded-md bg-slate-100 dark:bg-slate-750 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">Soon</span>
                 </div>
             @endif
         @endforeach
