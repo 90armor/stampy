@@ -1,0 +1,159 @@
+<?php
+
+namespace Tests\Feature\Reports;
+
+use App\Livewire\Reports\Attendance;
+use App\Models\AttendanceLog;
+use App\Models\Department;
+use App\Models\Employee;
+use App\Models\User;
+use App\Models\WorkSchedule;
+use App\Services\Attendance\DailySummaryBuilder;
+use Carbon\Carbon;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
+use Spatie\Permission\Models\Role;
+use Tests\TestCase;
+
+/**
+ * Phase 5b — Reports → Attendance on screen: the month and department
+ * pickers, the open-month notice, the table (pinned Employee column, amber
+ * timing totals only when non-zero, the totals row, the chevron as each row's
+ * only link) and the empty states. The clock is Mon 15 Jun 2026 12:00.
+ */
+class AttendanceReportPageTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private User $admin;
+
+    private Department $engineering;
+
+    private Employee $kyaw;
+
+    private Employee $su;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->travelTo(Carbon::parse('2026-06-15 12:00:00'));
+
+        foreach (['admin', 'manager', 'employee'] as $role) {
+            Role::firstOrCreate(['name' => $role]);
+        }
+
+        WorkSchedule::factory()->withBreakStart()->create([
+            'start_time' => '08:00:00', 'end_time' => '17:00:00', 'grace_minutes' => 0,
+            'break_minutes' => 60, 'break_start' => '12:00:00', 'workdays' => [1, 2, 3, 4, 5], 'is_default' => true,
+        ]);
+        $this->engineering = Department::factory()->create(['name' => 'Engineering']);
+        $this->admin = User::factory()->create()->assignRole('admin');
+
+        $this->kyaw = Employee::factory()->create(['employee_code' => 'EMP-0002', 'full_name' => 'Kyaw Kyaw', 'department_id' => $this->engineering->id]);
+        $this->su = Employee::factory()->create(['employee_code' => 'EMP-0005', 'full_name' => 'Su Su', 'department_id' => $this->engineering->id, 'join_date' => '2026-05-11']);
+
+        // Kyaw: 20 minutes late on Tue 5 May; Su: on time from her first day.
+        $this->punch($this->kyaw, '2026-05-05 08:20:00', 'in');
+        $this->punch($this->kyaw, '2026-05-05 17:00:00', 'out');
+        $this->punch($this->su, '2026-05-11 08:00:00', 'in');
+        $this->punch($this->su, '2026-05-11 17:00:00', 'out');
+        foreach ([$this->kyaw, $this->su] as $employee) {
+            app(DailySummaryBuilder::class)->rebuildBetween($employee, Carbon::parse('2026-05-01'), Carbon::parse('2026-06-12'));
+        }
+    }
+
+    private function punch(Employee $employee, string $at, string $type): void
+    {
+        AttendanceLog::factory()->create(['employee_id' => $employee->id, 'punched_at' => $at, 'punch_type' => $type]);
+    }
+
+    public function test_a_closed_month_shows_a_row_per_employee_and_the_totals(): void
+    {
+        $component = Livewire::actingAs($this->admin)->test(Attendance::class)
+            ->assertSet('month', '2026-06')
+            ->assertSee('This month is still open: figures can change until it ends.')
+            ->set('month', '2026-05')
+            ->assertDontSee('This month is still open');
+
+        $html = $component->html();
+        $this->assertMatchesRegularExpression('/Kyaw Kyaw.*EMP-0002 · Engineering.*Su Su.*EMP-0005 · Engineering.*Joined Mon 11 May.*Total/s', $html);
+
+        // Late is days · total, the total amber because it's non-zero.
+        $this->assertStringContainsString('1 day · <span class="font-medium text-amber-700 dark:text-amber-300">20m</span>', $html);
+        // Su was never late or early: an em dash, never an amber zero.
+        $this->assertSame(2, substr_count($html, 'text-amber-700'));
+        // The chevron is each row's only link, to that month of the calendar.
+        $this->assertStringContainsString('href="'.route('attendance.show', ['employee' => $this->kyaw, 'month' => '2026-05']).'"', $html);
+        $this->assertStringContainsString('aria-label="View attendance for Kyaw Kyaw, May 2026"', $html);
+        $this->assertSame(2, substr_count($html, 'aria-label="View attendance for'));
+    }
+
+    public function test_the_employee_column_is_pinned_while_the_figures_scroll(): void
+    {
+        $html = Livewire::actingAs($this->admin)->test(Attendance::class)->set('month', '2026-05')->html();
+
+        $this->assertStringContainsString('x-data="scrollEdges"', $html);
+        $this->assertStringContainsString('scroll-fade-end', $html);
+        // The header, both employee rows and the Total row.
+        $this->assertSame(1 + 2 + 1, substr_count($html, 'table-pin-lead'));
+        // Every divider runs above the pinned cells; none under the Total row.
+        $this->assertSame(1 + 2, substr_count($html, 'z-[2] h-px bg-slate-divider'));
+        $this->assertSame(substr_count($html, 'bg-slate-divider'), substr_count($html, 'z-[2] h-px bg-slate-divider'));
+        foreach (['Calculated workdays', 'Present', 'Absent', 'Incomplete', 'On leave', 'Leave taken', 'Late', 'Early leave', 'Worked', 'Not calculated'] as $column) {
+            $this->assertStringContainsString('>'.$column, $html);
+        }
+    }
+
+    public function test_the_department_filter_offers_the_viewers_departments_and_ignores_any_other(): void
+    {
+        $operations = Department::factory()->create(['name' => 'Operations']);
+        $sales = Department::factory()->create(['name' => 'Sales']);
+        $managerUser = User::factory()->create()->assignRole('manager');
+        $manager = Employee::factory()->create(['user_id' => $managerUser->id, 'department_id' => $this->engineering->id, 'full_name' => 'Aye Aye Mon']);
+        $this->kyaw->update(['manager_id' => $manager->id]);
+        // In the team, in Sales, gone before May.
+        Employee::factory()->inactive('2026-03-31')->create(['manager_id' => $manager->id, 'department_id' => $sales->id]);
+        Employee::factory()->create(['department_id' => $operations->id, 'full_name' => 'Outside The Team']);
+
+        Livewire::actingAs($managerUser)->withQueryParams(['month' => '2026-05', 'department' => (string) $operations->id])
+            ->test(Attendance::class)
+            ->assertSet('department', '')
+            ->assertSee('Kyaw Kyaw')
+            ->assertDontSee('Su Su')
+            ->assertDontSee('Outside The Team')
+            ->assertSeeHtml('<option value="'.$sales->id.'">Sales</option>')
+            ->assertDontSeeHtml('>Operations</option>')
+            ->set('department', (string) $sales->id)
+            ->assertSee('No employees in this department')
+            ->assertSee('Nobody in Sales was employed in May 2026.');
+    }
+
+    public function test_a_month_with_nothing_calculated_or_nobody_employed_says_which(): void
+    {
+        Livewire::actingAs($this->admin)->test(Attendance::class)
+            ->set('month', '2026-04')
+            ->assertSee('No attendance calculated for this month')
+            ->assertSee('Nothing has been calculated for April 2026 yet, for anyone here.')
+            ->assertDontSee('Kyaw Kyaw');
+
+        Employee::query()->update(['join_date' => '2026-06-01']);
+        Livewire::actingAs($this->admin)->test(Attendance::class)
+            ->set('month', '2026-05')
+            ->assertSee('No employees in this month')
+            ->assertSee('Nobody you can report on was employed in May 2026.');
+    }
+
+    public function test_changing_the_month_keeps_the_other_tabs_in_step(): void
+    {
+        Livewire::actingAs($this->admin)->test(Attendance::class)
+            ->set('month', '2026-05')
+            ->assertDispatched('report-month', month: '2026-05')
+            ->set('month', 'nonsense')
+            ->assertSet('month', '2026-06');
+
+        Livewire::actingAs($this->admin)->test(Attendance::class)
+            ->dispatch('report-month', month: '2026-04')
+            ->assertSet('month', '2026-04');
+    }
+}
