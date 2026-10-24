@@ -47,24 +47,29 @@
         @if ($report['rows'] === [])
             <x-empty-state icon="document-text" title="No credited overtime" description="Nothing was credited for this month." />
         @else
-            <div class="mt-3 overflow-x-auto">
+            {{-- Wider than a phone (and than 1024 with the sidebar): the Employee
+            column stays pinned while the figures scroll under it, and the end
+            edge fades while more columns lie beyond. No column is hidden. --}}
+            <div x-data="scrollEdges" @scroll.passive="measure()" class="scroll-fade-end mt-3 overflow-x-auto rounded-b-xl">
                 <table class="w-full min-w-[56rem] text-sm">
                     <thead>
                         <tr class="relative text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                            <th scope="col" class="px-6 py-3 font-medium">Employee</th>
+                            <th scope="col" class="table-pin-lead px-4 py-3 font-medium sm:px-6">Employee</th>
                             @foreach ($categories as $key => [$label, $rateColumn])
                                 <th scope="col" class="{{ $th }}">Pay · {{ $label }}<span class="block font-normal normal-case tracking-normal">{{ $rates->{$rateColumn} }}%</span></th>
                             @endforeach
                             <th scope="col" class="{{ $th }}">Time off</th>
-                            <th scope="col" class="px-6 py-3 text-right font-medium">Pay-equiv. hours<span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-divider"></span></th>
+                            <th scope="col" class="px-6 py-3 text-right font-medium">Pay-equiv. hours<span class="pointer-events-none absolute inset-x-4 bottom-0 z-[2] h-px bg-slate-divider sm:inset-x-6"></span></th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach ($report['rows'] as $row)
                             <tr class="relative">
-                                <td class="px-6 py-4">
-                                    <span class="font-medium text-slate-900 dark:text-slate-100">{{ $row['name'] }}</span>
-                                    <span class="block text-xs text-slate-500 dark:text-slate-400">{{ $row['code'] }}{{ $row['department'] ? ' · '.$row['department'] : '' }}</span>
+                                <td class="table-pin-lead px-4 py-4 sm:px-6">
+                                    {{-- Narrower on a phone, so the pinned column leaves room
+                                    for the figures: the name and code wrap instead. --}}
+                                    <span class="block max-w-[9rem] font-medium text-slate-900 sm:max-w-none dark:text-slate-100">{{ $row['name'] }}</span>
+                                    <span class="block max-w-[9rem] text-xs text-slate-500 sm:max-w-none dark:text-slate-400">{{ $row['code'] }}{{ $row['department'] ? ' · '.$row['department'] : '' }}</span>
                                 </td>
                                 @foreach (array_keys($categories) as $key)
                                     <td class="{{ $td }}">{{ $minutes($row['pay'][$key]) }}</td>
@@ -72,12 +77,12 @@
                                 <td class="{{ $td }}">{{ $minutes($row['time_off']) }}</td>
                                 <td class="px-6 py-4 text-right font-semibold tabular-nums text-slate-900 dark:text-slate-100">
                                     {{ number_format($row['pay_equivalent_hours'], 2) }}
-                                    <span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-divider"></span>
+                                    <span class="pointer-events-none absolute inset-x-4 bottom-0 z-[2] h-px bg-slate-divider sm:inset-x-6"></span>
                                 </td>
                             </tr>
                         @endforeach
                         <tr class="relative font-semibold">
-                            <td class="px-6 py-4 text-slate-900 dark:text-slate-100">Total</td>
+                            <td class="table-pin-lead px-4 py-4 text-slate-900 sm:px-6 dark:text-slate-100">Total</td>
                             @foreach (array_keys($categories) as $key)
                                 <td class="px-3 py-4 text-right tabular-nums text-slate-900 dark:text-slate-100">{{ $minutes($report['totals']['pay'][$key]) }}</td>
                             @endforeach

@@ -156,6 +156,25 @@ class OvertimeReportTest extends TestCase
         Livewire::actingAs($this->admin)->test(Overtime::class)->set('month', '2026-03')->assertSee('No credited overtime');
     }
 
+    public function test_the_employee_column_is_pinned_while_the_figures_scroll(): void
+    {
+        // Phase 5a: at 390px the table scrolls under a pinned Employee column,
+        // its end edge fading while more lies beyond; no column is hidden.
+        $this->seedMay();
+
+        $html = Livewire::actingAs($this->admin)->test(Overtime::class)->set('month', '2026-05')->html();
+
+        $this->assertStringContainsString('x-data="scrollEdges"', $html);
+        $this->assertStringContainsString('scroll-fade-end', $html);
+        // The header, every employee row and the Total row.
+        $this->assertSame(1 + 2 + 1, substr_count($html, 'table-pin-lead'));
+        // Every divider runs above the pinned cells.
+        $this->assertSame(substr_count($html, 'bg-slate-divider'), substr_count($html, 'z-[2] h-px bg-slate-divider'));
+        foreach (['Pay · Workday', 'Pay · Night', 'Pay · Rest day', 'Pay · Holiday', 'Time off', 'Pay-equiv. hours'] as $column) {
+            $this->assertStringContainsString($column, $html);
+        }
+    }
+
     public function test_the_csv_has_the_same_columns_and_says_when_it_was_generated(): void
     {
         $this->seedMay();

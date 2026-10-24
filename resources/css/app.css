@@ -201,3 +201,45 @@ input:-webkit-autofill:focus {
 .tab-bar-more-after {
     --tab-fade-after: 2.5rem;
 }
+
+/* A wide report table with its leading column pinned (the overtime report,
+   Phase 5a; docs/ATTENDANCE_UI.md, Responsive behavior). At every width the
+   first column sticks to the left edge of the scroll container — inert while
+   the table fits, as at 1440 — and is opaque (the card surface), so scrolled
+   cells never show through. While content passes under it, its right edge
+   carries the pinned columns' shadow; while more columns lie beyond the right
+   edge, that edge fades, as the tab bar's does. scrollEdges in
+   resources/js/app.js sets the two classes. The row divider sits in a
+   non-pinned cell with z-[2], so it runs unbroken above the pinned one. */
+.table-pin-lead {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    @apply bg-white dark:bg-slate-800;
+}
+.table-pin-lead::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: -0.75rem;
+    width: 0.75rem;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 150ms ease-out;
+    background-image: linear-gradient(to right, rgb(28 25 23 / 0.07), transparent);
+}
+.dark .table-pin-lead::after {
+    background-image: linear-gradient(to right, rgb(0 0 0 / 0.4), transparent);
+}
+.scroll-more-before .table-pin-lead::after {
+    opacity: 1;
+}
+.scroll-fade-end {
+    --scroll-fade-after: 0px;
+    -webkit-mask-image: linear-gradient(to left, transparent, #000 var(--scroll-fade-after));
+    mask-image: linear-gradient(to left, transparent, #000 var(--scroll-fade-after));
+}
+.scroll-fade-end.scroll-more-after {
+    --scroll-fade-after: 2.5rem;
+}
