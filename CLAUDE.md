@@ -655,7 +655,7 @@ Enforced in four places, none of which is optional:
 3. **Leave management** (complete — "Phase 3 — Leave management" below) — `leave_types`, `leaves`, request/approval workflow, balances, the leave UI, and the go-live checklist (`docs/GO_LIVE.md`).
 4. **Overtime** (complete — "Phase 4 — Overtime" below) — `overtime_requests`, request/approval workflow reusing `approval_steps` and `ApprovalFlow`, integration with processed attendance.
 5. **Reporting & polish** (scoped — "Phase 5 — Reporting & polish" below; 5a built) — cross-cutting reports (attendance/leave/overtime), exports, UX polish, performance pass. Still deferred, after 5a closed the UI items, `user:create-admin` and the Policies ability:
-   - **Payroll — 5c, waiting on HR** (also in `docs/HR_DECISIONS.md`, 21–23):
+   - **Payroll — 5c, waiting on HR** (also in `docs/HR_DECISIONS.md`, 21–27; 24–27 are the 5c questions, marked "Needed before 5c"):
      - **A payroll-period lock.** The overtime report and its CSV recompute from the builder's rows and today's rates every time, so a late claim, a cancellation, a punch correction or a rate change after payroll has run changes a closed month's figures. Today the defence is the CSV's export time and the open-month notice; Phase 5 should let an admin close a month — freezing its credited minutes and rates — so a later change is refused or shown as an adjustment to the next period.
      - **Pay-equivalent hours at the rates in force then**, not today's — with the lock.
      - **`late_minutes` on incomplete days** in a payroll export: recorded since Phase 2.6, not used for pay yet.
@@ -1070,7 +1070,7 @@ Verified:
 ### Still open
 
 - **HR's questions** — rates and days, limits, time off in lieu, counting: `docs/HR_DECISIONS.md`, 1–2 and 8–20. Settle the time off in lieu ratio and block (1–2) before the first time-off overtime is approved: they lock.
-- **Payroll** — the payroll-period lock and historical rates: the roadmap, item 5, and `docs/HR_DECISIONS.md`, 21–23.
+- **Payroll** — the payroll-period lock and historical rates: the roadmap, item 5, and `docs/HR_DECISIONS.md`, 21–27 (24–27 added in Phase 5a, needed before 5c).
 
 ## Phase 5 — Reporting & polish (scoping)
 
@@ -1116,7 +1116,7 @@ Closes the roadmap's deferred list (item 5), except the payroll items.
 
 ### 5c — Payroll (waiting on HR)
 
-Not scoped until HR answers. Add these to `docs/HR_DECISIONS.md`:
+Not scoped until HR answers. Add these to `docs/HR_DECISIONS.md` (done in 5a: 24–27, "Needed before 5c"):
 - **Payroll cutoff:** which day a month closes, and who closes it.
 - **Changes after close:** a late claim, a cancelled leave or a punch correction for a closed month — refused, or carried into the next period as an adjustment?
 - **Late minutes:** are they deducted from pay, and do late minutes on an incomplete day count?
@@ -1133,13 +1133,14 @@ Then: a month-close that freezes credited minutes and rates, pay-equivalent hour
 **Phase 5a, built:** polish and tooling, in five commits plus this documentation pass (commit 0 was the scope above).
 - **Small UI fixes:**
   - Holiday names are muted in the calendar cell (and its phone-width flag) and the day modal; a `holiday` day keeps its fuchsia fill, icon and pill (`docs/ATTENDANCE_UI.md`, Leave and holidays).
-  - "Bulk Reassign" with one schedule says why it's disabled, at rest.
+  - "Bulk Reassign" with one schedule says why it's disabled, at rest — from `sm` in the cell under that button and as wide as it, so it can't read as New Schedule's; on a phone under both buttons.
   - The sidebar's "Soon" items read at the muted-text colours, with `aria-disabled`; `NeutralScaleTest` no longer exempts them.
   - The 403 page's topbar says "Access denied" (the error partial's optional short `header`), so it fits one line at 390px; the card keeps the sentence.
 - **Charts:** the pending trend bar and the Department card's pending fill are **hollow** — a pale fill inside an outline of at least 3:1 (4.57 / 4.19:1 on the light card / track, 4.84 / 4.08:1 dark), up from 1.52 / 1.33 / 1.13:1 — because no solid tint lighter than the attended green reaches 3:1 on the light track (`docs/DESIGN_SYSTEM.md`, Dashboard). **The bundle needed no change:** `dashboard-chart.js` already imported only the components it registers (never `chart.js/auto` — the 4 Oct review's "imports all of Chart.js" was wrong). It is 151.97 KB / 53.10 KB gzipped (151.86 / 53.07 before; the outline options), and Chart.js core alone is 120.3 / 42.7 KB, so there is nothing left to tree-shake.
 - **The overtime report at 390px:** the Employee column is pinned at every width with the edge shadow, and the end edge fades while more columns lie beyond; nothing is hidden, and 1440 is unchanged (`docs/ATTENDANCE_UI.md`, Responsive behavior).
 - **Policies' own ability:** `PoliciesPolicy` as the `policies.view` gate — any tab the user may see, each by the ability its component checks. The sidebar item, the page and the route use it (`can:policies.view`, replacing `role:admin` on `/policies`). The page renders only those tabs and opens on the requested one if allowed, else the first. Behaviour is unchanged today; `PoliciesPageTest` grants a manager Holidays alone through a `Gate::before` and sees only that tab.
 - **`php artisan user:create-admin`** (Local environment, above; `docs/GO_LIVE.md`, steps 3 and 6, which no longer have a tinker snippet).
+- **Follow-ups before merge:** the Bulk Reassign hint moved under its own button (above); the report's end-edge fade was checked at 390 before any scroll, light and dark — it renders (the scroller has `scroll-more-after` from load), and a 2× crop with and without the mask is `storage/app/visual-audit/phase-5a/9-overtime-report-fade-evidence-390-zoomed.png`; `docs/HR_DECISIONS.md` gained the four 5c questions, 24–27.
 
 Claude's choices, open to veto: the hollow encoding for pending bars; "Access denied" as the 403's topbar title; the Soon items' label at the enabled items' muted colour, kept inactive by the fainter icon, the badge and no hover; the report's leading-column pin (a documented exception to "never a leading column" — a report is read across by who each row is); `can:policies.view` as the route layer; the scope sits at the end of this file, after Phase 4, rather than in the roadmap where "Phase 5's hasn't been written yet" stood.
 

@@ -2,34 +2,37 @@
     $dayLabels = [1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => 'Sat', 7 => 'Sun'];
 @endphp
 <div class="space-y-6">
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    {{-- Top-aligned while the hint shows, so the title stays level with the
+    buttons rather than with the hint's last line. --}}
+    <div @class(['flex flex-col gap-4 sm:flex-row sm:justify-between', 'sm:items-end' => $allSchedules->count() >= 2, 'sm:items-start' => $allSchedules->count() < 2])>
         <div>
             <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Schedules</h2>
             <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">Define the working hours and workdays used for employee attendance.</p>
         </div>
 
-        <div class="flex flex-col gap-2 sm:items-end">
-            <div class="flex flex-wrap items-center gap-3">
-                <x-button
-                    type="button"
-                    variant="secondary"
-                    wire:click="openBulkReassign"
-                    wire:loading.attr="disabled"
-                    wire:target="openBulkReassign"
-                    :disabled="$allSchedules->count() < 2"
-                    :aria-describedby="$allSchedules->count() < 2 ? 'bulk-reassign-hint' : null"
-                >
-                    Bulk Reassign
-                </x-button>
-                <x-button variant="primary" wire:click="create" wire:loading.attr="disabled" wire:target="create">
-                    <x-icon name="plus" class="w-5 h-5" />
-                    New Schedule
-                </x-button>
-            </div>
-            {{-- A disabled control says why, at rest — not in a tooltip, which
-            touch can't reach. --}}
+        {{-- A disabled control says why, at rest — not in a tooltip, which
+        touch can't reach. From sm the hint sits in the cell under Bulk
+        Reassign, as wide as that button (w-0 min-w-full: it wraps rather than
+        widening the column), so it can't read as New Schedule's; on a phone
+        it runs under both buttons. --}}
+        <div class="grid grid-cols-[auto_auto] justify-start gap-x-3 gap-y-2 sm:justify-end">
+            <x-button
+                type="button"
+                variant="secondary"
+                wire:click="openBulkReassign"
+                wire:loading.attr="disabled"
+                wire:target="openBulkReassign"
+                :disabled="$allSchedules->count() < 2"
+                :aria-describedby="$allSchedules->count() < 2 ? 'bulk-reassign-hint' : null"
+            >
+                Bulk Reassign
+            </x-button>
+            <x-button variant="primary" wire:click="create" wire:loading.attr="disabled" wire:target="create">
+                <x-icon name="plus" class="w-5 h-5" />
+                New Schedule
+            </x-button>
             @if ($allSchedules->count() < 2)
-                <p id="bulk-reassign-hint" class="text-xs text-slate-600 dark:text-slate-400">Create a second schedule to reassign employees.</p>
+                <p id="bulk-reassign-hint" class="col-span-2 text-xs text-slate-600 sm:col-span-1 sm:w-0 sm:min-w-full dark:text-slate-400">Create a second schedule to reassign employees.</p>
             @endif
         </div>
     </div>

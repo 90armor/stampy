@@ -48,7 +48,9 @@ class ScheduleManagementTest extends TestCase
         Livewire::actingAs($this->admin())
             ->test(Index::class)
             ->assertSeeHtml('aria-describedby="bulk-reassign-hint"')
-            ->assertSeeHtml('<p id="bulk-reassign-hint"')
+            // Under Bulk Reassign and as wide as it from sm, not under both buttons.
+            ->assertSeeHtml('<p id="bulk-reassign-hint" class="col-span-2 text-xs text-slate-600 sm:col-span-1 sm:w-0 sm:min-w-full')
+            ->assertSeeHtml('sm:items-start')
             ->assertSee('Create a second schedule to reassign employees.');
 
         $this->schedule(['name' => 'Evening shift']);
