@@ -1106,13 +1106,56 @@ Closes the roadmap's deferred list (item 5), except the payroll items.
    - Promoting an existing user stays in the employee form; the command never edits an existing account.
    - `docs/GO_LIVE.md` replaces the tinker snippet with it.
 
-### 5b — Reports (outline; detailed before building)
+### 5b — Reports (scoped 24 Oct 2026)
 
-- **Reports page with tabs** — Attendance, Leave, Overtime — each gated by its own ability (`ReportPolicy`: `attendance` and `leave` for admins and managers with an employee record, `overtime` admin only). The sidebar's Reports item goes live for anyone who can open a tab. `/reports/overtime` keeps working.
-- **Attendance, monthly:** one row per employee active on any day of the month, in the viewer's scope. Columns from `AttendanceSummary` — one definition, shared with My attendance: calculated workdays, present, absent, incomplete, on leave, leave taken (days), late (days · total), early leave (days · total), not calculated. Department filter (options scoped). A joiner or leaver counts only the days they were employed, with the date shown. An open month says so, as the overtime report does.
-- **Leave, yearly:** one row per employee and leave type with a balance — entitled, carried in, adjustments, used, pending, available — from `LeaveBalance`; types without a balance show days used. A leaver shows earned to last day. Year picker: this year, earlier years, next year once granted.
-- **CSV** for both, as the overtime report's: UTF-8 BOM, export time in the filename and first row, the open-month note.
-- **Edge cases to cover:** a manager whose team changes mid-month (scope is today's team, as everywhere else); a department filter emptied by scope; a month before go-live (rows from opening adjustments only); query count at 50 employees (no N+1).
+Replaces the earlier 5b outline. No HR sample report yet **(owner: build ours now, adjust after HR)**. Owner decisions are marked **(owner)**; Claude's are marked **(Claude)** and open to veto.
+
+#### Decisions
+
+1. **Build without HR's sample** **(owner)**. If HR later brings a report they keep by hand, its layout wins and we adjust columns; the figures underneath don't change.
+2. **One Reports page with tabs** **(Claude, moved from 5b.2 to 5b.1)**: Attendance, Leave, Overtime, via `x-tab-bar`. The tabs come first because managers have no way to reach a report otherwise. `/reports?tab=attendance|leave|overtime`; `/reports/overtime` redirects to `?tab=overtime` (bookmarks and `docs/GO_LIVE.md` keep working).
+3. **Access** **(owner)**: `ReportPolicy` gains `attendance` and `leave` — an admin, or a manager with an employee record. `overtime` stays admin-only. A `reports.view` gate is true when any tab is, exactly like `policies.view`; the sidebar item and route use it, and the page opens on the first tab the user may see. The manager's "Soon" on Reports goes away.
+4. **Scope is today's team** **(owner, existing rule)**: a manager sees themself and their transitive reports through `EmployeeScope`, as everywhere else — including someone who left the team mid-month, because scope is decided now, not per day. Admins see everyone.
+5. **Department is the current department** **(Claude)**: departments have no history, so someone who moved in mid-month counts wholly under their new one. The filter's options come from the departments of employees in scope.
+6. **CSV durations are whole minutes** **(Claude)**: the page shows `1h 20m`; the CSV gives integer minutes in a column headed "(minutes)", so HR can sum in Excel. Counts stay counts; leave days stay decimals (`0.5`).
+7. **Leave report shows one leave type at a time** **(Claude)**: a type picker (default Annual), one row per employee. Six figures × every type is too wide to read. The CSV exports **all** types in long form (one row per employee and type), which is what a spreadsheet wants.
+
+#### Attendance tab (monthly) — 5b.1
+
+- **Month picker** — the overtime report's (13 months). Boundaries in `Asia/Phnom_Penh`.
+- **Rows** — one per employee **active on any day of the month** (`join_date ≤ month end`, `left_on` null or ≥ month start) in the viewer's scope, in the overtime report's order. A joiner or leaver counts only their employed days; under the name a muted `Joined 12 Oct` / `Left 20 Oct`.
+- **Columns**, every figure from the same definition as `AttendanceSummary` (My attendance, the employee dashboard): Calculated workdays · Present · Absent · Incomplete · On leave · Leave taken (days, half = 0.5) · Late (`3 days · 1h 20m`) · Early leave (same form) · Worked (total) · Not calculated (workdays with no closed row). Timing totals in amber only when non-zero, as in the attendance views. A trailing chevron — the only link — opens the employee's attendance calendar at that month.
+- **No N+1**: the report computes from grouped queries, but **must agree with `AttendanceSummary` employee by employee** — a test compares every row against it for a seeded month. One definition, never two.
+- **Totals row** for the summable columns.
+- **Department filter** (options scoped, decision 5); "All departments" default.
+- **Open month** — the overtime report's notice ("This month is still open: figures can change until it ends."). Days after today count nowhere.
+- **No data** — a month with no attendance rows for anyone in scope (before go-live, or a filter that leaves nobody) shows an empty state that says which, not a table of zeros.
+- **CSV** — same columns (decision 6) plus employee code and department; UTF-8 BOM; filename `attendance-2026-10[-<department-slug>]-exported-2026-11-01-0910.csv`; the first row says when, the month, the filter and whose view it is (`All employees` / `Team of Aye Aye Mon`); an open month says so in the file.
+
+#### Leave tab (yearly) — 5b.2
+
+- **Year picker**: this year, earlier years with grants, next year once granted. **Type picker**: types that exist, default Annual.
+- **Rows** — employees in scope active on any day of the year. For a type with a balance (`LeaveBalance`): Entitled · Carried in · Adjustments · Used · Pending · Available. For a type without one: Used (days) only. A leaver shows the balance as at their last day (what `LeaveBalance` already gives), with `Left 20 Oct`. Annual before 12 months' service shows as not yet usable, the way Time off says it — not as a misleading 0.
+- **Time off in lieu** is just another type here: earned shows as Entitled/Adjustments as the balance engine reports it, with no special maths.
+- Department filter, totals row, chevron to the employee's profile Leave card.
+- **CSV** — all types, long form (decision 7), same file conventions as above.
+
+#### Edge cases to cover (tests)
+
+- A manager whose report moved to another manager mid-month: not in the old manager's report (today's scope), in the new one's — for the whole month.
+- A department filter that scope empties → empty state, not an error; a `?department=` outside scope is ignored, never widens scope.
+- A month before go-live / before anyone's join date → empty state.
+- An employee who joined and left inside the same month.
+- A half-day Present day: 1 present, 0.5 leave taken — same as `AttendanceSummary`.
+- Today in progress: counts as `AttendanceSummary` counts it, and the month is open.
+- Query count at 50 employees is constant in the number of employees.
+- An employee without a login is still a row (reports are about employees, not users).
+- A manager without an employee record: no attendance/leave tabs (no scope to report on).
+
+#### Build order
+
+- **5b.1** — Reports page and tabs, `reports.view`, the Attendance tab and its CSV. Screenshot stop.
+- **5b.2** — the Leave tab and its CSV. Screenshot stop, then the Phase 5b closeout entry in CLAUDE.md.
 
 ### 5c — Payroll (waiting on HR)
 
