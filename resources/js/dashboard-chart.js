@@ -12,8 +12,12 @@
 // marker the same way.
 //
 // Today is pending until it is calculated: it carries a muted "Today" marker,
-// and the checked-in share so far is drawn as a lighter, provisional bar with
-// the marker above it — never as a final 0% (docs/ATTENDANCE_UI.md).
+// and the checked-in share so far is drawn as a hollow, provisional bar with
+// the marker above it — never as a final 0% (docs/ATTENDANCE_UI.md). Hollow,
+// not just lighter (Phase 5a): no solid tint lighter than the attended green
+// reaches 3:1 against the card, so the outline carries the contrast
+// (primary-500 light / primary-400 dark) and the pale fill sets it apart from
+// the solid attended bars (docs/DESIGN_SYSTEM.md, Charts).
 import {
     Chart,
     BarController,
@@ -87,7 +91,8 @@ function initAttendanceTrendChart() {
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const markers = JSON.parse(canvas.dataset.markers || '[]');
     const pending = JSON.parse(canvas.dataset.pending || '[]');
-    const barColor = (index) => (pending[index] ? (dark ? primary(800) : primary(200)) : primary(500));
+    const barColor = (index) => (pending[index] ? (dark ? primary(900) : primary(100)) : primary(500));
+    const pendingOutline = dark ? primary(400) : primary(500);
     const muted = dark ? slate(400) : slate(500);
 
     new Chart(canvas, {
@@ -98,6 +103,10 @@ function initAttendanceTrendChart() {
                 data: JSON.parse(canvas.dataset.values),
                 backgroundColor: (ctx) => barColor(ctx.dataIndex),
                 hoverBackgroundColor: (ctx) => (pending[ctx.dataIndex] ? barColor(ctx.dataIndex) : primary(600)),
+                borderColor: pendingOutline,
+                borderWidth: (ctx) => (pending[ctx.dataIndex] ? 2 : 0),
+                // A pending bar's outline closes along the baseline too.
+                borderSkipped: (ctx) => (pending[ctx.dataIndex] ? false : 'start'),
                 borderRadius: 4,
                 maxBarThickness: 40,
             }],

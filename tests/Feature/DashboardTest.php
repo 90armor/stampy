@@ -527,6 +527,9 @@ class DashboardTest extends TestCase
 
         $response->assertSee('Checked in', false)
             ->assertSee('Today', false)
+            // The provisional bar is hollow: an outline at least 3:1 against
+            // the track, a pale fill unlike the solid attended bar (Phase 5a).
+            ->assertSee('h-full rounded-full border border-primary-500 bg-primary-100 dark:border-primary-400 dark:bg-primary-900', false)
             // In progress carries no percentage in the stat strip.
             ->assertDontSee('>100%<', false)
             ->assertDontSee('>0%<', false);

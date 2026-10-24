@@ -75,12 +75,12 @@ In-progress or not-yet-calculated attendance is **pending**, and every trend day
 | A trend day that is… | Shows |
 |---|---|
 | Off or Holiday (every scoped row) | no bar, a muted `Off` / `Holiday` marker |
-| Today, while pending (any In progress row, or an active employee with no row yet — `todayIsPending()`) | a lighter provisional bar (`primary-200`, dark `primary-800`) of **checked in so far** — anyone with a punch, in or out — and a `Today` marker; no bar while nobody has checked in |
+| Today, while pending (any In progress row, or an active employee with no row yet — `todayIsPending()`) | a hollow provisional bar (a `primary-100` fill inside a `primary-500` outline, dark `primary-900` inside `primary-400` — at least 3:1 against the card, `docs/DESIGN_SYSTEM.md`, Dashboard) of **checked in so far** — anyone with a punch, in or out — and a `Today` marker; no bar while nobody has checked in |
 | An earlier day still open (an in-only row inside its pairing window — a 9:30 in-punch keeps yesterday open until 03:30) | the same provisional bar and a `Pending` marker |
 | A past day with no rows, or with In progress rows whose window has already closed (the builder didn't run) | no bar, a muted `Not calculated` marker |
 | Closed | the rate as a `primary-500` bar; a closed workday with 0 attended gets a `0%` marker |
 
-Markers too wide for their slot (`Not calculated` at phone width) wrap onto two lines. The **Department card** shows counts, never a bare percentage: `Checked in N / M` with the provisional bar while today is pending, `Attended N / M` once it has closed.
+Markers too wide for their slot (`Not calculated` at phone width) wrap onto two lines. The **Department card** shows counts, never a bare percentage: `Checked in N / M` with the provisional (hollow) fill while today is pending, `Attended N / M` once it has closed.
 
 ## Status counts vs. the live strip
 

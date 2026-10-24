@@ -120,7 +120,8 @@
                                 <div>
                                     {{-- Counts, never a bare percentage (Phase 2.7): "Checked in
                                     N / M" (any punch today, so the departments total the strip's
-                                    At work + Left) with a lighter provisional bar while today is pending,
+                                    At work + Left) with a hollow provisional bar while today is pending (an
+                                    outline at least 3:1 against the track, as the trend's — Phase 5a),
                                     "Attended N / M" (present + incomplete) once it has closed. --}}
                                     @php
                                         $departmentCount = $department['pending'] ? $department['checkedIn'] : $department['attended'];
@@ -137,7 +138,7 @@
                                         @endif
                                     </div>
                                     <p class="text-xs text-slate-500 dark:text-slate-400">{{ $department['employees'] }} {{ $department['employees'] === 1 ? 'employee' : 'employees' }}</p>
-                                    <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-750"><div @class(['h-full rounded-full', 'bg-primary-200 dark:bg-primary-800' => $department['pending'], 'bg-primary-500' => ! $department['pending']]) style="width: {{ $departmentShare }}%"></div></div>
+                                    <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-750"><div @class(['h-full rounded-full', 'border border-primary-500 bg-primary-100 dark:border-primary-400 dark:bg-primary-900' => $department['pending'], 'bg-primary-500' => ! $department['pending']]) style="width: {{ $departmentShare }}%"></div></div>
                                 </div>
                             @endforeach
                         </div>
