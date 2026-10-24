@@ -7,6 +7,7 @@ The checklist an admin works through before anyone uses Stampy for real. Do the 
 Before anything else, take **[`HR_DECISIONS.md`](HR_DECISIONS.md)** to HR: the leave, overtime and time off in lieu policy questions with their current defaults. Steps 4 and 5 enter the answers, and two of them lock once used.
 
 - `APP_ENV=production`, `APP_DEBUG=false`, and a real `APP_KEY` in `.env`.
+- **PHP 8.5.12 or later** (check with `php -v`): earlier 8.5 releases have two actively exploited remote code execution flaws (CVE-2026-109618 / CVE-2026-109619). Set `session.upload_progress.enabled = 0` and `fatal_error_backtraces = Off` too, as `docker/php/conf.d/zz-security.ini` does here, and check them with `php -i | grep -E 'upload_progress.enabled|fatal_error_backtraces'` — and in PHP-FPM's configuration (`php-fpm -i`), which is what serves the web requests, not only the CLI's.
 - The app timezone is **Asia/Phnom_Penh**, set in `config/app.php` (not in `.env`): every attendance and leave rule is a local-time rule. Check it with `php artisan about` (Environment → Timezone).
 - The server's own clock must be correct (NTP). The database's session timezone doesn't matter — no query uses MySQL's clock.
 
