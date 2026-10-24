@@ -41,6 +41,24 @@ class ScheduleManagementTest extends TestCase
         ], $overrides));
     }
 
+    public function test_bulk_reassign_says_why_it_is_disabled_with_one_schedule(): void
+    {
+        $this->schedule(['name' => 'Morning shift', 'is_default' => true]);
+
+        Livewire::actingAs($this->admin())
+            ->test(Index::class)
+            ->assertSeeHtml('aria-describedby="bulk-reassign-hint"')
+            ->assertSeeHtml('<p id="bulk-reassign-hint"')
+            ->assertSee('Create a second schedule to reassign employees.');
+
+        $this->schedule(['name' => 'Evening shift']);
+
+        Livewire::actingAs($this->admin())
+            ->test(Index::class)
+            ->assertDontSeeHtml('bulk-reassign-hint')
+            ->assertDontSee('Create a second schedule to reassign employees.');
+    }
+
     public function test_admin_can_view_the_schedules_list(): void
     {
         $this->schedule(['name' => 'Morning shift', 'is_default' => true]);

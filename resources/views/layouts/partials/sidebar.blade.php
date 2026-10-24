@@ -57,13 +57,18 @@ $navItems = [
                     @endif
                 </a>
             @else
+                {{-- Not built yet: no link, no hover, a fainter icon and the "Soon"
+                badge say it's inactive; the label and badge still use the readable
+                muted colours (docs/DESIGN_SYSTEM.md, Muted text rule). --}}
                 <div
-                    class="flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-400 dark:text-slate-600 cursor-not-allowed"
+                    role="link"
+                    aria-disabled="true"
+                    class="flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-500 dark:text-slate-400 cursor-not-allowed"
                     title="Coming in a later phase"
                 >
-                    <x-icon :name="$item['icon']" class="w-5 h-5 shrink-0 text-slate-400 dark:text-slate-600" />
+                    <x-icon :name="$item['icon']" class="w-5 h-5 shrink-0 text-slate-300 dark:text-slate-600" />
                     {{ $item['label'] }}
-                    <span class="ml-auto rounded-md bg-slate-100 dark:bg-slate-750 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">Soon</span>
+                    <span class="ml-auto rounded-md bg-slate-100 dark:bg-slate-750 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">Soon</span>
                 </div>
             @endif
         @endforeach

@@ -8,21 +8,29 @@
             <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">Define the working hours and workdays used for employee attendance.</p>
         </div>
 
-        <div class="flex flex-wrap items-center gap-3">
-            <x-button
-                type="button"
-                variant="secondary"
-                wire:click="openBulkReassign"
-                wire:loading.attr="disabled"
-                wire:target="openBulkReassign"
-                :disabled="$allSchedules->count() < 2"
-            >
-                Bulk Reassign
-            </x-button>
-            <x-button variant="primary" wire:click="create" wire:loading.attr="disabled" wire:target="create">
-                <x-icon name="plus" class="w-5 h-5" />
-                New Schedule
-            </x-button>
+        <div class="flex flex-col gap-2 sm:items-end">
+            <div class="flex flex-wrap items-center gap-3">
+                <x-button
+                    type="button"
+                    variant="secondary"
+                    wire:click="openBulkReassign"
+                    wire:loading.attr="disabled"
+                    wire:target="openBulkReassign"
+                    :disabled="$allSchedules->count() < 2"
+                    :aria-describedby="$allSchedules->count() < 2 ? 'bulk-reassign-hint' : null"
+                >
+                    Bulk Reassign
+                </x-button>
+                <x-button variant="primary" wire:click="create" wire:loading.attr="disabled" wire:target="create">
+                    <x-icon name="plus" class="w-5 h-5" />
+                    New Schedule
+                </x-button>
+            </div>
+            {{-- A disabled control says why, at rest — not in a tooltip, which
+            touch can't reach. --}}
+            @if ($allSchedules->count() < 2)
+                <p id="bulk-reassign-hint" class="text-xs text-slate-600 dark:text-slate-400">Create a second schedule to reassign employees.</p>
+            @endif
         </div>
     </div>
 

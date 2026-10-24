@@ -134,7 +134,7 @@ class OvertimeReportTest extends TestCase
 
         // The admin's Reports item links to the report; the manager's is still "Soon"; an employee has none.
         $this->actingAs($this->admin)->get(route('dashboard'))->assertSee(route('reports.overtime'), false);
-        $this->actingAs($manager)->get(route('dashboard'))->assertSee('Reports')->assertDontSee(route('reports.overtime'), false);
+        $this->actingAs($manager)->get(route('dashboard'))->assertSee('Reports')->assertSee('aria-disabled="true"', false)->assertDontSee(route('reports.overtime'), false);
         $this->actingAs($employee)->get(route('dashboard'))->assertDontSee('Reports');
     }
 
