@@ -652,7 +652,7 @@ Enforced in four places, none of which is optional:
 2. **Attendance & device integration** (complete) — `attendance_logs` ingestion (CSV import for now — see "ZKTeco device ingestion" below), processing into `daily_attendances`, attendance dashboards/reports, effective-dated schedules, holidays, row-level manager scoping.
 3. **Leave management** (complete — "Phase 3 — Leave management" below) — `leave_types`, `leaves`, request/approval workflow, balances, the leave UI, and the go-live checklist (`docs/GO_LIVE.md`).
 4. **Overtime** (complete — "Phase 4 — Overtime" below) — `overtime_requests`, request/approval workflow reusing `approval_steps` and `ApprovalFlow`, integration with processed attendance.
-5. **Reporting & polish** (next — not yet scoped) — cross-cutting reports (attendance/leave/overtime), exports, UX polish, performance pass. Carried in, deliberately deferred to here:
+5. **Reporting & polish** (scoped — "Phase 5 — Reporting & polish" below) — cross-cutting reports (attendance/leave/overtime), exports, UX polish, performance pass. Carried in, deliberately deferred to here:
    - **Payroll** (also in `docs/HR_DECISIONS.md`, 21–23):
      - **A payroll-period lock.** The overtime report and its CSV recompute from the builder's rows and today's rates every time, so a late claim, a cancellation, a punch correction or a rate change after payroll has run changes a closed month's figures. Today the defence is the CSV's export time and the open-month notice; Phase 5 should let an admin close a month — freezing its credited minutes and rates — so a later change is refused or shown as an adjustment to the next period.
      - **Pay-equivalent hours at the rates in force then**, not today's — with the lock.
@@ -670,7 +670,7 @@ Enforced in four places, none of which is optional:
      - `dashboard-chart.js` imports all of Chart.js (152 KB, 53 KB gzipped) for one bar chart.
      - Disabled states: "Bulk Reassign" is disabled with only one schedule and doesn't say why; the sidebar's "Soon" items (exempt from the contrast minimum as inactive controls) could still be easier to read.
 
-A new phase's scope is written into this file *before* it's built, same as Phases 2, 3 and 4 were. Phase 5's hasn't been written yet.
+A new phase's scope is written into this file *before* it's built, same as Phases 2, 3 and 4 were. Phase 5's is "Phase 5 — Reporting & polish" below.
 
 **Phase 2, complete.** What shipped, at the level someone picking this up needs — the Database schema and Design system sections above already have the full detail, this is the map, not a re-explanation:
 - **Ingestion:** CSV import (`attendance:import`) — see "ZKTeco device ingestion" immediately below for why, and exactly where a real device plugs in later.
@@ -1078,3 +1078,61 @@ Verified:
 
 - **HR's questions** — rates and days, limits, time off in lieu, counting: `docs/HR_DECISIONS.md`, 1–2 and 8–20. Settle the time off in lieu ratio and block (1–2) before the first time-off overtime is approved: they lock.
 - **Payroll** — the payroll-period lock and historical rates: the roadmap, item 5, and `docs/HR_DECISIONS.md`, 21–23.
+
+## Phase 5 — Reporting & polish (scoping)
+
+Scoped 24 Oct 2026. Owner decisions are marked **(owner)**; Claude's choices are marked **(Claude)** and are open to the owner's veto. Phase 5 is split by what it waits on **(owner)**: 5a and 5b need nobody; 5c waits on HR.
+
+### Decisions
+
+1. **Three slices** **(owner)**:
+   - **5a — Polish and tooling:** the deferred UI items and `user:create-admin`.
+   - **5b — Reports:** monthly attendance and yearly leave reports, with CSV.
+   - **5c — Payroll:** the payroll-period lock, historical rates, `late_minutes` in payroll, medical certificates. **Not built until HR answers** the questions below.
+2. **Reports** **(owner)**: a monthly attendance report and a yearly leave report, alongside the existing overtime report. If HR already keeps a report by hand, its layout wins over this one; ask for a sample.
+3. **Who sees reports** **(owner)**: attendance and leave — admins for everyone, managers for themself and their reports (`EmployeeScope`). Overtime stays admin-only: it feeds payroll.
+4. **`user:create-admin`** goes into 5a **(owner)**, replacing `docs/GO_LIVE.md`'s tinker snippet.
+5. **No opening-balance CSV import** **(owner)**: under 50 employees, hand-entered adjustments are faster and checked as they go in. Revisit only if headcount grows well past 50.
+6. **Medical certificate upload moves to 5c** **(Claude)**: HR first has to say whether they want certificates at all, and storing files brings storage and backup questions.
+
+### 5a — Polish and tooling
+
+Closes the roadmap's deferred list (item 5), except the payroll items.
+
+1. **Holiday names are muted text in the calendar cell and the day modal**, as in the tables since 3f. The `holiday` status keeps its fuchsia fill, icon and badge; only the name stops reading as a status — on a worked holiday it was claiming a status the day doesn't have.
+2. **Dashboard chart contrast.** The trend's pending bar and the Department card's pending fill reach at least 3:1 against what they sit on (card or track), light and dark, measured as the earlier ratios were, and stay distinguishable from an attended bar — the "Today"/"Pending" marker already says which is which. Record the ratios in `docs/DESIGN_SYSTEM.md`.
+3. **Chart.js imports only what the bar chart uses** (registered components, not `chart.js/auto`). Report the bundle size before and after.
+4. **Disabled states say why.** "Bulk Reassign" with one schedule shows a visible hint ("Create a second schedule to reassign employees") — not a tooltip, since nothing may be hover-only. The sidebar's "Soon" items move to the readable muted-text colours (`docs/DESIGN_SYSTEM.md`, Muted text rule) while staying visibly inactive.
+5. **The 403 page's topbar title fits one line at 390px.**
+6. **The overtime report at 390px** **(Claude)**: the employee column is pinned and the rest scrolls inside the card, with the tab bar's fading edge showing more lies beyond — the Attendance tables' pinned-column pattern, no column hidden. Reports are desktop work; a phone layout of its own isn't worth it.
+7. **Policies gets its own ability** (`PoliciesPolicy` or a `policies.view` gate): true when the user can view any Policies tab, each tab gated by what its component checks; the page opens on the first tab the user may see. Behaviour is unchanged today (every tab is admin-only); this removes the sidebar's dependence on `LeaveType` `viewAny`.
+8. **`php artisan user:create-admin`** — the supported way to create an admin, the first one included:
+   - Prompts for name, username, optional email, and a password (hidden, entered twice, the app's password rules). `--employee=<code>` links the account to an existing employee record — the go-live step "admins linked to employee records".
+   - Refuses, with a message, and writes nothing: a username or email already taken; an employee code that doesn't exist or already has a login; no `admin` role yet ("run the configuration seeders first — docs/GO_LIVE.md, step N").
+   - Runs in production — that's its purpose. Creates exactly one user with the `admin` role, `must_change_password` false (the operator chose the password), and prints who was created.
+   - Promoting an existing user stays in the employee form; the command never edits an existing account.
+   - `docs/GO_LIVE.md` replaces the tinker snippet with it.
+
+### 5b — Reports (outline; detailed before building)
+
+- **Reports page with tabs** — Attendance, Leave, Overtime — each gated by its own ability (`ReportPolicy`: `attendance` and `leave` for admins and managers with an employee record, `overtime` admin only). The sidebar's Reports item goes live for anyone who can open a tab. `/reports/overtime` keeps working.
+- **Attendance, monthly:** one row per employee active on any day of the month, in the viewer's scope. Columns from `AttendanceSummary` — one definition, shared with My attendance: calculated workdays, present, absent, incomplete, on leave, leave taken (days), late (days · total), early leave (days · total), not calculated. Department filter (options scoped). A joiner or leaver counts only the days they were employed, with the date shown. An open month says so, as the overtime report does.
+- **Leave, yearly:** one row per employee and leave type with a balance — entitled, carried in, adjustments, used, pending, available — from `LeaveBalance`; types without a balance show days used. A leaver shows earned to last day. Year picker: this year, earlier years, next year once granted.
+- **CSV** for both, as the overtime report's: UTF-8 BOM, export time in the filename and first row, the open-month note.
+- **Edge cases to cover:** a manager whose team changes mid-month (scope is today's team, as everywhere else); a department filter emptied by scope; a month before go-live (rows from opening adjustments only); query count at 50 employees (no N+1).
+
+### 5c — Payroll (waiting on HR)
+
+Not scoped until HR answers. Add these to `docs/HR_DECISIONS.md`:
+- **Payroll cutoff:** which day a month closes, and who closes it.
+- **Changes after close:** a late claim, a cancelled leave or a punch correction for a closed month — refused, or carried into the next period as an adjustment?
+- **Late minutes:** are they deducted from pay, and do late minutes on an incomplete day count?
+- **Medical certificates:** required, from how many days, kept how long?
+
+Then: a month-close that freezes credited minutes and rates, pay-equivalent hours at the rates in force, and whatever HR decides above.
+
+### Build order
+
+- **5a** — one reviewable slice, screenshot stop at the end.
+- **5b** — scoped in detail first (with HR's sample report if there is one), then built in two halves: attendance, then leave and the tabs.
+- **5c** — after HR.
