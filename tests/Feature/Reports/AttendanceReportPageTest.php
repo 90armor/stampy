@@ -77,10 +77,10 @@ class AttendanceReportPageTest extends TestCase
             ->assertDontSee('This month is still open');
 
         $html = $component->html();
-        $this->assertMatchesRegularExpression('/Kyaw Kyaw.*EMP-0002 · Engineering.*Su Su.*EMP-0005 · Engineering.*Joined Mon 11 May.*Total/s', $html);
+        $this->assertMatchesRegularExpression('/Kyaw Kyaw.*EMP-0002&nbsp;· Engineering.*Su Su.*EMP-0005&nbsp;· Engineering.*Joined Mon 11 May.*Total/s', $html);
 
-        // Late is days · total, the total amber because it's non-zero.
-        $this->assertStringContainsString('1 day · <span class="font-medium text-amber-700 dark:text-amber-300">20m</span>', $html);
+        // Late is the total over the day count, the total amber because it's non-zero.
+        $this->assertMatchesRegularExpression('#<span class="block font-medium text-amber-700 dark:text-amber-300">20m</span>\s*<span class="block text-xs font-normal text-slate-500 dark:text-slate-400">1 day</span>#', $html);
         // Su was never late or early: an em dash, never an amber zero.
         $this->assertSame(2, substr_count($html, 'text-amber-700'));
         // The chevron is each row's only link, to that month of the calendar.

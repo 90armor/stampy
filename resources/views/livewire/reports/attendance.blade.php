@@ -11,7 +11,8 @@
 @endphp
 
 <div class="space-y-6">
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    {{-- Three controls: beside the title only from xl, where they fit on one line. --}}
+    <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
             <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Attendance report</h2>
             <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">Each employee's month in counts, from the calculated attendance.</p>
@@ -54,7 +55,7 @@
                 <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100">{{ $monthLabel }}</h3>
                 <p class="shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ count($report['rows']) }} {{ Str::plural('employee', count($report['rows'])) }}</p>
             </div>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">The same counts as each employee's attendance summary. Late and early leave are days · total time. Not calculated counts workdays with no finished attendance yet, today's included.</p>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">The same counts as each employee's attendance summary. Late and early leave are total time over the number of days. Not calculated counts workdays with no finished attendance yet, today's included.</p>
         </div>
 
         @if ($report['rows'] === [])
@@ -71,10 +72,10 @@
             while more columns lie beyond. No column is hidden. The chevron is
             each row's only link. --}}
             <div x-data="scrollEdges" @scroll.passive="measure()" class="scroll-fade-end mt-3 overflow-x-auto rounded-b-xl">
-                <table class="w-full min-w-[72rem] text-sm">
+                <table class="w-full min-w-[64rem] text-sm">
                     <thead>
                         <tr class="relative text-left align-bottom text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                            <th scope="col" class="table-pin-lead px-4 py-3 font-medium sm:px-6">Employee</th>
+                            <th scope="col" class="table-pin-lead min-w-[8.5rem] px-4 py-3 font-medium sm:px-6">Employee</th>
                             <th scope="col" class="{{ $th }}">Calculated workdays</th>
                             <th scope="col" class="{{ $th }}">Present</th>
                             <th scope="col" class="{{ $th }}">Absent</th>
@@ -85,7 +86,7 @@
                             <th scope="col" class="{{ $th }}">Early leave</th>
                             <th scope="col" class="{{ $th }}">Worked</th>
                             <th scope="col" class="{{ $th }}">Not calculated</th>
-                            <th scope="col" class="w-16 px-4 py-3 sm:px-6"><span class="sr-only">Attendance</span>{!! $divider !!}</th>
+                            <th scope="col" class="w-14 px-2 py-3 sm:pr-4"><span class="sr-only">Attendance</span>{!! $divider !!}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -103,10 +104,10 @@
                                         @php $employee = $row['employee']; @endphp
                                         {{-- Narrower on a phone, so the pinned column leaves room
                                         for the figures: the name and code wrap instead. --}}
-                                        <span class="block max-w-[9rem] font-medium text-slate-900 sm:max-w-none dark:text-slate-100">{{ $employee->full_name }}</span>
-                                        <span class="block max-w-[9rem] text-xs text-slate-500 sm:max-w-none dark:text-slate-400">{{ $employee->employee_code }}{{ $employee->department ? ' · '.$employee->department->name : '' }}</span>
+                                        <span class="block max-w-[9rem] font-medium text-slate-900 sm:max-w-none sm:whitespace-nowrap dark:text-slate-100">{{ $employee->full_name }}</span>
+                                        <span class="block max-w-[9rem] text-xs text-slate-500 sm:max-w-none sm:whitespace-nowrap dark:text-slate-400">{{ $employee->employee_code }}{!! $employee->department ? '&nbsp;· '.e($employee->department->name) : '' !!}</span>
                                         @if ($row['joined'] || $row['left'])
-                                            <span class="block max-w-[9rem] text-xs text-slate-500 sm:max-w-none dark:text-slate-400">{{ collect([$row['joined'] ? 'Joined '.DisplayDate::compact($row['joined']) : null, $row['left'] ? 'Left '.DisplayDate::compact($row['left']) : null])->filter()->implode(' · ') }}</span>
+                                            <span class="block max-w-[9rem] text-xs text-slate-500 sm:max-w-none sm:whitespace-nowrap dark:text-slate-400">{{ collect([$row['joined'] ? 'Joined '.DisplayDate::compact($row['joined']) : null, $row['left'] ? 'Left '.DisplayDate::compact($row['left']) : null])->filter()->implode(' · ') }}</span>
                                         @endif
                                     @endif
                                 </td>
@@ -116,23 +117,21 @@
                                 <td class="{{ $cell }}">{{ $s['incomplete'] }}</td>
                                 <td class="{{ $cell }}">{{ $s['leave'] }}</td>
                                 <td class="{{ $cell }}">{{ $s['leave_tenths'] > 0 ? LeaveDays::format($s['leave_tenths']) : '—' }}</td>
-                                <td class="{{ $cell }} whitespace-nowrap">
-                                    @if ($lateDays > 0)
-                                        {{ $lateDays }} {{ Str::plural('day', $lateDays) }} · <span class="font-medium text-amber-700 dark:text-amber-300">{{ Duration::format($s['late_minutes']) }}</span>
-                                    @else
-                                        —
-                                    @endif
-                                </td>
-                                <td class="{{ $cell }} whitespace-nowrap">
-                                    @if ($s['early_leave_days'] > 0)
-                                        {{ $s['early_leave_days'] }} {{ Str::plural('day', $s['early_leave_days']) }} · <span class="font-medium text-amber-700 dark:text-amber-300">{{ Duration::format($s['early_leave_minutes']) }}</span>
-                                    @else
-                                        —
-                                    @endif
-                                </td>
+                                {{-- The total over the day count: two lines, so the whole
+                                table fits at 1440 without scrolling. --}}
+                                @foreach ([[$lateDays, $s['late_minutes']], [$s['early_leave_days'], $s['early_leave_minutes']]] as [$days, $minutes])
+                                    <td class="{{ $cell }} whitespace-nowrap">
+                                        @if ($days > 0)
+                                            <span class="block font-medium text-amber-700 dark:text-amber-300">{{ Duration::format($minutes) }}</span>
+                                            <span class="block text-xs font-normal text-slate-500 dark:text-slate-400">{{ $days }} {{ Str::plural('day', $days) }}</span>
+                                        @else
+                                            —
+                                        @endif
+                                    </td>
+                                @endforeach
                                 <td class="{{ $cell }} whitespace-nowrap">{{ $s['total_worked_minutes'] > 0 ? Duration::format($s['total_worked_minutes']) : '—' }}</td>
                                 <td class="{{ $cell }}">{{ $s['not_calculated'] }}</td>
-                                <td class="px-4 py-2 text-right sm:px-6">
+                                <td class="px-2 py-2 text-right sm:pr-4">
                                     @unless ($row['total'])
                                         <a
                                             href="{{ route('attendance.show', ['employee' => $employee, 'month' => $month]) }}"
