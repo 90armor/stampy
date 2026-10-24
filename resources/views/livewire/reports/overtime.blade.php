@@ -9,7 +9,7 @@
 <div class="space-y-6">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-            <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Overtime report</h1>
+            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Overtime report</h2>
             <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">Credited overtime per employee for a month, for payroll.</p>
         </div>
         <div class="flex flex-wrap items-end gap-3">
@@ -38,7 +38,7 @@
     <x-card :padding="false">
         <div class="px-4 pt-5 sm:px-6">
             <div class="flex items-baseline justify-between gap-4">
-                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">{{ $monthLabel }}</h2>
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100">{{ $monthLabel }}</h3>
                 <p class="shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ count($report['rows']) }} {{ Str::plural('employee', count($report['rows'])) }}</p>
             </div>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Only approved, credited minutes count. Pay columns are minutes by category; time off is earned as leave, not paid. Pay-equivalent hours = Σ (minutes × rate) ÷ 60 at today's rates — payroll multiplies it by the hourly wage.</p>

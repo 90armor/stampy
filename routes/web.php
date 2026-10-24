@@ -8,11 +8,11 @@ use App\Livewire\Employees\Show as ShowEmployee;
 use App\Livewire\Leave\Approvals;
 use App\Livewire\Leave\TimeOff;
 use App\Livewire\Overtime\Index as OvertimeIndex;
-use App\Livewire\Reports\Overtime as OvertimeReport;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Position;
 use App\Policies\PoliciesPolicy;
+use App\Policies\ReportPolicy;
 use App\Support\DashboardAttendance;
 use App\Support\EmployeeDashboard;
 use App\Support\EmployeeScope;
@@ -119,6 +119,29 @@ Route::middleware('auth')->group(function () {
 
         return view('policies', ['tabs' => $tabs, 'tab' => $tab]);
     })->middleware('can:policies.view')->name('policies.index');
+
+    // Reports (Phase 5b): one page, a tab per report — Attendance (admins,
+    // and managers for their team), Overtime (admins). The same shape as
+    // Policies: its own ability (reports.view, ReportPolicy) is the route's
+    // gate, the page renders only the tabs the user may see, and each tab's
+    // component checks its own ability again in mount(), render() and on
+    // export.
+    Route::get('/reports', function (Request $request) {
+        $tabs = app(ReportPolicy::class)->tabs($request->user());
+        $tab = array_key_exists((string) $request->query('tab'), $tabs) ? $request->query('tab') : array_key_first($tabs);
+
+        return view('reports', ['tabs' => $tabs, 'tab' => $tab]);
+    })->middleware('can:reports.view')->name('reports.index');
+
+    // The overtime report's own page until Phase 5b: a bookmark lands on its
+    // tab, keeping the month. Who may see that tab is the tab's business —
+    // anyone else lands on their first tab, or is refused by /reports.
+    Route::get('/reports/overtime', function (Request $request) {
+        return redirect()->route('reports.index', array_filter([
+            'tab' => 'overtime',
+            'month' => $request->query('month'),
+        ]));
+    })->name('reports.overtime');
 });
 
 Route::middleware(['auth', 'role:admin|manager'])->group(function () {
@@ -140,8 +163,6 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
 
         return view('organization');
     })->name('organization.index');
-    // Reports (Phase 4d): the page checks its own ability (ReportPolicy); this group is the second layer.
-    Route::get('/reports/overtime', OvertimeReport::class)->name('reports.overtime');
 });
 
 require __DIR__.'/auth.php';

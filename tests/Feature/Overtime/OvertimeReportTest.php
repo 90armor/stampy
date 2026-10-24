@@ -120,22 +120,22 @@ class OvertimeReportTest extends TestCase
         $this->assertSame(16.0, OvertimeReport::forMonth(Carbon::parse('2026-05-01'))['rows'][0]['pay_equivalent_hours']);
     }
 
-    public function test_only_admins_open_it_and_the_sidebar_follows_the_same_ability(): void
+    public function test_only_admins_open_it(): void
     {
+        // A tab of the Reports page since Phase 5b (ReportsPageTest has the
+        // page, the tabs and the sidebar); the ability itself is unchanged.
         $manager = User::factory()->create()->assignRole('manager');
+        Employee::factory()->create(['user_id' => $manager->id]);
         $employee = User::factory()->create()->assignRole('employee');
 
-        $this->actingAs($this->admin)->get(route('reports.overtime'))->assertOk()->assertSee('Overtime report');
-        $this->actingAs($manager)->get(route('reports.overtime'))->assertForbidden();
-        $this->actingAs($employee)->get(route('reports.overtime'))->assertForbidden();
+        $this->actingAs($this->admin)->get(route('reports.index', ['tab' => 'overtime']))->assertOk()->assertSee('Overtime report');
 
         $this->assertTrue($this->admin->can('reports.overtime'));
         $this->assertFalse($manager->can('reports.overtime'));
+        $this->assertFalse($employee->can('reports.overtime'));
 
-        // The admin's Reports item links to the report; the manager's is still "Soon"; an employee has none.
-        $this->actingAs($this->admin)->get(route('dashboard'))->assertSee(route('reports.overtime'), false);
-        $this->actingAs($manager)->get(route('dashboard'))->assertSee('Reports')->assertSee('aria-disabled="true"', false)->assertDontSee(route('reports.overtime'), false);
-        $this->actingAs($employee)->get(route('dashboard'))->assertDontSee('Reports');
+        Livewire::actingAs($manager)->test(Overtime::class)->assertForbidden();
+        Livewire::actingAs($employee)->test(Overtime::class)->assertForbidden();
     }
 
     public function test_the_page_shows_the_month_and_says_when_it_is_still_open(): void

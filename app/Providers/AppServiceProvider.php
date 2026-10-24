@@ -25,8 +25,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Reports aren't models, so their abilities are gates (ReportPolicy).
+        // Reports aren't models, so their abilities are gates (ReportPolicy):
+        // one per tab, and the page's own — any of its tabs.
+        Gate::define('reports.attendance', [ReportPolicy::class, 'attendance']);
+        Gate::define('reports.leave', [ReportPolicy::class, 'leave']);
         Gate::define('reports.overtime', [ReportPolicy::class, 'overtime']);
+        Gate::define('reports.view', [ReportPolicy::class, 'view']);
         // Nor is the Policies page: any of its tabs, by each tab's own ability.
         Gate::define('policies.view', [PoliciesPolicy::class, 'view']);
 

@@ -7,6 +7,7 @@ use App\Support\DisplayDate;
 use App\Support\OvertimeReport;
 use App\Support\OvertimeSummary;
 use Carbon\Carbon;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -17,7 +18,9 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * filename and first row carry when it was exported, and an open month says
  * so: a cancellation after payroll ran changes the figures, and HR must be
  * able to tell which export they paid from. Gated by the reports.overtime
- * ability (ReportPolicy), the same one the sidebar checks.
+ * ability (ReportPolicy). A tab of the Reports page since Phase 5b, which
+ * shows it only to whoever has that ability; its month follows the other
+ * tabs' (the report-month event).
  */
 class Overtime extends Component
 {
@@ -31,6 +34,24 @@ class Overtime extends Component
 
         if (! preg_match('/^\d{4}-\d{2}$/', $this->month)) {
             $this->month = today()->format('Y-m');
+        }
+    }
+
+    public function updatedMonth(): void
+    {
+        if (! preg_match('/^\d{4}-\d{2}$/', $this->month)) {
+            $this->month = today()->format('Y-m');
+        }
+
+        $this->dispatch('report-month', month: $this->month);
+    }
+
+    /** Another report tab changed the month: show the same one. */
+    #[On('report-month')]
+    public function followMonth(string $month): void
+    {
+        if (preg_match('/^\d{4}-\d{2}$/', $month)) {
+            $this->month = $month;
         }
     }
 
@@ -86,6 +107,6 @@ class Overtime extends Component
             'months' => $options,
             'categories' => OvertimeSummary::CATEGORIES,
             'rates' => OvertimeSettings::current(),
-        ])->layout('layouts.app', ['header' => 'Reports']);
+        ]);
     }
 }
