@@ -156,4 +156,75 @@ class AttendanceReportPageTest extends TestCase
             ->dispatch('report-month', month: '2026-04')
             ->assertSet('month', '2026-04');
     }
+
+    public function test_the_csv_has_the_same_rows_in_whole_minutes_and_says_what_it_is(): void
+    {
+        $this->travelTo(Carbon::parse('2026-06-15 09:10:00'));
+
+        $response = Livewire::actingAs($this->admin)->test(Attendance::class)->set('month', '2026-05')->call('download');
+        $response->assertFileDownloaded('attendance-2026-05-exported-2026-06-15-0910.csv');
+
+        // A UTF-8 byte-order mark first, for Excel; the rows after it are plain CSV.
+        $content = $this->downloadedContent($response);
+        $this->assertStringStartsWith("\xEF\xBB\xBF", $content);
+        $this->assertSame(1, substr_count($content, "\xEF\xBB\xBF"));
+        $lines = $this->lines($content);
+
+        $this->assertSame('Attendance report, May 2026 — All departments — All employees — generated 2026-06-15 09:10 (Asia/Phnom_Penh)', $lines[0][0]);
+        $this->assertStringStartsWith('The same counts as each employee\'s attendance summary.', $lines[1][0]);
+        $this->assertSame(['Code', 'Name', 'Department', 'Joined', 'Left', 'Calculated workdays', 'Present', 'Absent', 'Incomplete', 'On leave', 'Leave taken (days)', 'Late (days)', 'Late (minutes)', 'Early leave (days)', 'Early leave (minutes)', 'Worked (minutes)', 'Not calculated'], $lines[2]);
+        $this->assertSame(['EMP-0002', 'Kyaw Kyaw', 'Engineering', '', '', '21', '1', '20', '0', '0', '0.0', '1', '20', '0', '0', '460', '0'], $lines[3]);
+        $this->assertSame(['EMP-0005', 'Su Su', 'Engineering', '2026-05-11', '', '15', '1', '14', '0', '0', '0.0', '0', '0', '0', '0', '480', '0'], $lines[4]);
+        $this->assertSame(['Total', '', '', '', '', '36', '2', '34', '0', '0', '0.0', '1', '20', '0', '0', '940', '0'], $lines[5]);
+        $this->assertCount(6, $lines);
+
+        // The totals are the page's.
+        $totals = Livewire::actingAs($this->admin)->test(Attendance::class)->set('month', '2026-05')->viewData('report')['totals'];
+        $this->assertSame([(string) $totals['workdays'], (string) $totals['present'], (string) $totals['absent'], (string) $totals['total_worked_minutes']], [$lines[5][5], $lines[5][6], $lines[5][7], $lines[5][15]]);
+
+        // The open month says so in the file too.
+        $open = $this->lines($this->downloadedContent(Livewire::actingAs($this->admin)->test(Attendance::class)->call('download')));
+        $this->assertSame('This month is still open: figures can change until it ends.', $open[1][0]);
+    }
+
+    public function test_a_managers_csv_holds_their_team_only_and_names_the_department(): void
+    {
+        $this->travelTo(Carbon::parse('2026-06-15 09:10:00'));
+        $managerUser = User::factory()->create()->assignRole('manager');
+        $manager = Employee::factory()->create(['user_id' => $managerUser->id, 'employee_code' => 'EMP-0001', 'full_name' => 'Aye Aye Mon', 'department_id' => $this->engineering->id]);
+        $this->kyaw->update(['manager_id' => $manager->id]);
+
+        $response = Livewire::actingAs($managerUser)->test(Attendance::class)
+            ->set('month', '2026-05')
+            ->set('department', (string) $this->engineering->id)
+            ->call('download');
+        $response->assertFileDownloaded('attendance-2026-05-engineering-exported-2026-06-15-0910.csv');
+
+        $lines = $this->lines($this->downloadedContent($response));
+        $this->assertSame('Attendance report, May 2026 — Engineering — Team of Aye Aye Mon — generated 2026-06-15 09:10 (Asia/Phnom_Penh)', $lines[0][0]);
+        $this->assertSame(['EMP-0001', 'EMP-0002', 'Total'], array_column(array_slice($lines, 3), 0));
+    }
+
+    public function test_the_csv_is_refused_without_the_ability(): void
+    {
+        // The ability can go between loading the page and exporting.
+        $managerUser = User::factory()->create()->assignRole('manager');
+        Employee::factory()->create(['user_id' => $managerUser->id]);
+        $component = Livewire::actingAs($managerUser)->test(Attendance::class);
+        $managerUser->removeRole('manager')->assignRole('employee');
+        $managerUser->unsetRelation('roles');
+
+        $component->call('download')->assertForbidden();
+    }
+
+    /** @return list<list<?string>> */
+    private function lines(string $content): array
+    {
+        return array_map('str_getcsv', explode("\n", trim(substr($content, 3))));
+    }
+
+    private function downloadedContent($response): string
+    {
+        return base64_decode(data_get($response->effects, 'download.content'));
+    }
 }
