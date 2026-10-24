@@ -177,13 +177,16 @@ class DailyAttendance extends Model
     }
 
     /**
-     * Resolves leaveDay() for every row with a leave_id in one query.
+     * Resolves leaveDay() for every row with a leave_id in one query. Rows
+     * already resolved are skipped, so a caller that resolves a whole list
+     * once (the attendance report) can then hand parts of it to code that
+     * calls this again (AttendanceSummary) without a query per part.
      *
      * @param  Collection<int, self>  $rows
      */
     public static function withLeaveDays(Collection $rows): void
     {
-        $withLeave = $rows->whereNotNull('leave_id');
+        $withLeave = $rows->whereNotNull('leave_id')->filter(fn (self $row) => $row->resolvedLeaveDay === null);
 
         if ($withLeave->isEmpty()) {
             return;
