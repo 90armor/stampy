@@ -3,10 +3,14 @@
 namespace App\Livewire\Reports;
 
 use App\Models\LeaveType;
+use App\Support\EmployeeScope;
+use App\Support\LeaveDays;
 use App\Support\LeaveReport;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Reports → Leave (Phase 5b): the yearly leave report (LeaveReport) for one
@@ -14,7 +18,9 @@ use Livewire\Component;
  * that employee's balance as Time off and the profile show it. Gated by the
  * reports.leave ability (ReportPolicy), which the Reports page also shows the
  * tab by. Its year and department are its own (?year=, ?leave-department=):
- * the tabs share only the month.
+ * the tabs share only the month. The CSV has every type, one row per
+ * employee and type with a Total row after each type, in decimal days, and
+ * says when it was exported, for which year, department and whose view.
  */
 class Leave extends Component
 {
@@ -32,6 +38,69 @@ class Leave extends Component
     public function mount(): void
     {
         $this->authorize('reports.leave');
+    }
+
+    public function download(): StreamedResponse
+    {
+        $this->authorize('reports.leave');
+
+        $year = $this->selectedYear();
+        $user = auth()->user();
+        $reports = LeaveReport::types($year)->map(fn (LeaveType $type) => [$type, $this->report($year, $type)]);
+        $first = $reports->first()[1] ?? null;
+        $department = $first !== null && $first['department'] !== null ? $first['departments'][$first['department']] : null;
+        $exportedAt = now();
+        $view = EmployeeScope::for($user, 'Leave report CSV')->ids === null ? 'All employees' : 'Team of '.$user->employee->full_name;
+        $decimal = fn (int $tenths) => LeaveDays::toDecimal($tenths);
+
+        return response()->streamDownload(function () use ($reports, $year, $department, $exportedAt, $view, $decimal) {
+            $out = fopen('php://output', 'w');
+            // A UTF-8 byte-order mark: HR opens this in Excel, which otherwise
+            // reads the file as ANSI and breaks "—" and Khmer or Myanmar names.
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, ['Leave report, '.$year.' — '.($department ?? 'All departments').' — '.$view.' — generated '.$exportedAt->format('Y-m-d H:i').' ('.config('app.timezone').')']);
+            fputcsv($out, ['Pending is as of the export time.']);
+            fputcsv($out, ['Each row is the employee\'s balance as Time off shows it, in days. A type with no balance has only its used and pending days. Time off in lieu lists only employees who have earned some. Joined and Left only when inside the year.']);
+            fputcsv($out, ['Code', 'Name', 'Department', 'Joined', 'Left', 'Type', 'Balance', 'Entitled', 'Carried in', 'Adjustments', 'Used', 'Pending', 'Available', 'Usable from']);
+
+            foreach ($reports as [$type, $report]) {
+                // A type nobody has (Time off in lieu before anyone earns
+                // it) adds nothing, not a Total of zeros.
+                if ($report['rows'] === []) {
+                    continue;
+                }
+                $hasBalance = $report['hasBalance'];
+
+                foreach ($report['rows'] as $row) {
+                    $employee = $row['employee'];
+                    $balance = $row['balance'];
+                    fputcsv($out, [
+                        $employee->employee_code, $employee->full_name, $employee->department?->name,
+                        $row['joined']?->format('Y-m-d'), $row['left']?->format('Y-m-d'),
+                        $type->name, $hasBalance ? 'Yes' : 'No',
+                        $hasBalance ? $decimal($balance->entitled) : '',
+                        $hasBalance ? $decimal($balance->carriedIn) : '',
+                        $hasBalance ? $decimal($balance->adjustments) : '',
+                        $decimal($balance->used), $decimal($balance->pending),
+                        $hasBalance ? $decimal($balance->available()) : '',
+                        $balance->usableFrom?->format('Y-m-d'),
+                    ]);
+                }
+
+                $totals = $report['totals'];
+                fputcsv($out, [
+                    'Total', '', '', '', '', $type->name, $hasBalance ? 'Yes' : 'No',
+                    $hasBalance ? $decimal($totals['entitled']) : '',
+                    $hasBalance ? $decimal($totals['carriedIn']) : '',
+                    $hasBalance ? $decimal($totals['adjustments']) : '',
+                    $decimal($totals['used']), $decimal($totals['pending']),
+                    $hasBalance ? $decimal($totals['available']) : '',
+                    '',
+                ]);
+            }
+
+            fclose($out);
+        }, 'leave-'.$year.($department !== null ? '-'.Str::slug($department) : '').'-exported-'.$exportedAt->format('Y-m-d-Hi').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     /** The year asked for, if offered; else this year. */

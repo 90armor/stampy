@@ -45,6 +45,10 @@
                     </x-select>
                 </div>
             @endif
+            <x-button type="button" variant="secondary" wire:click="download">
+                <x-icon name="document-text" class="h-5 w-5" />
+                Download CSV
+            </x-button>
         </div>
     </div>
 

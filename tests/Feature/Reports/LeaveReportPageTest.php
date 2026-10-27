@@ -127,4 +127,66 @@ class LeaveReportPageTest extends TestCase
             ->assertSee('Annual · 2025')
             ->assertDontSee('Pending is as of now.');
     }
+
+    public function test_the_csv_has_every_type_in_long_form_and_says_what_it_is(): void
+    {
+        Leave::factory()->for($this->kyaw)->between('2026-05-04', '2026-05-29')->approved()->create(['leave_type_id' => $this->annual->id]);
+        Leave::factory()->for($this->kyaw)->between('2026-06-01', '2026-06-02')->approved()->create(['leave_type_id' => $this->unpaid->id]);
+        $this->travelTo(Carbon::parse('2026-06-15 09:10:00'));
+
+        $response = Livewire::actingAs($this->admin)->test(LeaveReportTab::class)->call('download');
+        $response->assertFileDownloaded('leave-2026-exported-2026-06-15-0910.csv');
+
+        $content = $this->downloadedContent($response);
+        $this->assertStringStartsWith("\xEF\xBB\xBF", $content);
+        $this->assertSame(1, substr_count($content, "\xEF\xBB\xBF"));
+        $lines = $this->lines($content);
+
+        $this->assertSame('Leave report, 2026 — All departments — All employees — generated 2026-06-15 09:10 (Asia/Phnom_Penh)', $lines[0][0]);
+        $this->assertSame('Pending is as of the export time.', $lines[1][0]);
+        $this->assertSame(['Code', 'Name', 'Department', 'Joined', 'Left', 'Type', 'Balance', 'Entitled', 'Carried in', 'Adjustments', 'Used', 'Pending', 'Available', 'Usable from'], $lines[3]);
+        $this->assertSame([
+            ['EMP-0002', 'Kyaw Kyaw', 'Engineering', '', '', 'Annual', 'Yes', '18.0', '0.0', '0.0', '20.0', '0.0', '-2.0', ''],
+            ['EMP-0005', 'Su Su', 'Engineering', '2026-03-02', '', 'Annual', 'Yes', '0.0', '0.0', '0.0', '0.0', '0.0', '0.0', '2027-03-02'],
+            ['Total', '', '', '', '', 'Annual', 'Yes', '18.0', '0.0', '0.0', '20.0', '0.0', '-2.0', ''],
+            ['EMP-0002', 'Kyaw Kyaw', 'Engineering', '', '', 'Unpaid', 'No', '', '', '', '2.0', '0.0', '', ''],
+            ['EMP-0005', 'Su Su', 'Engineering', '2026-03-02', '', 'Unpaid', 'No', '', '', '', '0.0', '0.0', '', ''],
+            ['Total', '', '', '', '', 'Unpaid', 'No', '', '', '', '2.0', '0.0', '', ''],
+        ], array_slice($lines, 4));
+
+        // Each type's Total is the page's.
+        foreach ([$this->annual, $this->unpaid] as $type) {
+            $totals = Livewire::actingAs($this->admin)->test(LeaveReportTab::class)->set('type', (string) $type->id)->viewData('report')['totals'];
+            $csvTotal = collect($lines)->first(fn ($line) => $line[0] === 'Total' && $line[5] === $type->name);
+            $this->assertSame(\App\Support\LeaveDays::toDecimal($totals['used']), $csvTotal[10]);
+        }
+    }
+
+    public function test_a_managers_csv_holds_their_team_only_and_names_the_department(): void
+    {
+        $this->travelTo(Carbon::parse('2026-06-15 09:10:00'));
+        $managerUser = User::factory()->create()->assignRole('manager');
+        Employee::factory()->create(['user_id' => $managerUser->id, 'employee_code' => 'EMP-0001', 'full_name' => 'Aye Aye Mon', 'department_id' => $this->kyaw->department_id]);
+        $this->kyaw->update(['manager_id' => Employee::where('employee_code', 'EMP-0001')->value('id')]);
+
+        $response = Livewire::actingAs($managerUser)->test(LeaveReportTab::class)
+            ->set('department', (string) $this->kyaw->department_id)
+            ->call('download');
+        $response->assertFileDownloaded('leave-2026-engineering-exported-2026-06-15-0910.csv');
+
+        $lines = $this->lines($this->downloadedContent($response));
+        $this->assertSame('Leave report, 2026 — Engineering — Team of Aye Aye Mon — generated 2026-06-15 09:10 (Asia/Phnom_Penh)', $lines[0][0]);
+        $this->assertSame(['EMP-0001', 'EMP-0002'], collect(array_slice($lines, 4))->pluck(0)->reject(fn ($code) => $code === 'Total')->unique()->values()->all());
+    }
+
+    /** @return list<list<?string>> */
+    private function lines(string $content): array
+    {
+        return array_map('str_getcsv', explode("\n", trim(substr($content, 3))));
+    }
+
+    private function downloadedContent($response): string
+    {
+        return base64_decode(data_get($response->effects, 'download.content'));
+    }
 }
