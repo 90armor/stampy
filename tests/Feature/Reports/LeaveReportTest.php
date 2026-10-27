@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Reports;
 
-use App\Enums\LeaveStatus;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Leave;
@@ -94,8 +93,10 @@ class LeaveReportTest extends TestCase
         $this->assertGreaterThan(0, $rowsSeen);
 
         // A leaver: the balance as at their last day, and Left in the year.
+        // Today, not yesterday: on 1 Jan yesterday is last year, and a leaver
+        // from then is rightly not in this year's report at all.
         $leaver = Employee::where('employee_code', 'EMP-0010')->firstOrFail();
-        app(EmployeeLifecycle::class)->deactivate($leaver, today()->subDay()->max($leaver->join_date), $admin);
+        app(EmployeeLifecycle::class)->deactivate($leaver, today()->max($leaver->join_date), $admin);
         $annual = LeaveType::where('name', 'Annual')->firstOrFail();
         $report = LeaveReport::forYear(today()->year, $annual, $admin);
         $row = collect($report['rows'])->first(fn ($row) => $row['employee']->is($leaver));
