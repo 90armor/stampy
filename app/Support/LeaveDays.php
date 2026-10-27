@@ -60,10 +60,10 @@ final class LeaveDays
         return str_ends_with($decimal, '.0') ? substr($decimal, 0, -2) : $decimal;
     }
 
-    /** Tenths → "1 day", "0.5 day", "3.5 days" — an amount with its unit, the same everywhere. */
+    /** Tenths → "1 day", "0.5 day", "3.5 days", "0 days" — an amount with its unit, the same everywhere. */
     public static function label(int $tenths): string
     {
-        return self::format($tenths).' '.(abs($tenths) <= self::DAY ? 'day' : 'days');
+        return self::format($tenths).' '.($tenths !== 0 && abs($tenths) <= self::DAY ? 'day' : 'days');
     }
 
     /**

@@ -14,12 +14,10 @@ use App\Models\User;
  */
 class ReportPolicy
 {
-    /**
-     * Tab key => label, in display order. Leave joins in 5b.2; its ability
-     * already exists below.
-     */
+    /** Tab key => label, in display order. */
     public const TABS = [
         'attendance' => 'Attendance',
+        'leave' => 'Leave',
         'overtime' => 'Overtime',
     ];
 
@@ -52,7 +50,7 @@ class ReportPolicy
         return $this->teamReport($user);
     }
 
-    /** The yearly leave report (5b.2) — the same people as attendance. */
+    /** The yearly leave report — the same people as attendance. */
     public function leave(User $user): bool
     {
         return $this->teamReport($user);

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Livewire\Reports\Attendance;
+use App\Livewire\Reports\Leave;
 use App\Livewire\Reports\Overtime;
 use App\Models\Employee;
 use App\Models\User;
@@ -45,21 +46,23 @@ class ReportsPageTest extends TestCase
     {
         $this->actingAs($this->admin)->get(route('reports.index'))
             ->assertOk()
-            ->assertSeeInOrder(['aria-label="Report sections"', '>Attendance<', '>Overtime<'], false)
+            ->assertSeeInOrder(['aria-label="Report sections"', '>Attendance<', '>Leave<', '>Overtime<'], false)
             ->assertSee("x-data=\"{ tab: 'attendance' }\"", false)
             ->assertSeeLivewire(Attendance::class)
+            ->assertSeeLivewire(Leave::class)
             ->assertSeeLivewire(Overtime::class);
 
         $this->assertTrue($this->admin->can('reports.view'));
     }
 
-    public function test_a_manager_with_an_employee_record_sees_attendance_only(): void
+    public function test_a_manager_with_an_employee_record_sees_attendance_and_leave(): void
     {
         $this->actingAs($this->manager)->get(route('reports.index'))
             ->assertOk()
-            ->assertSee('>Attendance<', false)
+            ->assertSeeInOrder(['>Attendance<', '>Leave<'], false)
             ->assertDontSee('>Overtime<', false)
             ->assertSeeLivewire(Attendance::class)
+            ->assertSeeLivewire(Leave::class)
             ->assertDontSeeLivewire(Overtime::class);
 
         $this->assertTrue($this->manager->can('reports.attendance'));
@@ -96,6 +99,7 @@ class ReportsPageTest extends TestCase
             $this->actingAs($user)->get(route('dashboard'))->assertDontSee(route('reports.index'), false);
 
             Livewire::actingAs($user)->test(Attendance::class)->assertForbidden();
+            Livewire::actingAs($user)->test(Leave::class)->assertForbidden();
             Livewire::actingAs($user)->test(Overtime::class)->assertForbidden();
         }
     }

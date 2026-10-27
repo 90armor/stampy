@@ -14,7 +14,7 @@
     >
         <div>
             <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Reports</h1>
-            <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">Monthly figures per employee, on screen and as a CSV.</p>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">Figures per employee for a month or a year, on screen and as a CSV.</p>
         </div>
 
         <x-tab-bar label="Report sections" :tabs="$tabs" />
@@ -24,6 +24,9 @@
                 @switch ($key)
                     @case ('attendance')
                         <livewire:reports.attendance />
+                        @break
+                    @case ('leave')
+                        <livewire:reports.leave />
                         @break
                     @case ('overtime')
                         <livewire:reports.overtime />
