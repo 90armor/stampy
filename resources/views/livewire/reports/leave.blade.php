@@ -11,8 +11,9 @@
 @endphp
 
 <div class="space-y-6">
-    {{-- Four controls: beside the title only from xl, where they fit on one line. --}}
-    <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+    {{-- Four controls: beside the title only from 2xl; at 1440 they wrapped
+    beside it, the CSV button alone on a second line. --}}
+    <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
         <div>
             <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Leave report</h2>
             <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">Each employee's balance of one leave type for a year, as Time off shows it.</p>
@@ -97,7 +98,7 @@
                 <table @class(['w-full text-sm', 'min-w-[46rem]' => $hasBalance])>
                     <thead>
                         <tr class="relative text-left align-bottom text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                            <th scope="col" class="table-pin-lead min-w-[8.5rem] px-4 py-3 font-medium sm:w-56 sm:pl-6 sm:pr-3">Employee</th>
+                            <th scope="col" class="table-pin-lead min-w-[8.5rem] px-4 py-3 font-medium sm:w-56 sm:min-w-44 sm:pl-6 sm:pr-3">Employee</th>
                             @if ($hasBalance)
                                 <th scope="col" class="{{ $th }}">Entitled{!! $earned ? '<span class="block font-normal normal-case tracking-normal">from overtime</span>' : '' !!}</th>
                                 <th scope="col" class="{{ $th }}">Carried in</th>
@@ -135,6 +136,7 @@
                                             $row['joined'] ? 'Joined '.DisplayDate::compact($row['joined']) : null,
                                             $row['left'] ? 'Left '.DisplayDate::compact($row['left']) : null,
                                             $balance->earnedToLastDay !== null ? 'Earned to last day: '.LeaveDays::label($balance->earnedToLastDay) : null,
+                                            ($row['toilRemainder'] ?? 0) > 0 ? \App\Support\Duration::format($row['toilRemainder']).' toward the next half day' : null,
                                         ]) as $line)
                                             <span class="block max-w-[8.75rem] text-xs text-slate-500 sm:max-w-none dark:text-slate-400">{{ $line }}</span>
                                         @endforeach

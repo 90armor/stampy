@@ -160,6 +160,8 @@ class LeaveReportTest extends TestCase
         $toilReport = LeaveReport::forYear(2026, $toil, $admin);
         $this->assertSame([$veteran->id], array_map(fn ($row) => $row['employee']->id, $toilReport['rows']));
         $this->assertSame(-5, $toilReport['rows'][0]['balance']->available());
+        // No overtime settings point at this type in the test: no remainder line.
+        $this->assertNull($toilReport['rows'][0]['toilRemainder']);
 
         // Next year, once granted: offered, with its entitlements.
         $this->assertNotContains(2027, LeaveReport::years());

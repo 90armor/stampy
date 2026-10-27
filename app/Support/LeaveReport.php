@@ -39,7 +39,7 @@ final class LeaveReport
 
     /**
      * @return array{
-     *     rows: list<array{employee: Employee, joined: ?Carbon, left: ?Carbon, balance: Balance, earnedSoFar: ?int}>,
+     *     rows: list<array{employee: Employee, joined: ?Carbon, left: ?Carbon, balance: Balance, earnedSoFar: ?int, toilRemainder: ?int}>,
      *     totals: array<string, int>,
      *     hasBalance: bool,
      *     current: bool,
@@ -49,7 +49,10 @@ final class LeaveReport
      *
      * Amounts are tenths of a day (LeaveDays). `earnedSoFar` is set while the
      * type isn't usable yet (EntitlementCalculator::earnedSoFar(), as Time
-     * off shows it). `current` is this year: its pending is as of now.
+     * off shows it); `toilRemainder` for Time off in lieu, the overtime minutes
+     * saved toward the next half day (LeaveType::toilRemainderFor()) — why
+     * someone with 0 available is listed at all. `current` is this year: its
+     * pending is as of now.
      */
     public static function forYear(int $year, LeaveType $type, User $viewer, ?int $departmentId = null): array
     {
@@ -92,6 +95,7 @@ final class LeaveReport
                 'left' => $employee->left_on?->year === $year ? $employee->left_on : null,
                 'balance' => $balance,
                 'earnedSoFar' => $balance->usableFrom !== null ? $calculator->earnedSoFar($employee, $type, today()) : null,
+                'toilRemainder' => $type->toilRemainderFor($employee),
             ];
         }
 
