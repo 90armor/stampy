@@ -16,7 +16,9 @@ use Carbon\CarbonImmutable;
  * Annual); usedByType/pendingByType break both down by the leave's own type.
  * Usage consumes the carry first (FIFO): usedFromCarry + usedFromGrant = used.
  * usableFrom is set while the type isn't usable yet (the eligibility date);
- * earnedToLastDay only in a leaver's last year — display only.
+ * earnedToLastDay only in a leaver's last year — display only. A type with no
+ * balance (hasBalance false) carries only used and pending — its days taken
+ * and waiting; available() means nothing for it.
  */
 final readonly class Balance
 {
