@@ -189,7 +189,7 @@ A short, non-interactive “Scroll to view all columns” cue appears above the 
 - The pinned cell is opaque, the card surface (report rows have no hover). On a phone the name and code wrap at `9rem`, so the figures keep about half the card; the attendance report's column keeps at least `8.5rem`, and its code is joined to the `·` after it, so the dot never starts a line.
 - Its right edge carries the pinned columns' shadow while content passes under it; the scroll container's **end edge fades** while more columns lie beyond it — the tab bar's mask technique (`.scroll-fade-end`, `scrollEdges` in `resources/js/app.js`).
 - The row divider stays in the row's last cell, which isn't pinned, with `z-[2]`, so it runs unbroken above the pinned cell — the trailing-pin rule above, mirrored. The scroller's bottom corners are rounded so the pinned Total cell can't poke past the card's corner.
-- At 1440 both tables fit and nothing changes; the attendance report fits from 1366 (`px-2` cells and the short headers above), and scrolls by about 80px at 1280.
+- At 1440 the tables fit and nothing changes; the attendance report fits from 1366 (`px-1.5` cells, the short headers and the fixed Employee column; 27px to spare with the seeded data) and scrolls by about 60px at 1280.
 
 **Calendar below `sm`** (about 44px cells at 390px): the day number and status icon stack vertically instead of sitting side by side, and a holiday's name is replaced in the cell by a small muted flag (unless the status icon already is the holiday flag, which keeps its fuchsia) — the name stays in the cell's accessible label and in the day modal. Nothing in a cell clips or collides.
 
@@ -201,15 +201,30 @@ Summary metrics may stack or use compact responsive columns, but labels, counts,
 
 Reports → Attendance (Phase 5b) is one row per employee for a month, read across. It follows the rules above, with these specifics:
 
-- **Every figure is the employee's attendance summary** (`AttendanceSummary`, the counts above My attendance) — never re-derived in the view or the report. Columns: Employee, Workdays (Calculated workdays), Present, Absent, Incomplete, On leave, Leave taken (days; a half day 0.5), Days off (Days off worked), Late, Early (Early leave), Worked, Not calculated, then the row's chevron. Short headers carry the full name in `<abbr title>`, as the Daily Attendance table's Early does.
-- **Workdays are scheduled workdays only** (`WorkdayCalendar::isWorkday`): the status counts add up to them. A present day on a non-workday or holiday counts under **Days off**; a one-punch day off counts nowhere — the day itself still shows Incomplete. Worked includes every day.
+- **Every figure is the employee's attendance summary** (`AttendanceSummary`, the counts above My attendance) — never re-derived in the view or the report. Columns: Employee, Workdays (Calculated workdays), Present, Absent, Incomplete, On leave, Leave taken (days; a half day 0.5), Days off worked ("Days off" over a muted "worked", like "Leave taken / days" — alone, it read as days off taken), Late, Early (Early leave), Worked, Not calculated, then the row's chevron. Short headers carry the full name in `<abbr title>`, as the Daily Attendance table's Early does.
+- **Workdays are scheduled workdays only** (`WorkdayCalendar::isWorkday`): the status counts add up to them. A present day on a non-workday or holiday counts under **Days off worked**; a one-punch day off counts nowhere — the day itself still shows Incomplete. Worked includes every day.
 - **Late and Early leave are the total over the day count**: the total time on top, in the timing text colour with medium weight (`amber-700` / `amber-300`, as in the tables' Late/Early values), and the number of days under it, muted `text-xs`. Two lines rather than `3 days · 1h 20m` on one, so the table fits. With no late or early day the cell is an em dash — never an amber zero. Late days are Present and Incomplete days with late minutes; a day still In progress waits until it closes, as in My attendance.
+- **Worked on approved leave** shows as a muted second line under Leave taken, "N worked": the calculated workdays where `DailyAttendance::workedOnLeave()` — the dashboard's and the attendance views' definition. Those days are still charged (Phase 3 rule 17), so they are also in Leave taken; the line lets HR paying from the report see them.
 - **Not calculated** counts past workdays with no finished row — none at all, or an In progress row no longer open (`DailyAttendance::isOpen()`), the dashboard's "Not calculated". Today never counts until it closes; the open-month notice covers it. It is a count, not a status: it never colours anything and never reads as absent.
+- **The Employee column has a fixed width from `sm`** (`sm:w-44`): a long name or department wraps inside it, never widening it.
 - **A joiner or leaver** has a muted third line under the code (`Joined Mon 12 Oct`, `Left Fri 16 Oct`, `DisplayDate::compact`); their figures cover only the days they were employed.
 - **The Total row** sums every column, Late and Early included, in the semibold weight; it has no chevron and no divider under it.
 - **The trailing chevron is the row's only link**, as in the attendance tables: visible at rest, 40px, labelled `View attendance for {name}, {Month Year}`, opening that employee's calendar at the report's month. A manager's report holds only their team, so every chevron opens.
 - **Empty states say which:** "No employees in this month" / "No employees in this department" when nobody in the viewer's scope was employed then, "No attendance calculated for this month" when they were but nothing was built — never a table of zeros.
 - **Controls:** Month (the overtime report's 13 months, shared with the other report tabs), Department (the viewer's team's departments only), Download CSV. They sit beside the title from `xl`, under it below.
+
+## The leave report
+
+Reports → Leave (Phase 5b) is one row per employee for one leave type and year. It follows the attendance report's table rules, with these specifics:
+
+- **Every figure is the employee's balance** (`LeaveBalance`, what Time off and the profile's Leave card show). Columns: Employee, Entitled ("from overtime" under it for Time off in lieu), Carried in, Adjustments, Used, Pending, Available, then the row's chevron. A type without a balance (Unpaid, Maternity, Special) has Employee and Used only.
+- **Amounts are `LeaveDays::label()`** ("18 days", "0.5 day"); a zero is an em dash, except Available, which always shows its number.
+- **Pending is muted; Available is bold.** A negative Available keeps its minus sign and the normal text colour — never red: colour is for attendance status, not balances. The card says "Pending is as of now" for the current year.
+- **A type not usable yet** (Annual before 12 months' service) spans the figures with Time off's line, "Usable from Tue 2 Mar 2027 · 12 days earned so far" — never a bare 0 that reads as used up.
+- **Muted lines under the name:** Joined / Left inside the year, "Earned to last day" for a leaver, and for Time off in lieu the overtime saved toward the next half day.
+- **Time off in lieu lists only whoever it is shown for** elsewhere (`LeaveType::isShownFor()`); with nobody, the empty state says "Nobody has Time off in lieu in {year}". The other empty states: nobody employed that year, nobody in the department.
+- **The trailing chevron** (`View leave for {name}`) opens the employee's profile at its Leave card (`#leave`).
+- **Controls:** Year, Leave type, Department (the tab's own, `?leave-department=`), Download CSV. They sit beside the title from `2xl`, under it below. The Employee column is pinned with the fading end edge, as on the attendance report, and keeps its width from `sm`.
 
 ## Dark mode and accessibility
 
