@@ -152,6 +152,7 @@ class AttendanceReportTest extends TestCase
             'workdays' => 21,
             // The half-day Present day is one present day and half a day of leave.
             'leave_tenths' => 15,
+            'worked_on_leave' => 0,
             'leave' => 1,
             'present' => 4,
             'days_off_worked' => 0,
@@ -322,10 +323,12 @@ class AttendanceReportTest extends TestCase
             Employee::query()->delete();
 
             Employee::factory()->count($employees)->create(['department_id' => $this->engineering->id])->each(function (Employee $employee) {
-                DailyAttendance::factory()->for($employee)->create(['work_date' => '2026-05-04', 'late_minutes' => 5]);
-                DailyAttendance::factory()->for($employee)->create(['work_date' => '2026-05-05', 'status' => AttendanceStatus::Incomplete]);
+                // As the builder writes them: each row names its schedule.
+                $schedule = ['work_schedule_id' => WorkSchedule::query()->value('id')];
+                DailyAttendance::factory()->for($employee)->create(['work_date' => '2026-05-04', 'late_minutes' => 5, ...$schedule]);
+                DailyAttendance::factory()->for($employee)->create(['work_date' => '2026-05-05', 'status' => AttendanceStatus::Incomplete, ...$schedule]);
                 $leave = Leave::factory()->for($employee)->between('2026-05-06', '2026-05-06')->approved()->create();
-                DailyAttendance::factory()->for($employee)->create(['work_date' => '2026-05-06', 'status' => AttendanceStatus::Leave, 'leave_id' => $leave->id]);
+                DailyAttendance::factory()->for($employee)->create(['work_date' => '2026-05-06', 'status' => AttendanceStatus::Leave, 'leave_id' => $leave->id, ...$schedule]);
             });
 
             DB::flushQueryLog();
@@ -343,8 +346,9 @@ class AttendanceReportTest extends TestCase
         $this->admin->load('roles');
 
         // Departments, employees (with department and schedules: three),
-        // the month's rows, their leave, holidays.
-        $this->assertSame(8, $count(10));
-        $this->assertSame(8, $count(50));
+        // the month's rows and the schedules they were built on, their
+        // leave, holidays.
+        $this->assertSame(9, $count(10));
+        $this->assertSame(9, $count(50));
     }
 }

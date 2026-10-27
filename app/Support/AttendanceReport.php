@@ -26,7 +26,7 @@ final class AttendanceReport
 {
     /** The figures every row (and the totals) has, in column order. */
     public const FIGURES = [
-        'workdays', 'present', 'absent', 'incomplete', 'leave', 'leave_tenths', 'days_off_worked',
+        'workdays', 'present', 'absent', 'incomplete', 'leave', 'leave_tenths', 'worked_on_leave', 'days_off_worked',
         'late', 'incomplete_late', 'late_minutes', 'early_leave_days', 'early_leave_minutes',
         'total_worked_minutes', 'not_calculated',
     ];
@@ -70,6 +70,8 @@ final class AttendanceReport
         $records = $employees->isEmpty() ? collect() : DailyAttendance::query()
             ->whereIn('employee_id', $employees->modelKeys())
             ->whereBetween('work_date', [$from->format('Y-m-d'), $to->format('Y-m-d')])
+            // workedOnLeave() reads the schedule on a half-day leave day.
+            ->with('workSchedule')
             ->get();
         // Once for everyone: AttendanceSummary's own call then finds every
         // row already resolved.

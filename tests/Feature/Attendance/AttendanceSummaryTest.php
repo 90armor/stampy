@@ -140,6 +140,8 @@ class AttendanceSummaryTest extends TestCase
         $this->assertSame(1, $summary['present']);
         $this->assertSame(0, $summary['leave']);
         $this->assertSame(10, $summary['leave_tenths']);
+        // …and it is visible as such: one of those days was worked.
+        $this->assertSame(1, $summary['worked_on_leave']);
     }
 
     public function test_a_day_off_worked_inside_a_leave_costs_no_leave(): void

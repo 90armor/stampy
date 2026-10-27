@@ -5,10 +5,11 @@
     use App\Support\LeaveDays;
 
     // Narrow cell padding and short headers (the full name in an <abbr>, as
-    // the attendance table's Early) so the whole table fits from 1366.
-    $th = 'px-2 py-3 text-right font-medium';
-    $td = 'px-2 py-4 text-right tabular-nums text-slate-700 dark:text-slate-300';
-    $total = 'px-2 py-4 text-right tabular-nums text-slate-900 dark:text-slate-100';
+    // the attendance table's Early) so the whole table fits from 1366; a long
+    // name or department wraps inside the fixed Employee column.
+    $th = 'px-1.5 py-3 text-right font-medium';
+    $td = 'px-1.5 py-4 text-right tabular-nums text-slate-700 dark:text-slate-300';
+    $total = 'px-1.5 py-4 text-right tabular-nums text-slate-900 dark:text-slate-100';
     $abbr = fn (string $short, string $full) => '<abbr title="'.e($full).'" class="no-underline">'.e($short).'</abbr>';
     $divider = '<span class="pointer-events-none absolute inset-x-4 bottom-0 z-[2] h-px bg-slate-divider sm:inset-x-6"></span>';
 @endphp
@@ -58,7 +59,7 @@
                 <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100">{{ $monthLabel }}</h3>
                 <p class="shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ count($report['rows']) }} {{ Str::plural('employee', count($report['rows'])) }}</p>
             </div>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">The same counts as each employee's attendance summary. Workdays are scheduled workdays only; a day worked on a day off or holiday counts under Days off. Late and early leave are total time over the number of days. Not calculated counts past workdays with no finished attendance.</p>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">The same counts as each employee's attendance summary. Workdays are scheduled workdays only; a day worked on a day off or holiday counts under Days off worked. Leave taken says how many of its days were worked anyway. Late and early leave are total time over the number of days. Not calculated counts past workdays with no finished attendance.</p>
         </div>
 
         @if ($report['rows'] === [])
@@ -78,14 +79,14 @@
                 <table class="w-full min-w-[64rem] text-sm">
                     <thead>
                         <tr class="relative text-left align-bottom text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                            <th scope="col" class="table-pin-lead min-w-[8.5rem] px-4 py-3 font-medium sm:pl-6 sm:pr-3">Employee</th>
+                            <th scope="col" class="table-pin-lead min-w-[8.5rem] px-4 py-3 font-medium sm:w-44 sm:min-w-44 sm:pl-6 sm:pr-3">Employee</th>
                             <th scope="col" class="{{ $th }}">{!! $abbr('Workdays', 'Calculated workdays') !!}</th>
                             <th scope="col" class="{{ $th }}">Present</th>
                             <th scope="col" class="{{ $th }}">Absent</th>
                             <th scope="col" class="{{ $th }}">Incomplete</th>
                             <th scope="col" class="{{ $th }}">On leave</th>
                             <th scope="col" class="{{ $th }}">Leave taken<span class="block font-normal normal-case tracking-normal">days</span></th>
-                            <th scope="col" class="{{ $th }}">{!! $abbr('Days off', 'Days off worked') !!}</th>
+                            <th scope="col" class="{{ $th }}">Days off<span class="block font-normal normal-case tracking-normal">worked</span></th>
                             <th scope="col" class="{{ $th }}">Late</th>
                             <th scope="col" class="{{ $th }}">{!! $abbr('Early', 'Early leave') !!}</th>
                             <th scope="col" class="{{ $th }}">Worked</th>
@@ -106,12 +107,14 @@
                                         <span class="text-slate-900 dark:text-slate-100">Total</span>
                                     @else
                                         @php $employee = $row['employee']; @endphp
-                                        {{-- Narrower on a phone, so the pinned column leaves room
-                                        for the figures: the name and code wrap instead. --}}
-                                        <span class="block max-w-[9rem] font-medium text-slate-900 sm:max-w-none sm:whitespace-nowrap dark:text-slate-100">{{ $employee->full_name }}</span>
-                                        <span class="block max-w-[9rem] text-xs text-slate-500 sm:max-w-none sm:whitespace-nowrap dark:text-slate-400">{{ $employee->employee_code }}{!! $employee->department ? '&nbsp;· '.e($employee->department->name) : '' !!}</span>
+                                        {{-- A fixed width at every size: a long name or department
+                                        wraps instead of widening the pinned column, so the
+                                        table still fits from 1366 and leaves a phone room
+                                        for the figures. --}}
+                                        <span class="block max-w-[8.75rem] sm:max-w-none font-medium text-slate-900 dark:text-slate-100">{{ $employee->full_name }}</span>
+                                        <span class="block max-w-[8.75rem] sm:max-w-none text-xs text-slate-500 dark:text-slate-400">{{ $employee->employee_code }}{!! $employee->department ? '&nbsp;· '.e($employee->department->name) : '' !!}</span>
                                         @if ($row['joined'] || $row['left'])
-                                            <span class="block max-w-[9rem] text-xs text-slate-500 sm:max-w-none sm:whitespace-nowrap dark:text-slate-400">{{ collect([$row['joined'] ? 'Joined '.DisplayDate::compact($row['joined']) : null, $row['left'] ? 'Left '.DisplayDate::compact($row['left']) : null])->filter()->implode(' · ') }}</span>
+                                            <span class="block max-w-[8.75rem] sm:max-w-none text-xs text-slate-500 dark:text-slate-400">{{ collect([$row['joined'] ? 'Joined '.DisplayDate::compact($row['joined']) : null, $row['left'] ? 'Left '.DisplayDate::compact($row['left']) : null])->filter()->implode(' · ') }}</span>
                                         @endif
                                     @endif
                                 </td>
@@ -120,7 +123,15 @@
                                 <td class="{{ $cell }}">{{ $s['absent'] }}</td>
                                 <td class="{{ $cell }}">{{ $s['incomplete'] }}</td>
                                 <td class="{{ $cell }}">{{ $s['leave'] }}</td>
-                                <td class="{{ $cell }}">{{ $s['leave_tenths'] > 0 ? LeaveDays::format($s['leave_tenths']) : '—' }}</td>
+                                <td class="{{ $cell }}">
+                                    {{ $s['leave_tenths'] > 0 ? LeaveDays::format($s['leave_tenths']) : '—' }}
+                                    {{-- Days of that leave the employee worked anyway
+                                    (DailyAttendance::workedOnLeave()): still charged,
+                                    so HR paying from this can see them. --}}
+                                    @if ($s['worked_on_leave'] > 0)
+                                        <span class="block whitespace-nowrap text-xs font-normal text-slate-500 dark:text-slate-400">{{ $s['worked_on_leave'] }} worked</span>
+                                    @endif
+                                </td>
                                 <td class="{{ $cell }}">{{ $s['days_off_worked'] }}</td>
                                 {{-- The total over the day count: two lines, so the whole
                                 table fits without scrolling. --}}

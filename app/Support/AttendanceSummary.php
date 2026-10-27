@@ -127,6 +127,12 @@ final class AttendanceSummary
             'leave_tenths' => $workdays->whereNotNull('leave_id')->sum(
                 fn (DailyAttendance $row) => $row->leaveDay()->fullDay ? LeaveDays::DAY : LeaveDays::HALF
             ),
+            // Of those workdays, the ones worked on approved leave
+            // (DailyAttendance::workedOnLeave() — the dashboard's and the
+            // attendance views' definition): a punch on a full-day leave, or
+            // into the half on leave. The leave stays charged (Phase 3 rule
+            // 17), so it is still in leave_tenths.
+            'worked_on_leave' => $workdays->filter(fn (DailyAttendance $row) => $row->workedOnLeave())->count(),
             'leave' => $counts->get(AttendanceStatus::Leave->value, 0),
             'present' => $counts->get(AttendanceStatus::Present->value, 0),
             // A present day on a non-workday or holiday (both punches) — not

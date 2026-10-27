@@ -6,6 +6,7 @@ use App\Livewire\Reports\Attendance;
 use App\Models\AttendanceLog;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\Leave;
 use App\Models\User;
 use App\Models\WorkSchedule;
 use App\Services\Attendance\DailySummaryBuilder;
@@ -104,9 +105,11 @@ class AttendanceReportPageTest extends TestCase
             $this->assertStringContainsString('>'.$column, $html);
         }
         // Short headers keep their full name, as the attendance table's Early does.
-        foreach (['Calculated workdays' => 'Workdays', 'Days off worked' => 'Days off', 'Early leave' => 'Early'] as $full => $short) {
+        foreach (['Calculated workdays' => 'Workdays', 'Early leave' => 'Early'] as $full => $short) {
             $this->assertStringContainsString('<abbr title="'.$full.'" class="no-underline">'.$short.'</abbr>', $html);
         }
+        // "Days off" alone read as days off taken, beside On leave: it says worked.
+        $this->assertStringContainsString('Days off<span class="block font-normal normal-case tracking-normal">worked</span>', $html);
     }
 
     public function test_the_department_filter_offers_the_viewers_departments_and_ignores_any_other(): void
@@ -176,15 +179,15 @@ class AttendanceReportPageTest extends TestCase
 
         $this->assertSame('Attendance report, May 2026 — All departments — All employees — generated 2026-06-15 09:10 (Asia/Phnom_Penh)', $lines[0][0]);
         $this->assertStringStartsWith('The same counts as each employee\'s attendance summary.', $lines[1][0]);
-        $this->assertSame(['Code', 'Name', 'Department', 'Joined', 'Left', 'Calculated workdays', 'Present', 'Absent', 'Incomplete', 'On leave', 'Leave taken (days)', 'Days off worked', 'Late (days)', 'Late (minutes)', 'Early leave (days)', 'Early leave (minutes)', 'Worked (minutes)', 'Not calculated'], $lines[2]);
-        $this->assertSame(['EMP-0002', 'Kyaw Kyaw', 'Engineering', '', '', '21', '1', '20', '0', '0', '0.0', '0', '1', '20', '0', '0', '460', '0'], $lines[3]);
-        $this->assertSame(['EMP-0005', 'Su Su', 'Engineering', '2026-05-11', '', '15', '1', '14', '0', '0', '0.0', '0', '0', '0', '0', '0', '480', '0'], $lines[4]);
-        $this->assertSame(['Total', '', '', '', '', '36', '2', '34', '0', '0', '0.0', '0', '1', '20', '0', '0', '940', '0'], $lines[5]);
+        $this->assertSame(['Code', 'Name', 'Department', 'Joined', 'Left', 'Calculated workdays', 'Present', 'Absent', 'Incomplete', 'On leave', 'Leave taken (days)', 'Worked on leave (days)', 'Days off worked', 'Late (days)', 'Late (minutes)', 'Early leave (days)', 'Early leave (minutes)', 'Worked (minutes)', 'Not calculated'], $lines[2]);
+        $this->assertSame(['EMP-0002', 'Kyaw Kyaw', 'Engineering', '', '', '21', '1', '20', '0', '0', '0.0', '0', '0', '1', '20', '0', '0', '460', '0'], $lines[3]);
+        $this->assertSame(['EMP-0005', 'Su Su', 'Engineering', '2026-05-11', '', '15', '1', '14', '0', '0', '0.0', '0', '0', '0', '0', '0', '0', '480', '0'], $lines[4]);
+        $this->assertSame(['Total', '', '', '', '', '36', '2', '34', '0', '0', '0.0', '0', '0', '1', '20', '0', '0', '940', '0'], $lines[5]);
         $this->assertCount(6, $lines);
 
         // The totals are the page's.
         $totals = Livewire::actingAs($this->admin)->test(Attendance::class)->set('month', '2026-05')->viewData('report')['totals'];
-        $this->assertSame([(string) $totals['workdays'], (string) $totals['present'], (string) $totals['absent'], (string) $totals['total_worked_minutes']], [$lines[5][5], $lines[5][6], $lines[5][7], $lines[5][16]]);
+        $this->assertSame([(string) $totals['workdays'], (string) $totals['present'], (string) $totals['absent'], (string) $totals['total_worked_minutes']], [$lines[5][5], $lines[5][6], $lines[5][7], $lines[5][17]]);
 
         // The open month says so in the file too.
         $open = $this->lines($this->downloadedContent(Livewire::actingAs($this->admin)->test(Attendance::class)->call('download')));
@@ -219,6 +222,35 @@ class AttendanceReportPageTest extends TestCase
         $managerUser->unsetRelation('roles');
 
         $component->call('download')->assertForbidden();
+    }
+
+    public function test_leave_taken_says_how_many_of_its_days_were_worked(): void
+    {
+        // Both punches on an approved full day of leave: Present, still charged
+        // (Phase 3 rule 17) — the report says so under Leave taken.
+        Leave::factory()->for($this->kyaw)->between('2026-05-12', '2026-05-12')->approved()->create();
+        $this->punch($this->kyaw, '2026-05-12 08:00:00', 'in');
+        $this->punch($this->kyaw, '2026-05-12 17:00:00', 'out');
+        app(DailySummaryBuilder::class)->rebuildBetween($this->kyaw, Carbon::parse('2026-05-12'), Carbon::parse('2026-05-12'));
+
+        $html = Livewire::actingAs($this->admin)->test(Attendance::class)->set('month', '2026-05')->html();
+
+        // Kyaw's row and the Total row; Su worked no leave, so no line.
+        $this->assertSame(2, substr_count($html, '1 worked</span>'));
+    }
+
+    public function test_a_long_name_or_department_wraps_instead_of_widening_the_pinned_column(): void
+    {
+        $long = Department::factory()->create(['name' => 'Human Resources and Administration']);
+        Employee::factory()->create(['full_name' => 'Aung Kyaw Moe Thandar Htun', 'department_id' => $long->id]);
+
+        $html = Livewire::actingAs($this->admin)->test(Attendance::class)->set('month', '2026-05')->html();
+
+        // The Employee column has a fixed width from sm; its lines may wrap.
+        $this->assertStringContainsString('table-pin-lead min-w-[8.5rem] px-4 py-3 font-medium sm:w-44 sm:min-w-44', $html);
+        $this->assertMatchesRegularExpression('#<span class="block max-w-\[8.75rem\] sm:max-w-none font-medium[^"]*">Aung Kyaw Moe Thandar Htun</span>#', $html);
+        $this->assertStringNotContainsString('whitespace-nowrap', substr($html, strpos($html, 'Aung Kyaw Moe Thandar Htun') - 200, 400));
+        $this->assertStringContainsString('&nbsp;· Human Resources and Administration', $html);
     }
 
     /** @return list<list<?string>> */
