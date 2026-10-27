@@ -26,7 +26,7 @@ final class AttendanceReport
 {
     /** The figures every row (and the totals) has, in column order. */
     public const FIGURES = [
-        'workdays', 'present', 'absent', 'incomplete', 'leave', 'leave_tenths',
+        'workdays', 'present', 'absent', 'incomplete', 'leave', 'leave_tenths', 'days_off_worked',
         'late', 'incomplete_late', 'late_minutes', 'early_leave_days', 'early_leave_minutes',
         'total_worked_minutes', 'not_calculated',
     ];
@@ -83,7 +83,7 @@ final class AttendanceReport
         foreach ($employees as $employee) {
             $own = $byEmployee->get($employee->id, collect());
             $summary = [
-                ...AttendanceSummary::fromRecords($own),
+                ...AttendanceSummary::fromRecords($own, $employee, $holidays),
                 'not_calculated' => AttendanceSummary::notCalculated($employee, $from, $own, $holidays),
             ];
 

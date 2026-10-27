@@ -4,9 +4,12 @@
     use App\Support\Duration;
     use App\Support\LeaveDays;
 
-    $th = 'px-3 py-3 text-right font-medium';
-    $td = 'px-3 py-4 text-right tabular-nums text-slate-700 dark:text-slate-300';
-    $total = 'px-3 py-4 text-right tabular-nums text-slate-900 dark:text-slate-100';
+    // Narrow cell padding and short headers (the full name in an <abbr>, as
+    // the attendance table's Early) so the whole table fits from 1366.
+    $th = 'px-2 py-3 text-right font-medium';
+    $td = 'px-2 py-4 text-right tabular-nums text-slate-700 dark:text-slate-300';
+    $total = 'px-2 py-4 text-right tabular-nums text-slate-900 dark:text-slate-100';
+    $abbr = fn (string $short, string $full) => '<abbr title="'.e($full).'" class="no-underline">'.e($short).'</abbr>';
     $divider = '<span class="pointer-events-none absolute inset-x-4 bottom-0 z-[2] h-px bg-slate-divider sm:inset-x-6"></span>';
 @endphp
 
@@ -55,7 +58,7 @@
                 <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100">{{ $monthLabel }}</h3>
                 <p class="shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ count($report['rows']) }} {{ Str::plural('employee', count($report['rows'])) }}</p>
             </div>
-            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">The same counts as each employee's attendance summary. Late and early leave are total time over the number of days. Not calculated counts workdays with no finished attendance yet, today's included.</p>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">The same counts as each employee's attendance summary. Workdays are scheduled workdays only; a day worked on a day off or holiday counts under Days off. Late and early leave are total time over the number of days. Not calculated counts past workdays with no finished attendance.</p>
         </div>
 
         @if ($report['rows'] === [])
@@ -75,18 +78,19 @@
                 <table class="w-full min-w-[64rem] text-sm">
                     <thead>
                         <tr class="relative text-left align-bottom text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                            <th scope="col" class="table-pin-lead min-w-[8.5rem] px-4 py-3 font-medium sm:px-6">Employee</th>
-                            <th scope="col" class="{{ $th }}">Calculated workdays</th>
+                            <th scope="col" class="table-pin-lead min-w-[8.5rem] px-4 py-3 font-medium sm:pl-6 sm:pr-3">Employee</th>
+                            <th scope="col" class="{{ $th }}">{!! $abbr('Workdays', 'Calculated workdays') !!}</th>
                             <th scope="col" class="{{ $th }}">Present</th>
                             <th scope="col" class="{{ $th }}">Absent</th>
                             <th scope="col" class="{{ $th }}">Incomplete</th>
                             <th scope="col" class="{{ $th }}">On leave</th>
                             <th scope="col" class="{{ $th }}">Leave taken<span class="block font-normal normal-case tracking-normal">days</span></th>
+                            <th scope="col" class="{{ $th }}">{!! $abbr('Days off', 'Days off worked') !!}</th>
                             <th scope="col" class="{{ $th }}">Late</th>
-                            <th scope="col" class="{{ $th }}">Early leave</th>
+                            <th scope="col" class="{{ $th }}">{!! $abbr('Early', 'Early leave') !!}</th>
                             <th scope="col" class="{{ $th }}">Worked</th>
                             <th scope="col" class="{{ $th }}">Not calculated</th>
-                            <th scope="col" class="w-14 px-2 py-3 sm:pr-4"><span class="sr-only">Attendance</span>{!! $divider !!}</th>
+                            <th scope="col" class="w-12 px-1 py-3"><span class="sr-only">Attendance</span>{!! $divider !!}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -97,7 +101,7 @@
                                 $cell = $row['total'] ? $total : $td;
                             @endphp
                             <tr @class(['relative', 'font-semibold' => $row['total']])>
-                                <td class="table-pin-lead px-4 py-4 sm:px-6">
+                                <td class="table-pin-lead px-4 py-4 sm:pl-6 sm:pr-3">
                                     @if ($row['total'])
                                         <span class="text-slate-900 dark:text-slate-100">Total</span>
                                     @else
@@ -117,8 +121,9 @@
                                 <td class="{{ $cell }}">{{ $s['incomplete'] }}</td>
                                 <td class="{{ $cell }}">{{ $s['leave'] }}</td>
                                 <td class="{{ $cell }}">{{ $s['leave_tenths'] > 0 ? LeaveDays::format($s['leave_tenths']) : '—' }}</td>
+                                <td class="{{ $cell }}">{{ $s['days_off_worked'] }}</td>
                                 {{-- The total over the day count: two lines, so the whole
-                                table fits at 1440 without scrolling. --}}
+                                table fits without scrolling. --}}
                                 @foreach ([[$lateDays, $s['late_minutes']], [$s['early_leave_days'], $s['early_leave_minutes']]] as [$days, $minutes])
                                     <td class="{{ $cell }} whitespace-nowrap">
                                         @if ($days > 0)
@@ -131,7 +136,7 @@
                                 @endforeach
                                 <td class="{{ $cell }} whitespace-nowrap">{{ $s['total_worked_minutes'] > 0 ? Duration::format($s['total_worked_minutes']) : '—' }}</td>
                                 <td class="{{ $cell }}">{{ $s['not_calculated'] }}</td>
-                                <td class="px-2 py-2 text-right sm:pr-4">
+                                <td class="px-1 py-2 text-right">
                                     @unless ($row['total'])
                                         <a
                                             href="{{ route('attendance.show', ['employee' => $employee, 'month' => $month]) }}"

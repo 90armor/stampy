@@ -121,7 +121,8 @@
                 days the builder has already processed (present+absent+
                 incomplete rows that exist, plus leave days since Phase 3d —
                 a late/early day is already a present row, not a fourth
-                category), not every scheduled
+                category — and only on scheduled workdays since Phase 5b: a
+                day off worked has its own line below), not every scheduled
                 workday in the month. A month that's only partly built would
                 otherwise read as having far fewer workdays than it actually
                 has. --}}
@@ -176,6 +177,15 @@
                 <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">
                     Leave taken: <strong class="font-semibold text-slate-900 dark:text-slate-100">{{ \App\Support\LeaveDays::format($summary['leave_tenths']) }} {{ $summary['leave_tenths'] === \App\Support\LeaveDays::DAY ? 'day' : 'days' }}</strong>
                     <span class="text-xs">· counted separately from the workday figures above (half days count 0.5)</span>
+                </p>
+            @endif
+
+            {{-- Present on a day off (a non-workday or a holiday): outside the
+            workday figures above, so it gets its own line, like leave taken. --}}
+            @if ($summary['days_off_worked'] > 0)
+                <p class="mt-3 text-sm text-slate-500 dark:text-slate-400">
+                    Days off worked: <strong class="font-semibold text-slate-900 dark:text-slate-100">{{ $summary['days_off_worked'] }}</strong>
+                    <span class="text-xs">· present on a non-workday or holiday, not counted in the workday figures above</span>
                 </p>
             @endif
 

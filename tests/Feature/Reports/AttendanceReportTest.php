@@ -154,6 +154,7 @@ class AttendanceReportTest extends TestCase
             'leave_tenths' => 15,
             'leave' => 1,
             'present' => 4,
+            'days_off_worked' => 0,
             'late' => 1,
             'absent' => 15,
             'incomplete' => 1,
@@ -237,8 +238,9 @@ class AttendanceReportTest extends TestCase
         $this->assertSame(0, $summary['present']);
         // The late arrival waits for the day to close, as in My attendance.
         $this->assertSame(0, $summary['late_minutes']);
-        // 11, 12 June and today — never the holiday, never a day after today.
-        $this->assertSame(3, $summary['not_calculated']);
+        // 11 and 12 June — never the holiday, never today until it closes,
+        // never a day after today.
+        $this->assertSame(2, $summary['not_calculated']);
         $this->assertEveryRowEqualsTheSummary($report, Carbon::parse('2026-06-01'));
     }
 

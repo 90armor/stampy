@@ -74,6 +74,7 @@ class Attendance extends Component
         $line = fn (array $summary) => [
             $summary['workdays'], $summary['present'], $summary['absent'], $summary['incomplete'], $summary['leave'],
             LeaveDays::toDecimal($summary['leave_tenths']),
+            $summary['days_off_worked'],
             AttendanceReport::lateDays($summary), $summary['late_minutes'],
             $summary['early_leave_days'], $summary['early_leave_minutes'],
             $summary['total_worked_minutes'], $summary['not_calculated'],
@@ -88,8 +89,8 @@ class Attendance extends Component
             if ($report['open']) {
                 fputcsv($out, ['This month is still open: figures can change until it ends.']);
             }
-            fputcsv($out, ['The same counts as each employee\'s attendance summary. Durations in whole minutes; leave taken in days. Joined and Left only when inside the month.']);
-            fputcsv($out, ['Code', 'Name', 'Department', 'Joined', 'Left', 'Calculated workdays', 'Present', 'Absent', 'Incomplete', 'On leave', 'Leave taken (days)', 'Late (days)', 'Late (minutes)', 'Early leave (days)', 'Early leave (minutes)', 'Worked (minutes)', 'Not calculated']);
+            fputcsv($out, ['The same counts as each employee\'s attendance summary. Workdays are scheduled workdays only; a day worked on a day off or holiday counts under Days off worked. Durations in whole minutes; leave taken in days. Joined and Left only when inside the month.']);
+            fputcsv($out, ['Code', 'Name', 'Department', 'Joined', 'Left', 'Calculated workdays', 'Present', 'Absent', 'Incomplete', 'On leave', 'Leave taken (days)', 'Days off worked', 'Late (days)', 'Late (minutes)', 'Early leave (days)', 'Early leave (minutes)', 'Worked (minutes)', 'Not calculated']);
 
             foreach ($report['rows'] as $row) {
                 $employee = $row['employee'];

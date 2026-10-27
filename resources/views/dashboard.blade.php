@@ -429,10 +429,11 @@
                                 </div>
                             @endforeach
                         </dl>
-                        @if ($month['leave_tenths'] > 0 || $month['total_worked_minutes'] > 0 || $mine['overtimeThisMonth'] > 0)
+                        @if ($month['leave_tenths'] > 0 || $month['days_off_worked'] > 0 || $month['total_worked_minutes'] > 0 || $mine['overtimeThisMonth'] > 0)
                             <p class="mt-4 border-t border-slate-divider pt-3 text-xs text-slate-500 dark:text-slate-400">
                                 {{ implode(' · ', array_filter([
                                     $month['leave_tenths'] > 0 ? 'Leave taken: '.\App\Support\LeaveDays::label($month['leave_tenths']) : null,
+                                    $month['days_off_worked'] > 0 ? 'Days off worked: '.$month['days_off_worked'] : null,
                                     $month['total_worked_minutes'] > 0 ? 'Worked: '.\App\Support\Duration::format($month['total_worked_minutes']) : null,
                                     $mine['overtimeThisMonth'] > 0 ? 'Overtime: '.\App\Support\Duration::format($mine['overtimeThisMonth']).' credited' : null,
                                 ])) }}

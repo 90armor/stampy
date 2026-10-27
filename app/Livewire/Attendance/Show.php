@@ -559,11 +559,16 @@ class Show extends Component
      * the employee dashboard uses too.
      *
      * @param  Collection<int, array{date: Carbon, record: ?DailyAttendance}>  $days
+     * @param  Collection<string, string>  $holidays  holidaysByDate(), already loaded for the month
      * @return array<string, int>
      */
-    private function summary(Collection $days): array
+    private function summary(Collection $days, Collection $holidays): array
     {
-        return AttendanceSummary::fromRecords($days->pluck('record')->filter()->values());
+        return AttendanceSummary::fromRecords(
+            $days->pluck('record')->filter()->values(),
+            $this->employee,
+            $holidays->map(fn () => true)->all(),
+        );
     }
 
     public function render()
@@ -610,17 +615,18 @@ class Show extends Component
         // needs to know how far the CURRENT month got, which $existing
         // already answers for free.
         $lastBuiltInMonth = $existing->keys()->sort()->last();
+        $holidays = $this->holidaysByDate();
 
         return view('livewire.attendance.show', [
             'days' => $days,
             'gridDays' => $this->gridDays($existing),
             'recordsByDate' => $existing,
-            'summary' => $this->summary($days),
+            'summary' => $this->summary($days, $holidays),
             'monthLabel' => DisplayDate::month($this->monthStart()),
             'isCurrentMonth' => $this->month === today()->format('Y-m'),
             'punchesByDate' => $this->punchesByDate(),
             'overnightPunches' => $this->overnightPunches($existing),
-            'holidaysByDate' => $this->holidaysByDate(),
+            'holidaysByDate' => $holidays,
             'dayLeaves' => $this->dayLeaves(),
             'dayOvertime' => $this->viewingDay !== null ? $this->dayOvertime($existing->get($this->viewingDay)) : null,
             'lastBuiltInMonth' => $lastBuiltInMonth,

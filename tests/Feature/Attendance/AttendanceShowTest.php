@@ -8,6 +8,7 @@ use App\Models\DailyAttendance;
 use App\Models\Employee;
 use App\Models\User;
 use App\Models\WorkSchedule;
+use App\Support\WorkdayCalendar;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -251,13 +252,20 @@ class AttendanceShowTest extends TestCase
             ['status' => AttendanceStatus::Absent, 'late_minutes' => 0],
         ];
 
-        foreach ($rows as $i => $row) {
+        // On the month's first four workdays: since Phase 5b a present day
+        // on a day off is a day off worked, not one of the workdays.
+        $date = $month->copy();
+        foreach ($rows as $row) {
+            while (! WorkdayCalendar::isWorkday($employee, $date)) {
+                $date->addDay();
+            }
             DailyAttendance::factory()->create([
                 'employee_id' => $employee->id,
-                'work_date' => $month->copy()->addDays($i)->format('Y-m-d'),
+                'work_date' => $date->format('Y-m-d'),
                 'status' => $row['status'],
                 'late_minutes' => $row['late_minutes'],
             ]);
+            $date->addDay();
         }
 
         $summary = Livewire::actingAs($this->admin())

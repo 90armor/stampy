@@ -100,8 +100,12 @@ class AttendanceReportPageTest extends TestCase
         // Every divider runs above the pinned cells; none under the Total row.
         $this->assertSame(1 + 2, substr_count($html, 'z-[2] h-px bg-slate-divider'));
         $this->assertSame(substr_count($html, 'bg-slate-divider'), substr_count($html, 'z-[2] h-px bg-slate-divider'));
-        foreach (['Calculated workdays', 'Present', 'Absent', 'Incomplete', 'On leave', 'Leave taken', 'Late', 'Early leave', 'Worked', 'Not calculated'] as $column) {
+        foreach (['Present', 'Absent', 'Incomplete', 'On leave', 'Leave taken', 'Late', 'Worked', 'Not calculated'] as $column) {
             $this->assertStringContainsString('>'.$column, $html);
+        }
+        // Short headers keep their full name, as the attendance table's Early does.
+        foreach (['Calculated workdays' => 'Workdays', 'Days off worked' => 'Days off', 'Early leave' => 'Early'] as $full => $short) {
+            $this->assertStringContainsString('<abbr title="'.$full.'" class="no-underline">'.$short.'</abbr>', $html);
         }
     }
 
@@ -172,15 +176,15 @@ class AttendanceReportPageTest extends TestCase
 
         $this->assertSame('Attendance report, May 2026 — All departments — All employees — generated 2026-06-15 09:10 (Asia/Phnom_Penh)', $lines[0][0]);
         $this->assertStringStartsWith('The same counts as each employee\'s attendance summary.', $lines[1][0]);
-        $this->assertSame(['Code', 'Name', 'Department', 'Joined', 'Left', 'Calculated workdays', 'Present', 'Absent', 'Incomplete', 'On leave', 'Leave taken (days)', 'Late (days)', 'Late (minutes)', 'Early leave (days)', 'Early leave (minutes)', 'Worked (minutes)', 'Not calculated'], $lines[2]);
-        $this->assertSame(['EMP-0002', 'Kyaw Kyaw', 'Engineering', '', '', '21', '1', '20', '0', '0', '0.0', '1', '20', '0', '0', '460', '0'], $lines[3]);
-        $this->assertSame(['EMP-0005', 'Su Su', 'Engineering', '2026-05-11', '', '15', '1', '14', '0', '0', '0.0', '0', '0', '0', '0', '480', '0'], $lines[4]);
-        $this->assertSame(['Total', '', '', '', '', '36', '2', '34', '0', '0', '0.0', '1', '20', '0', '0', '940', '0'], $lines[5]);
+        $this->assertSame(['Code', 'Name', 'Department', 'Joined', 'Left', 'Calculated workdays', 'Present', 'Absent', 'Incomplete', 'On leave', 'Leave taken (days)', 'Days off worked', 'Late (days)', 'Late (minutes)', 'Early leave (days)', 'Early leave (minutes)', 'Worked (minutes)', 'Not calculated'], $lines[2]);
+        $this->assertSame(['EMP-0002', 'Kyaw Kyaw', 'Engineering', '', '', '21', '1', '20', '0', '0', '0.0', '0', '1', '20', '0', '0', '460', '0'], $lines[3]);
+        $this->assertSame(['EMP-0005', 'Su Su', 'Engineering', '2026-05-11', '', '15', '1', '14', '0', '0', '0.0', '0', '0', '0', '0', '0', '480', '0'], $lines[4]);
+        $this->assertSame(['Total', '', '', '', '', '36', '2', '34', '0', '0', '0.0', '0', '1', '20', '0', '0', '940', '0'], $lines[5]);
         $this->assertCount(6, $lines);
 
         // The totals are the page's.
         $totals = Livewire::actingAs($this->admin)->test(Attendance::class)->set('month', '2026-05')->viewData('report')['totals'];
-        $this->assertSame([(string) $totals['workdays'], (string) $totals['present'], (string) $totals['absent'], (string) $totals['total_worked_minutes']], [$lines[5][5], $lines[5][6], $lines[5][7], $lines[5][15]]);
+        $this->assertSame([(string) $totals['workdays'], (string) $totals['present'], (string) $totals['absent'], (string) $totals['total_worked_minutes']], [$lines[5][5], $lines[5][6], $lines[5][7], $lines[5][16]]);
 
         // The open month says so in the file too.
         $open = $this->lines($this->downloadedContent(Livewire::actingAs($this->admin)->test(Attendance::class)->call('download')));

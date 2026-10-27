@@ -16,14 +16,19 @@ use Illuminate\Support\Collection;
  * definition for all three (Phase 3e).
  *
  * Counts only — no derived or payroll-adjacent figures. "Calculated
- * workdays" is present + absent + incomplete + leave rows that exist (a day
- * of leave is still one of the workdays, Phase 3d rule 20), so the four
- * status counts always add up to it. "Late"/"early_leave_days" and "Total
- * worked" are plain counts/sums over the same calculated rows, not anything
- * interpreted. Late and early leave come from late_minutes/
- * early_leave_minutes, not from status — timing is not a status (see
- * AttendanceStatus's doc comment) — so a day can contribute to both counts
- * at once.
+ * workdays" are the present, absent, incomplete and leave rows on the
+ * employee's scheduled workdays (WorkdayCalendar::isWorkday — the schedule
+ * in force on the date, not a holiday; Phase 5b), so the four status counts
+ * always add up to it. A present day on a day off — a non-workday or a
+ * holiday — is a "day off worked" instead (owner, Phase 5b): it keeps its
+ * status and colour on the day, it just isn't one of the workdays. A
+ * one-punch day off counts nowhere (owner): not a workday, and without both
+ * punches not a day worked either — the day itself still shows Incomplete.
+ * "Late"/"early_leave_days" and "Total worked" are plain counts/sums over
+ * the calculated rows, not anything interpreted. Late and early leave come
+ * from late_minutes/early_leave_minutes, not from status — timing is not a
+ * status (see AttendanceStatus's doc comment) — so a day can contribute to
+ * both counts at once.
  */
 final class AttendanceSummary
 {
@@ -32,16 +37,18 @@ final class AttendanceSummary
      */
     public static function forMonth(Employee $employee, CarbonInterface $month): array
     {
-        return self::fromRecords(self::monthRecords($employee, $month));
+        return self::fromRecords(self::monthRecords($employee, $month), $employee);
     }
 
     /**
-     * Workdays of the month with no closed row: dates inside the employment
-     * period, up to today, that are a working day for this employee
-     * (WorkdayCalendar::isWorkday — the schedule in force on the date, not a
-     * holiday) and have no row yet, or one still In progress. Days after
-     * today count nowhere. Today's open day counts until it closes: it isn't
-     * calculated yet, which is all this says — never absent.
+     * Past workdays of the month with no finished row — the dashboard's "Not
+     * calculated": dates inside the employment period, before today, that
+     * are a working day for this employee (WorkdayCalendar::isWorkday) and
+     * have no row, or an In progress row that is no longer open
+     * (DailyAttendance::isOpen() — the builder hasn't run since it should
+     * have closed it). Today counts nowhere until it closes, and neither does
+     * an earlier day still inside its pairing window: both are pending, not
+     * missing.
      *
      * Not part of fromRecords(): it needs the employee and the month, not
      * just rows, and only the attendance report shows it.
@@ -54,7 +61,7 @@ final class AttendanceSummary
         $records ??= self::monthRecords($employee, $month);
 
         $from = Carbon::instance($month)->startOfMonth()->max($employee->join_date);
-        $to = Carbon::instance($month)->endOfMonth()->startOfDay()->min(today());
+        $to = Carbon::instance($month)->endOfMonth()->startOfDay()->min(today()->subDay());
         if ($employee->left_on !== null) {
             $to = $to->min($employee->left_on);
         }
@@ -64,13 +71,13 @@ final class AttendanceSummary
         }
 
         $holidays ??= WorkdayCalendar::holidaysBetween($from, $to);
-        $closed = $records
-            ->reject(fn (DailyAttendance $row) => $row->status === AttendanceStatus::InProgress)
+        $finished = $records
+            ->reject(fn (DailyAttendance $row) => $row->status === AttendanceStatus::InProgress && ! $row->isOpen())
             ->mapWithKeys(fn (DailyAttendance $row) => [$row->work_date->format('Y-m-d') => true]);
 
         $count = 0;
         for ($date = $from->copy(); $date->lte($to); $date->addDay()) {
-            if (! $closed->has($date->format('Y-m-d')) && WorkdayCalendar::isWorkday($employee, $date, $holidays)) {
+            if (! $finished->has($date->format('Y-m-d')) && WorkdayCalendar::isWorkday($employee, $date, $holidays)) {
                 $count++;
             }
         }
@@ -90,12 +97,16 @@ final class AttendanceSummary
     }
 
     /**
-     * @param  Collection<int, DailyAttendance>  $records
+     * @param  Collection<int, DailyAttendance>  $records  the employee's rows
+     * @param  array<string, true>|null  $holidays  a WorkdayCalendar::holidaysBetween() result covering the rows, to save the query
      * @return array<string, int>
      */
-    public static function fromRecords(Collection $records): array
+    public static function fromRecords(Collection $records, Employee $employee, ?array $holidays = null): array
     {
-        $counts = $records->countBy(fn (DailyAttendance $row) => $row->status->value);
+        $holidays ??= $records->isEmpty() ? [] : WorkdayCalendar::holidaysBetween($records->min('work_date'), $records->max('work_date'));
+        [$onWorkdays, $onDaysOff] = $records->partition(fn (DailyAttendance $row) => WorkdayCalendar::isWorkday($employee, $row->work_date, $holidays));
+
+        $counts = $onWorkdays->countBy(fn (DailyAttendance $row) => $row->status->value);
 
         $workdayStatuses = [
             AttendanceStatus::Present,
@@ -103,7 +114,7 @@ final class AttendanceSummary
             AttendanceStatus::Incomplete,
             AttendanceStatus::Leave,
         ];
-        $workdays = $records->filter(fn (DailyAttendance $row) => in_array($row->status, $workdayStatuses, true));
+        $workdays = $onWorkdays->filter(fn (DailyAttendance $row) => in_array($row->status, $workdayStatuses, true));
         DailyAttendance::withLeaveDays($workdays);
 
         return [
@@ -111,28 +122,33 @@ final class AttendanceSummary
             // Leave taken on those workdays, in tenths of a day (LeaveDays): a
             // full day 1, a half day 0.5 — a half-day Present day counts once
             // in workdays and 0.5 here. An off day or holiday inside a leave
-            // costs nothing, so it isn't a workday and isn't counted.
+            // costs nothing, so it isn't a workday and isn't counted — worked
+            // or not.
             'leave_tenths' => $workdays->whereNotNull('leave_id')->sum(
                 fn (DailyAttendance $row) => $row->leaveDay()->fullDay ? LeaveDays::DAY : LeaveDays::HALF
             ),
             'leave' => $counts->get(AttendanceStatus::Leave->value, 0),
             'present' => $counts->get(AttendanceStatus::Present->value, 0),
+            // A present day on a non-workday or holiday (both punches) — not
+            // one of the workdays. A one-punch day off counts nowhere.
+            'days_off_worked' => $onDaysOff->filter(fn (DailyAttendance $row) => $row->status === AttendanceStatus::Present)->count(),
             // "of which N late" is a breakdown of Present, so only Present
             // days count here, even though since Phase 2.6 an incomplete day
             // can carry late minutes too (it is still shown in its own row).
-            'late' => $records->filter(fn (DailyAttendance $row) => $row->status === AttendanceStatus::Present && $row->isLate())->count(),
+            'late' => $onWorkdays->filter(fn (DailyAttendance $row) => $row->status === AttendanceStatus::Present && $row->isLate())->count(),
             'absent' => $counts->get(AttendanceStatus::Absent->value, 0),
             'incomplete' => $counts->get(AttendanceStatus::Incomplete->value, 0),
             // Late annotates its own status group: an incomplete day with a
             // late in-punch is counted here, under Incomplete.
-            'incomplete_late' => $records->filter(fn (DailyAttendance $row) => $row->status === AttendanceStatus::Incomplete && $row->isLate())->count(),
+            'incomplete_late' => $onWorkdays->filter(fn (DailyAttendance $row) => $row->status === AttendanceStatus::Incomplete && $row->isLate())->count(),
             // The late minutes of exactly the days `late` and `incomplete_late`
             // count — an In progress day's late arrival waits until it closes.
-            'late_minutes' => (int) $records
+            'late_minutes' => (int) $onWorkdays
                 ->filter(fn (DailyAttendance $row) => in_array($row->status, [AttendanceStatus::Present, AttendanceStatus::Incomplete], true) && $row->isLate())
                 ->sum('late_minutes'),
-            'early_leave_days' => $records->filter(fn (DailyAttendance $row) => $row->leftEarly())->count(),
-            'early_leave_minutes' => (int) $records->filter(fn (DailyAttendance $row) => $row->leftEarly())->sum('early_leave_minutes'),
+            'early_leave_days' => $onWorkdays->filter(fn (DailyAttendance $row) => $row->leftEarly())->count(),
+            'early_leave_minutes' => (int) $onWorkdays->filter(fn (DailyAttendance $row) => $row->leftEarly())->sum('early_leave_minutes'),
+            // Every worked minute of the month, days off worked included.
             'total_worked_minutes' => (int) $records->sum('worked_minutes'),
         ];
     }
