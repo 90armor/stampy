@@ -101,7 +101,7 @@
         </x-card>
 
         {{-- Leave (Phase 3e): full width, under the rest — the balance table needs it. --}}
-        <x-card :padding="false" class="order-5 lg:col-span-12">
+        <x-card :padding="false" id="leave" class="order-5 scroll-mt-20 lg:col-span-12">
             <livewire:employees.leave-card :employee="$employee" :key="'leave-card-'.$employee->id" />
         </x-card>
 

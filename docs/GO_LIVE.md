@@ -27,15 +27,15 @@ Departments, positions and holidays are entered in the app (step 3), not seeded:
 
 ## 3. The first admin, then the organization and working time
 
-There is no sign-up. Create the first admin from tinker (`php artisan tinker`), then change the password at first login:
+There is no sign-up. Create the first admin with:
 
-```php
-$user = App\Models\User::create(['name' => 'Full Name', 'username' => 'admin.name', 'email' => 'name@company.com', 'password' => 'a-temporary-password']);
-$user->forceFill(['must_change_password' => true])->save(); // not mass-assignable: asks for a new password at first login
-$user->assignRole('admin');
+```bash
+php artisan user:create-admin
 ```
 
-If this admin will also take leave, link them to an employee record (step 6). An admin with no employee record is only for a system account.
+It asks for a name, a username (what they sign in with), an email (optional — press Enter to skip) and a password, typed twice and checked by the same rules as the password-change form. It needs the `admin` role from step 2, and refuses — creating nothing — if the username or email is already taken. The password is the one you typed, so nothing asks for a new one at first login.
+
+If this admin will also take leave, link them to an employee record (step 6). An admin with no employee record is only for a system account. Once the employee exists, `php artisan user:create-admin --employee=EMP-0001` creates an admin already linked to it; the account's name then follows the employee record. The command never changes an existing account: to make someone who already has a login an admin, change their role in the employee form.
 
 Then, as that admin:
 
@@ -70,6 +70,8 @@ To pay overtime only, set "Credited to" to "No time off in lieu". The request fo
 
 **Who approves:** overtime uses the same two steps as leave. The employee's manager (with the manager role) decides first, then an admin. The managers set up in the next step are the overtime approvers too.
 
+**Reports for HR:** Reports → Attendance gives each employee's month in counts (workdays, absences, late and early leave, leave taken and days off worked), and Reports → Leave each employee's balance of a leave type for a year, both with a CSV. Managers see their own team in both. For someone who has left, read untaken leave from the leave CSV's **Available at last day** column, not **Available**, which is the full year's balance.
+
 **Payroll:** Reports → Overtime shows a month's approved, credited overtime per employee: pay minutes by category, time off minutes as a total, and pay-equivalent hours (the minutes × today's rates ÷ 60, pay only — payroll multiplies by the hourly wage). **Download CSV** saves the same table. The filename and the first line say when it was exported. A month still in progress says so on the page and in the file: until the month ends, a late claim or a cancellation can still change it. Export after the month closes, and keep the file payroll was run from.
 
 ## 6. People, logins and managers
@@ -77,7 +79,7 @@ To pay overtime only, set "Credited to" to "No time off in lieu". The request fo
 - **Employees:** add each one with their real join date; it decides their leave grants and service requirements. Fix a wrong join date before any leave is taken against it.
 - **Logins:** give a login to everyone who will request their own leave. Employees without one can still have leave filed for them by an admin.
 - **Managers:** anyone who approves leave needs the **manager role**, and their team's `Manager` set to them. If an employee's manager doesn't have the role, that employee's requests skip the manager step, with a note saying so, and go straight to an admin.
-- **Admins who take leave:** link their login to their employee record. Otherwise they can't request their own leave, and they aren't anyone's approver at the manager step.
+- **Admins who take leave:** their login has to be linked to their employee record. Otherwise they can't request their own leave, and they aren't anyone's approver at the manager step. Add their employee record first (without a login), then create their admin login linked to it: `php artisan user:create-admin --employee=EMP-0001`.
 
 Each employee gets this year's leave grants when they're created. Check one with `php artisan leave:balance EMP-0001`.
 

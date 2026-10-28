@@ -286,7 +286,7 @@ class DashboardAttendance
             $isStale = $key !== $todayKey && self::rowsOfEmployeesActiveOn($employeeIds, $cursor)
                 ->where('status', AttendanceStatus::InProgress->value)
                 ->get(['work_date', 'first_in', 'last_out'])
-                ->contains(fn (DailyAttendance $row) => ! self::isOpen($row));
+                ->contains(fn (DailyAttendance $row) => ! $row->isOpen());
             $byStatus = $rows->mapWithKeys(fn (DailyAttendance $row) => [$row->status->value => (int) $row->total]);
             $statuses = $byStatus->keys();
             $checkedIn = (int) $rows->sum('checked_in');
@@ -580,15 +580,6 @@ class DashboardAttendance
     private static function expected(int $headcount, int $onLeaveOutsideN): int
     {
         return $headcount - $onLeaveOutsideN;
-    }
-
-    private static function isOpen(DailyAttendance $row): bool
-    {
-        if ($row->first_in !== null && $row->last_out === null) {
-            return now()->lte($row->first_in->copy()->addHours(DailySummaryBuilder::MAX_SHIFT_HOURS));
-        }
-
-        return $row->work_date->isToday();
     }
 
     /**

@@ -65,8 +65,15 @@ The ratio and the block are rows 1–2 above.
 
 ## Payroll (Phase 5)
 
+Phase 5's payroll slice (5c) isn't scoped until HR answers 24–27; they're marked **Needed before 5c**. 21 and 22 belong with them.
+
 | # | Question | Current default | Decided by | Where to change · what it affects |
 |---|---|---|---|---|
 | 21 | Do late minutes on a day with a missing punch count for payroll? | Late is recorded as soon as the in-punch exists, and stays on an incomplete day. Nothing reaches payroll yet. | Owner (recording); payroll use open | Phase 5 exports. |
 | 22 | Should a month be locked once payroll has run? | **No lock**: a late claim, a cancellation, a punch correction or a rate change can still change a past month's report. The CSV says when it was exported, and an open month says so. | Claude (deferred) | Phase 5 build. |
 | 23 | Should a past month's pay-equivalent hours use the rates in force then? | **Today's rates**: the report re-prices a past month after a rate change. The minutes never change. | Claude | Phase 5 build, with the lock (22). |
+| 24 | **Needed before 5c.** Payroll cutoff: on which day does a month close for payroll, and who closes it? | **No close**: a month is only "still open" until its last day (the overtime report's notice); its figures can change at any time after. | Open — waits on HR | 5c build (a month-close for admins, with 22). **Future only**. |
+| 25 | **Needed before 5c.** A late claim, a cancelled leave or a punch correction for a month already closed: refused, or carried into the next period as an adjustment? | **Applied to the month it belongs to**: with no close, the report simply recomputes that month. | Claude (deferred, with 22) | 5c build. **Future only**. |
+| 26 | **Needed before 5c.** Are late minutes deducted from pay? (Whether late on a day with a missing punch counts is 21.) | **Not deducted**: late minutes are recorded and shown in attendance, and nothing sends them to payroll — the overtime CSV has no late column. | Owner (recording only); pay use open | 5c build (a payroll export). **Future only**. |
+| 27 | **Needed before 5c.** Medical certificates: are they required, from how many days of Medical leave, and kept for how long? | **None**: a leave request has a reason text only; nothing can be uploaded. | Claude (moved to 5c — storing files brings storage and backup questions) | 5c build (an upload on the request, with storage and backups). **Future only**. |
+| 28 | Is untaken leave paid out when someone leaves, and from which figure? | **The app shows "Available at last day"**: the leaver's yearly grant pro-rated to their last day, plus what they carried in and any adjustments, less leave used and pending. It is the bold Available for a leaver on Reports → Leave, on Time off and on the profile's Leave card, with the full-year balance beside it, and its own column in the leave report's CSV. Paying it out is payroll's; the app pays nothing. | Claude | Reports → Leave, and the payroll process. **Future only**. |

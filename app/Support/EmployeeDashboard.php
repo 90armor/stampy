@@ -37,7 +37,7 @@ final class EmployeeDashboard
     public const DECISIONS_DAYS = 30;
 
     /**
-     * @return array{decided: list<Leave|OvertimeRequest>, balances: list<array{name: string, available: int, usableFrom: ?CarbonImmutable, earnedSoFar: ?int, toilRemainder: ?int}>, next: ?array{leave: Leave, days: int}, month: array<string, int>, pending: list<array{leave: Leave, days: int}>, overtime: list<OvertimeRequest>, overtimeThisMonth: int}
+     * @return array{decided: list<Leave|OvertimeRequest>, balances: list<array{name: string, available: int, fullYear: ?int, usableFrom: ?CarbonImmutable, earnedSoFar: ?int, toilRemainder: ?int}>, next: ?array{leave: Leave, days: int}, month: array<string, int>, pending: list<array{leave: Leave, days: int}>, overtime: list<OvertimeRequest>, overtimeThisMonth: int}
      */
     public static function for(Employee $employee, User $user): array
     {
@@ -92,8 +92,11 @@ final class EmployeeDashboard
 
                     return [
                         'name' => $type->name,
-                        'available' => $balance->available(),
-                        'usableFrom' => $balance->usableFrom,
+                        // A leaver's last year: what they had at their last day, the
+                        // full-year figure a muted line — as Time off and the report.
+                        'available' => LeaveReport::available($balance),
+                        'fullYear' => $balance->availableAtLastDay() !== null ? $balance->available() : null,
+                        'usableFrom' => $balance->availableAtLastDay() === null ? $balance->usableFrom : null,
                         'earnedSoFar' => $calculator->earnedSoFar($employee, $type, today()),
                         'toilRemainder' => $type->toilRemainderFor($employee),
                     ];

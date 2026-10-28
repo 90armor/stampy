@@ -46,7 +46,20 @@ class LeaveBalance
     public function for(Employee $employee, LeaveType $type, int $year): Balance
     {
         if (! $type->hasBalance()) {
-            return new Balance($type, $year, hasBalance: false);
+            // No balance to show, but its days still count (Unpaid,
+            // Maternity, Special — the leave report's Used, Phase 5b): the
+            // same usage count as below, so there's one definition.
+            [$approved, $pending, $usedByType, $pendingByType] = $this->usage($employee, $type, $year);
+
+            return new Balance(
+                type: $type,
+                year: $year,
+                hasBalance: false,
+                used: $approved[$year] ?? 0,
+                pending: $pending[$year] ?? 0,
+                usedByType: $usedByType,
+                pendingByType: $pendingByType,
+            );
         }
 
         $entitlements = ! $type->isGrantedYearly() ? [] : LeaveEntitlement::query()

@@ -120,7 +120,8 @@
                                 <div>
                                     {{-- Counts, never a bare percentage (Phase 2.7): "Checked in
                                     N / M" (any punch today, so the departments total the strip's
-                                    At work + Left) with a lighter provisional bar while today is pending,
+                                    At work + Left) with a hollow provisional bar while today is pending (an
+                                    outline at least 3:1 against the track, as the trend's — Phase 5a),
                                     "Attended N / M" (present + incomplete) once it has closed. --}}
                                     @php
                                         $departmentCount = $department['pending'] ? $department['checkedIn'] : $department['attended'];
@@ -137,7 +138,7 @@
                                         @endif
                                     </div>
                                     <p class="text-xs text-slate-500 dark:text-slate-400">{{ $department['employees'] }} {{ $department['employees'] === 1 ? 'employee' : 'employees' }}</p>
-                                    <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-750"><div @class(['h-full rounded-full', 'bg-primary-200 dark:bg-primary-800' => $department['pending'], 'bg-primary-500' => ! $department['pending']]) style="width: {{ $departmentShare }}%"></div></div>
+                                    <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-750"><div @class(['h-full rounded-full', 'border border-primary-500 bg-primary-100 dark:border-primary-400 dark:bg-primary-900' => $department['pending'], 'bg-primary-500' => ! $department['pending']]) style="width: {{ $departmentShare }}%"></div></div>
                                 </div>
                             @endforeach
                         </div>
@@ -335,7 +336,10 @@
                                     <dt class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $balance['name'] }}</dt>
                                     @if ($balance['usableFrom'] === null)
                                         <dd class="text-right text-sm tabular-nums text-slate-500 dark:text-slate-400">
-                                            <span class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ \App\Support\LeaveDays::format($balance['available']) }}</span> available
+                                            <span class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ \App\Support\LeaveDays::format($balance['available']) }}</span> available{{ $balance['fullYear'] !== null ? ' at last day' : '' }}
+                                            @if ($balance['fullYear'] !== null)
+                                                <span class="block text-xs">Full-year balance: {{ \App\Support\LeaveDays::label($balance['fullYear']) }}</span>
+                                            @endif
                                             @if (($balance['toilRemainder'] ?? 0) > 0)
                                                 <span class="block text-xs">{{ \App\Support\Duration::format($balance['toilRemainder']) }} toward the next half day</span>
                                             @endif
@@ -428,10 +432,11 @@
                                 </div>
                             @endforeach
                         </dl>
-                        @if ($month['leave_tenths'] > 0 || $month['total_worked_minutes'] > 0 || $mine['overtimeThisMonth'] > 0)
+                        @if ($month['leave_tenths'] > 0 || $month['days_off_worked'] > 0 || $month['total_worked_minutes'] > 0 || $mine['overtimeThisMonth'] > 0)
                             <p class="mt-4 border-t border-slate-divider pt-3 text-xs text-slate-500 dark:text-slate-400">
                                 {{ implode(' · ', array_filter([
                                     $month['leave_tenths'] > 0 ? 'Leave taken: '.\App\Support\LeaveDays::label($month['leave_tenths']) : null,
+                                    $month['days_off_worked'] > 0 ? 'Days off worked: '.$month['days_off_worked'] : null,
                                     $month['total_worked_minutes'] > 0 ? 'Worked: '.\App\Support\Duration::format($month['total_worked_minutes']) : null,
                                     $mine['overtimeThisMonth'] > 0 ? 'Overtime: '.\App\Support\Duration::format($mine['overtimeThisMonth']).' credited' : null,
                                 ])) }}

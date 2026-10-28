@@ -11,8 +11,14 @@ employee profile's Leave card (Phase 3e). $balanceRows: list of
     // A type not usable yet: when it becomes usable, and what's been earned meanwhile.
     $usableLine = fn ($balance, $row) => 'Usable from '.DisplayDate::compact($balance->usableFrom)
         .($row['earnedSoFar'] !== null ? ' · '.LeaveDays::label($row['earnedSoFar']).' earned so far' : '');
-    // A leaver's last year: the allowance pro-rated to their last day (EntitlementCalculator::earnedToLastDay()).
-    $earnedLine = fn ($balance) => $balance->earnedToLastDay !== null ? 'Earned to last day: '.LeaveDays::label($balance->earnedToLastDay) : null;
+    // A leaver's last year: Available is what they had at their last day
+    // (Balance::availableAtLastDay() — the grant pro-rated to it), the figure
+    // untaken leave is read from; the full-year balance moves to a muted line.
+    // The leave report and the employee dashboard show the same.
+    $earnedLine = fn ($balance) => $balance->availableAtLastDay() !== null ? 'Full-year balance: '.LeaveDays::label($balance->available()) : null;
+    $available = fn ($balance) => \App\Support\LeaveReport::available($balance);
+    // Not usable yet, unless they've left: then what they earned is what they have.
+    $notUsableYet = fn ($balance) => $balance->usableFrom !== null && $balance->availableAtLastDay() === null;
     // Time off in lieu: the overtime saved below a full half day (TimeOffInLieuReconciler::remainderMinutes()).
     $toilLine = fn ($row) => ($row['toilRemainder'] ?? 0) > 0 ? \App\Support\Duration::format($row['toilRemainder']).' toward the next half day' : null;
 @endphp
@@ -27,9 +33,9 @@ employee profile's Leave card (Phase 3e). $balanceRows: list of
             <li class="border-t border-slate-divider px-4 py-4 first:border-t-0">
                 <div class="flex items-baseline justify-between gap-3">
                     <p class="text-sm font-medium text-slate-900 dark:text-slate-100">{{ $row['type']->name }}</p>
-                    @if ($balance->usableFrom === null)
-                        <p class="text-sm tabular-nums text-slate-500 dark:text-slate-400"><span class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ LeaveDays::format($balance->available()) }}</span> available</p>
-                    @endif
+                    @unless ($notUsableYet($balance))
+                        <p class="text-sm tabular-nums text-slate-500 dark:text-slate-400"><span class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ LeaveDays::format($available($balance)) }}</span> available{{ $balance->availableAtLastDay() !== null ? ' at last day' : '' }}</p>
+                    @endunless
                 </div>
                 @if ($earnedLine($balance))
                     <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $earnedLine($balance) }}</p>
@@ -37,7 +43,7 @@ employee profile's Leave card (Phase 3e). $balanceRows: list of
                 @if ($toilLine($row))
                     <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ $toilLine($row) }}</p>
                 @endif
-                @if ($balance->usableFrom !== null)
+                @if ($notUsableYet($balance))
                     <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $usableLine($balance, $row) }}</p>
                 @else
                     <dl class="mt-2 grid grid-cols-4 gap-x-3 gap-y-2 text-xs">
@@ -80,7 +86,7 @@ employee profile's Leave card (Phase 3e). $balanceRows: list of
                                 <span class="block text-xs font-normal text-slate-500 dark:text-slate-400">{{ $toilLine($row) }}</span>
                             @endif
                         </td>
-                        @if ($balance->usableFrom !== null)
+                        @if ($notUsableYet($balance))
                             <td colspan="{{ $showAdjustments ? 6 : 5 }}" class="px-6 py-4 text-right text-slate-500 dark:text-slate-400">
                                 {{ $usableLine($balance, $row) }}
                                 @unless ($loop->last)<span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-divider"></span>@endunless
@@ -96,7 +102,8 @@ employee profile's Leave card (Phase 3e). $balanceRows: list of
                             <td class="px-3 py-4 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ LeaveDays::format($balance->used) }}</td>
                             <td class="px-3 py-4 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ LeaveDays::format($balance->pending) }}</td>
                             <td class="px-6 py-4 text-right font-semibold tabular-nums text-slate-900 dark:text-slate-100">
-                                {{ LeaveDays::format($balance->available()) }}
+                                {{ LeaveDays::format($available($balance)) }}
+                                @if ($balance->availableAtLastDay() !== null)<span class="block text-xs font-normal text-slate-500 dark:text-slate-400">at last day</span>@endif
                                 @unless ($loop->last)<span class="pointer-events-none absolute inset-x-6 bottom-0 h-px bg-slate-divider"></span>@endunless
                             </td>
                         @endif

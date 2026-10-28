@@ -84,14 +84,13 @@ class NeutralScaleTest extends TestCase
     public function test_readable_text_never_uses_light_slate_400_which_is_for_decorative_icons(): void
     {
         // Light slate-400 is 2.52:1 on white (docs/DESIGN_SYSTEM.md, Muted text
-        // rule): icons and icon-only containers may use it, text may not. The
-        // sidebar's disabled "Soon" items are a recorded Phase 5 item.
+        // rule): icons and icon-only containers may use it, text may not — the
+        // sidebar's disabled "Soon" items included (Phase 5a).
         $iconOnly = [
             'resources/views/components/empty-state.blade.php' => 'rounded-full bg-slate-100 text-slate-400',
             'resources/views/livewire/attendance/index.blade.php' => 'rounded-full bg-slate-100 text-slate-400',
             'resources/views/livewire/employees/index.blade.php' => 'rounded-full bg-slate-100 text-slate-400',
             'resources/views/components/time-input.blade.php' => 'rounded-md text-slate-400 transition',
-            'resources/views/layouts/partials/sidebar.blade.php' => 'text-slate-400 dark:',
         ];
         $offenders = [];
 

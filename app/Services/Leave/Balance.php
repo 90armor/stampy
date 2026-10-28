@@ -16,7 +16,10 @@ use Carbon\CarbonImmutable;
  * Annual); usedByType/pendingByType break both down by the leave's own type.
  * Usage consumes the carry first (FIFO): usedFromCarry + usedFromGrant = used.
  * usableFrom is set while the type isn't usable yet (the eligibility date);
- * earnedToLastDay only in a leaver's last year — display only.
+ * earnedToLastDay only in a leaver's last year, and availableAtLastDay() from
+ * it. A type with no
+ * balance (hasBalance false) carries only used and pending — its days taken
+ * and waiting; available() means nothing for it.
  */
 final readonly class Balance
 {
@@ -44,5 +47,20 @@ final readonly class Balance
     public function available(): int
     {
         return $this->entitled + $this->carriedIn + $this->adjustments - $this->used - $this->pending;
+    }
+
+    /**
+     * A leaver's last year: what they have available at their last day —
+     * the year's grant pro-rated to it (earnedToLastDay) in place of the
+     * full-year grant, with the same carry-over, adjustments, use and
+     * pending. The figure untaken leave is read from when someone leaves
+     * (docs/HR_DECISIONS.md, 28); null for anyone else, or a type with no
+     * yearly grant (Time off in lieu has nothing to pro-rate). A leaver who
+     * left before their type was usable gets what they earned to that day.
+     */
+    public function availableAtLastDay(): ?int
+    {
+        return $this->earnedToLastDay === null ? null
+            : $this->carriedIn + $this->earnedToLastDay + $this->adjustments - $this->used - $this->pending;
     }
 }

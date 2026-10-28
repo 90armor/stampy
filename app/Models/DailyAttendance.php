@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\AttendanceStatus;
 use App\Enums\LeaveHalf;
 use App\Enums\LeaveStatus;
+use App\Services\Attendance\DailySummaryBuilder;
 use App\Services\Attendance\ExpectedWindow;
 use App\Services\Attendance\LeaveDay;
 use App\Support\Duration;
@@ -137,6 +138,23 @@ class DailyAttendance extends Model
             && $this->last_out->format('Y-m-d') !== $this->work_date->format('Y-m-d');
     }
 
+    /**
+     * An In progress row that can still close on its own: an in-only row
+     * inside its pairing window (first in-punch + MAX_SHIFT_HOURS, past
+     * midnight if need be), or any other row while its date is today. An In
+     * progress row that isn't open is stale — the builder hasn't run since it
+     * should have closed it — which the dashboard's trend and the attendance
+     * report both call "Not calculated".
+     */
+    public function isOpen(): bool
+    {
+        if ($this->first_in !== null && $this->last_out === null) {
+            return now()->lte($this->first_in->copy()->addHours(DailySummaryBuilder::MAX_SHIFT_HOURS));
+        }
+
+        return $this->work_date->isToday();
+    }
+
     public function isLate(): bool
     {
         return $this->late_minutes > 0;
@@ -177,13 +195,16 @@ class DailyAttendance extends Model
     }
 
     /**
-     * Resolves leaveDay() for every row with a leave_id in one query.
+     * Resolves leaveDay() for every row with a leave_id in one query. Rows
+     * already resolved are skipped, so a caller that resolves a whole list
+     * once (the attendance report) can then hand parts of it to code that
+     * calls this again (AttendanceSummary) without a query per part.
      *
      * @param  Collection<int, self>  $rows
      */
     public static function withLeaveDays(Collection $rows): void
     {
-        $withLeave = $rows->whereNotNull('leave_id');
+        $withLeave = $rows->whereNotNull('leave_id')->filter(fn (self $row) => $row->resolvedLeaveDay === null);
 
         if ($withLeave->isEmpty()) {
             return;

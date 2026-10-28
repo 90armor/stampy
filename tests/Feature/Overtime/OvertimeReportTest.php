@@ -120,22 +120,22 @@ class OvertimeReportTest extends TestCase
         $this->assertSame(16.0, OvertimeReport::forMonth(Carbon::parse('2026-05-01'))['rows'][0]['pay_equivalent_hours']);
     }
 
-    public function test_only_admins_open_it_and_the_sidebar_follows_the_same_ability(): void
+    public function test_only_admins_open_it(): void
     {
+        // A tab of the Reports page since Phase 5b (ReportsPageTest has the
+        // page, the tabs and the sidebar); the ability itself is unchanged.
         $manager = User::factory()->create()->assignRole('manager');
+        Employee::factory()->create(['user_id' => $manager->id]);
         $employee = User::factory()->create()->assignRole('employee');
 
-        $this->actingAs($this->admin)->get(route('reports.overtime'))->assertOk()->assertSee('Overtime report');
-        $this->actingAs($manager)->get(route('reports.overtime'))->assertForbidden();
-        $this->actingAs($employee)->get(route('reports.overtime'))->assertForbidden();
+        $this->actingAs($this->admin)->get(route('reports.index', ['tab' => 'overtime']))->assertOk()->assertSee('Overtime report');
 
         $this->assertTrue($this->admin->can('reports.overtime'));
         $this->assertFalse($manager->can('reports.overtime'));
+        $this->assertFalse($employee->can('reports.overtime'));
 
-        // The admin's Reports item links to the report; the manager's is still "Soon"; an employee has none.
-        $this->actingAs($this->admin)->get(route('dashboard'))->assertSee(route('reports.overtime'), false);
-        $this->actingAs($manager)->get(route('dashboard'))->assertSee('Reports')->assertDontSee(route('reports.overtime'), false);
-        $this->actingAs($employee)->get(route('dashboard'))->assertDontSee('Reports');
+        Livewire::actingAs($manager)->test(Overtime::class)->assertForbidden();
+        Livewire::actingAs($employee)->test(Overtime::class)->assertForbidden();
     }
 
     public function test_the_page_shows_the_month_and_says_when_it_is_still_open(): void
@@ -154,6 +154,25 @@ class OvertimeReportTest extends TestCase
             ->assertSee('14.50');
 
         Livewire::actingAs($this->admin)->test(Overtime::class)->set('month', '2026-03')->assertSee('No credited overtime');
+    }
+
+    public function test_the_employee_column_is_pinned_while_the_figures_scroll(): void
+    {
+        // Phase 5a: at 390px the table scrolls under a pinned Employee column,
+        // its end edge fading while more lies beyond; no column is hidden.
+        $this->seedMay();
+
+        $html = Livewire::actingAs($this->admin)->test(Overtime::class)->set('month', '2026-05')->html();
+
+        $this->assertStringContainsString('x-data="scrollEdges"', $html);
+        $this->assertStringContainsString('scroll-fade-end', $html);
+        // The header, every employee row and the Total row.
+        $this->assertSame(1 + 2 + 1, substr_count($html, 'table-pin-lead'));
+        // Every divider runs above the pinned cells.
+        $this->assertSame(substr_count($html, 'bg-slate-divider'), substr_count($html, 'z-[2] h-px bg-slate-divider'));
+        foreach (['Pay · Workday', 'Pay · Night', 'Pay · Rest day', 'Pay · Holiday', 'Time off', 'Pay-equiv. hours'] as $column) {
+            $this->assertStringContainsString($column, $html);
+        }
     }
 
     public function test_the_csv_has_the_same_columns_and_says_when_it_was_generated(): void

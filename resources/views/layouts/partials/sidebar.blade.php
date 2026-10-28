@@ -3,8 +3,8 @@ $navItems = [
     ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'home', 'visible' => true, 'enabled' => true],
     ['label' => 'Employees', 'route' => 'employees.index', 'icon' => 'users', 'visible' => auth()->user()->hasAnyRole(['admin', 'manager']), 'enabled' => true],
     ['label' => 'Organization', 'route' => 'organization.index', 'icon' => 'building-office', 'visible' => auth()->user()->hasRole('admin'), 'enabled' => true],
-    // Policy, not structure (Phase 3e): leave types now, overtime rules in Phase 4.
-    ['label' => 'Policies', 'route' => 'policies.index', 'icon' => 'scale', 'visible' => auth()->user()->can('viewAny', \App\Models\LeaveType::class), 'enabled' => true],
+    // Policy, not structure (Phase 3e). Its own ability (Phase 5a): any Policies tab the user may see.
+    ['label' => 'Policies', 'route' => 'policies.index', 'icon' => 'scale', 'visible' => auth()->user()->can('policies.view'), 'enabled' => true],
     // 'Attendance' and 'My attendance' share the 'attendance.' route-name
     // prefix but must not both light up together, so each gets an explicit
     // pattern instead of the derived 'prefix.*' every other item uses.
@@ -14,10 +14,8 @@ $navItems = [
     ['label' => 'Time off', 'route' => 'time-off.index', 'icon' => 'calendar-days', 'visible' => auth()->user()->can('timeOff', \App\Models\Leave::class), 'enabled' => true, 'activePatterns' => ['time-off.*']],
     ['label' => 'Overtime', 'route' => 'overtime.index', 'icon' => 'bolt', 'visible' => auth()->user()->can('viewAny', \App\Models\OvertimeRequest::class), 'enabled' => true, 'activePatterns' => ['overtime.*']],
     ['label' => 'Approvals', 'route' => 'approvals.index', 'icon' => 'inbox', 'visible' => auth()->user()->can('decideAny', \App\Models\Leave::class), 'enabled' => true, 'activePatterns' => ['approvals.*'], 'badge' => \App\Support\ApprovalBadge::count(auth()->user())],
-    // Reports (Phase 4d): live for whoever can open the overtime report (ReportPolicy); still "Soon" for managers.
-    auth()->user()->can('reports.overtime')
-        ? ['label' => 'Reports', 'route' => 'reports.overtime', 'icon' => 'document-text', 'visible' => true, 'enabled' => true, 'activePatterns' => ['reports.*']]
-        : ['label' => 'Reports', 'icon' => 'document-text', 'visible' => auth()->user()->hasRole('manager'), 'enabled' => false],
+    // Reports (Phase 5b): whoever may see any of its tabs (the reports.view gate, ReportPolicy).
+    ['label' => 'Reports', 'route' => 'reports.index', 'icon' => 'document-text', 'visible' => auth()->user()->can('reports.view'), 'enabled' => true, 'activePatterns' => ['reports.*']],
 ];
 @endphp
 
@@ -57,13 +55,18 @@ $navItems = [
                     @endif
                 </a>
             @else
+                {{-- Not built yet: no link, no hover, a fainter icon and the "Soon"
+                badge say it's inactive; the label and badge still use the readable
+                muted colours (docs/DESIGN_SYSTEM.md, Muted text rule). --}}
                 <div
-                    class="flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-400 dark:text-slate-600 cursor-not-allowed"
+                    role="link"
+                    aria-disabled="true"
+                    class="flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-500 dark:text-slate-400 cursor-not-allowed"
                     title="Coming in a later phase"
                 >
-                    <x-icon :name="$item['icon']" class="w-5 h-5 shrink-0 text-slate-400 dark:text-slate-600" />
+                    <x-icon :name="$item['icon']" class="w-5 h-5 shrink-0 text-slate-300 dark:text-slate-600" />
                     {{ $item['label'] }}
-                    <span class="ml-auto rounded-md bg-slate-100 dark:bg-slate-750 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-400">Soon</span>
+                    <span class="ml-auto rounded-md bg-slate-100 dark:bg-slate-750 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">Soon</span>
                 </div>
             @endif
         @endforeach

@@ -39,6 +39,27 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 
+    // A horizontally scrolling table with a pinned leading column (the
+    // overtime report): marks whether content lies before or after the
+    // visible part, for the pinned column's shadow and the fading end edge
+    // (.table-pin-lead / .scroll-fade-end in resources/css/app.css).
+    window.Alpine.data('scrollEdges', () => ({
+        init() {
+            this.measure();
+            this.observer = new ResizeObserver(() => this.measure());
+            this.observer.observe(this.$el);
+            if (this.$el.firstElementChild) this.observer.observe(this.$el.firstElementChild);
+        },
+        destroy() {
+            this.observer?.disconnect();
+        },
+        measure() {
+            const el = this.$el;
+            el.classList.toggle('scroll-more-before', el.scrollLeft > 1);
+            el.classList.toggle('scroll-more-after', el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+        },
+    }));
+
     // A page's section tabs (<x-tab-bar>, put on its scroll container). Fades
     // whichever edge has more tabs beyond it (.tab-bar-scroller in
     // resources/css/app.css), and keeps the active tab — the page's `tab` —
