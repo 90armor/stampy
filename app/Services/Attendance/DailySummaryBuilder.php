@@ -3,19 +3,46 @@
 namespace App\Services\Attendance;
 
 use App\Enums\AttendanceStatus;
+use App\Enums\LeaveStatus;
+use App\Enums\OvertimeCompensation;
+use App\Enums\OvertimeStatus;
 use App\Enums\PunchType;
 use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
 use App\Models\Employee;
-use App\Models\Holiday;
+use App\Models\Leave;
+use App\Models\OvertimeRequest;
+use App\Models\OvertimeSettings;
 use App\Models\WorkSchedule;
+use App\Services\Overtime\TimeOffInLieuReconciler;
+use App\Support\WorkdayCalendar;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Computes (or recomputes) one employee's daily_attendances row for one
- * date, purely from attendance_logs. daily_attendances is derived data and
- * must always be fully recomputable — nothing else may write to it.
+ * date, purely from attendance_logs and approved leave. daily_attendances is
+ * derived data and must always be fully recomputable — nothing else may
+ * write to it.
+ *
+ * Approved leave is an input since Phase 3d (LeaveDay): a range build loads
+ * the employee's approved leaves once (approvedLeavesBetween()) and passes
+ * them to build() for every date; a lone build() loads its own. Approved
+ * overtime requests are one more since Phase 4b, loaded the same way
+ * (approvedOvertimeBetween()) and credited by OvertimeCalculator — a separate
+ * dimension like late minutes: they never change a day's status. Every
+ * multi-date build goes through buildDates().
+ *
+ * Time off in lieu follows the credited minutes (Phase 4b): when a build
+ * changes the minutes credited to a time_off request, buildDates() reconciles
+ * that employee once, at the end of the range (TimeOffInLieuReconciler). A
+ * reconciliation failure never rolls back or blocks the build — it's logged
+ * with the command that heals it — and attendance:build-daily reconciles
+ * every employee it builds who has time-off overtime, changed or not, so the
+ * scheduled runs heal a failure by themselves.
  *
  * Every attendance_logs query here uses AttendanceLog::notVoided() — a
  * voided punch (e.g. someone else's finger matched the device) must never
@@ -30,14 +57,44 @@ class DailySummaryBuilder
      * it — the shift is left incomplete rather than pairing punches that are
      * probably unrelated (e.g. the start of the *next* shift).
      */
-    private const MAX_SHIFT_HOURS = 18;
+    public const MAX_SHIFT_HOURS = 18;
 
-    public function build(Employee $employee, CarbonInterface $date): DailyAttendance
+    /** @var array<int, int> employee id => the time_off request whose credited minutes a build just changed */
+    private array $toilTriggers = [];
+
+    /** @var array<int, string> employee codes reconciled with no TOIL leave type set, until reportToil() */
+    private array $toilUnconfigured = [];
+
+    public function __construct(private OvertimeCalculator $overtime = new OvertimeCalculator) {}
+
+    /**
+     * Returns null, having removed any existing row, for a date the employee
+     * wasn't employed on (Employee::isActiveOn(): before join_date, or after
+     * left_on). A backdated deactivation must not leave the rows built while
+     * they were still active behind it, and the builder stays the only writer
+     * of daily_attendances — so it's the builder that removes them.
+     */
+    public function build(Employee $employee, CarbonInterface $date, ?Collection $leaves = null, ?Collection $overtime = null): ?DailyAttendance
     {
         $workDate = Carbon::instance($date)->startOfDay();
+
+        if (! $employee->isActiveOn($workDate)) {
+            $removed = DailyAttendance::query()
+                ->where('employee_id', $employee->id)
+                ->whereDate('work_date', $workDate)
+                ->first();
+
+            if ($removed !== null) {
+                $this->noteToilChange($employee, $removed, OvertimeCredit::none()->attributes(), null);
+                $removed->delete();
+            }
+
+            return null;
+        }
+
         $schedule = $employee->scheduleOn($workDate);
 
-        $isWorkday = in_array($workDate->dayOfWeekIso, $schedule->workdays, true);
+        $isWorkday = WorkdayCalendar::isScheduledWorkday($schedule, $workDate);
 
         $firstIn = AttendanceLog::query()
             ->notVoided()
@@ -114,10 +171,32 @@ class DailySummaryBuilder
             }
         }
 
-        $isHoliday = Holiday::query()->whereDate('date', $workDate)->exists();
+        $isHoliday = WorkdayCalendar::isHoliday($workDate);
+        $leaveDay = LeaveDay::on($leaves ?? $this->approvedLeavesBetween($employee, $workDate, $workDate), $workDate);
 
-        $attributes = $this->calculate($schedule, $workDate, $isWorkday, $firstIn, $lastOut, $isHoliday);
+        // Defensive only: a half-day can't be submitted on, or reassigned onto,
+        // a schedule without break_start (LeaveRequestService,
+        // EmployeeScheduleAssigner). If one gets there anyway there are no
+        // halves to shrink the window to: build the day by the ordinary rules,
+        // keep leave_id, and say so in the log.
+        if ($leaveDay->isHalfDay() && $schedule->break_start === null) {
+            Log::warning("Leave #{$leaveDay->leaveId}: half-day leave on {$workDate->format('Y-m-d')} for {$employee->employee_code}, but schedule \"{$schedule->name}\" has no break start — built as an ordinary day.");
+            $leaveDay = $leaveDay->withoutHalf();
+        }
+
+        $attributes = $this->calculate($schedule, $workDate, $isWorkday, $firstIn, $lastOut, $isHoliday, $leaveDay);
         $attributes['work_schedule_id'] = $schedule->id;
+        $attributes['leave_id'] = $leaveDay->leaveId;
+
+        // Overtime (Phase 4b): the approved request for this work date, if any,
+        // credited from the same paired punches. Status and timing above are
+        // already decided and don't look at it.
+        $request = ($overtime ?? $this->approvedOvertimeBetween($employee, $workDate, $workDate))
+            ->first(fn (OvertimeRequest $request) => $request->date->isSameDay($workDate));
+        $attributes += $credit = $this->overtime->calculate(
+            $request, $firstIn?->punched_at, $lastOut?->punched_at, $schedule, $workDate,
+            $isWorkday, $isHoliday, $leaveDay, OvertimeSettings::current(),
+        )->attributes();
 
         // Not updateOrCreate(): work_date has a 'date' cast, which formats
         // through the connection's full datetime format when set on the
@@ -130,6 +209,8 @@ class DailySummaryBuilder
             ->where('employee_id', $employee->id)
             ->whereDate('work_date', $workDate)
             ->first();
+
+        $this->noteToilChange($employee, $existing, $credit, $request);
 
         if ($existing) {
             $existing->fill($attributes)->save();
@@ -165,14 +246,14 @@ class DailySummaryBuilder
      * before their join_date, never after today — so widening can't invent a
      * pre-hire or future row (CLAUDE.md: builds can't reach outside real time).
      *
-     * @return int the number of days built
+     * @return int the number of days built (a date after left_on is removed, not built)
      */
     public function rebuildAround(Employee $employee, CarbonInterface $from, ?CarbonInterface $to = null): int
     {
         $first = Carbon::instance($from)->startOfDay()->subDay()->max($employee->join_date->copy()->startOfDay());
         $last = Carbon::instance($to ?? $from)->startOfDay()->addDay()->min(today());
 
-        return $this->buildRange($employee, $first, $last);
+        return $this->buildAndReport($employee, $first, $last);
     }
 
     /**
@@ -189,7 +270,11 @@ class DailySummaryBuilder
      * nothing — correct, since nothing about "today" has changed yet for an
      * assignment that doesn't take effect until later.
      *
-     * @return int the number of days built (0 for a future-dated assignment)
+     * Also how a deactivation or reactivation is applied (EmployeeLifecycle):
+     * from the day after left_on, build() removes or rebuilds each row.
+     *
+     * @return int the number of days built (0 for a future-dated assignment;
+     *             dates after left_on are removed, not built)
      */
     public function rebuildFrom(Employee $employee, CarbonInterface $effectiveFrom): int
     {
@@ -200,16 +285,201 @@ class DailySummaryBuilder
             return 0;
         }
 
-        return $this->buildRange($employee, $first, $last);
+        return $this->buildAndReport($employee, $first, $last);
     }
 
-    private function buildRange(Employee $employee, Carbon $first, Carbon $last): int
+    /**
+     * Rebuilds $from..$to as given, clamped like the others to join_date and
+     * today — for a change that affects exactly a known span, such as an
+     * approved or cancelled leave (LeaveRequestService). An empty range (a
+     * leave entirely in the future) builds nothing.
+     *
+     * @return int the number of days built
+     */
+    public function rebuildBetween(Employee $employee, CarbonInterface $from, CarbonInterface $to): int
+    {
+        $first = Carbon::instance($from)->startOfDay()->max($employee->join_date->copy()->startOfDay());
+        $last = Carbon::instance($to)->startOfDay()->min(today());
+
+        if ($first->gt($last)) {
+            return 0;
+        }
+
+        return $this->buildAndReport($employee, $first, $last);
+    }
+
+    /**
+     * An overtime request's work date, after it's approved or cancelled
+     * (Phase 4c calls this). Just that date: overtime after midnight belongs
+     * to its work date, and a decision changes no punch, so no adjacent day's
+     * pairing can change. Clamped like rebuildBetween() — a future date
+     * builds nothing.
+     *
+     * @return int the number of days built (0 or 1)
+     */
+    public function rebuildOvertimeDate(OvertimeRequest $request): int
+    {
+        return $this->rebuildBetween($request->employee, $request->date, $request->date);
+    }
+
+    /**
+     * The employee's approved leaves touching $from..$to, in one query — what
+     * a range build passes to build() for every date in it.
+     *
+     * @return Collection<int, Leave>
+     */
+    public function approvedLeavesBetween(Employee $employee, CarbonInterface $from, CarbonInterface $to): Collection
+    {
+        return Leave::query()
+            ->where('employee_id', $employee->id)
+            ->where('status', LeaveStatus::Approved->value)
+            ->whereDate('start_date', '<=', $to->format('Y-m-d'))
+            ->whereDate('end_date', '>=', $from->format('Y-m-d'))
+            ->get();
+    }
+
+    /**
+     * The employee's approved overtime requests with a work date in
+     * $from..$to, in one query (Phase 4b) — passed to build() like the leaves.
+     *
+     * @return Collection<int, OvertimeRequest>
+     */
+    public function approvedOvertimeBetween(Employee $employee, CarbonInterface $from, CarbonInterface $to): Collection
+    {
+        return OvertimeRequest::query()
+            ->where('employee_id', $employee->id)
+            ->where('status', OvertimeStatus::Approved->value)
+            ->whereBetween('date', [$from->format('Y-m-d'), $to->format('Y-m-d')])
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * Records the employee for reconciliation when this build changes the
+     * minutes credited to a time_off request: the old row's request, or the
+     * new one, credited time off and the overtime columns differ. Only on a
+     * change does it look the old request up.
+     *
+     * @param  array<string, int|null>  $new  OvertimeCredit::attributes()
+     */
+    private function noteToilChange(Employee $employee, ?DailyAttendance $old, array $new, ?OvertimeRequest $newRequest): void
+    {
+        $columns = array_keys($new);
+        $before = array_combine($columns, array_map(fn (string $column) => $old?->{$column} === null ? null : (int) $old->{$column}, $columns));
+
+        if ($before === $new) {
+            return;
+        }
+
+        $minutes = fn (array $row): int => array_sum(array_map('intval', array_slice($row, 1)));
+        $timeOff = fn (?OvertimeRequest $request): bool => $request?->compensation === OvertimeCompensation::TimeOff;
+
+        if ($minutes($new) > 0 && $timeOff($newRequest)) {
+            $this->toilTriggers[$employee->id] = $newRequest->id;
+
+            return;
+        }
+
+        $oldId = $before['overtime_request_id'];
+
+        if ($oldId !== null && $minutes($before) > 0) {
+            $oldRequest = $oldId === $newRequest?->id ? $newRequest : OvertimeRequest::query()->find($oldId);
+
+            if ($timeOff($oldRequest)) {
+                $this->toilTriggers[$employee->id] = $oldRequest->id;
+            }
+        }
+    }
+
+    /**
+     * Reconciles the employee's time off in lieu — never letting a failure
+     * escape: the build it follows stands, the failure is logged with the
+     * command that heals it (attendance:build-daily reconciles everyone it
+     * builds who has time-off overtime). A deactivated employee isn't built by
+     * the scheduled runs, so their heal is always that command, by hand.
+     */
+    public function reconcileToil(Employee $employee, ?OvertimeRequest $trigger = null): void
+    {
+        try {
+            $result = app(TimeOffInLieuReconciler::class)->reconcile($employee, $trigger);
+
+            if ($result->isNoToilType()) {
+                $this->toilUnconfigured[$employee->id] = $employee->employee_code;
+            }
+        } catch (Throwable $e) {
+            Log::error("Time off in lieu reconciliation for {$employee->employee_code} failed ({$e->getMessage()}). The attendance build stands. "
+                .'Run: php artisan attendance:build-daily --date='.today()->format('Y-m-d')." --employee={$employee->employee_code}");
+        }
+    }
+
+    /**
+     * One summary line for every employee reconciled with no TOIL leave type
+     * set since the last call — not one per employee, which every 15 minutes
+     * would bury the log. Returns how many there were.
+     */
+    public function reportToil(): int
+    {
+        $count = count($this->toilUnconfigured);
+
+        if ($count > 0) {
+            Log::warning("Time off in lieu: {$count} employee(s) have time-off overtime to credit, but no TOIL leave type is set "
+                .'(overtime_settings.toil_leave_type_id) — nothing was credited ('.implode(', ', $this->toilUnconfigured).').');
+        }
+
+        $this->toilUnconfigured = [];
+
+        return $count;
+    }
+
+    /** buildDates() for one employee's rebuild, then its missing-TOIL-type line, if any. */
+    private function buildAndReport(Employee $employee, Carbon $first, Carbon $last): int
+    {
+        $built = $this->buildDates($employee, $first, $last);
+        $this->reportToil();
+
+        return $built;
+    }
+
+    /**
+     * Builds $first..$last exactly as given — no clamping; the rebuild*()
+     * methods clamp first — with the range's approved leaves and overtime
+     * loaded once. The one way every multi-date build runs: the rebuild*()
+     * methods, attendance:build-daily and a holiday change. $each gets every
+     * build()'s result (null for a date the employee wasn't employed on).
+     *
+     * If a build changed the minutes credited to a time_off request, the
+     * employee is reconciled once, after the last date — unless $reconcile is
+     * false, for a caller that reconciles everyone itself (attendance:build-daily).
+     * The caller reports a missing TOIL type with reportToil(), once per run.
+     *
+     * @param  (callable(?DailyAttendance): void)|null  $each
+     * @return int the number of days built
+     */
+    public function buildDates(Employee $employee, CarbonInterface $first, CarbonInterface $last, ?callable $each = null, bool $reconcile = true): int
     {
         $built = 0;
+        $first = Carbon::instance($first)->startOfDay();
+        $last = Carbon::instance($last)->startOfDay();
+        $leaves = $this->approvedLeavesBetween($employee, $first, $last);
+        $overtime = $this->approvedOvertimeBetween($employee, $first, $last);
 
         for ($day = $first->copy(); $day->lte($last); $day->addDay()) {
-            $this->build($employee, $day);
-            $built++;
+            $row = $this->build($employee, $day, $leaves, $overtime);
+
+            if ($each !== null) {
+                $each($row);
+            }
+
+            if ($row !== null) {
+                $built++;
+            }
+        }
+
+        $trigger = $this->toilTriggers[$employee->id] ?? null;
+        unset($this->toilTriggers[$employee->id]);
+
+        if ($reconcile && $trigger !== null) {
+            $this->reconcileToil($employee, OvertimeRequest::query()->find($trigger));
         }
 
         return $built;
@@ -225,6 +495,7 @@ class DailySummaryBuilder
         ?AttendanceLog $firstIn,
         ?AttendanceLog $lastOut,
         bool $isHoliday,
+        LeaveDay $leaveDay,
     ): array {
         $hasIn = $firstIn !== null;
         $hasOut = $lastOut !== null;
@@ -234,31 +505,59 @@ class DailySummaryBuilder
         $lateMinutes = 0;
         $earlyLeaveMinutes = 0;
 
+        // When they were expected (Phase 3d): start_time–end_time, or on a
+        // half-day leave the half that's worked (ExpectedWindow).
+        $window = ExpectedWindow::for($schedule, $workDate, $leaveDay->half);
+
         if ($hasBoth) {
             $workedSeconds = $lastOut->punched_at->getTimestamp() - $firstIn->punched_at->getTimestamp();
-            $workedMinutes = max(0, intdiv($workedSeconds, 60) - $schedule->break_minutes);
 
-            // Working a holiday is never late or early-leaving, regardless of
-            // when they clocked in/out — matters for OT later, where a
-            // holiday's worked hours must not also register as a timing
-            // exception. isWorkday is deliberately still checked alongside
-            // isHoliday: a holiday landing on a weekend is caught by the
-            // status match() below (-> Off) before this is ever reached with
-            // hasBoth true, but the guard here is the one that actually
-            // stops late/early from being computed either way.
-            if ($isWorkday && ! $isHoliday) {
-                $scheduledStart = Carbon::parse($workDate->format('Y-m-d').' '.$schedule->start_time);
-                $scheduledEnd = Carbon::parse($workDate->format('Y-m-d').' '.$schedule->end_time);
+            // A full day keeps its rule: the whole break_minutes off, however
+            // the day was punched. A half-day leave day subtracts only the
+            // part of the span that overlaps the break window — arriving at
+            // the PM start, or leaving at break_start, costs nothing.
+            $workedMinutes = $leaveDay->isHalfDay()
+                ? max(0, intdiv($workedSeconds - $window->breakOverlapSeconds($firstIn->punched_at, $lastOut->punched_at), 60))
+                : max(0, intdiv($workedSeconds, 60) - $schedule->break_minutes);
+        }
 
-                // Grace only decides WHETHER first_in counts as late, not how
-                // much: once outside grace, late_minutes is the full gap from
-                // start_time, not the remainder past the grace period.
-                $minutesAfterStart = intdiv($firstIn->punched_at->getTimestamp() - $scheduledStart->getTimestamp(), 60);
+        // Timing (Phase 2.6). Late is a fact about the in-punch alone, so it
+        // is computed whenever the day HAS an in-punch — the same $firstIn the
+        // pairing above already chose, never a second pairing rule — whatever
+        // the status turns out to be: in_progress (late while the day is
+        // still open), incomplete (the out-punch never came) or present. A
+        // late fact therefore never disappears when an in_progress day later
+        // becomes incomplete: both builds read the same in-punch. An out-only
+        // day has no in-punch, so no late. Early leave is a fact about the
+        // out-punch measured against a shift that was actually worked, so it
+        // still needs both punches — before the out-punch it isn't knowable.
+        //
+        // Working a holiday is never late or early-leaving, regardless of
+        // when they clocked in/out — matters for OT later, where a holiday's
+        // worked hours must not also register as a timing exception. That
+        // now covers in_progress and incomplete holiday days too. isWorkday is
+        // checked alongside isHoliday: an ordinary weekend someone came in on
+        // isn't measured against a schedule they weren't on. The zeroing
+        // after the status match() below enforces both for every status.
+        //
+        // Measured against the expected window: on an AM-leave day late
+        // counts from the PM start (+ grace), on a PM-leave day early leave
+        // counts against break_start.
+        if ($hasIn && $isWorkday && ! $isHoliday) {
+            $scheduledStart = $window->start;
 
-                if ($minutesAfterStart > $schedule->grace_minutes) {
-                    $lateMinutes = $minutesAfterStart;
-                }
+            // Grace only decides WHETHER first_in counts as late, not how
+            // much: once outside grace, late_minutes is the full gap from
+            // start_time, not the remainder past the grace period. intdiv,
+            // never round: seconds never count against the employee.
+            $minutesAfterStart = intdiv($firstIn->punched_at->getTimestamp() - $scheduledStart->getTimestamp(), 60);
 
+            if ($minutesAfterStart > $schedule->grace_minutes) {
+                $lateMinutes = $minutesAfterStart;
+            }
+
+            if ($hasBoth) {
+                $scheduledEnd = $window->end;
                 $minutesBeforeEnd = intdiv($scheduledEnd->getTimestamp() - $lastOut->punched_at->getTimestamp(), 60);
                 $earlyLeaveMinutes = max(0, $minutesBeforeEnd);
             }
@@ -284,37 +583,63 @@ class DailySummaryBuilder
         //   3. present      — both punches exist, on any day (workday,
         //                    holiday, or an ordinary weekend someone came in
         //                    on). A holiday doesn't need to override this —
-        //                    it already zeroed late/early above — and a
+        //                    timing is zeroed for it below — and a
         //                    fully-punched day is never "in progress"
         //                    regardless of the time of day.
-        //   4. in_progress  — today, the schedule's end_time hasn't passed
-        //                    yet, and punches so far would otherwise resolve
-        //                    to incomplete or absent below. Only ever
-        //                    applies to today (see isInProgress()); not
-        //                    conditioned on isWorkday, matching rule 5's own
-        //                    workday-agnostic incomplete rule.
-        //   5. incomplete   — exactly one of {in, out}, on any day. This
+        //   4. leave        — an approved full-day leave covers the date (Phase
+        //                    3d, LeaveDay; an AM plus a PM leave count as
+        //                    one), and fewer than both punches exist. From
+        //                    00:00: never in_progress, so never "due" or "not
+        //                    in yet". A single punch doesn't make it
+        //                    incomplete — the punch stays stored and the day
+        //                    is flagged (DailyAttendance::workedOnLeave()).
+        //                    Both punches are present (rule 3), and an off day
+        //                    or holiday inside the leave stays off/holiday
+        //                    (rules 1–2), costing no balance. A leave row
+        //                    carries no timing and no worked minutes.
+        //   5. in_progress  — the day is still open, and punches so far would
+        //                    otherwise resolve to incomplete or absent below.
+        //                    "Open" depends on the punches (Phase 2.7, see
+        //                    isInProgress()): an in-only day stays open until
+        //                    its pairing window closes (first in-punch +
+        //                    MAX_SHIFT_HOURS) — past the schedule's end and
+        //                    past midnight, so someone on overtime is still
+        //                    "at work" and a (+1) out-punch turns the day
+        //                    present with no incomplete in between. A day
+        //                    with no punches, or only an out-punch, is open
+        //                    while it is today and the schedule's end_time
+        //                    hasn't passed. Not conditioned on isWorkday,
+        //                    matching rule 6's own workday-agnostic rule.
+        //   6. incomplete   — exactly one of {in, out}, on any day. This
         //                    includes a one-sided punch on a holiday: the
         //                    punch being incomplete is a device-defect fact
         //                    independent of whether the day was a holiday,
         //                    so holiday does not suppress it the way it does
         //                    for "no punches at all" in rule 2.
-        //   6. absent       — a workday, no punches, not a holiday, and not
-        //                    (today and still before end_time).
+        //   7. absent       — a workday, no punches, not a holiday, and not
+        //                    (today and still before end_time) — unchanged
+        //                    by Phase 2.7: no punches still closes at the
+        //                    schedule's end.
         //
         // Timing is a separate dimension from all of this — see
         // AttendanceStatus's doc comment for why a `Late` status doesn't
-        // exist here.
+        // exist here. Since Phase 2.6 late_minutes may be non-zero on
+        // in_progress, incomplete and present rows (any row with an
+        // in-punch on a non-holiday workday); early_leave_minutes only ever
+        // on present rows.
         $status = match (true) {
             ! $hasIn && ! $hasOut && ! $isWorkday => AttendanceStatus::Off,
             ! $hasIn && ! $hasOut && $isHoliday => AttendanceStatus::Holiday,
             $hasBoth => AttendanceStatus::Present,
-            $this->isInProgress($workDate, $schedule) => AttendanceStatus::InProgress,
+            $leaveDay->fullDay => AttendanceStatus::Leave,
+            $this->isInProgress($workDate, $window, $firstIn, $lastOut) => AttendanceStatus::InProgress,
             $hasIn xor $hasOut => AttendanceStatus::Incomplete,
             default => AttendanceStatus::Absent,
         };
 
-        if (! $isWorkday || $isHoliday) {
+        // A full-day leave has no expected window either: a leave row carries
+        // no timing, and neither does a day worked anyway (present, rule 17).
+        if (! $isWorkday || $isHoliday || $leaveDay->fullDay) {
             $lateMinutes = 0;
             $earlyLeaveMinutes = 0;
         }
@@ -324,7 +649,7 @@ class DailySummaryBuilder
         // Present first), so worked_minutes is already 0 from its
         // initialization above, same as it already was for a one-sided
         // Incomplete punch before InProgress existed.
-        if ($status === AttendanceStatus::Incomplete || $status === AttendanceStatus::Absent) {
+        if (in_array($status, [AttendanceStatus::Incomplete, AttendanceStatus::Absent, AttendanceStatus::Leave], true)) {
             $workedMinutes = 0;
         }
 
@@ -339,22 +664,36 @@ class DailySummaryBuilder
     }
 
     /**
-     * Only ever true for today: a day already in the past is either fully
-     * resolved (present/incomplete) or definitively absent by now, and a
-     * future date is never built at all. Rebuilding today after end_time has
-     * passed must downgrade this to absent/incomplete on its own — there is
-     * no separate "un-in-progress" step, it's simply that this returns false
-     * once now() has caught up, and the match() above falls through to
-     * whichever of those two the punches actually resolve to.
+     * Whether the day is still open (Phase 2.7). Only asked when the day
+     * doesn't already have both punches (rule 3 claims those as present).
+     *
+     * - An in-only day is open until its pairing window closes: first
+     *   in-punch + MAX_SHIFT_HOURS, the same bound build() uses to pair an
+     *   out-punch (inclusive, so the instant an out could still pair, the day
+     *   is still open). Past the schedule's end and past midnight: until
+     *   then an out-punch can still arrive and pair, so calling the day
+     *   incomplete would be premature — and someone on overtime would read
+     *   as gone. Rebuilding after the window closes turns it incomplete; the
+     *   scheduler rebuilds yesterday while it has open rows for exactly that.
+     * - A day with no punches, or only an out-punch, is open only while it is
+     *   today and the expected window's end hasn't passed — the schedule's
+     *   end_time, or break_start on a PM-leave day (Phase 3d: the morning
+     *   was missed, so the day closes at noon).
+     *
+     * A future date is never built at all. Nothing here un-opens a day by
+     * itself: a rebuild after the relevant moment simply falls through to
+     * incomplete or absent in calculate()'s match().
      */
-    private function isInProgress(Carbon $workDate, WorkSchedule $schedule): bool
+    private function isInProgress(Carbon $workDate, ExpectedWindow $window, ?AttendanceLog $firstIn, ?AttendanceLog $lastOut): bool
     {
+        if ($firstIn !== null && $lastOut === null) {
+            return now()->lte($firstIn->punched_at->copy()->addHours(self::MAX_SHIFT_HOURS));
+        }
+
         if (! $workDate->isToday()) {
             return false;
         }
 
-        $scheduledEnd = Carbon::parse($workDate->format('Y-m-d').' '.$schedule->end_time);
-
-        return now()->lt($scheduledEnd);
+        return now()->lt($window->end);
     }
 }

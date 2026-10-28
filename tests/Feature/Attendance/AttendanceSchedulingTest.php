@@ -30,7 +30,7 @@ class AttendanceSchedulingTest extends TestCase
      * The two rebuild tasks as they'd be registered at a given moment (the real
      * schedule computes its dates when it is registered, i.e. on every tick).
      *
-     * @return array{today: Event, heal: Event}
+     * @return array{today: Event, yesterday: Event, heal: Event}
      */
     private function tasksAt(string $now): array
     {
@@ -40,9 +40,9 @@ class AttendanceSchedulingTest extends TestCase
         AttendanceSchedule::register($schedule);
 
         $events = array_values(array_filter($schedule->events(), fn (Event $e) => str_contains($e->command, 'attendance:build-daily')));
-        $this->assertCount(2, $events);
+        $this->assertCount(3, $events);
 
-        return ['today' => $events[0], 'heal' => $events[1]];
+        return ['today' => $events[0], 'yesterday' => $events[1], 'heal' => $events[2]];
     }
 
     /**
@@ -75,7 +75,7 @@ class AttendanceSchedulingTest extends TestCase
             ->map(fn ($row) => $row->work_date->format('Y-m-d'))->all();
     }
 
-    public function test_the_real_application_schedule_has_both_rebuild_tasks(): void
+    public function test_the_real_application_schedule_has_all_three_rebuild_tasks(): void
     {
         // withSchedule() only registers once the console application starts, as it does under schedule:work.
         $this->artisan('schedule:list')->assertSuccessful();
@@ -84,13 +84,14 @@ class AttendanceSchedulingTest extends TestCase
             ->filter(fn (Event $e) => str_contains($e->command, 'attendance:build-daily'))
             // The test harness can start the console more than once per test (RefreshDatabase's migrate does too),
             // which registers the same task again; the scheduler container starts it exactly once.
-            ->unique(fn (Event $e) => $e->expression.'|'.$e->command)
+            ->unique(fn (Event $e) => $e->expression.'|'.$e->command.'|'.$e->output)
             ->map(fn (Event $e) => $e->expression)
             ->sort()
             ->values()
             ->all();
 
-        $this->assertSame(['*/15 * * * *', '10 2 * * *'], $tasks);
+        // Today and (while it has open rows) yesterday every 15 minutes; the healing window each night.
+        $this->assertSame(['*/15 * * * *', '*/15 * * * *', '10 2 * * *'], $tasks);
     }
 
     public function test_one_task_rebuilds_only_today_every_fifteen_minutes(): void
@@ -131,6 +132,33 @@ class AttendanceSchedulingTest extends TestCase
         $this->assertSame(AttendanceStatus::Absent, DailyAttendance::where('employee_id', $employee->id)->firstOrFail()->status);
     }
 
+    public function test_the_yesterday_task_closes_a_late_in_only_row_once_its_pairing_window_passes(): void
+    {
+        $employee = Employee::factory()->create();
+        // Monday 09:30 in-punch, no out: the pairing window closes Tuesday 03:30.
+        \App\Models\AttendanceLog::factory()->create(['employee_id' => $employee->id, 'punched_at' => '2026-02-09 09:30:00', 'punch_type' => 'in']);
+
+        // Monday evening, past end time: still in progress (overtime is still "at work").
+        $this->runScheduled($this->tasksAt('2026-02-09 18:00:00')['today']);
+        $row = fn () => DailyAttendance::where('employee_id', $employee->id)->whereDate('work_date', '2026-02-09')->firstOrFail();
+        $this->assertSame(AttendanceStatus::InProgress, $row()->status);
+
+        // Tuesday 03:15: the yesterday task is due (Monday has an open row) but the window hasn't closed yet.
+        $yesterday = $this->tasksAt('2026-02-10 03:15:00')['yesterday'];
+        $this->assertSame(['--date' => '2026-02-09'], $this->optionsOf($yesterday));
+        $this->assertTrue($yesterday->filtersPass($this->app));
+        $this->runScheduled($yesterday);
+        $this->assertSame(AttendanceStatus::InProgress, $row()->status);
+
+        // Tuesday 03:45: the next run closes it, with no wait for 02:10 the following night.
+        $yesterday = $this->tasksAt('2026-02-10 03:45:00')['yesterday'];
+        $this->runScheduled($yesterday);
+        $this->assertSame(AttendanceStatus::Incomplete, $row()->status);
+
+        // Nothing open any more: the task is skipped from now on.
+        $this->assertFalse($this->tasksAt('2026-02-10 04:00:00')['yesterday']->filtersPass($this->app));
+    }
+
     public function test_the_seven_day_task_rebuilds_a_gap_in_the_middle_of_its_window(): void
     {
         $employee = Employee::factory()->create();
@@ -156,6 +184,8 @@ class AttendanceSchedulingTest extends TestCase
 
         $this->assertSame(storage_path('logs/attendance-rebuild-today.log'), $monday['today']->output);
         $this->assertSame(storage_path('logs/attendance-rebuild-heal.log'), $monday['heal']->output);
+        $this->assertSame(storage_path('logs/attendance-rebuild-yesterday.log'), $monday['yesterday']->output);
+        $this->assertSame($monday['yesterday']->output, $tuesday['yesterday']->output);
         $this->assertSame($monday['today']->output, $tuesday['today']->output);
         $this->assertSame($monday['heal']->output, $tuesday['heal']->output);
     }

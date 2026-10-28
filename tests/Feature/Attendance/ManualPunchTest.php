@@ -3,6 +3,7 @@
 namespace Tests\Feature\Attendance;
 
 use App\Enums\AttendanceStatus;
+use App\Enums\PunchType;
 use App\Livewire\Attendance\Show;
 use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
@@ -29,6 +30,13 @@ class ManualPunchTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // A fixed clock: this class's data sits on fixed Feb–Mar 2026 dates that
+        // must read as the past (not today, not the future) and as this year,
+        // so DisplayDate omits the year. Without it the class only passed while
+        // the real clock was later in 2026 (CLAUDE.md, pinned-instant check).
+        // A test that travels itself still overrides this.
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
 
         foreach (['admin', 'manager', 'employee'] as $role) {
             Role::firstOrCreate(['name' => $role]);
@@ -72,6 +80,24 @@ class ManualPunchTest extends TestCase
         return [$component, $employee];
     }
 
+    public function test_raw_punch_badges_are_neutral_for_both_directions(): void
+    {
+        $employee = Employee::factory()->create();
+        AttendanceLog::factory()->create(['employee_id' => $employee->id, 'punch_type' => PunchType::In, 'punched_at' => Carbon::parse('2026-03-02 08:00:00')]);
+        AttendanceLog::factory()->create(['employee_id' => $employee->id, 'punch_type' => PunchType::Out, 'punched_at' => Carbon::parse('2026-03-02 17:00:00')]);
+
+        $html = Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', '2026-03')
+            ->call('openDay', '2026-03-02')
+            ->html();
+
+        // Green means Present; an in-punch is not a status.
+        $this->assertMatchesRegularExpression('/bg-slate-100 text-slate-600[^>]*>\s*In\s*</', $html);
+        $this->assertMatchesRegularExpression('/bg-slate-100 text-slate-600[^>]*>\s*Out\s*</', $html);
+        $this->assertDoesNotMatchRegularExpression('/bg-green-50 text-green-700[^>]*>\s*In\s*</', $html);
+    }
+
     public function test_punch_validation_messages_are_human_readable_not_raw_property_names(): void
     {
         // Laravel's default attribute-name fallback would otherwise read
@@ -98,9 +124,37 @@ class ManualPunchTest extends TestCase
 
         $component->call('addPunch')->assertHasErrors(['newPunchDate']);
 
-        $this->assertStringContainsString("before this employee's start date (Feb 2, 2026)", $component->errors()->first('newPunchDate'));
+        $this->assertSame("A punch must fall within this employee's employment (from Mon 2 Feb).", $component->errors()->first('newPunchDate'));
         $this->assertSame(0, AttendanceLog::where('employee_id', $employee->id)->count());
         $this->assertSame(0, DailyAttendance::where('employee_id', $employee->id)->count());
+    }
+
+    /**
+     * After their last day, a manual punch is refused with the period named
+     * — up to and including left_on it's an ordinary correction.
+     */
+    public function test_a_punch_dated_after_the_employees_last_day_is_rejected_and_nothing_is_written(): void
+    {
+        $employee = Employee::factory()->inactive('2026-03-31')->create(['join_date' => '2026-02-02']);
+
+        $form = fn (string $date) => Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', substr($date, 0, 7))
+            ->call('startAddingPunch', $date)
+            ->set('newPunchDate', $date)
+            ->set('newPunchTime', '08:00')
+            ->set('newPunchType', 'in');
+
+        $rejected = $form('2026-04-01')->call('addPunch')->assertHasErrors(['newPunchDate']);
+
+        $this->assertSame("A punch must fall within this employee's employment (2 Feb – 31 Mar).", $rejected->errors()->first('newPunchDate'));
+        $this->assertSame(0, AttendanceLog::where('employee_id', $employee->id)->count());
+
+        $form('2026-03-31')->call('addPunch')->assertHasNoErrors();
+
+        $this->assertSame(1, AttendanceLog::where('employee_id', $employee->id)->count());
+        $this->assertTrue(DailyAttendance::where('employee_id', $employee->id)->whereDate('work_date', '2026-03-31')->exists());
+        $this->assertFalse(DailyAttendance::where('employee_id', $employee->id)->whereDate('work_date', '2026-04-01')->exists());
     }
 
     public function test_a_punch_today_on_the_hire_date_creates_no_row_before_hire_or_for_tomorrow(): void

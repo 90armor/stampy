@@ -2,14 +2,22 @@
 
 namespace App\Livewire\Attendance;
 
-use App\Enums\AttendanceStatus;
+use App\Enums\LeaveStatus;
+use App\Enums\OvertimeStatus;
 use App\Enums\PunchSource;
 use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
 use App\Models\Employee;
-use App\Models\Holiday;
+use App\Models\Leave;
+use App\Models\OvertimeRequest;
 use App\Services\Attendance\DailySummaryBuilder;
+use App\Services\Leave\LeaveDayCounter;
+use App\Services\Overtime\OvertimeRequestService;
+use App\Support\AttendanceSummary;
 use App\Support\AttendanceTime;
+use App\Support\DisplayDate;
+use App\Support\OvertimeResult;
+use App\Support\WorkdayCalendar;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
@@ -149,15 +157,22 @@ class Show extends Component
     {
         $this->authorize('update', $this->employee);
 
+        // A manual punch must fall inside the employment period (join_date to
+        // left_on, Employee::scopeActiveOn()) and not in the future. A device or
+        // CSV punch outside it is kept — raw hardware facts are never dropped —
+        // but an admin entering one by hand is a mistake to catch here.
         $joinDate = $this->employee->join_date;
+        $leftOn = $this->employee->left_on;
+        $lastAllowed = $leftOn !== null && $leftOn->lt(today()) ? $leftOn : today();
+        $outsideEmployment = "A punch must fall within this employee's employment (".$this->employmentPeriod().').';
 
         $this->validate([
-            'newPunchDate' => ['required', 'date', 'after_or_equal:'.$joinDate->format('Y-m-d'), 'before_or_equal:'.today()->format('Y-m-d')],
+            'newPunchDate' => ['required', 'date', 'after_or_equal:'.$joinDate->format('Y-m-d'), 'before_or_equal:'.$lastAllowed->format('Y-m-d')],
             'newPunchTime' => ['required', 'date_format:H:i'],
             'newPunchType' => ['required', 'in:in,out'],
         ], [
-            'newPunchDate.after_or_equal' => "A punch can't be dated before this employee's start date ({$joinDate->format('M j, Y')}).",
-            'newPunchDate.before_or_equal' => "A punch can't be dated in the future.",
+            'newPunchDate.after_or_equal' => $outsideEmployment,
+            'newPunchDate.before_or_equal' => $leftOn !== null ? $outsideEmployment : "A punch can't be dated in the future.",
         ], [
             'newPunchDate' => 'punch date',
             'newPunchTime' => 'punch time',
@@ -230,6 +245,19 @@ class Show extends Component
         $this->addingPunchFor = null;
     }
 
+    /**
+     * "from Mon 2 Feb 2026", or "2 Feb – 10 Apr" once they've left — the
+     * period a manual punch must fall in.
+     */
+    private function employmentPeriod(): string
+    {
+        $leftOn = $this->employee->left_on;
+
+        return $leftOn === null
+            ? 'from '.DisplayDate::compact($this->employee->join_date)
+            : DisplayDate::range($this->employee->join_date, $leftOn);
+    }
+
     public function voidPunch(int $punchId): void
     {
         $this->authorize('update', $this->employee);
@@ -272,7 +300,11 @@ class Show extends Component
         return DailyAttendance::query()
             ->where('employee_id', $this->employee->id)
             ->whereBetween('work_date', [$start->format('Y-m-d'), $end->format('Y-m-d')])
+            ->with('workSchedule')
             ->get()
+            // Leave days resolved once for the month (the half-day and
+            // worked-on-leave annotations read them), not per cell.
+            ->tap(fn (Collection $rows) => DailyAttendance::withLeaveDays($rows))
             ->keyBy(fn (DailyAttendance $row) => $row->work_date->format('Y-m-d'));
     }
 
@@ -360,6 +392,59 @@ class Show extends Component
      *
      * @return Collection<string, Collection<int, AttendanceLog>>
      */
+    /**
+     * Overnight shifts, so a day's punch list can say which shift a punch
+     * belongs to. A (+1) out-punch is grouped under the date it was punched,
+     * not the shift it closed: without this, the next day's list opens with
+     * an unexplained 12:42 AM Out and the shift's own day never shows it.
+     *
+     * - 'outs': shift work_date ('Y-m-d') => the AttendanceLog that closed it
+     *   the next day, listed on the shift's day with "(+1)".
+     * - 'shifts': AttendanceLog id => the shift's work_date (Carbon), noted
+     *   on the day the punch was recorded.
+     *
+     * Covers the day before the month too: the 1st's list can hold the
+     * previous month's last overnight out. Two queries at most, the same in
+     * both views (their query counts stay equal).
+     *
+     * @param  Collection<string, DailyAttendance>  $existing
+     * @return array{outs: Collection<string, AttendanceLog>, shifts: Collection<int, Carbon>}
+     */
+    private function overnightPunches(Collection $existing): array
+    {
+        $dayBefore = $this->monthStart()->subDay();
+        $rows = $existing->values()->push(
+            DailyAttendance::query()
+                ->where('employee_id', $this->employee->id)
+                ->whereDate('work_date', $dayBefore)
+                ->first(),
+        )->filter(fn (?DailyAttendance $row) => $row?->isOvernightOut());
+
+        if ($rows->isEmpty()) {
+            return ['outs' => collect(), 'shifts' => collect()];
+        }
+
+        $logs = AttendanceLog::query()
+            ->where('employee_id', $this->employee->id)
+            ->where('punch_type', 'out')
+            ->whereNull('voided_at')
+            ->whereIn('punched_at', $rows->map(fn (DailyAttendance $row) => $row->last_out->format('Y-m-d H:i:s'))->all())
+            ->with('createdBy', 'voidedBy')
+            ->get()
+            ->keyBy(fn (AttendanceLog $log) => $log->punched_at->format('Y-m-d H:i:s'));
+
+        $outs = collect();
+        $shifts = collect();
+        foreach ($rows as $row) {
+            if ($log = $logs->get($row->last_out->format('Y-m-d H:i:s'))) {
+                $outs->put($row->work_date->format('Y-m-d'), $log);
+                $shifts->put($log->id, $row->work_date);
+            }
+        }
+
+        return ['outs' => $outs, 'shifts' => $shifts];
+    }
+
     private function punchesByDate(): Collection
     {
         $start = $this->monthStart();
@@ -380,59 +465,110 @@ class Show extends Component
      * deliberate: daily_attendances only has rows for dates the builder has
      * already reached, so a holiday three weeks out would have no row at
      * all if this were sourced from there — employees need to see upcoming
-     * holidays, which is most of the point of showing them. Powers the
-     * calendar grid only; not fetched or shown in the table view.
+     * holidays, which is most of the point of showing them. Read through
+     * the builder's own lookup (WorkdayCalendar::holidayNamesBetween()), not
+     * a query of its own. Powers the calendar, the day modal and (Phase 3e)
+     * the table view's holiday annotation.
      *
-     * @return Collection<string, Holiday>
+     * @return Collection<string, string> 'Y-m-d' => name
      */
-    private function holidaysByDate(): Collection
+    /**
+     * Every approved leave covering the day the modal is open on — an AM and
+     * a PM leave can be two types, and daily_attendances.leave_id holds only
+     * one — with what it charges that day (LeaveDayCounter, never inferred:
+     * nothing on a holiday or day off for a workdays type, a full day for
+     * Maternity's calendar days).
+     *
+     * @return list<array{leave: Leave, charged: int}>
+     */
+    private function dayLeaves(): array
     {
-        $start = $this->monthStart();
-        $end = $start->copy()->endOfMonth();
+        if ($this->viewingDay === null) {
+            return [];
+        }
 
-        return Holiday::query()
-            ->whereBetween('date', [$start->format('Y-m-d'), $end->format('Y-m-d')])
+        $date = Carbon::createFromFormat('Y-m-d', $this->viewingDay)->startOfDay();
+        $counter = app(LeaveDayCounter::class);
+
+        return Leave::query()
+            ->where('employee_id', $this->employee->id)
+            ->where('status', LeaveStatus::Approved->value)
+            ->whereDate('start_date', '<=', $date)
+            ->whereDate('end_date', '>=', $date)
+            ->with('leaveType')
+            ->orderByRaw("half = 'pm'")
             ->get()
-            ->keyBy(fn (Holiday $holiday) => $holiday->date->format('Y-m-d'));
+            ->map(fn (Leave $leave) => [
+                'leave' => $leave,
+                'charged' => array_sum($counter->count($this->employee, $leave->leaveType, $date, $date, $leave->half !== null)),
+            ])
+            ->all();
     }
 
     /**
-     * Counts only — no derived or payroll-adjacent figures. "Workdays" is
-     * simply present+absent+incomplete (i.e. every calculated day that
-     * isn't off/holiday/leave); "late"/"early_leave_days" and "Total worked"
-     * are plain counts/sums over the same calculated rows, not anything
-     * interpreted. "Late" and "early leave" are counted from late_minutes/
-     * early_leave_minutes, not from status — timing is not a status (see
-     * AttendanceStatus's doc comment) — so a day can contribute to both
-     * counts at once.
+     * The day the modal is open on, for overtime (Phase 4d): the request — the
+     * approved one the day was credited against, else a pending or approved
+     * one for that date — what it credited by category, and in words what
+     * it has credited or why nothing (OvertimeResult: no out-punch, left
+     * before the window, on leave). Null without a request.
      *
-     * @param  Collection<int, array{date: Carbon, record: ?DailyAttendance}>  $days
-     * @return array<string, int>
+     * @return array{request: OvertimeRequest, minutes: array<string, int>, result: ?string}|null
      */
-    private function summary(Collection $days): array
+    private function dayOvertime(?DailyAttendance $record): ?array
     {
-        $records = $days->pluck('record')->filter();
+        if ($this->viewingDay === null) {
+            return null;
+        }
 
-        $counts = $records->countBy(fn (DailyAttendance $row) => $row->status->value);
+        $request = $record?->overtime_request_id !== null
+            ? OvertimeRequest::find($record->overtime_request_id)
+            : OvertimeRequest::query()
+                ->where('employee_id', $this->employee->id)
+                ->whereDate('date', $this->viewingDay)
+                ->whereIn('status', [OvertimeStatus::Pending->value, OvertimeStatus::Approved->value])
+                ->latest('id')
+                ->first();
 
-        $workdayStatuses = [
-            AttendanceStatus::Present->value,
-            AttendanceStatus::Absent->value,
-            AttendanceStatus::Incomplete->value,
-        ];
+        if ($request === null) {
+            return null;
+        }
+
+        $request->setRelation('employee', $this->employee);
+        $credited = $record?->overtime_request_id === $request->id;
 
         return [
-            'workdays' => $records->whereIn('status', array_map(
-                fn (string $value) => AttendanceStatus::from($value),
-                $workdayStatuses
-            ))->count(),
-            'present' => $counts->get(AttendanceStatus::Present->value, 0),
-            'late' => $records->filter(fn (DailyAttendance $row) => $row->isLate())->count(),
-            'absent' => $counts->get(AttendanceStatus::Absent->value, 0),
-            'incomplete' => $counts->get(AttendanceStatus::Incomplete->value, 0),
-            'early_leave_days' => $records->filter(fn (DailyAttendance $row) => $row->leftEarly())->count(),
-            'total_worked_minutes' => (int) $records->sum('worked_minutes'),
+            'request' => $request,
+            'minutes' => $credited ? [
+                'workday' => $record->overtime_workday_minutes, 'night' => $record->overtime_night_minutes,
+                'rest_day' => $record->overtime_rest_day_minutes, 'holiday' => $record->overtime_holiday_minutes,
+            ] : [],
+            'result' => OvertimeResult::line($request, $record, $request->status === OvertimeStatus::Approved ? app(OvertimeRequestService::class)->approvedMinutes($request) : 0),
         ];
+    }
+
+    private function holidaysByDate(): Collection
+    {
+        $start = $this->monthStart();
+
+        // The builder's own lookup (WorkdayCalendar), names included.
+        return collect(WorkdayCalendar::holidayNamesBetween($start, $start->copy()->endOfMonth()));
+    }
+
+    /**
+     * The month's counts — the shared definition (AttendanceSummary), which
+     * the employee dashboard uses too.
+     *
+     * @param  Collection<int, array{date: Carbon, record: ?DailyAttendance}>  $days
+     * @param  Collection<string, string>  $holidays  holidaysByDate(), already loaded for the month
+     * @return array<string, int>
+     */
+    private function summary(Collection $days, Collection $holidays): array
+    {
+        return AttendanceSummary::fromRecords(
+            $days->pluck('record')->filter()->values(),
+            $this->employee,
+            $holidays->map(fn () => true)->all(),
+        );
     }
 
     public function render()
@@ -479,16 +615,20 @@ class Show extends Component
         // needs to know how far the CURRENT month got, which $existing
         // already answers for free.
         $lastBuiltInMonth = $existing->keys()->sort()->last();
+        $holidays = $this->holidaysByDate();
 
         return view('livewire.attendance.show', [
             'days' => $days,
             'gridDays' => $this->gridDays($existing),
             'recordsByDate' => $existing,
-            'summary' => $this->summary($days),
-            'monthLabel' => $this->monthStart()->format('F Y'),
+            'summary' => $this->summary($days, $holidays),
+            'monthLabel' => DisplayDate::month($this->monthStart()),
             'isCurrentMonth' => $this->month === today()->format('Y-m'),
             'punchesByDate' => $this->punchesByDate(),
-            'holidaysByDate' => $this->holidaysByDate(),
+            'overnightPunches' => $this->overnightPunches($existing),
+            'holidaysByDate' => $holidays,
+            'dayLeaves' => $this->dayLeaves(),
+            'dayOvertime' => $this->viewingDay !== null ? $this->dayOvertime($existing->get($this->viewingDay)) : null,
             'lastBuiltInMonth' => $lastBuiltInMonth,
             'monthFullyBuilt' => $lastBuiltInMonth === $days->last()['date']->format('Y-m-d'),
             // Same reasoning as $layoutData just above: nobody reaches

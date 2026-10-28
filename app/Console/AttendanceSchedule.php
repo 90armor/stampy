@@ -2,6 +2,8 @@
 
 namespace App\Console;
 
+use App\Enums\AttendanceStatus;
+use App\Models\DailyAttendance;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Stringable;
@@ -22,12 +24,27 @@ class AttendanceSchedule
     {
         $today = today()->format('Y-m-d');
 
-        // Moves an in_progress day to its final status once end_time passes, and picks up punches imported during the day.
+        // Moves an in_progress day to its final status once it closes, and picks up punches imported during the day.
         $schedule->command('attendance:build-daily', ['--date' => $today])
             ->everyFifteenMinutes()
             ->withoutOverlapping(10)
             ->sendOutputTo(storage_path('logs/attendance-rebuild-today.log'))
             ->onFailureWithOutput(self::logFailure('today'));
+
+        // Phase 2.7: an in-only day stays in_progress until its pairing window (first in-punch + 18h) closes, which
+        // can be after midnight — a 9:30 in-punch closes at 03:30. While yesterday has any open row, rebuild it on the
+        // same cadence so it closes within 15 minutes instead of waiting for 02:10 (or, for a 9:30 punch, for the
+        // next night). The check runs on each tick; with nothing open, the task is skipped.
+        $yesterday = today()->subDay()->format('Y-m-d');
+        $schedule->command('attendance:build-daily', ['--date' => $yesterday])
+            ->everyFifteenMinutes()
+            ->when(fn (): bool => DailyAttendance::query()
+                ->whereDate('work_date', $yesterday)
+                ->where('status', AttendanceStatus::InProgress->value)
+                ->exists())
+            ->withoutOverlapping(10)
+            ->sendOutputTo(storage_path('logs/attendance-rebuild-yesterday.log'))
+            ->onFailureWithOutput(self::logFailure('yesterday'));
 
         // A window, not just yesterday: a gap from downtime heals itself with no state to track, because the builder is idempotent.
         $schedule->command('attendance:build-daily', [

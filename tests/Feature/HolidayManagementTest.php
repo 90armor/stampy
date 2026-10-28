@@ -62,6 +62,75 @@ class HolidayManagementTest extends TestCase
         $this->assertDatabaseHas('holidays', ['date' => self::WORKDAY, 'name' => 'Test Holiday']);
     }
 
+    public function test_holiday_workspace_presents_year_context_and_accessible_actions(): void
+    {
+        Carbon::setTestNow('2026-09-28 10:00:00');
+        $admin = $this->admin();
+        Holiday::factory()->create(['date' => self::WORKDAY, 'name' => 'Constitution Day']);
+
+        $component = Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->assertSet('yearFilter', '2026')
+            ->assertSee('Configure company-wide dates that affect attendance.')
+            ->assertSee('aria-label="Holidays for 2026"', false)
+            ->assertSee('datetime="2026-02-02"', false)
+            ->assertSee('aria-label="Edit Constitution Day holiday on Monday, 2 February 2026"', false)
+            ->assertSee('aria-label="Delete Constitution Day holiday on Monday, 2 February 2026"', false)
+            ->assertSee('role="tooltip"', false);
+
+        $component->call('create')
+            ->assertSee('Saving changes recalculates attendance for the employees active on the affected date or dates.')
+            ->assertSee('maxlength="255"', false)
+            ->assertSee('wire:loading.attr="disabled"', false)
+            ->assertSee('Saving&hellip;', false);
+    }
+
+    public function test_holiday_note_matches_the_database_string_limit(): void
+    {
+        $admin = $this->admin();
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->call('create')
+            ->set('date', self::WORKDAY)
+            ->set('name', 'Test Holiday')
+            ->set('note', str_repeat('a', 255))
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseHas('holidays', [
+            'date' => self::WORKDAY,
+            'note' => str_repeat('a', 255),
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->call('create')
+            ->set('date', '2026-02-03')
+            ->set('name', 'Another Holiday')
+            ->set('note', str_repeat('a', 256))
+            ->call('save')
+            ->assertHasErrors(['note' => 'max']);
+
+        $this->assertDatabaseMissing('holidays', ['date' => '2026-02-03']);
+    }
+
+    public function test_year_filter_is_chronological_and_names_an_empty_year(): void
+    {
+        Carbon::setTestNow('2026-09-28 10:00:00');
+        $admin = $this->admin();
+        Holiday::factory()->create(['date' => '2026-11-09', 'name' => 'Later Holiday']);
+        Holiday::factory()->create(['date' => '2026-01-07', 'name' => 'Earlier Holiday']);
+        Holiday::factory()->create(['date' => '2027-01-01', 'name' => 'Next Year Holiday']);
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->assertSeeInOrder(['Earlier Holiday', 'Later Holiday'])
+            ->assertDontSee('Next Year Holiday')
+            ->set('yearFilter', '2028')
+            ->assertSee('No holidays for 2028');
+    }
+
     public function test_admin_can_edit_a_holiday(): void
     {
         $admin = $this->admin();
@@ -113,20 +182,24 @@ class HolidayManagementTest extends TestCase
         $manager = User::factory()->create()->assignRole('manager');
 
         $this->actingAs($manager)
-            ->get(route('organization.index'))
+            ->get(route('policies.index', ['tab' => 'holidays']))
             ->assertForbidden();
     }
 
-    public function test_creating_a_holiday_rebuilds_that_date_for_all_active_employees(): void
+    public function test_creating_a_holiday_rebuilds_that_date_for_every_employee_active_on_it(): void
     {
+        // Fixed clock: this test's data sits on fixed 2026 dates (see CLAUDE.md, pinned-instant check).
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $admin = $this->admin();
         $active = Employee::factory()->create(['status' => 'active']);
-        $inactive = Employee::factory()->create(['status' => 'inactive']);
+        // Deactivated since, but still employed on WORKDAY — the holiday applies to them too.
+        $leftAfter = Employee::factory()->inactive('2026-03-31')->create();
+        $leftBefore = Employee::factory()->inactive('2026-01-30')->create();
 
-        // Both start the day absent (no punches, an ordinary workday).
+        // Both employed ones start the day absent (no punches, an ordinary workday).
         app(DailySummaryBuilder::class)->build($active, Carbon::parse(self::WORKDAY));
-        app(DailySummaryBuilder::class)->build($inactive, Carbon::parse(self::WORKDAY));
-        $this->assertSame(AttendanceStatus::Absent, DailyAttendance::where('employee_id', $active->id)->first()->status);
+        app(DailySummaryBuilder::class)->build($leftAfter, Carbon::parse(self::WORKDAY));
+        $this->assertSame(AttendanceStatus::Absent, DailyAttendance::where('employee_id', $leftAfter->id)->first()->status);
 
         Livewire::actingAs($admin)
             ->test(Index::class)
@@ -135,20 +208,21 @@ class HolidayManagementTest extends TestCase
             ->set('name', 'Test Holiday')
             ->call('save');
 
-        $this->assertSame(
-            AttendanceStatus::Holiday,
-            DailyAttendance::where('employee_id', $active->id)->where('work_date', self::WORKDAY)->first()->status
-        );
-        // Inactive employees are explicitly out of scope for the rebuild —
-        // their stale row is left exactly as it was.
-        $this->assertSame(
-            AttendanceStatus::Absent,
-            DailyAttendance::where('employee_id', $inactive->id)->where('work_date', self::WORKDAY)->first()->status
-        );
+        foreach ([$active, $leftAfter] as $employee) {
+            $this->assertSame(
+                AttendanceStatus::Holiday,
+                DailyAttendance::where('employee_id', $employee->id)->where('work_date', self::WORKDAY)->first()->status
+            );
+        }
+
+        // Someone who had already left gets no row for the date at all.
+        $this->assertFalse(DailyAttendance::where('employee_id', $leftBefore->id)->exists());
     }
 
     public function test_deleting_a_holiday_reverts_the_rebuilt_days(): void
     {
+        // Fixed clock: this test's data sits on fixed 2026 dates (see CLAUDE.md, pinned-instant check).
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $admin = $this->admin();
         $employee = Employee::factory()->create(['status' => 'active']);
         $holiday = Holiday::factory()->create(['date' => self::WORKDAY, 'name' => 'Test Holiday']);
@@ -171,6 +245,8 @@ class HolidayManagementTest extends TestCase
 
     public function test_editing_a_holidays_date_rebuilds_both_the_old_and_new_dates(): void
     {
+        // Fixed clock: this test's data sits on fixed 2026 dates (see CLAUDE.md, pinned-instant check).
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $admin = $this->admin();
         $employee = Employee::factory()->create(['status' => 'active']);
         $oldDate = self::WORKDAY;

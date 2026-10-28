@@ -2,10 +2,14 @@
 
 namespace App\Services\Attendance;
 
+use App\Enums\LeaveStatus;
 use App\Exceptions\BulkReassignmentTooFarBackException;
+use App\Exceptions\HalfDayLeaveNeedsBreakException;
 use App\Models\Employee;
 use App\Models\EmployeeWorkSchedule;
+use App\Models\Leave;
 use App\Models\WorkSchedule;
+use App\Support\DisplayDate;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -66,6 +70,8 @@ class EmployeeScheduleAssigner
      */
     public function assign(Employee $employee, WorkSchedule $schedule, CarbonInterface $effectiveFrom): array
     {
+        $this->refuseHalfDaysWithoutBreak([$employee], $schedule, $effectiveFrom);
+
         EmployeeWorkSchedule::updateOrCreate(
             ['employee_id' => $employee->id, 'effective_from' => $effectiveFrom->format('Y-m-d')],
             ['work_schedule_id' => $schedule->id, 'created_by' => Auth::id()],
@@ -112,9 +118,9 @@ class EmployeeScheduleAssigner
     /**
      * Moves every active employee currently on $from (per scheduleOn(today()),
      * the same resolution the builder itself uses) to $to, effective
-     * $effectiveFrom — inactive employees are left alone, matching
-     * attendance:build-daily's own active-only scope; their schedule no
-     * longer affects anything that gets built.
+     * $effectiveFrom — inactive employees are left alone: a bulk move is
+     * about who is on the schedule now, and a former employee's days up to
+     * their left_on keep the schedule they had.
      *
      * @return array{employees: int, days: int, rebuildError: ?string}
      *
@@ -127,6 +133,8 @@ class EmployeeScheduleAssigner
         }
 
         $employees = $this->employeesCurrentlyOn($from);
+
+        $this->refuseHalfDaysWithoutBreak($employees->all(), $to, $effectiveFrom);
 
         // Every assignment, written in one transaction, BEFORE any
         // rebuilding starts: the admin's intent either lands completely or
@@ -167,18 +175,81 @@ class EmployeeScheduleAssigner
     }
 
     /**
+     * Refuses (HalfDayLeaveNeedsBreakException, before anything is written) to
+     * move $employees onto $schedule from $effectiveFrom when that schedule has
+     * no break_start and any of them has a pending or approved half-day leave
+     * that would land on it — the days the new assignment governs, up to the
+     * employee's next assignment. Whether it would, is Employee::scheduleOn()
+     * on the assignments as they'd be after the change.
+     *
+     * @param  list<Employee>  $employees
+     */
+    public function refuseHalfDaysWithoutBreak(array $employees, WorkSchedule $schedule, CarbonInterface $effectiveFrom): void
+    {
+        if ($schedule->break_start !== null) {
+            return;
+        }
+
+        $offending = [];
+
+        foreach ($employees as $employee) {
+            $after = $employee->scheduleAssignments
+                ->reject(fn (EmployeeWorkSchedule $row) => $row->effective_from->isSameDay($effectiveFrom))
+                ->push((new EmployeeWorkSchedule(['effective_from' => $effectiveFrom->format('Y-m-d')]))->setRelation('workSchedule', $schedule))
+                ->sortBy('effective_from')
+                ->values();
+
+            $offending = [...$offending, ...$this->halfDaysWithoutBreak($employee, $after)];
+        }
+
+        if ($offending !== []) {
+            throw new HalfDayLeaveNeedsBreakException($schedule->name, $offending);
+        }
+    }
+
+    /**
+     * The employee's pending and approved half-day leaves that would fall on a
+     * schedule with no break_start under $assignments.
+     *
+     * @param  Collection<int, EmployeeWorkSchedule>  $assignments
+     * @return list<string>
+     */
+    public function halfDaysWithoutBreak(Employee $employee, Collection $assignments): array
+    {
+        if ($assignments->isEmpty()) {
+            return [];
+        }
+
+        $preview = $employee->replicate();
+        $preview->setRelation('scheduleAssignments', $assignments);
+
+        return Leave::query()
+            ->where('employee_id', $employee->id)
+            ->whereIn('status', [LeaveStatus::Pending->value, LeaveStatus::Approved->value])
+            ->whereNotNull('half')
+            ->orderBy('start_date')
+            ->get()
+            ->filter(fn (Leave $leave) => $preview->scheduleOn($leave->start_date)->break_start === null)
+            ->map(fn (Leave $leave) => "{$employee->full_name}'s {$leave->status->value} half day on ".DisplayDate::compact($leave->start_date).' ('.$leave->half->label().')')
+            ->values()
+            ->all();
+    }
+
+    /**
      * Names exactly what to run to finish the job — with a 60-day bulk cap,
      * the stale window a failed rebuild can leave behind may reach 60 days,
      * well past the nightly scheduled rebuild's own 7-day healing window
      * (CLAUDE.md, "daily_attendances builds itself"), so this can't be left
      * to heal itself. Public: Employees\ScheduleAssignments::deleteAssignment()
      * reuses this for the same message after its own rebuildFrom() call,
-     * rather than a second copy of the same wording drifting out of sync.
+     * rather than a second copy of the same wording drifting out of sync — as
+     * do EmployeeLifecycle and LeaveRequestService ($until: a range that ends
+     * before today, such as a past leave).
      */
-    public function rebuildRecoveryMessage(CarbonInterface $effectiveFrom, string $employeeOption = ''): string
+    public function rebuildRecoveryMessage(CarbonInterface $effectiveFrom, string $employeeOption = '', ?CarbonInterface $until = null): string
     {
         $from = $effectiveFrom->format('Y-m-d');
-        $to = today()->format('Y-m-d');
+        $to = ($until ?? today())->format('Y-m-d');
         $employeeFlag = $employeeOption === '' ? '' : " {$employeeOption}";
 
         return "Not every affected day may have been rebuilt. Run: php artisan attendance:build-daily --from={$from} --to={$to}{$employeeFlag}";

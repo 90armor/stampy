@@ -229,12 +229,13 @@ class AttendanceIndexTest extends TestCase
             ->render()
             ->getData()['summary'];
 
-        $this->assertSame(['present', 'late', 'early', 'absent', 'incomplete'], $summary->keys()->all());
+        $this->assertSame(['present', 'late', 'early', 'absent', 'incomplete', 'incomplete_late'], $summary->keys()->all());
         $this->assertSame(1, $summary->get('present'));
         $this->assertSame(0, $summary->get('late'));
         $this->assertSame(0, $summary->get('early'));
         $this->assertSame(0, $summary->get('absent'));
         $this->assertSame(0, $summary->get('incomplete'));
+        $this->assertSame(0, $summary->get('incomplete_late'));
     }
 
     public function test_changing_a_filter_resets_pagination_to_page_one(): void
@@ -368,6 +369,251 @@ class AttendanceIndexTest extends TestCase
             ->assertSee('(+1)');
     }
 
+    public function test_the_default_status_filter_reads_as_no_filter_applied(): void
+    {
+        $component = Livewire::actingAs($this->admin())->test(Index::class);
+
+        // The query default is unchanged: every status except Off.
+        $this->assertEqualsCanonicalizing(
+            ['present', 'incomplete', 'absent', 'holiday', 'leave', 'in_progress'],
+            $component->get('statuses'),
+        );
+
+        // ...but no chip renders as selected, and none uses a solid fill.
+        $html = $component->html();
+        $this->assertStringNotContainsString('aria-pressed="true"', $html);
+        $this->assertStringContainsString('Show off days', $html);
+        $this->assertStringNotContainsString('bg-primary-700 text-white', $html);
+    }
+
+    public function test_status_chips_narrow_from_the_default_and_return_to_it(): void
+    {
+        $component = Livewire::actingAs($this->admin())->test(Index::class);
+
+        $component->call('toggleStatus', 'absent');
+        $this->assertSame(['absent'], $component->get('statuses'));
+        $this->assertSame(1, substr_count($component->html(), 'aria-pressed="true"'));
+        $this->assertStringContainsString('bg-primary-50 text-primary-700 ring-primary-600', $component->html());
+
+        $component->call('toggleStatus', 'incomplete');
+        $this->assertEqualsCanonicalizing(['absent', 'incomplete'], $component->get('statuses'));
+
+        $component->call('toggleStatus', 'absent');
+        $component->call('toggleStatus', 'incomplete');
+        // Removing the last selected chip returns to "all working statuses".
+        $this->assertEqualsCanonicalizing(
+            ['present', 'incomplete', 'absent', 'holiday', 'leave', 'in_progress'],
+            $component->get('statuses'),
+        );
+    }
+
+    public function test_show_off_days_adds_off_independently_of_the_status_selection(): void
+    {
+        $component = Livewire::actingAs($this->admin())->test(Index::class);
+
+        $component->call('toggleStatus', 'off');
+        $this->assertContains('off', $component->get('statuses'));
+        $this->assertCount(7, $component->get('statuses'));
+        // Every working status is still in the set, so only the off-days
+        // toggle reads as selected.
+        $this->assertSame(1, substr_count($component->html(), 'aria-pressed="true"'));
+
+        $component->call('toggleStatus', 'absent');
+        $this->assertEqualsCanonicalizing(['absent', 'off'], $component->get('statuses'));
+
+        $component->call('toggleStatus', 'off');
+        $this->assertSame(['absent'], $component->get('statuses'));
+    }
+
+    public function test_the_chevron_is_the_rows_only_link_and_names_the_employee_and_date(): void
+    {
+        // Fixed clock: this test's data sits on fixed 2026 dates (see CLAUDE.md, pinned-instant check).
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-04-15 12:00:00'));
+        $admin = $this->admin();
+        $employee = Employee::factory()->create(['full_name' => 'Chevron Chan']);
+
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => '2026-03-02',
+            'status' => AttendanceStatus::Absent,
+        ]);
+
+        $html = Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->set('fromDate', '2026-03-02')
+            ->set('toDate', '2026-03-02')
+            ->html();
+
+        $href = route('attendance.show', $employee).'?month=2026-03';
+        $this->assertSame(1, substr_count($html, 'href="'.$href.'"'));
+        $this->assertStringContainsString('aria-label="View attendance for Chevron Chan, Mon 2 Mar"', $html);
+        // The name is plain text, not a link.
+        $this->assertMatchesRegularExpression('/<div class="whitespace-nowrap text-sm font-medium text-slate-900 dark:text-slate-100">Chevron Chan<\/div>/', $html);
+        $this->assertStringNotContainsString('text-primary-700 underline', $html);
+        // 40px target.
+        $this->assertStringContainsString('inline-flex h-10 w-10', $html);
+        // The shared tooltip, shown on hover and on keyboard focus; never a
+        // native title, and the aria-label stays the accessible name.
+        $this->assertMatchesRegularExpression('/<span role="tooltip" class="[^"]*group-hover\/action:opacity-100 group-focus-within\/action:opacity-100[^"]*">View attendance details<\/span>/', $html);
+        $this->assertStringNotContainsString('title="View attendance', $html);
+    }
+
+    public function test_the_early_header_is_abbreviated_with_an_accessible_full_name(): void
+    {
+        $admin = $this->admin();
+        $employee = Employee::factory()->create();
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => today()->format('Y-m-d'),
+            'status' => AttendanceStatus::Absent,
+        ]);
+
+        $html = Livewire::actingAs($admin)->test(Index::class)->html();
+
+        $this->assertStringContainsString('<abbr title="Early leave" class="no-underline">Early</abbr>', $html);
+
+        // Column order is an owner decision (docs/ATTENDANCE_UI.md): Date,
+        // Employee, Department, the times, then Status and the chevron.
+        // Only the records table's headers (the date picker's grid has its own).
+        $headers = [];
+        preg_match('/<table class="min-w-\[64rem\] w-full">.*?<\/thead>/s', $html, $recordsHead);
+        preg_match_all('/<th[^>]*>\s*(.*?)\s*<\/th>/s', $recordsHead[0], $matches);
+        foreach ($matches[1] as $cell) {
+            $headers[] = trim(strip_tags(preg_replace('/<span class="sr-only">.*?<\/span>/s', '', $cell)));
+        }
+        $this->assertSame(['Date', 'Employee', 'Department', 'In', 'Out', 'Worked', 'Late', 'Early', 'Status', ''], $headers);
+        // From sm to below xl, Status and the chevron are the pinned trailing columns.
+        $this->assertStringContainsString('<th class="table-pin table-pin-start px-6 py-3">Status</th>', $html);
+        $this->assertStringContainsString('<th class="table-pin table-pin-end py-3 pl-2 pr-6">', $html);
+        $this->assertStringContainsString('x-data="pinnedColumns"', $html);
+        $this->assertStringContainsString('<tr class="relative whitespace-nowrap', $html);
+        // Empty values are a muted em dash.
+        $this->assertStringContainsString('<span class="text-slate-300 dark:text-slate-600">—</span>', $html);
+    }
+
+    public function test_the_date_range_picker_is_a_labelled_grid_with_native_inputs_below_sm(): void
+    {
+        $this->travelTo('2026-03-04 10:00:00');
+
+        $html = Livewire::actingAs($this->admin())->test(Index::class)->html();
+
+        // The grid picker gets the app-timezone today from the server.
+        $this->assertStringContainsString('x-data="datePicker({ mode: \'range\', today: \'2026-03-04\', presets: ', $html);
+        $this->assertStringContainsString('role="dialog"', $html);
+        $this->assertStringContainsString('aria-label="Choose a date range"', $html);
+        // The shared calendar (<x-date-picker.calendar>), Alpine-rendered,
+        // so out of Livewire's morph.
+        $this->assertMatchesRegularExpression('/<div x-ref="picker" @keydown="onKeydown\(\$event\)" class="hidden sm:block" wire:ignore/', $html);
+        // A fixed panel, placed against the trigger so nothing can clip it.
+        $this->assertMatchesRegularExpression('/x-ref="panel"\s+role="dialog"\s+aria-label="Choose a date range"\s+class="fixed /', $html);
+        // Three grids — days, months, years — each labelled by what it shows,
+        // and the heading zooms out from days to months to years.
+        $this->assertStringContainsString('<table x-show="view === \'days\'" role="grid" :aria-label="gridLabel"', $html);
+        $this->assertStringContainsString('<table x-show="view === \'months\'" x-cloak role="grid" :aria-label="gridLabel"', $html);
+        $this->assertStringContainsString('<table x-show="view === \'years\'" x-cloak role="grid" :aria-label="gridLabel"', $html);
+        $this->assertStringContainsString('@click="zoomOut()"', $html);
+        $this->assertStringContainsString('<span class="sr-only" aria-live="polite" x-text="gridLabel"></span>', $html);
+        $this->assertStringContainsString('abbr="Sunday"', $html);
+        // Below sm: the native inputs, bound to the same properties as before.
+        $this->assertStringContainsString('<div class="mt-2 space-y-3 sm:hidden">', $html);
+        $this->assertStringContainsString('wire:model.live="fromDate"', $html);
+        $this->assertStringContainsString('wire:model.live="toDate"', $html);
+    }
+
+    public function test_quick_ranges_include_last_month_and_set_both_dates(): void
+    {
+        $this->travelTo('2026-10-02 10:00:00');
+
+        $component = Livewire::actingAs($this->admin())->test(Index::class);
+
+        $this->assertSame([
+            'today' => ['label' => 'Today', 'from' => '2026-10-02', 'to' => '2026-10-02'],
+            'yesterday' => ['label' => 'Yesterday', 'from' => '2026-10-01', 'to' => '2026-10-01'],
+            'last7' => ['label' => 'Last 7 days', 'from' => '2026-09-26', 'to' => '2026-10-02'],
+            'last30' => ['label' => 'Last 30 days', 'from' => '2026-09-03', 'to' => '2026-10-02'],
+            'thisMonth' => ['label' => 'This month', 'from' => '2026-10-01', 'to' => '2026-10-02'],
+            'lastMonth' => ['label' => 'Last month', 'from' => '2026-09-01', 'to' => '2026-09-30'],
+        ], $component->instance()->presetRanges());
+
+        $component->call('setRange', 'lastMonth')
+            ->assertSet('fromDate', '2026-09-01')
+            ->assertSet('toDate', '2026-09-30');
+
+        // The picker gets the same definitions, to show a matching preset as selected.
+        $this->assertStringContainsString('@click="applyPreset(\'lastMonth\')"', $component->html());
+    }
+
+    public function test_last_month_crosses_the_year_boundary_and_ignores_month_length(): void
+    {
+        $this->travelTo('2027-01-31 09:00:00');
+
+        Livewire::actingAs($this->admin())->test(Index::class)
+            ->call('setRange', 'lastMonth')
+            ->assertSet('fromDate', '2026-12-01')
+            ->assertSet('toDate', '2026-12-31');
+
+        $this->travelTo('2026-03-31 09:00:00');
+
+        Livewire::actingAs($this->admin())->test(Index::class)
+            ->call('setRange', 'lastMonth')
+            ->assertSet('fromDate', '2026-02-01')
+            ->assertSet('toDate', '2026-02-28');
+    }
+
+    public function test_the_date_range_picker_writes_the_same_properties_and_url(): void
+    {
+        Livewire::actingAs($this->admin())
+            ->withQueryParams(['from' => '2026-02-01', 'to' => '2026-02-10'])
+            ->test(Index::class)
+            ->assertSet('fromDate', '2026-02-01')
+            ->assertSet('toDate', '2026-02-10')
+            // What datePicker (range mode) sends: both properties, one request.
+            ->set(['fromDate' => '2026-01-28', 'toDate' => '2026-02-03'])
+            ->assertSet('fromDate', '2026-01-28')
+            ->assertSet('toDate', '2026-02-03')
+            ->assertSee('28 Jan – 3 Feb');
+    }
+
+    public function test_the_summary_strip_states_its_range_wide_scope(): void
+    {
+        // Fixed clock: this test's data sits on fixed 2026 dates (see CLAUDE.md, pinned-instant check).
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-04-15 12:00:00'));
+        $component = Livewire::actingAs($this->admin())
+            ->test(Index::class)
+            ->set('fromDate', '2026-09-01')
+            ->set('toDate', '2026-09-29');
+
+        $component->assertSee('1–29 Sep · all statuses');
+
+        // Narrowing the table doesn't narrow the strip, and the label says so.
+        $component->set('employeeFilter', 'someone')
+            ->assertSee('1–29 Sep · all employees, all statuses');
+
+        // One strip treatment: x-stat-card cells, neutral icon tiles.
+        $this->assertSame(3, substr_count($component->html(), 'text-xl font-semibold leading-7 tabular-nums'));
+    }
+
+    public function test_a_range_of_exactly_today_shows_the_live_strip(): void
+    {
+        $admin = $this->admin();
+        [$arrived, $left, $notYet] = Employee::factory()->count(3)->create()->all();
+
+        DailyAttendance::factory()->create(['employee_id' => $arrived->id, 'work_date' => today()->format('Y-m-d'), 'status' => AttendanceStatus::InProgress, 'first_in' => today()->setTime(7, 55)]);
+        DailyAttendance::factory()->create(['employee_id' => $left->id, 'work_date' => today()->format('Y-m-d'), 'status' => AttendanceStatus::Present, 'first_in' => today()->setTime(7, 50), 'last_out' => today()->setTime(15, 0), 'early_leave_minutes' => 120]);
+        DailyAttendance::factory()->create(['employee_id' => $notYet->id, 'work_date' => today()->format('Y-m-d'), 'status' => AttendanceStatus::InProgress]);
+
+        $component = Livewire::actingAs($admin)->test(Index::class);
+
+        $component->assertSeeInOrder(['At work', '1', 'Left', '1', '1 early', 'Not in', '1'])
+            ->assertSee('Today, '.today()->format('D j M').' · so far')
+            ->assertDontSee('Incomplete</dt>', false);
+
+        // Any other range keeps the end-of-day status counts.
+        $component->set('fromDate', today()->subDay()->format('Y-m-d'))
+            ->assertSee('Absent')
+            ->assertDontSee('dark:text-slate-400">Not in</dt>', false);
+    }
+
     public function test_incomplete_badge_and_stat_card_use_violet_not_amber(): void
     {
         $admin = $this->admin();
@@ -383,9 +629,7 @@ class AttendanceIndexTest extends TestCase
 
         $html = Livewire::actingAs($admin)->test(Index::class)->html();
 
-        // bg-amber-50 text-amber-600 legitimately appears elsewhere on this
-        // page (Late's own stat card/badge, even at a zero count), so this
-        // checks the Incomplete badge's own violet classes directly rather
+        // Checks the Incomplete badge's own violet classes directly rather
         // than a broad "no amber anywhere" assertion.
         $this->assertStringContainsString('bg-violet-50 text-violet-700', $html);
     }
@@ -414,18 +658,20 @@ class AttendanceIndexTest extends TestCase
             'early_leave_minutes' => 5,
         ]);
 
-        $html = Livewire::actingAs($admin)->test(Index::class)->html();
+        $html = Livewire::actingAs($admin)->test(Index::class)
+            // A range that isn't exactly today shows end-of-day status counts.
+            ->set('fromDate', today()->subDay()->format('Y-m-d'))
+            ->html();
 
         // A late/early day is already counted in Present, not a peer tile
         // (see CLAUDE.md's "Status vs. timing" note) — the containment is
         // shown as a sub-line, not a fourth "Late" stat card.
-        $this->assertStringContainsString('of which', $html);
         $this->assertStringContainsString('2 late', $html);
-        $this->assertStringContainsString('1 left early', $html);
+        $this->assertStringContainsString('1 early', $html);
         // The exact joined text, not just its pieces — interleaved
         // @if/@endif directives around static text used to leave a stray
         // space where the raw HTML between them collapsed on render.
-        $this->assertStringContainsString('of which 2 late · 1 left early', $html);
+        $this->assertStringContainsString('2 late · 1 early', $html);
     }
 
     public function test_no_breakdown_subtext_when_nothing_is_late_or_early(): void
@@ -442,10 +688,11 @@ class AttendanceIndexTest extends TestCase
 
         $html = Livewire::actingAs($admin)->test(Index::class)->html();
 
-        $this->assertStringNotContainsString('of which', $html);
+        $this->assertStringNotContainsString(' late', $html);
+        $this->assertStringNotContainsString(' early', $html);
     }
 
-    public function test_a_late_arrival_marks_the_in_time_with_a_red_underline_and_a_label(): void
+    public function test_a_late_arrival_is_marked_by_an_amber_late_value_and_a_neutral_in_time(): void
     {
         $admin = $this->admin();
         $employee = Employee::factory()->create();
@@ -462,11 +709,46 @@ class AttendanceIndexTest extends TestCase
 
         $html = Livewire::actingAs($admin)->test(Index::class)->html();
 
-        $this->assertStringContainsString('aria-label="Arrived 12 minutes late"', $html);
-        $this->assertStringNotContainsString('aria-label="Left', $html);
+        // In/Out stay neutral; the timing fact is the amber Late value.
+        $this->assertMatchesRegularExpression('/class="whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums font-medium text-amber-700 dark:text-amber-300">12m</', $html);
+        $this->assertStringNotContainsString('aria-label="Arrived', $html);
+        $this->assertStringNotContainsString('underline decoration-red', $html);
+        // Status-only colour: a late Present row is a green badge.
+        $this->assertStringContainsString('bg-green-50 text-green-700', $html);
+        $this->assertStringNotContainsString('bg-amber-50 text-amber-700', $html);
     }
 
-    public function test_a_present_row_with_an_early_leave_marks_the_out_time(): void
+    public function test_late_and_early_durations_use_the_same_compact_format_as_worked(): void
+    {
+        $admin = $this->admin();
+        $employee = Employee::factory()->create();
+
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => today()->format('Y-m-d'),
+            'status' => AttendanceStatus::Present,
+            'first_in' => today()->setTime(9, 20),
+            'last_out' => today()->setTime(16, 39),
+            'worked_minutes' => 379,
+            'late_minutes' => 80,
+            'early_leave_minutes' => 21,
+        ]);
+
+        $html = Livewire::actingAs($admin)->test(Index::class)
+            // A range that isn't exactly today shows end-of-day status counts.
+            ->set('fromDate', today()->subDay()->format('Y-m-d'))
+            ->html();
+
+        $this->assertStringContainsString('>1h 20m<', $html);
+        $this->assertStringContainsString('>21m<', $html);
+        $this->assertStringContainsString('>6h 19m<', $html);
+        $this->assertStringNotContainsString('>80m<', $html);
+        // The Present tile's subtext is a COUNT of timing days, not a
+        // duration, and keeps its "N late · N early" wording.
+        $this->assertStringContainsString('1 late · 1 early', $html);
+    }
+
+    public function test_a_present_row_with_an_early_leave_marks_the_early_value(): void
     {
         $admin = $this->admin();
         $employee = Employee::factory()->create();
@@ -483,9 +765,9 @@ class AttendanceIndexTest extends TestCase
 
         $html = Livewire::actingAs($admin)->test(Index::class)->html();
 
-        $this->assertStringContainsString('aria-label="Left 4 minutes early"', $html);
+        $this->assertMatchesRegularExpression('/class="whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums font-medium text-amber-700 dark:text-amber-300">4m</', $html);
         // The Status badge stays "Present" — status doesn't change, only the
-        // specific Out time is marked (see CLAUDE.md's "Marked times" note).
+        // Early value is marked (docs/ATTENDANCE_UI.md).
         $this->assertStringContainsString('Present', $html);
         // No separate "Early 4m" chip beside the badge — the marked time and
         // the numeric Early leave column already show this.
@@ -624,5 +906,48 @@ class AttendanceIndexTest extends TestCase
         $this->assertSame(2, $lateFiltered->total());
         $this->assertSame(2, $summary['early']);
         $this->assertSame(2, $earlyFiltered->total());
+    }
+
+    public function test_the_late_filter_includes_in_progress_and_incomplete_late_rows_but_the_present_breakdown_does_not(): void
+    {
+        $admin = $this->admin();
+        $date = today()->subDay()->format('Y-m-d');
+        $make = fn (AttendanceStatus $status, int $late) => DailyAttendance::factory()->create([
+            'employee_id' => Employee::factory()->create()->id,
+            'work_date' => $date,
+            'status' => $status,
+            'first_in' => today()->subDay()->setTime(8, 0)->addMinutes($late),
+            'late_minutes' => $late,
+        ]);
+        $make(AttendanceStatus::Present, 20);
+        $make(AttendanceStatus::Incomplete, 35);
+        $make(AttendanceStatus::Present, 0);
+
+        $component = Livewire::actingAs($admin)->test(Index::class)
+            ->set('fromDate', $date)->set('toDate', $date);
+
+        // The Present sub-line is a breakdown of Present: only the present late day.
+        $this->assertSame(1, $component->instance()->render()->getData()['summary']['late']);
+        // ...and the late incomplete day annotates its own group, Incomplete.
+        $this->assertSame(1, $component->instance()->render()->getData()['summary']['incomplete_late']);
+        $this->assertMatchesRegularExpression('/>Incomplete<\/dt>.*?>1<\/dd>.*?>\s*1 late\s*<\/dd>/s', $component->html());
+
+        // The filter returns late rows of every status, and the Late column
+        // shows the incomplete day's minutes in amber.
+        $filtered = $component->set('timingFilters', ['late']);
+        $this->assertSame(2, $filtered->instance()->render()->getData()['attendances']->total());
+        $this->assertStringContainsString('font-medium text-amber-700 dark:text-amber-300">35m<', $filtered->html());
+    }
+
+    public function test_a_filter_chip_is_the_same_size_selected_or_not(): void
+    {
+        $view = file_get_contents(resource_path('views/livewire/attendance/index.blade.php'));
+
+        // Fixed height; unselected padding = selected padding + the check's 14px + 6px gap.
+        $this->assertStringContainsString("\$chipBase = 'inline-flex h-7 ", $view);
+        $this->assertStringContainsString("\$chipSelected = 'px-3 ", $view);
+        $this->assertStringContainsString("\$chipUnselected = 'px-[1.375rem] ", $view);
+        // The label reserves its semibold width.
+        $this->assertStringContainsString('invisible [grid-area:1/1] font-semibold', $view);
     }
 }

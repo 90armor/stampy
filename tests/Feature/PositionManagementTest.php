@@ -42,6 +42,24 @@ class PositionManagementTest extends TestCase
         $this->assertDatabaseHas('positions', ['name' => 'Human Resources Manager']);
     }
 
+    public function test_position_workspace_content_and_actions_are_accessible(): void
+    {
+        $admin = User::factory()->create()->assignRole('admin');
+        Position::factory()->create(['name' => 'Customer Success Lead']);
+
+        $component = Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->assertSee('Manage the organization-wide job titles assigned to employees.')
+            ->assertSee('aria-label="Positions"', false)
+            ->assertSee('aria-label="Edit Customer Success Lead position"', false)
+            ->assertSee('aria-label="Delete Customer Success Lead position"', false)
+            ->assertSee('role="tooltip"', false);
+
+        $component->call('create')
+            ->assertSee('wire:loading.attr="disabled"', false)
+            ->assertSee('Saving&hellip;', false);
+    }
+
     public function test_admin_can_edit_a_position(): void
     {
         $admin = User::factory()->create()->assignRole('admin');

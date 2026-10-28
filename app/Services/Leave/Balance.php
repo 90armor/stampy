@@ -1,0 +1,66 @@
+<?php
+
+namespace App\Services\Leave;
+
+use App\Models\LeaveType;
+use Carbon\CarbonImmutable;
+
+/**
+ * One leave type's balance for one employee and year (LeaveBalance). Every
+ * amount is integer tenths of a day (LeaveDays).
+ *
+ * available = entitled + carriedIn + adjustments − used − pending. For an
+ * earned type (Time off in lieu) entitled is what overtime earned — the
+ * system-posted adjustments — and adjustments only an admin's corrections. used and
+ * pending include leaves of types that deduct from this one (Special from
+ * Annual); usedByType/pendingByType break both down by the leave's own type.
+ * Usage consumes the carry first (FIFO): usedFromCarry + usedFromGrant = used.
+ * usableFrom is set while the type isn't usable yet (the eligibility date);
+ * earnedToLastDay only in a leaver's last year, and availableAtLastDay() from
+ * it. A type with no
+ * balance (hasBalance false) carries only used and pending — its days taken
+ * and waiting; available() means nothing for it.
+ */
+final readonly class Balance
+{
+    /**
+     * @param  array<string, int>  $usedByType
+     * @param  array<string, int>  $pendingByType
+     */
+    public function __construct(
+        public LeaveType $type,
+        public int $year,
+        public bool $hasBalance,
+        public int $entitled = 0,
+        public int $carriedIn = 0,
+        public int $adjustments = 0,
+        public int $used = 0,
+        public int $pending = 0,
+        public int $usedFromCarry = 0,
+        public int $usedFromGrant = 0,
+        public array $usedByType = [],
+        public array $pendingByType = [],
+        public ?CarbonImmutable $usableFrom = null,
+        public ?int $earnedToLastDay = null,
+    ) {}
+
+    public function available(): int
+    {
+        return $this->entitled + $this->carriedIn + $this->adjustments - $this->used - $this->pending;
+    }
+
+    /**
+     * A leaver's last year: what they have available at their last day —
+     * the year's grant pro-rated to it (earnedToLastDay) in place of the
+     * full-year grant, with the same carry-over, adjustments, use and
+     * pending. The figure untaken leave is read from when someone leaves
+     * (docs/HR_DECISIONS.md, 28); null for anyone else, or a type with no
+     * yearly grant (Time off in lieu has nothing to pro-rate). A leaver who
+     * left before their type was usable gets what they earned to that day.
+     */
+    public function availableAtLastDay(): ?int
+    {
+        return $this->earnedToLastDay === null ? null
+            : $this->carriedIn + $this->earnedToLastDay + $this->adjustments - $this->used - $this->pending;
+    }
+}

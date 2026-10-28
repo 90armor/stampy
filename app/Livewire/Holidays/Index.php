@@ -65,7 +65,7 @@ class Index extends Component
         $this->validate([
             'date' => ['required', 'date'],
             'name' => ['required', 'string', 'max:255'],
-            'note' => ['nullable', 'string', 'max:1000'],
+            'note' => ['nullable', 'string', 'max:255'],
         ]);
 
         // A plain 'unique' rule would surface as "The date has already been
@@ -121,7 +121,8 @@ class Index extends Component
     }
 
     /**
-     * Rebuilds one date for every active employee — adding, editing or
+     * Rebuilds one date for every employee active on it
+     * (Employee::scopeActiveOn()) — adding, editing or
      * deleting a holiday changes how that date's punches (or lack of them)
      * are interpreted, for everyone, not just whoever happens to view their
      * own attendance page next.
@@ -140,9 +141,13 @@ class Index extends Component
         $builder = app(DailySummaryBuilder::class);
         $day = Carbon::parse($date);
 
+        // buildDates(): a holiday changes overtime categories, so credited time
+        // off in lieu too (Phase 4b) — reconciled per employee, reported once.
         Employee::query()
-            ->where('status', 'active')
-            ->each(fn (Employee $employee) => $builder->build($employee, $day));
+            ->activeOn($day)
+            ->each(fn (Employee $employee) => $builder->buildDates($employee, $day, $day));
+
+        $builder->reportToil();
     }
 
     public function render()

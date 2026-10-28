@@ -38,30 +38,21 @@ class Index extends Component
         $this->resetPage();
     }
 
+    public function resetFilters(): void
+    {
+        $this->reset(['search', 'departmentFilter', 'statusFilter']);
+        $this->resetPage();
+    }
+
     public function mount(): void
     {
         $this->authorize('viewAny', Employee::class);
     }
 
-    public function deactivate(Employee $employee): void
-    {
-        $this->authorize('deactivate', $employee);
-
-        // Status change only — the record (and its attendance history, once
-        // that exists) is preserved. Never soft- or hard-delete here.
-        $employee->update(['status' => 'inactive']);
-    }
-
-    public function reactivate(Employee $employee): void
-    {
-        $this->authorize('update', $employee);
-
-        $employee->update(['status' => 'active']);
-    }
-
     /**
-     * The create/edit form lives in the sibling FormModal component; this is
-     * just here so saving there re-renders this list with the fresh data.
+     * The create/edit form (FormModal) and deactivate/reactivate
+     * (StatusModal) live in sibling components; this is just here so saving
+     * there re-renders this list with the fresh data.
      */
     #[On('employee-saved')]
     public function refreshEmployees(): void
@@ -97,6 +88,7 @@ class Index extends Component
                 ->get(),
             'hasAnyEmployees' => $visible()->exists(),
             'scopeHasNoEmployeeRecord' => $scope->hasNoEmployeeRecord,
+            'filtersActive' => $this->search !== '' || $this->departmentFilter !== '' || $this->statusFilter !== '',
             'stats' => [
                 'total_employees' => $visible()->count(),
                 'active_employees' => $visible()->where('status', 'active')->count(),

@@ -6,8 +6,11 @@ use App\Enums\AttendanceStatus;
 use App\Models\DailyAttendance;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Support\DashboardAttendance;
 use App\Support\EmployeeScope;
+use App\Support\WorkdayCalendar;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -57,6 +60,22 @@ class Index extends Component
      */
     #[Url(as: 'timing', history: true)]
     public array $timingFilters = [];
+
+    /**
+     * Only days worked on approved leave (DailyAttendance::workedOnLeave()) —
+     * how an admin finds past cases, now that the dashboard's Needs attention
+     * lists only today's (Phase 3e). Neither a status nor timing: its own
+     * filter.
+     */
+    #[Url(as: 'worked-on-leave', history: true)]
+    public bool $workedOnLeave = false;
+
+    /**
+     * Only days with credited overtime (Phase 4d) — an annotation, so its own
+     * filter, like Worked on leave.
+     */
+    #[Url(as: 'overtime', history: true)]
+    public bool $overtime = false;
 
     public function mount(): void
     {
@@ -112,14 +131,58 @@ class Index extends Component
         $this->resetPage();
     }
 
+    /**
+     * The status chips narrow; they don't enumerate. The stored $statuses set
+     * (and the query and URL built from it) is unchanged — the default is
+     * still every status except Off — but the chips present it so that the
+     * default reads as "no filter applied":
+     *
+     * - The working-status chips (everything but Off) show as unselected
+     *   while ALL of them are in the set. Clicking one from there narrows the
+     *   set to just that status; clicking further chips adds or removes
+     *   them; removing the last one returns to "all working statuses".
+     * - Off is a separate "Show off days" toggle that adds or removes 'off'
+     *   independently of the working-status selection.
+     */
     public function toggleStatus(string $status): void
     {
-        if (in_array($status, $this->statuses, true)) {
-            $this->statuses = array_values(array_diff($this->statuses, [$status]));
+        $off = AttendanceStatus::Off->value;
+        $includesOff = in_array($off, $this->statuses, true);
+
+        if ($status === $off) {
+            $includesOff = ! $includesOff;
+            $working = array_values(array_diff($this->statuses, [$off]));
         } else {
-            $this->statuses[] = $status;
+            $allWorking = $this->defaultStatuses();
+            $working = array_values(array_intersect($this->statuses, $allWorking));
+
+            if (count($working) === count($allWorking)) {
+                $working = [$status];
+            } elseif (in_array($status, $working, true)) {
+                $working = array_values(array_diff($working, [$status]));
+            } else {
+                $working[] = $status;
+            }
+
+            if ($working === []) {
+                $working = $allWorking;
+            }
         }
 
+        $this->statuses = $includesOff ? [...$working, $off] : $working;
+
+        $this->resetPage();
+    }
+
+    public function toggleWorkedOnLeave(): void
+    {
+        $this->workedOnLeave = ! $this->workedOnLeave;
+        $this->resetPage();
+    }
+
+    public function toggleOvertime(): void
+    {
+        $this->overtime = ! $this->overtime;
         $this->resetPage();
     }
 
@@ -134,21 +197,41 @@ class Index extends Component
         $this->resetPage();
     }
 
-    public function setRange(string $preset): void
+    /**
+     * The date picker's quick ranges, in display order: label and the
+     * from/to dates (Y-m-d) each one sets. One definition for setRange() and
+     * for the picker, which shows a preset as selected while the applied or
+     * pending range equals it.
+     *
+     * @return array<string, array{label: string, from: string, to: string}>
+     */
+    public function presetRanges(): array
     {
         $today = today();
+        $lastMonth = $today->copy()->startOfMonth()->subMonthNoOverflow();
 
-        [$from, $to] = match ($preset) {
-            'today' => [$today, $today],
-            'yesterday' => [$today->copy()->subDay(), $today->copy()->subDay()],
-            'last7' => [$today->copy()->subDays(6), $today],
-            'last30' => [$today->copy()->subDays(29), $today],
-            'thisMonth' => [$today->copy()->startOfMonth(), $today],
-            default => [$today, $today],
-        };
+        $ranges = [
+            'today' => ['Today', $today, $today],
+            'yesterday' => ['Yesterday', $today->copy()->subDay(), $today->copy()->subDay()],
+            'last7' => ['Last 7 days', $today->copy()->subDays(6), $today],
+            'last30' => ['Last 30 days', $today->copy()->subDays(29), $today],
+            'thisMonth' => ['This month', $today->copy()->startOfMonth(), $today],
+            'lastMonth' => ['Last month', $lastMonth, $lastMonth->copy()->endOfMonth()],
+        ];
 
-        $this->fromDate = $from->format('Y-m-d');
-        $this->toDate = $to->format('Y-m-d');
+        return array_map(fn (array $range) => [
+            'label' => $range[0],
+            'from' => $range[1]->format('Y-m-d'),
+            'to' => $range[2]->format('Y-m-d'),
+        ], $ranges);
+    }
+
+    public function setRange(string $preset): void
+    {
+        $range = $this->presetRanges()[$preset] ?? $this->presetRanges()['today'];
+
+        $this->fromDate = $range['from'];
+        $this->toDate = $range['to'];
 
         // Setting these properties directly (not via wire:model) doesn't
         // trigger updatingFromDate()/updatingToDate(), so reset explicitly.
@@ -163,6 +246,8 @@ class Index extends Component
         $this->departmentFilter = '';
         $this->statuses = $this->defaultStatuses();
         $this->timingFilters = [];
+        $this->workedOnLeave = false;
+        $this->overtime = false;
         $this->resetPage();
     }
 
@@ -242,7 +327,37 @@ class Index extends Component
                         $query->orWhere('daily_attendances.early_leave_minutes', '>', 0);
                     }
                 })
+            )
+            ->when(
+                $this->workedOnLeave,
+                fn (Builder $query) => $query->whereIn('daily_attendances.id', $this->workedOnLeaveIds())
+            )
+            ->when(
+                $this->overtime,
+                fn (Builder $query) => $query->whereRaw('(daily_attendances.overtime_workday_minutes + daily_attendances.overtime_night_minutes + daily_attendances.overtime_rest_day_minutes + daily_attendances.overtime_holiday_minutes) > 0')
             );
+    }
+
+    /**
+     * The rows in range (and scope) that were worked on approved leave,
+     * decided by DailyAttendance::workedOnLeave() itself rather than a
+     * second definition in SQL. SQL only narrows to the candidates — a row
+     * with a leave and a punch — which are few.
+     *
+     * @return list<int>
+     */
+    private function workedOnLeaveIds(): array
+    {
+        $candidates = DailyAttendance::query()
+            ->whereBetween('work_date', [$this->fromDate, $this->toDate])
+            ->when($this->scopedEmployeeIds() !== null, fn (Builder $query) => $query->whereIn('employee_id', $this->scopedEmployeeIds() ?? []))
+            ->whereNotNull('leave_id')
+            ->where(fn (Builder $query) => $query->whereNotNull('first_in')->orWhereNotNull('last_out'))
+            ->with('workSchedule')
+            ->get();
+        DailyAttendance::withLeaveDays($candidates);
+
+        return $candidates->filter(fn (DailyAttendance $row) => $row->workedOnLeave())->pluck('id')->values()->all();
     }
 
     /**
@@ -298,11 +413,16 @@ class Index extends Component
         // counted in 'present' above — these two are a breakdown of it, not
         // additional rows — which is why the view renders them as a
         // sub-line under the Present tile rather than as peer tiles (see
-        // CLAUDE.md's "Status vs. timing" note). This must stay in sync
-        // with what the list's timing filter itself returns — covered by a
-        // test asserting the two agree.
-        $lateCount = (clone $query)->where('late_minutes', '>', 0)->count();
+        // CLAUDE.md's "Status vs. timing" note). Since Phase 2.6 late can
+        // also sit on in_progress and incomplete rows, so the late count is
+        // restricted to Present rows to stay a breakdown OF Present; the
+        // "Late arrival" filter itself returns late rows of every status.
+        // For Present rows the two agree — covered by a test.
+        $lateCount = (clone $query)->where('status', AttendanceStatus::Present->value)->where('late_minutes', '>', 0)->count();
         $earlyCount = (clone $query)->where('early_leave_minutes', '>', 0)->count();
+        // Late annotates its own status group: incomplete days with a late
+        // in-punch are counted under Incomplete, not folded into Present.
+        $incompleteLateCount = (clone $query)->where('status', AttendanceStatus::Incomplete->value)->where('late_minutes', '>', 0)->count();
 
         return collect([
             'present' => $counts->get(AttendanceStatus::Present->value, 0),
@@ -310,6 +430,7 @@ class Index extends Component
             'early' => $earlyCount,
             'absent' => $counts->get(AttendanceStatus::Absent->value, 0),
             'incomplete' => $counts->get(AttendanceStatus::Incomplete->value, 0),
+            'incomplete_late' => $incompleteLateCount,
         ]);
     }
 
@@ -319,10 +440,12 @@ class Index extends Component
 
         $attendances = $this->baseQuery()
             ->select('daily_attendances.*')
-            ->with(['employee.department'])
+            ->with(['employee.department', 'workSchedule'])
             ->orderBy('daily_attendances.work_date', 'desc')
             ->orderBy('employees.full_name')
             ->paginate(self::PER_PAGE);
+        // The page's leave annotations read leaveDay(): one query for the page.
+        DailyAttendance::withLeaveDays($attendances->getCollection());
 
         $summary = $this->summary();
 
@@ -338,8 +461,16 @@ class Index extends Component
             'attendances' => $attendances,
             'departments' => $departments,
             'summary' => $summary,
+            // A range of exactly today shows the live "who is here now"
+            // strip instead of end-of-day status counts.
+            'live' => $this->fromDate === $this->toDate && $this->fromDate === today()->format('Y-m-d')
+                ? DashboardAttendance::liveToday($this->scopedEmployeeIds())
+                : null,
             'maxBuiltDate' => DailyAttendance::max('work_date'),
             'allStatuses' => AttendanceStatus::cases(),
+            // Holiday names for the annotation, from the builder's own lookup.
+            'holidays' => WorkdayCalendar::holidayNamesBetween(Carbon::parse($this->fromDate), Carbon::parse($this->toDate)),
+            'presetRanges' => $this->presetRanges(),
             'scopeHasNoEmployeeRecord' => $this->scope()->hasNoEmployeeRecord,
         ])->layout('layouts.app', ['header' => 'Attendance']);
     }

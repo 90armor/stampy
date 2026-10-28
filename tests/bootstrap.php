@@ -13,3 +13,11 @@ foreach (['DB_CONNECTION', 'DB_HOST', 'DB_PORT', 'DB_DATABASE', 'DB_URL'] as $ke
 }
 
 require __DIR__.'/../vendor/autoload.php';
+
+// A pinned run says so, once, before any test: Tests\TestCase::setUp() moves
+// every test's clock to PIN_NOW (scripts/pinned-instants.sh), so a stray
+// PIN_NOW in a shell or CI would otherwise pin a whole run silently. An
+// unpinned run prints nothing.
+if (($pin = getenv('PIN_NOW')) !== false && $pin !== '') {
+    fwrite(STDERR, "Clock pinned: every test starts at {$pin} (PIN_NOW).".PHP_EOL);
+}

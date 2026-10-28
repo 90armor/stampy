@@ -41,6 +41,10 @@ php artisan boost:install
 
 Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
 
+## Going live
+
+Before real use, follow **[docs/GO_LIVE.md](docs/GO_LIVE.md)**: the production seed (never plain `db:seed`, which builds the demo system), the first admin, the organization and leave policy, opening balances, and the scheduler.
+
 ## Docker
 
 A Docker Compose setup is included for local development, as an alternative to the native PHP/MySQL/Node setup described in `CLAUDE.md`.

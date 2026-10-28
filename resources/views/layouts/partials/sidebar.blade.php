@@ -3,19 +3,25 @@ $navItems = [
     ['label' => 'Dashboard', 'route' => 'dashboard', 'icon' => 'home', 'visible' => true, 'enabled' => true],
     ['label' => 'Employees', 'route' => 'employees.index', 'icon' => 'users', 'visible' => auth()->user()->hasAnyRole(['admin', 'manager']), 'enabled' => true],
     ['label' => 'Organization', 'route' => 'organization.index', 'icon' => 'building-office', 'visible' => auth()->user()->hasRole('admin'), 'enabled' => true],
+    // Policy, not structure (Phase 3e). Its own ability (Phase 5a): any Policies tab the user may see.
+    ['label' => 'Policies', 'route' => 'policies.index', 'icon' => 'scale', 'visible' => auth()->user()->can('policies.view'), 'enabled' => true],
     // 'Attendance' and 'My attendance' share the 'attendance.' route-name
     // prefix but must not both light up together, so each gets an explicit
     // pattern instead of the derived 'prefix.*' every other item uses.
     ['label' => 'Attendance', 'route' => 'attendance.index', 'icon' => 'clock', 'visible' => auth()->user()->hasAnyRole(['admin', 'manager']), 'enabled' => true, 'activePatterns' => ['attendance.index', 'attendance.show']],
     ['label' => 'My attendance', 'route' => 'attendance.mine', 'icon' => 'user-circle', 'visible' => true, 'enabled' => true, 'activePatterns' => ['attendance.mine']],
-    ['label' => 'Time off', 'icon' => 'calendar-days', 'visible' => true, 'enabled' => false],
-    ['label' => 'Reports', 'icon' => 'document-text', 'visible' => auth()->user()->hasAnyRole(['admin', 'manager']), 'enabled' => false],
+    // Gated by the ability each page itself checks, never a role list (CLAUDE.md, Roles & authorization).
+    ['label' => 'Time off', 'route' => 'time-off.index', 'icon' => 'calendar-days', 'visible' => auth()->user()->can('timeOff', \App\Models\Leave::class), 'enabled' => true, 'activePatterns' => ['time-off.*']],
+    ['label' => 'Overtime', 'route' => 'overtime.index', 'icon' => 'bolt', 'visible' => auth()->user()->can('viewAny', \App\Models\OvertimeRequest::class), 'enabled' => true, 'activePatterns' => ['overtime.*']],
+    ['label' => 'Approvals', 'route' => 'approvals.index', 'icon' => 'inbox', 'visible' => auth()->user()->can('decideAny', \App\Models\Leave::class), 'enabled' => true, 'activePatterns' => ['approvals.*'], 'badge' => \App\Support\ApprovalBadge::count(auth()->user())],
+    // Reports (Phase 5b): whoever may see any of its tabs (the reports.view gate, ReportPolicy).
+    ['label' => 'Reports', 'route' => 'reports.index', 'icon' => 'document-text', 'visible' => auth()->user()->can('reports.view'), 'enabled' => true, 'activePatterns' => ['reports.*']],
 ];
 @endphp
 
-<div class="flex h-full w-[242px] flex-col bg-white/70 backdrop-blur-xl border-r border-slate-200/60 dark:bg-slate-900/60 dark:border-slate-800/70">
+<div class="flex h-full w-[242px] flex-col bg-white/70 backdrop-blur-xl border-r border-slate-border dark:bg-slate-800/60">
     <div class="flex h-16 shrink-0 items-center px-6">
-        <a href="{{ route('dashboard') }}" wire:navigate class="flex items-center gap-2.5">
+        <a href="{{ route('dashboard') }}" wire:navigate class="flex items-center gap-2.5 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
             <x-logo size="28" />
             <span class="text-xl font-medium text-slate-900 dark:text-slate-100">Stampy</span>
         </a>
@@ -25,7 +31,7 @@ $navItems = [
         @foreach ($navItems as $item)
             @continue(! $item['visible'])
             @if ($item['label'] === 'Attendance')
-                <div class="my-2 border-t border-slate-200/70 dark:border-slate-800/70"></div>
+                <div class="my-2 border-t border-slate-divider"></div>
             @endif
             @if ($item['enabled'])
                 {{-- Match on the route-name prefix (e.g. 'employees*'), not the exact
@@ -36,23 +42,31 @@ $navItems = [
                 <a
                     href="{{ route($item['route']) }}"
                     wire:navigate
-                    class="group relative flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm transition
-                        {{ $active ? 'bg-primary-100/80 font-semibold text-primary-700 dark:bg-primary-900/50 dark:text-primary-300' : 'font-medium text-slate-500 hover:bg-slate-100/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-white' }}"
+                    class="group relative flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500
+                        {{ $active ? 'bg-primary-100/80 font-semibold text-primary-700 dark:bg-primary-900/50 dark:text-primary-300' : 'font-medium text-slate-500 hover:bg-slate-100/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-750/60 dark:hover:text-white' }}"
                 >
                     @if ($active)
                         <span class="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-primary-600 dark:bg-primary-400"></span>
                     @endif
                     <x-icon :name="$item['icon']" class="w-5 h-5 shrink-0 {{ $active ? 'text-primary-700 dark:text-primary-300' : 'text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200' }}" />
                     {{ $item['label'] }}
+                    @if (($item['badge'] ?? 0) > 0)
+                        <span class="ml-auto rounded-md bg-primary-600 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-white dark:bg-primary-500" aria-label="{{ $item['badge'] }} waiting">{{ $item['badge'] }}</span>
+                    @endif
                 </a>
             @else
+                {{-- Not built yet: no link, no hover, a fainter icon and the "Soon"
+                badge say it's inactive; the label and badge still use the readable
+                muted colours (docs/DESIGN_SYSTEM.md, Muted text rule). --}}
                 <div
-                    class="flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-400 dark:text-slate-600 cursor-not-allowed"
+                    role="link"
+                    aria-disabled="true"
+                    class="flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-500 dark:text-slate-400 cursor-not-allowed"
                     title="Coming in a later phase"
                 >
-                    <x-icon :name="$item['icon']" class="w-5 h-5 shrink-0 text-slate-400 dark:text-slate-600" />
+                    <x-icon :name="$item['icon']" class="w-5 h-5 shrink-0 text-slate-300 dark:text-slate-600" />
                     {{ $item['label'] }}
-                    <span class="ml-auto rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">Soon</span>
+                    <span class="ml-auto rounded-md bg-slate-100 dark:bg-slate-750 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">Soon</span>
                 </div>
             @endif
         @endforeach

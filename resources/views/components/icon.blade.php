@@ -38,11 +38,17 @@ $paths = match ($name) {
     // A flat dash has zero shape overlap with every other status icon.
     'minus' => 'M5 12h14',
     'flag' => 'M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.109.732a9 9 0 0 1-6.086-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5',
+    'scale' => 'M12 3v17.25m0 0c-1.472 0-2.882.265-4.185.75M12 20.25c1.472 0 2.882.265 4.185.75M18.75 4.97A48.416 48.416 0 0 0 12 4.5c-2.291 0-4.545.16-6.75.47m13.5 0c1.01.143 2.01.317 3 .52m-3-.52 2.62 10.726c.122.499-.106 1.028-.589 1.202a5.988 5.988 0 0 1-2.031.352 5.988 5.988 0 0 1-2.031-.352c-.483-.174-.711-.703-.59-1.202L18.75 4.971Zm-16.5.52c.99-.203 1.99-.377 3-.52m0 0 2.62 10.726c.122.499-.106 1.028-.589 1.202a5.989 5.989 0 0 1-2.031.352 5.989 5.989 0 0 1-2.031-.352c-.483-.174-.711-.703-.59-1.202L5.25 4.971Z',
     'lock-closed' => 'M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z',
     default => '',
 };
+
+// 20px only when the caller sets no size of its own. Merging 'w-5 h-5' in
+// front of a caller's 'h-4 w-4' kept both classes, and Tailwind emits h-5
+// after h-4, so every smaller icon rendered at 20px.
+$sized = preg_match('/(?:^|\s)(?:w|h|size)-/', (string) $attributes->get('class'));
 @endphp
 
-<svg {{ $attributes->merge(['class' => 'w-5 h-5']) }} fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
+<svg {{ $attributes->merge(['class' => $sized ? '' : 'w-5 h-5']) }} fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
     <path stroke-linecap="round" stroke-linejoin="round" d="{{ $paths }}" />
 </svg>

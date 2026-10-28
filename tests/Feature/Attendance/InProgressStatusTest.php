@@ -110,8 +110,10 @@ class InProgressStatusTest extends TestCase
         $this->assertSame(AttendanceStatus::InProgress, $row->status);
     }
 
-    public function test_today_in_punch_only_after_end_time_is_incomplete(): void
+    public function test_today_in_punch_only_after_end_time_stays_in_progress(): void
     {
+        // Phase 2.7: an in-only day stays open until its pairing window
+        // closes, not at the schedule's end (see DayCloseTest).
         Carbon::setTestNow(Carbon::parse(self::TODAY.' 18:00:00'));
 
         $employee = $this->employee();
@@ -123,7 +125,7 @@ class InProgressStatusTest extends TestCase
 
         $row = app(DailySummaryBuilder::class)->build($employee, Carbon::parse(self::TODAY));
 
-        $this->assertSame(AttendanceStatus::Incomplete, $row->status);
+        $this->assertSame(AttendanceStatus::InProgress, $row->status);
     }
 
     public function test_a_past_date_with_no_punches_is_absent_never_in_progress(): void

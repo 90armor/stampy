@@ -8,6 +8,8 @@ use App\Models\DailyAttendance;
 use App\Models\Employee;
 use App\Models\User;
 use App\Models\WorkSchedule;
+use App\Support\WorkdayCalendar;
+use Carbon\Carbon;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -212,7 +214,7 @@ class AttendanceShowTest extends TestCase
         $employee = Employee::factory()->create();
         $month = today()->startOfMonth();
 
-        // Only the first day of the month has been calculated; every other
+        // Only the month's first workday has been calculated; every other
         // day in the month must show as "Not calculated", not "Absent" —
         // asserted via the summary counts (workdays/absent stay at what the
         // one real row contributes) rather than a page-wide assertDontSee,
@@ -220,7 +222,7 @@ class AttendanceShowTest extends TestCase
         // printed (with a 0 count) regardless of whether any day has it.
         DailyAttendance::factory()->create([
             'employee_id' => $employee->id,
-            'work_date' => $month->format('Y-m-d'),
+            'work_date' => $this->firstWorkdays($employee, $month, 1)[0],
             'status' => AttendanceStatus::Present,
         ]);
 
@@ -251,12 +253,12 @@ class AttendanceShowTest extends TestCase
             ['status' => AttendanceStatus::Absent, 'late_minutes' => 0],
         ];
 
-        foreach ($rows as $i => $row) {
+        foreach ($this->firstWorkdays($employee, $month, count($rows)) as $i => $date) {
             DailyAttendance::factory()->create([
                 'employee_id' => $employee->id,
-                'work_date' => $month->copy()->addDays($i)->format('Y-m-d'),
-                'status' => $row['status'],
-                'late_minutes' => $row['late_minutes'],
+                'work_date' => $date,
+                'status' => $rows[$i]['status'],
+                'late_minutes' => $rows[$i]['late_minutes'],
             ]);
         }
 
@@ -283,15 +285,16 @@ class AttendanceShowTest extends TestCase
         $month = today()->startOfMonth();
         $employee = Employee::factory()->create();
 
+        [$first, $second] = $this->firstWorkdays($employee, $month, 2);
         DailyAttendance::factory()->create([
             'employee_id' => $employee->id,
-            'work_date' => $month->format('Y-m-d'),
+            'work_date' => $first,
             'status' => AttendanceStatus::Present,
             'late_minutes' => 12,
         ]);
         DailyAttendance::factory()->create([
             'employee_id' => $employee->id,
-            'work_date' => $month->copy()->addDay()->format('Y-m-d'),
+            'work_date' => $second,
             'status' => AttendanceStatus::Present,
             'early_leave_minutes' => 9,
         ]);
@@ -303,5 +306,25 @@ class AttendanceShowTest extends TestCase
 
         $this->assertStringContainsString('(of which 1 late · 1 left early)', $html);
         $this->assertStringNotContainsString('left early )', $html);
+    }
+
+    /**
+     * The month's first $count workdays ('Y-m-d'). Since Phase 5b a present
+     * day on a day off is a day off worked, not one of the summary's
+     * workdays, so rows these tests count go on workdays — a fixed day of
+     * the month falls on a weekend at some instants.
+     *
+     * @return list<string>
+     */
+    private function firstWorkdays(Employee $employee, Carbon $month, int $count): array
+    {
+        $dates = [];
+        for ($date = $month->copy(); count($dates) < $count; $date->addDay()) {
+            if (WorkdayCalendar::isWorkday($employee, $date)) {
+                $dates[] = $date->format('Y-m-d');
+            }
+        }
+
+        return $dates;
     }
 }

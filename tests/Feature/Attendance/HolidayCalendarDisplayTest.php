@@ -96,7 +96,7 @@ class HolidayCalendarDisplayTest extends TestCase
             ->set('month', self::MONTH);
 
         $component->assertSee('Company Anniversary');
-        $component->assertSee('March 1, 2026, Off, Holiday: Company Anniversary');
+        $component->assertSee('Sunday, 1 March 2026, Off, Holiday: Company Anniversary');
     }
 
     public function test_a_worked_holiday_shows_the_name_with_the_present_colour(): void
@@ -117,7 +117,46 @@ class HolidayCalendarDisplayTest extends TestCase
             ->html();
 
         $this->assertStringContainsString('Test Holiday', $html);
-        $this->assertStringContainsString('bg-green-50 dark:bg-green-900/20', $html);
+        // A worked holiday is Present: the neutral cell surface with the green
+        // day number and check (fill is reserved for exceptions).
+        $this->assertStringContainsString('bg-white dark:bg-slate-800 ring-slate-divider', $html);
+        $this->assertStringContainsString('text-green-700 dark:text-green-400', $html);
+    }
+
+    public function test_the_holiday_name_is_muted_in_the_cell_and_the_day_modal_whatever_the_status(): void
+    {
+        // Phase 5a: a fuchsia name on a worked holiday's Present cell read as
+        // a second status. The name is muted on both kinds of day; only a
+        // Holiday-status day keeps the fuchsia fill.
+        foreach ([AttendanceStatus::Holiday, AttendanceStatus::Present] as $status) {
+            $employee = Employee::factory()->create();
+            Holiday::factory()->create(['date' => '2026-03-02', 'name' => 'Test Holiday']);
+            DailyAttendance::factory()->create([
+                'employee_id' => $employee->id,
+                'work_date' => '2026-03-02',
+                'status' => $status,
+                'late_minutes' => 0,
+                'early_leave_minutes' => 0,
+            ]);
+
+            $html = Livewire::actingAs($this->admin())
+                ->test(Show::class, ['employee' => $employee])
+                ->set('month', self::MONTH)
+                ->call('openDay', '2026-03-02')
+                ->html();
+
+            $this->assertStringContainsString('leading-tight text-slate-600 dark:text-slate-400 sm:block" title="Test Holiday"', $html, $status->value);
+            $this->assertMatchesRegularExpression('/<p class="mt-0\.5 flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">\s*<svg[^>]*>.*?<\/svg>\s*Test Holiday/s', $html, $status->value);
+            $this->assertStringNotContainsString('text-fuchsia-700 dark:text-fuchsia-300 sm:block', $html, $status->value);
+            $this->assertStringNotContainsString('font-medium text-fuchsia-700', $html, $status->value);
+            $this->assertSame(
+                $status === AttendanceStatus::Holiday,
+                str_contains($html, 'bg-fuchsia-50 dark:bg-fuchsia-900/20'),
+                $status->value,
+            );
+
+            Holiday::query()->delete();
+        }
     }
 
     public function test_holidays_are_not_shown_on_out_of_month_padding_cells(): void

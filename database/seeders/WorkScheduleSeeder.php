@@ -16,6 +16,8 @@ class WorkScheduleSeeder extends Seeder
                 'end_time' => '17:00:00',
                 'grace_minutes' => 10,
                 'break_minutes' => 60,
+                // The morning/afternoon boundary for half-day leave (Phase 3).
+                'break_start' => '12:00:00',
                 'workdays' => [1, 2, 3, 4, 5],
                 'is_default' => true,
             ]

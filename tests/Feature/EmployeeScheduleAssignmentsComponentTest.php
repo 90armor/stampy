@@ -128,7 +128,7 @@ class EmployeeScheduleAssignmentsComponentTest extends TestCase
 
     public function test_admin_sees_a_bulk_reassign_hint_but_a_manager_does_not(): void
     {
-        // The hint links to the Schedules tab, which is
+        // The hint links to Policies → Schedules, which is
         // WorkSchedulePolicy::create (admin-only) — same ability
         // Schedules\Index::openBulkReassign() itself checks, so nobody who
         // can't actually reach it is shown a link to it.
@@ -136,8 +136,8 @@ class EmployeeScheduleAssignmentsComponentTest extends TestCase
 
         Livewire::actingAs($this->admin())
             ->test(ScheduleAssignments::class, ['employee' => $employee])
-            ->assertSee('Bulk reassign on the Schedules tab')
-            ->assertSeeHtml('organization?tab=schedules');
+            ->assertSee('Bulk reassign in Policies → Schedules')
+            ->assertSeeHtml('href="'.route('policies.index', ['tab' => 'schedules']).'"');
 
         $managerEmployee = Employee::factory()->create();
         $manager = $this->managerUser($managerEmployee);
@@ -145,7 +145,33 @@ class EmployeeScheduleAssignmentsComponentTest extends TestCase
 
         Livewire::actingAs($manager)
             ->test(ScheduleAssignments::class, ['employee' => $report])
-            ->assertDontSee('Bulk reassign on the Schedules tab');
+            ->assertDontSee('Bulk reassign in Policies → Schedules');
+    }
+
+    public function test_current_schedule_is_presented_before_assignment_history(): void
+    {
+        $employee = Employee::factory()->create();
+        $originalScheduleName = $employee->scheduleAssignments()
+            ->with('workSchedule')
+            ->sole()
+            ->workSchedule
+            ->name;
+        $newSchedule = WorkSchedule::factory()->create(['name' => 'Current Evening Shift']);
+
+        EmployeeWorkSchedule::factory()->create([
+            'employee_id' => $employee->id,
+            'work_schedule_id' => $newSchedule->id,
+            'effective_from' => today(),
+        ]);
+
+        $html = Livewire::actingAs($this->admin())
+            ->test(ScheduleAssignments::class, ['employee' => $employee])
+            ->html();
+
+        $this->assertStringContainsString('Current Evening Shift', $html);
+        $this->assertLessThan(strpos($html, $originalScheduleName), strpos($html, 'Current Evening Shift'));
+        $this->assertLessThan(strpos($html, 'Assign schedule'), strpos($html, 'Current Evening Shift'));
+        $this->assertLessThan(strpos($html, 'Assignment history'), strpos($html, 'Assign schedule'));
     }
 
     public function test_admin_cannot_delete_the_only_assignment_row(): void

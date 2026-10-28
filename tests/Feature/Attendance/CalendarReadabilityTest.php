@@ -63,9 +63,8 @@ class CalendarReadabilityTest extends TestCase
         // Each legend entry's icon path, not just its label text — proves
         // the legend actually pairs icon-to-label, not just prints text
         // near unrelated icons elsewhere on the page. No icon path for
-        // "Late / Early leave": that entry is a colour swatch + underlined
-        // sample time, not an icon at all — merging it out of the icon list
-        // is exactly what stopped it duplicating present's check icon.
+        // "Late / Early leave": timing isn't a status, so that entry is an
+        // amber sample marked time, not an icon.
         foreach ([
             'M4.5 12.75l6 6 9-13.5',       // present (check)
             'M12 9v3.75m-9.303',            // incomplete (triangle)
@@ -111,7 +110,7 @@ class CalendarReadabilityTest extends TestCase
             ->test(Show::class, ['employee' => $employee])
             ->set('month', self::MONTH)
             ->assertSee('only been calculated up to')
-            ->assertSee('Mar 5, 2026');
+            ->assertSee('Thu 5 Mar');
     }
 
     public function test_a_month_with_nothing_built_shows_a_generic_notice_not_a_date(): void
@@ -169,12 +168,12 @@ class CalendarReadabilityTest extends TestCase
             ->test(Show::class, ['employee' => $employee])
             ->set('month', self::MONTH);
 
-        $component->assertSee('March 2, 2026, Present, left 45 minutes early');
-        $component->assertSee('March 3, 2026, Present');
-        $component->assertDontSee('March 3, 2026, Present, left');
+        $component->assertSee('Monday, 2 March 2026, Present, left 45 minutes early');
+        $component->assertSee('Tuesday, 3 March 2026, Present');
+        $component->assertDontSee('Tuesday, 3 March 2026, Present, left');
     }
 
-    public function test_a_late_arrival_marks_the_in_time_with_red_underline_and_a_label(): void
+    public function test_a_late_arrival_marks_the_in_time_in_amber_without_underline_and_with_a_label(): void
     {
         $employee = Employee::factory()->create();
         DailyAttendance::factory()->create([
@@ -192,12 +191,15 @@ class CalendarReadabilityTest extends TestCase
             ->set('month', self::MONTH)
             ->html();
 
-        $this->assertStringContainsString('aria-label="Arrived 12 minutes late"', $html);
-        $this->assertStringContainsString('decoration-red-600', $html);
+        $this->assertMatchesRegularExpression('/<span class="font-medium text-amber-700 dark:text-amber-300" aria-label="Arrived 12 minutes late">/', $html);
+        $this->assertStringNotContainsString('decoration-red', $html);
         $this->assertStringNotContainsString('aria-label="Left', $html);
+        // The cell itself is an ordinary Present cell (neutral surface), not amber.
+        $this->assertStringContainsString('bg-white dark:bg-slate-800 ring-slate-divider', $html);
+        $this->assertStringNotContainsString('bg-amber-50 dark:bg-amber-900/20', $html);
     }
 
-    public function test_an_early_departure_marks_the_out_time_with_red_underline_and_a_label(): void
+    public function test_an_early_departure_marks_the_out_time_in_amber_and_with_a_label(): void
     {
         $employee = Employee::factory()->create();
         DailyAttendance::factory()->create([
@@ -215,12 +217,14 @@ class CalendarReadabilityTest extends TestCase
             ->set('month', self::MONTH)
             ->html();
 
-        $this->assertStringContainsString('aria-label="Left 4 minutes early"', $html);
+        $this->assertMatchesRegularExpression('/<span class="font-medium text-amber-700 dark:text-amber-300" aria-label="Left 4 minutes early">/', $html);
         $this->assertStringNotContainsString('aria-label="Arrived', $html);
     }
 
-    public function test_the_table_view_also_marks_late_arrival_and_early_leave_times(): void
+    public function test_the_table_view_marks_timing_on_the_late_and_early_values_not_the_times(): void
     {
+        // Fixed clock: this test's data sits on fixed 2026 dates (see CLAUDE.md, pinned-instant check).
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $employee = Employee::factory()->create();
         DailyAttendance::factory()->create([
             'employee_id' => $employee->id,
@@ -238,12 +242,18 @@ class CalendarReadabilityTest extends TestCase
             ->set('view', 'table')
             ->html();
 
-        $this->assertStringContainsString('aria-label="Arrived 12 minutes late"', $html);
-        $this->assertStringContainsString('aria-label="Left 4 minutes early"', $html);
-        // The marked times and the numeric Late/Early leave columns already
-        // show this — a third "Late 12m"/"Early 4m" chip beside the Status
-        // badge repeated the same fact and bloated the row height, so it
-        // was removed.
+        // Same rule as the Daily Attendance table: In/Out stay neutral and
+        // the amber Late/Early values carry the timing fact.
+        $this->assertMatchesRegularExpression('/class="whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums font-medium text-amber-700 dark:text-amber-300">12m</', $html);
+        $this->assertMatchesRegularExpression('/class="whitespace-nowrap px-6 py-2 text-right text-sm tabular-nums font-medium text-amber-700 dark:text-amber-300">4m</', $html);
+        $this->assertStringNotContainsString('aria-label="Arrived', $html);
+        $this->assertStringNotContainsString('aria-label="Left', $html);
+        // The row's one affordance is the trailing 40px raw-punches toggle,
+        // named for its date (an admin is acting here).
+        $this->assertStringContainsString('aria-label="Show raw punches for Mon 2 Mar"', $html);
+        $this->assertStringContainsString('<abbr title="Early leave" class="no-underline">Early</abbr>', $html);
+        // A third "Late 12m"/"Early 4m" chip beside the Status badge
+        // repeated the same fact and bloated the row height.
         $this->assertStringNotContainsString('>Late 12m<', $html);
         $this->assertStringNotContainsString('>Early 4m<', $html);
     }
@@ -345,6 +355,7 @@ class CalendarReadabilityTest extends TestCase
 
         $this->assertStringContainsString('text-violet-700', $html);
         $this->assertStringContainsString('dark:text-violet-300', $html);
+        // The late day's timing marker is the (amber-700 light) timing text.
         $this->assertStringContainsString('text-amber-700', $html);
     }
 
@@ -369,7 +380,7 @@ class CalendarReadabilityTest extends TestCase
         $this->assertStringNotContainsString('bg-amber-50 text-amber-700', $html);
     }
 
-    public function test_a_present_day_with_an_early_leave_borrows_lates_amber_cell_colour(): void
+    public function test_a_present_day_with_an_early_leave_keeps_the_green_present_cell(): void
     {
         $employee = Employee::factory()->create();
         DailyAttendance::factory()->create([
@@ -397,8 +408,13 @@ class CalendarReadabilityTest extends TestCase
             ->set('month', self::MONTH)
             ->html();
 
-        $this->assertStringContainsString('bg-amber-50 dark:bg-amber-900/20', $html);
-        $this->assertStringContainsString('bg-green-50 dark:bg-green-900/20', $html);
+        // Colour is status-only and fill emphasizes exceptions: both days are
+        // neutral Present cells; the early day is distinguished only by its
+        // amber marked Out time.
+        $this->assertStringNotContainsString('bg-amber-50 dark:bg-amber-900/20', $html);
+        $this->assertStringNotContainsString('bg-green-50 dark:bg-green-900/20', $html);
+        $this->assertSame(2, substr_count($html, 'bg-white dark:bg-slate-800 ring-slate-divider'));
+        $this->assertStringContainsString('aria-label="Left 4 minutes early"', $html);
     }
 
     public function test_the_legend_shows_a_marked_time_sample_instead_of_a_dot(): void
@@ -411,8 +427,34 @@ class CalendarReadabilityTest extends TestCase
             ->html();
 
         $this->assertStringContainsString('Late / Early leave', $html);
-        $this->assertStringContainsString('decoration-red-600', $html);
+        // The sample is an amber marked time with no underline and no
+        // colour swatch — timing never colours a cell.
+        $this->assertStringContainsString('font-medium text-amber-700 dark:text-amber-300', $html);
+        $this->assertStringNotContainsString('decoration-red', $html);
         $this->assertStringNotContainsString('bg-slate-700 dark:bg-slate-200', $html);
+    }
+
+    public function test_off_cells_have_no_fill_and_a_dashed_boundary(): void
+    {
+        $employee = Employee::factory()->create();
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => '2026-03-01',
+            'status' => AttendanceStatus::Off,
+        ]);
+
+        $html = Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', self::MONTH)
+            ->html();
+
+        // Quieter than a Present cell: no grey fill, a dashed boundary, and a
+        // fainter icon than the day number.
+        $this->assertStringContainsString('bg-transparent ring-transparent border border-dashed border-slate-divider', $html);
+        $this->assertStringNotContainsString('bg-slate-100 dark:bg-slate-750 ring-slate-500/10', $html);
+        // The fainter icon: decorative slate-400 (dark slate-500), against
+        // the day number's readable slate-500 (dark slate-400).
+        $this->assertStringContainsString('text-slate-400 dark:text-slate-500', $html);
     }
 
     public function test_off_cells_show_no_time_placeholder(): void
@@ -625,5 +667,49 @@ class CalendarReadabilityTest extends TestCase
         DB::disableQueryLog();
 
         $this->assertSame($tableCount, $calendarCount);
+    }
+
+    public function test_an_incomplete_day_with_a_late_in_punch_marks_the_in_time(): void
+    {
+        $employee = Employee::factory()->create();
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id,
+            'work_date' => '2026-03-02',
+            'status' => AttendanceStatus::Incomplete,
+            'first_in' => Carbon::parse('2026-03-02 08:35:00'),
+            'last_out' => null,
+            'late_minutes' => 35,
+        ]);
+
+        $html = Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', self::MONTH)
+            ->call('openDay', '2026-03-02')
+            ->html();
+
+        // Calendar cell and day modal both mark the late in-time; the cell
+        // stays violet (Incomplete) — late is an annotation, not a colour.
+        $this->assertSame(2, substr_count($html, 'aria-label="Arrived 35 minutes late"'));
+        $this->assertStringContainsString('Monday, 2 March 2026, Incomplete, arrived 35 minutes late', $html);
+    }
+
+    public function test_the_month_summary_annotates_late_on_each_status_group(): void
+    {
+        $employee = Employee::factory()->create();
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id, 'work_date' => '2026-03-02', 'status' => AttendanceStatus::Present,
+            'first_in' => Carbon::parse('2026-03-02 08:20:00'), 'last_out' => Carbon::parse('2026-03-02 17:00:00'), 'late_minutes' => 20,
+        ]);
+        DailyAttendance::factory()->create([
+            'employee_id' => $employee->id, 'work_date' => '2026-03-03', 'status' => AttendanceStatus::Incomplete,
+            'first_in' => Carbon::parse('2026-03-03 08:30:00'), 'late_minutes' => 30,
+        ]);
+
+        Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', self::MONTH)
+            // Present's breakdown still counts present days only; the late
+            // incomplete day is annotated under Incomplete.
+            ->assertSeeInOrder(['Present', '1', '(of which 1 late)', 'Incomplete', '1', '(1 late)']);
     }
 }

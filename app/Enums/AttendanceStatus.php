@@ -7,7 +7,8 @@ namespace App\Enums;
  * leave. Whether the timing was off (late arrival, early leave) is a
  * SEPARATE dimension, tracked on DailyAttendance's late_minutes/
  * early_leave_minutes columns and surfaced through its isLate()/leftEarly()/
- * displayVariant() methods — never as a status value. A `Late` case used to
+ * hasTimingException() methods — never as a status value, and never as a
+ * displayVariant() colour (that is status-only; timing is an annotation). A `Late` case used to
  * live here; it was removed because it mixed the two dimensions (a day that
  * was both late AND left early would need a third, combined status, and the
  * question "what do we call a day that's both?" was the sign timing didn't

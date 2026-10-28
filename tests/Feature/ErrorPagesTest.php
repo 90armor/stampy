@@ -50,6 +50,8 @@ class ErrorPagesTest extends TestCase
 
         $response->assertStatus(403);
         $response->assertSee("You don't have access to this page");
+        // The topbar holds a short page name; the sentence wrapped at 390px.
+        $response->assertSeeInOrder(['font-semibold text-slate-900 dark:text-slate-100">', 'Access denied'], false);
         $response->assertSee('Go to dashboard');
         // The app shell, not a bare page — the sidebar's own nav items.
         $response->assertSee('Dashboard');

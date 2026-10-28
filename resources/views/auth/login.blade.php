@@ -1,6 +1,5 @@
 <x-guest-layout>
     <x-slot:pageTitle>Sign in</x-slot:pageTitle>
-    <p class="mb-1.5 text-xs font-bold uppercase tracking-widest text-slate-600 dark:text-slate-400">Welcome back</p>
     <h2 class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Sign in to your workspace</h2>
     <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">Enter your credentials to continue.</p>
 
@@ -21,7 +20,7 @@
                 class="flex items-start gap-x-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400"
                 role="alert"
             >
-                <x-icon name="exclamation-triangle" class="mt-0.5 h-4 w-4 shrink-0" />
+                <x-icon name="exclamation-triangle" class="mt-0.5 h-5 w-5 shrink-0" />
                 <span>{{ $errors->first('auth') }}</span>
             </div>
         @endif
@@ -80,12 +79,12 @@
         <!-- Remember Me -->
         <div class="flex flex-col items-stretch gap-1 min-[360px]:flex-row min-[360px]:items-center min-[360px]:justify-between">
             <label for="remember_me" class="inline-flex min-h-11 cursor-pointer items-center gap-x-2 text-sm text-slate-700 dark:text-slate-300">
-                <input id="remember_me" type="checkbox" class="rounded border-slate-300 text-primary-600 shadow-sm checked:border-primary-600 checked:bg-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800 dark:checked:border-primary-600 dark:checked:bg-primary-600" name="remember">
+                <input id="remember_me" type="checkbox" class="shadow-sm" name="remember">
                 {{ __('Keep me signed in on this device') }}
             </label>
 
             @if (Route::has('password.request'))
-                <a class="inline-flex min-h-11 items-center text-sm font-semibold text-primary-700 hover:text-primary-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:text-accent-300 dark:hover:text-accent-200 dark:focus:ring-offset-slate-950" href="{{ route('password.request') }}" wire:navigate>
+                <a class="inline-flex min-h-11 items-center text-sm font-semibold text-primary-700 hover:text-primary-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:text-accent-300 dark:hover:text-accent-200 dark:focus:ring-offset-slate-900" href="{{ route('password.request') }}" wire:navigate>
                     {{ __('Forgot password?') }}
                 </a>
             @endif
@@ -97,7 +96,7 @@
                 <path class="opacity-90" fill="currentColor" d="M21 12a9 9 0 0 0-9-9v3a6 6 0 0 1 6 6h3Z" />
             </svg>
             <span x-text="submitting ? 'Signing in…' : 'Sign in'">{{ __('Sign in') }}</span>
-            <x-icon name="chevron-right" class="h-4 w-4" x-show="!submitting" />
+            <x-icon name="chevron-right" class="h-5 w-5" x-show="!submitting" />
         </x-button>
 
         <p class="text-center text-xs text-slate-600 dark:text-slate-400">

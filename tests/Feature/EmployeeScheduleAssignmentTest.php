@@ -55,6 +55,7 @@ class EmployeeScheduleAssignmentTest extends TestCase
             $this->assertStringContainsString('No default work schedule exists', $e->getMessage());
             $this->assertStringContainsString('EMP-4242', $e->getMessage());
             $this->assertStringContainsString('WorkScheduleSeeder', $e->getMessage());
+            $this->assertStringContainsString('the default in Policies → Schedules', $e->getMessage());
         }
 
         // The whole thing rolled back — not an orphaned employee with no

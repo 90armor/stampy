@@ -8,7 +8,8 @@ use RuntimeException;
 /**
  * Once any daily_attendances row or employee_work_schedules assignment
  * references a schedule, its hours are locked: start_time, end_time,
- * grace_minutes, break_minutes and workdays can no longer change, because
+ * grace_minutes, break_minutes, break_start and workdays can no longer
+ * change (break_start may be set once, from empty — see WorkSchedule), because
  * DailySummaryBuilder must always be able to recompute an already-built row
  * identically — CLAUDE.md's "daily_attendances must always be fully
  * recomputable" rule would otherwise no longer hold for any day already

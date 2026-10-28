@@ -8,7 +8,8 @@ use RuntimeException;
 /**
  * Attendance can't be calculated for an employee with no schedule of their
  * own when no work_schedules row is flagged is_default — there is nothing to
- * measure lateness or workdays against.
+ * measure lateness or workdays against. Only an admin creates employees, so
+ * only an admin (or the log) reads it: it names where to fix it.
  */
 class NoDefaultWorkScheduleException extends RuntimeException
 {
@@ -17,7 +18,8 @@ class NoDefaultWorkScheduleException extends RuntimeException
         parent::__construct(
             "No default work schedule exists: employee {$employee->employee_code} has no work schedule assigned, "
             .'and no row in work_schedules has is_default = true. '
-            .'Create one with `php artisan db:seed --class=WorkScheduleSeeder`, or set is_default on an existing schedule.'
+            .'Make an existing schedule the default in Policies → Schedules, or create one there '
+            .'(or with `php artisan db:seed --class=WorkScheduleSeeder`).'
         );
     }
 }
