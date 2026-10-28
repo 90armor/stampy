@@ -99,7 +99,7 @@ The two can't meet on one record: a pending request never reaches attendance at 
 
 Use Tailwind's spacing scale and favor the established rhythm:
 
-- Page container: `max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8`.
+- Page container: `max-w-7xl 2xl:max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8` — one rule for every page. From `2xl` (a 1536px viewport) it widens to 1536px, so a 1920px screen shows 1472px of content instead of 1216px with wide empty gutters; the cap stays so a 2560px monitor doesn't stretch rows apart (owner, 28 Oct 2026). Below 1536px nothing changes. A page that wants a narrower measure (Profile's `max-w-2xl`) sets its own inside it.
 - Standard card padding: `p-6`; compact/stat card padding: `p-4`.
 - Form groups: `space-y-5` or `space-y-6`; label-to-control spacing: `mt-1`; error spacing: `mt-2`.
 - Common inline gaps: `gap-2` or `gap-3`; section gaps: `gap-4` to `gap-6`.
