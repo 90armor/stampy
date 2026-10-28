@@ -336,7 +336,10 @@
                                     <dt class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $balance['name'] }}</dt>
                                     @if ($balance['usableFrom'] === null)
                                         <dd class="text-right text-sm tabular-nums text-slate-500 dark:text-slate-400">
-                                            <span class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ \App\Support\LeaveDays::format($balance['available']) }}</span> available
+                                            <span class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ \App\Support\LeaveDays::format($balance['available']) }}</span> available{{ $balance['fullYear'] !== null ? ' at last day' : '' }}
+                                            @if ($balance['fullYear'] !== null)
+                                                <span class="block text-xs">Full-year balance: {{ \App\Support\LeaveDays::label($balance['fullYear']) }}</span>
+                                            @endif
                                             @if (($balance['toilRemainder'] ?? 0) > 0)
                                                 <span class="block text-xs">{{ \App\Support\Duration::format($balance['toilRemainder']) }} toward the next half day</span>
                                             @endif

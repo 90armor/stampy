@@ -13,6 +13,7 @@ use App\Services\EmployeeLifecycle;
 use App\Services\Leave\Balance;
 use App\Services\Leave\LeaveBalance;
 use App\Services\Leave\LeaveGranter;
+use App\Support\EmployeeDashboard;
 use App\Support\LeaveDays;
 use App\Support\LeaveReport;
 use Carbon\Carbon;
@@ -111,6 +112,16 @@ class LeaveReportTest extends TestCase
         \Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Employees\LeaveCard::class, ['employee' => $leaver->fresh()])
             ->assertSee('Full-year balance: '.LeaveDays::label($balance->available()))
             ->assertSee('at last day');
+
+        // And on their own dashboard's Leave balance card.
+        $dashboard = collect(EmployeeDashboard::for($leaver->fresh(), $admin)['balances'])->firstWhere('name', 'Annual');
+        $this->assertSame(LeaveReport::available($balance), $dashboard['available']);
+        $this->assertSame($balance->available(), $dashboard['fullYear']);
+        $this->assertNull($dashboard['usableFrom']);
+        $user = $leaver->user ?? tap(User::factory()->create()->assignRole('employee'), fn (User $user) => $leaver->update(['user_id' => $user->id]));
+        $this->actingAs($user)->get(route('dashboard'))
+            ->assertOk()
+            ->assertSeeInOrder([LeaveDays::format(LeaveReport::available($balance)), 'available at last day', 'Full-year balance: '.LeaveDays::label($balance->available())]);
     }
 
     public function test_the_edge_cases_show_what_time_off_shows(): void

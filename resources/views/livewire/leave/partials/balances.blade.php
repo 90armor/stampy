@@ -14,9 +14,9 @@ employee profile's Leave card (Phase 3e). $balanceRows: list of
     // A leaver's last year: Available is what they had at their last day
     // (Balance::availableAtLastDay() — the grant pro-rated to it), the figure
     // untaken leave is read from; the full-year balance moves to a muted line.
-    // The leave report shows the same.
+    // The leave report and the employee dashboard show the same.
     $earnedLine = fn ($balance) => $balance->availableAtLastDay() !== null ? 'Full-year balance: '.LeaveDays::label($balance->available()) : null;
-    $available = fn ($balance) => $balance->availableAtLastDay() ?? $balance->available();
+    $available = fn ($balance) => \App\Support\LeaveReport::available($balance);
     // Not usable yet, unless they've left: then what they earned is what they have.
     $notUsableYet = fn ($balance) => $balance->usableFrom !== null && $balance->availableAtLastDay() === null;
     // Time off in lieu: the overtime saved below a full half day (TimeOffInLieuReconciler::remainderMinutes()).
