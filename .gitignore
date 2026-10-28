@@ -25,3 +25,6 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Phase 6a audit screenshots (local only)
+/docs/audit/shots/

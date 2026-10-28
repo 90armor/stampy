@@ -1,0 +1,3 @@
+import { OUT, withBrowser } from './lib.mjs';
+await withBrowser(async (b) => { for (const t of ['light','dark']) { const c = await b.newContext({ colorScheme: t }); await c.addInitScript((x)=>localStorage.setItem('theme',x), t); const p = await c.newPage();
+ for (const w of [390,1440]) { await p.setViewportSize({width:w,height:w<600?844:900}); await p.goto('file://' + new URL('../../../storage/app/audit-500.html', import.meta.url).pathname + ''); await p.waitForTimeout(1500); await p.screenshot({path:`${OUT}/500-guest-${w}-${t}.png`}); console.log(t,w,(await p.locator('body').innerText()).replace(/\s+/g,' ').slice(0,140)); } await c.close(); } });
