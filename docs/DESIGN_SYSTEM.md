@@ -286,6 +286,20 @@ Dropdowns and popovers are opaque, elevated content surfaces. Modals use `<x-mod
 - For Livewire regions, prefer a local loading state near the affected content over blocking the full application shell.
 - Avoid skeletons unless latency and layout stability on a representative page justify them.
 
+## Error pages
+
+Every error page uses one shared partial, `resources/views/errors/partials/page.blade.php` — the app's own shell and `<x-empty-state>` in a card, never Laravel's bare default — for **403, 404, 419, 500 and 503**. The layout follows the session, not the status code: signed in, the app shell (sidebar, topbar, a short topbar `header` such as "Access denied"); signed out, the guest shell. The action is "Go to dashboard" (signed in) or "Go to login" (signed out), unless the page passes its own:
+
+| Status | Title | Action |
+|---|---|---|
+| 403 | You don't have access to this page | Go to dashboard |
+| 404 | Page not found | Go to dashboard / Go to login |
+| 419 | This page expired · "Reload and try again." | **Reload** — the page it came from, fetched fresh, never a re-post |
+| 500 | Something went wrong | Go to dashboard / Go to login |
+| 503 | Stampy is down for maintenance | **Reload** |
+
+An unmatched URL reaches the 404 through a fallback route inside the web group, so the session runs and a signed-in user gets the app shell (Phase 6b). Maintenance (503) answers before the session starts, so it's always the guest shell.
+
 ## Empty states
 
 Use `<x-empty-state>` inside the owning solid content surface. State what is missing, optionally explain why, and offer one authorized next action when one exists. “No results” after filtering should help users reset filters; it is distinct from “no records exist.” Users without an employee link use `<x-no-employee-record>` rather than a misleading empty table.

@@ -11,8 +11,10 @@ All PHP scripts run inside the `app` container and write to the **dev** `stampy`
 | `seed-personas.php` | Adds the audit personas and stress data on top of a normal seed. Every account's password is `password`. |
 | `stale-setup.php` | A pending Medical leave for persona E1 (`DAY=YYYY-MM-DD`), or cancels one (`CANCEL=id`). |
 | `stress-employees.php` | 70 extra employees, for the 100+ row directory. |
+| `f01-4-check.php` | Phase 6b: what happens to a leaver's pending requests, and filing for a leaver (report only; reseed afterwards). |
+| `stale-6b.php`, `reset-token.php` | Phase 6b screenshots: a pending request moved on behind the approver's back; a reset token for the reset-password page. |
 | `querycount.php` | `php scripts/audit/querycount.php <username> <path>`: status, queries, query ms, server ms and the most repeated query for one page, in a fresh app. |
-| `playwright/` | The screenshot/measurement harness (`pages.mjs`) and the journeys. Needs `playwright` and `axe-core` installed next to it (e.g. `npm i --no-save playwright@1.62.1 axe-core@4.10.3` in a scratch folder, then run with `NODE_PATH`), with the app on http://localhost:8000. Run from the repo root. |
+| `playwright/` | The screenshot/measurement harness (`pages.mjs`), the journeys, and `shots-6b.mjs` (Phase 6b's screenshots, into `docs/audit/shots/6b/`). Needs `playwright` and `axe-core` installed next to it (e.g. `npm i --no-save playwright@1.62.1 axe-core@4.10.3` in a scratch folder, then run with `NODE_PATH`), with the app on http://localhost:8000. Run from the repo root. |
 
 Run a tinker script: `docker compose exec app php artisan tinker --execute="require 'scripts/audit/seed-personas.php';"`
 

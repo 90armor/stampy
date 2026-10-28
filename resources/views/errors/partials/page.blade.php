@@ -1,5 +1,5 @@
 {{--
-    Shared shell for 403/404/500: the app's own layout and design system
+    Shared shell for 403/404/419/500/503: the app's own layout and design system
     (x-card/x-empty-state), a plain message, and a way back — never Laravel's
     bare, unstyled default (resources/views/errors/{code}.blade.php, published
     nowhere in this app), which had no navigation and surfaced the raw
@@ -17,6 +17,9 @@
     $header, if given, is a short topbar title for a page whose card title is
     a sentence: the topbar holds a page name, and at 390px the 403's full
     sentence wrapped onto two lines (Phase 5a).
+
+    $action, if given (['label' => …, 'href' => …]), replaces the way back:
+    419 and 503 offer Reload instead (Phase 6b) — retrying is the fix there.
 --}}
 @if (auth()->check())
     <x-app-layout>
@@ -25,7 +28,7 @@
         <x-card>
             <x-empty-state :icon="$icon" :title="$title" :description="$description">
                 <x-slot name="action">
-                    <x-button variant="primary" href="{{ route('dashboard') }}">Go to dashboard</x-button>
+                    <x-button variant="primary" href="{{ $action['href'] ?? route('dashboard') }}">{{ $action['label'] ?? 'Go to dashboard' }}</x-button>
                 </x-slot>
             </x-empty-state>
         </x-card>
@@ -35,7 +38,7 @@
         <x-card>
             <x-empty-state :icon="$icon" :title="$title" :description="$description">
                 <x-slot name="action">
-                    <x-button variant="primary" href="{{ route('login') }}">Go to login</x-button>
+                    <x-button variant="primary" href="{{ $action['href'] ?? route('login') }}">{{ $action['label'] ?? 'Go to login' }}</x-button>
                 </x-slot>
             </x-empty-state>
         </x-card>

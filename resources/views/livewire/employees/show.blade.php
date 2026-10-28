@@ -33,10 +33,18 @@
             @endcan
             @if ($employee->status === 'active')
                 @can('deactivate', $employee)
-                    <x-button type="button" variant="secondary" wire:click="$dispatch('deactivate-employee', { id: {{ $employee->id }} })">
-                        <x-icon name="user-x" class="w-5 h-5" />
-                        Deactivate
-                    </x-button>
+                    @if ($employee->user_id !== null && $employee->user_id === auth()->id())
+                        {{-- Phase 6b: never your own record (EmployeeLifecycle refuses it too). --}}
+                        <x-button type="button" variant="secondary" disabled aria-describedby="deactivate-self-hint">
+                            <x-icon name="user-x" class="w-5 h-5" />
+                            Deactivate
+                        </x-button>
+                    @else
+                        <x-button type="button" variant="secondary" wire:click="$dispatch('deactivate-employee', { id: {{ $employee->id }} })">
+                            <x-icon name="user-x" class="w-5 h-5" />
+                            Deactivate
+                        </x-button>
+                    @endif
                 @endcan
             @else
                 @can('update', $employee)
@@ -45,6 +53,9 @@
                         Reactivate
                     </x-button>
                 @endcan
+            @endif
+            @if ($employee->status === 'active' && $employee->user_id !== null && $employee->user_id === auth()->id() && auth()->user()->can('deactivate', $employee))
+                <p id="deactivate-self-hint" class="w-full text-xs text-slate-600 dark:text-slate-400 sm:text-right">{{ \App\Exceptions\SelfDeactivationException::MESSAGE }}</p>
             @endif
         </div>
     </header>

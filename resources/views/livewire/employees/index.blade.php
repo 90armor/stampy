@@ -176,7 +176,20 @@
                                         </span>
                                     @endcan
                                     @can('deactivate', $employee)
-                                        @if ($employee->status === 'active')
+                                        @if ($employee->status === 'active' && $employee->user_id !== null && $employee->user_id === auth()->id())
+                                            {{-- Phase 6b: never your own record. Focusable, so the tooltip's reason reaches keyboard and touch too. --}}
+                                            <span class="group/action relative inline-flex">
+                                                <button
+                                                    type="button"
+                                                    aria-disabled="true"
+                                                    class="inline-flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-lg text-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-600"
+                                                    aria-label="Deactivate {{ $employee->full_name }}: {{ \App\Exceptions\SelfDeactivationException::MESSAGE }}"
+                                                >
+                                                    <x-icon name="user-x" class="w-5 h-5" />
+                                                </button>
+                                                <span role="tooltip" class="pointer-events-none absolute bottom-full right-0 z-10 mb-2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-sm transition-opacity group-hover/action:opacity-100 group-focus-within/action:opacity-100 dark:bg-slate-100 dark:text-slate-900">{{ \App\Exceptions\SelfDeactivationException::MESSAGE }}</span>
+                                            </span>
+                                        @elseif ($employee->status === 'active')
                                             <span class="group/action relative inline-flex">
                                                 <button
                                                     type="button"

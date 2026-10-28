@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\AffectedLeavesChangedException;
+use App\Exceptions\SelfDeactivationException;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\Attendance\DailySummaryBuilder;
@@ -13,6 +14,7 @@ use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -27,6 +29,11 @@ use Throwable;
  * status write always lands, and a rebuild that fails partway is reported,
  * logged and named with the command that heals it — never rolled back into
  * the write. daily_attendances is derived, so a stale range is recoverable.
+ *
+ * An admin can't deactivate their own linked record (SelfDeactivationException,
+ * Phase 6b). A deactivation whose last day has passed also signs the
+ * employee's login out everywhere (endSessions()); reactivating restores
+ * access with the same password.
  *
  * Reactivating means "the deactivation was a mistake": the employment
  * period is one unbroken span again and the gap days become ordinary days
@@ -85,6 +92,10 @@ class EmployeeLifecycle
      */
     public function deactivate(Employee $employee, CarbonInterface $leftOn, ?User $actor = null, ?array $expectedLeaveEffects = null): array
     {
+        if ($actor !== null && $employee->user_id !== null && $employee->user_id === $actor->id) {
+            throw new SelfDeactivationException;
+        }
+
         DB::transaction(function () use ($employee, $leftOn, $actor, $expectedLeaveEffects) {
             Employee::query()->lockForUpdate()->findOrFail($employee->id);
 
@@ -98,6 +109,8 @@ class EmployeeLifecycle
             $this->overtime->applyDeactivation($employee, $leftOn, $actor);
             $employee->update(['status' => 'inactive', 'left_on' => $leftOn->format('Y-m-d')]);
         });
+
+        $this->endSessions($employee, $leftOn);
 
         return $this->rebuildAfter($employee, Carbon::instance($leftOn), 'Deactivation');
     }
@@ -116,6 +129,29 @@ class EmployeeLifecycle
         }
 
         return $this->rebuildAfter($employee, $leftOn, 'Reactivation');
+    }
+
+    /**
+     * Cleanup once a leaver's access has ended (a last day before today): their
+     * "remember me" token is rotated and their database sessions are deleted,
+     * so they're signed out everywhere at once. EnsureStillEmployed is the
+     * guarantee — this only saves the next request from discovering it. A last
+     * day of today keeps today's sessions; the middleware ends them tomorrow.
+     */
+    private function endSessions(Employee $employee, CarbonInterface $leftOn): void
+    {
+        $user = $employee->user;
+
+        if ($user === null || ! $leftOn->lt(today())) {
+            return;
+        }
+
+        $user->setRememberToken(Str::random(60));
+        $user->saveQuietly();
+
+        if (config('session.driver') === 'database') {
+            DB::connection(config('session.connection'))->table(config('session.table', 'sessions'))->where('user_id', $user->id)->delete();
+        }
     }
 
     /**

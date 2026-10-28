@@ -3,11 +3,13 @@
 namespace App\Livewire\Leave;
 
 use App\Contracts\Approvable;
+use App\Enums\ApprovalOutcome;
 use App\Enums\LeaveStatus;
 use App\Enums\OvertimeCompensation;
 use App\Enums\OvertimeStatus;
 use App\Exceptions\OvertimeValidationException;
 use App\Exceptions\StaleDecisionException;
+use App\Models\ApprovalStep;
 use App\Models\Leave;
 use App\Models\OvertimeRequest;
 use App\Models\OvertimeSettings;
@@ -39,8 +41,10 @@ use Livewire\Component;
  * Approve takes an optional note; reject requires one — it's the
  * requester's only feedback. Decisions go through the request type's own
  * service (LeaveRequestService, OvertimeRequestService) with the step the
- * approver saw, so a request that moved on fails with the service's own
- * message, and the list refreshes. For overtime the approver may change the
+ * approver saw. A request that moved on while the page was open — cancelled,
+ * decided by someone else, past the manager's step — gets a calm notice
+ * saying so, checked before authorize() (staleReason(), Phase 6b), and the
+ * list refreshes; the service's own stale check stays the last guard. For overtime the approver may change the
  * compensation, and sees what the day's punches would credit
  * (OvertimeRequestService::wouldCredit()); over a daily limit, a manager sees
  * the problem and approves anyway, an admin completing it gives an override
@@ -74,15 +78,34 @@ class Approvals extends Component
 
     public ?string $problem = null;
 
+    /**
+     * Why the request someone tried to decide can't be decided any more —
+     * cancelled, already decided, or moved on to the next step since the page
+     * was loaded (Phase 6b). A calm notice, never the error overlay.
+     */
+    public ?string $stale = null;
+
     public function mount(): void
     {
         $this->authorize('decideAny', Leave::class);
     }
 
-    public function openDecision(int $id, string $decision, string $type = 'leave'): void
+    /**
+     * $step is the step the item was showing when it was clicked: a request
+     * that has moved on since is stale, not forbidden.
+     */
+    public function openDecision(int $id, string $decision, string $type = 'leave', ?int $step = null): void
     {
         $request = $this->find($type, $id);
+
+        if (($why = $this->staleReason($request, $step)) !== null) {
+            $this->showStale($why);
+
+            return;
+        }
+
         $this->authorize('approve', $request);
+        $this->stale = null;
 
         $this->decidingType = $type === 'overtime' ? 'overtime' : 'leave';
         $this->decidingId = $request->id;
@@ -105,6 +128,12 @@ class Approvals extends Component
 
         $leave = Leave::with(['employee', 'leaveType'])->findOrFail($this->decidingId);
 
+        if (($why = $this->staleReason($leave, $this->expectedStep)) !== null) {
+            $this->showStale($why);
+
+            return;
+        }
+
         $this->validate(
             ['note' => [$this->decision === 'reject' ? 'required' : 'nullable', 'string', 'max:1000']],
             ['note.required' => 'Write a reason to reject this request.'],
@@ -116,9 +145,11 @@ class Approvals extends Component
             if ($this->decision === 'reject') {
                 $service->reject($leave, auth()->user(), $note, $this->expectedStep);
                 $this->notice = "Rejected {$leave->employee->full_name}'s {$leave->leaveType->name} leave.";
+                $this->stale = null;
                 $this->problem = null;
             } else {
                 $result = $service->approve($leave, auth()->user(), $note, $this->expectedStep);
+                $this->stale = null;
                 $this->notice = $result['leave']->status === LeaveStatus::Approved
                     ? "Approved {$leave->employee->full_name}'s {$leave->leaveType->name} leave."
                     : "Approved {$leave->employee->full_name}'s {$leave->leaveType->name} leave — it now waits for an admin.";
@@ -137,6 +168,12 @@ class Approvals extends Component
     {
         $request = OvertimeRequest::with('employee')->findOrFail($this->decidingId);
 
+        if (($why = $this->staleReason($request, $this->expectedStep)) !== null) {
+            $this->showStale($why);
+
+            return;
+        }
+
         $this->validate(
             ['note' => [$this->decision === 'reject' ? 'required' : 'nullable', 'string', 'max:1000'], 'compensation' => ['in:pay,time_off']],
             ['note.required' => 'Write a reason to reject this request.'],
@@ -149,10 +186,12 @@ class Approvals extends Component
             if ($this->decision === 'reject') {
                 $service->reject($request, auth()->user(), $note, $this->expectedStep);
                 $this->notice = "Rejected {$whose}.";
+                $this->stale = null;
                 $this->problem = null;
             } else {
                 $result = $service->approve($request, auth()->user(), $note, OvertimeCompensation::from($this->compensation), $this->expectedStep,
                     trim($this->override_reason) !== '' ? trim($this->override_reason) : null);
+                $this->stale = null;
                 $this->notice = $result['request']->status === OvertimeStatus::Approved
                     ? "Approved {$whose}."
                     : "Approved {$whose} — it now waits for an admin.";
@@ -172,6 +211,47 @@ class Approvals extends Component
             $this->problem = $e->getMessage();
         }
 
+        $this->showDecision = false;
+        $this->reset(['decidingId', 'note', 'expectedStep', 'override_reason']);
+    }
+
+    /**
+     * Why this request can no longer be decided at $step, in plain words — or
+     * null when it still can (or when the user may not even see it: then
+     * authorize() answers, with the 403 a real authorization failure gets).
+     * Checked before authorize(), which fails for any request no longer
+     * pending and would otherwise put Livewire's error overlay on screen.
+     */
+    private function staleReason(Approvable $request, ?int $step): ?string
+    {
+        if (auth()->user()->cannot('view', $request)) {
+            return null;
+        }
+
+        $request->loadMissing(['employee', 'cancelledBy', 'approvalSteps.decidedBy']);
+        $decided = fn (array $outcomes) => $request->approvalSteps
+            ->filter(fn (ApprovalStep $s) => in_array($s->outcome, $outcomes, true))
+            ->sortBy('step')
+            ->last();
+        $by = fn (?ApprovalStep $s) => $s === null ? '.' : ' by '.($s->decidedBy?->name ?? 'an admin').' on '.DisplayDate::compact($s->decided_at).'.';
+
+        return match ($request->status->value) {
+            'cancelled' => ($request->cancelledBy?->name ?? $request->employee->full_name).' cancelled this request.',
+            'approved' => 'Already approved'.$by($decided([ApprovalOutcome::Approved, ApprovalOutcome::SelfApproved])),
+            'rejected' => 'Already rejected'.$by($decided([ApprovalOutcome::Rejected])),
+            default => match (true) {
+                $step === null || $request->current_step === $step => null,
+                $request->current_step === ApprovalFlow::ADMIN_STEP => 'Already moved on to admin approval.',
+                default => 'This request has changed since the page loaded.',
+            },
+        };
+    }
+
+    private function showStale(string $why): void
+    {
+        $this->stale = $why;
+        $this->notice = null;
+        $this->problem = null;
         $this->showDecision = false;
         $this->reset(['decidingId', 'note', 'expectedStep', 'override_reason']);
     }

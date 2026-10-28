@@ -6,28 +6,23 @@
 
     <h2 class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Reset your password</h2>
     <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
-        {{ __('Enter your email or username and we\'ll email you a secure link to choose a new one, if your account has an email on file.') }}
+        Enter your username or email. If your account has an email on file, we'll send a link to choose a new password.
     </p>
 
-    <!-- Session Status -->
-    <x-auth-session-status class="mt-6" :status="session('status')" />
-
     @if (session('status'))
-        <div class="mt-6 flex gap-x-3 rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-900/20">
+        {{-- Phase 6b: one message for every outcome (PasswordResetLinkController::SENT). --}}
+        <div class="mt-6 flex gap-x-3 rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-900/20" role="status">
             <x-icon name="check" class="w-5 h-5 shrink-0 text-green-600 dark:text-green-400" />
-            <div>
-                <p class="text-sm font-semibold text-green-800 dark:text-green-300">Check your inbox</p>
-                <p class="mt-1 text-sm text-green-700 dark:text-green-400">A password reset link is on its way, if an account exists for that address.</p>
-            </div>
+            <p class="text-sm text-green-800 dark:text-green-300">{{ session('status') }}</p>
         </div>
     @else
         <form method="POST" action="{{ route('password.email') }}" class="mt-8 space-y-5">
             @csrf
 
-            <!-- Email or username -->
+            <!-- Username or email -->
             <div>
-                <x-input-label for="email" :value="__('Email or username')" />
-                <x-text-input id="email" class="block mt-1 w-full" type="text" name="email" :value="old('email')" required autofocus placeholder="you@company.com or username" />
+                <x-input-label for="email" :value="__('Username or email')" />
+                <x-text-input id="email" class="block mt-1 w-full" type="text" name="email" :value="old('email')" required autofocus autocomplete="username" placeholder="Your username or email" />
                 <x-input-error :messages="$errors->get('email')" class="mt-2" />
             </div>
 

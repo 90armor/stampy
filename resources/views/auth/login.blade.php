@@ -15,13 +15,19 @@
     >
         @csrf
 
-        @if ($errors->has('auth'))
+        @if ($errors->has('auth') || $endedMessage)
             <div
                 class="flex items-start gap-x-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400"
                 role="alert"
             >
                 <x-icon name="exclamation-triangle" class="mt-0.5 h-5 w-5 shrink-0" />
-                <span>{{ $errors->first('auth') }}</span>
+                <span>{{ $errors->first('auth') ?: $endedMessage }}</span>
+            </div>
+        @elseif ($expired)
+            {{-- Phase 6b: the session ran out mid-use; signing in returns to the page. --}}
+            <div class="flex items-start gap-x-2 rounded-lg border border-slate-border bg-white px-4 py-3 text-sm text-slate-700 dark:bg-slate-800 dark:text-slate-300" role="status">
+                <x-icon name="info" class="mt-0.5 h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" />
+                <span>Your session expired. Sign in to continue.</span>
             </div>
         @endif
 
