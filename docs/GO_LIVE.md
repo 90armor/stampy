@@ -70,7 +70,7 @@ To pay overtime only, set "Credited to" to "No time off in lieu". The request fo
 
 **Who approves:** overtime uses the same two steps as leave. The employee's manager (with the manager role) decides first, then an admin. The managers set up in the next step are the overtime approvers too.
 
-**Reports for HR:** Reports → Attendance gives each employee's month in counts (workdays, absences, late and early leave, leave taken and days off worked), and Reports → Leave each employee's balance of a leave type for a year, both with a CSV. Managers see their own team in both.
+**Reports for HR:** Reports → Attendance gives each employee's month in counts (workdays, absences, late and early leave, leave taken and days off worked), and Reports → Leave each employee's balance of a leave type for a year, both with a CSV. Managers see their own team in both. For someone who has left, read untaken leave from the leave CSV's **Available at last day** column, not **Available**, which is the full year's balance.
 
 **Payroll:** Reports → Overtime shows a month's approved, credited overtime per employee: pay minutes by category, time off minutes as a total, and pay-equivalent hours (the minutes × today's rates ÷ 60, pay only — payroll multiplies by the hourly wage). **Download CSV** saves the same table. The filename and the first line say when it was exported. A month still in progress says so on the page and in the file: until the month ends, a late claim or a cancellation can still change it. Export after the month closes, and keep the file payroll was run from.
 
