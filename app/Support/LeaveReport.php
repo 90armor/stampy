@@ -85,8 +85,7 @@ final class LeaveReport
             $balance = $balances->for($employee, $type, $year);
 
             foreach (self::FIGURES as $figure) {
-                // A type without a balance has nothing available to sum.
-                $totals[$figure] += $figure !== 'available' ? $balance->{$figure} : ($balance->hasBalance ? $balance->available() : 0);
+                $totals[$figure] += $figure !== 'available' ? $balance->{$figure} : self::available($balance);
             }
 
             $rows[] = [
@@ -107,6 +106,16 @@ final class LeaveReport
             'departments' => $departments,
             'department' => $departmentId,
         ];
+    }
+
+    /**
+     * The Available a row shows in bold and the Total sums: a leaver's at
+     * their last day (Balance::availableAtLastDay()), everyone else's for the
+     * year. A type without a balance has nothing available.
+     */
+    public static function available(Balance $balance): int
+    {
+        return ! $balance->hasBalance ? 0 : ($balance->availableAtLastDay() ?? $balance->available());
     }
 
     /**

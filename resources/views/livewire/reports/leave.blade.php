@@ -64,7 +64,7 @@
             @if ($report)
                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
                     @if ($report['hasBalance'])
-                        The same balance as each employee's Time off: available = entitled + carried in + adjustments − used − pending.
+                        The same balance as each employee's Time off: available = entitled + carried in + adjustments − used − pending. For someone who left this year, available is at their last day.
                     @else
                         {{ $selectedType->name }} has no balance: the days each employee took.
                     @endif
@@ -119,9 +119,12 @@
                                 $cell = $row['total'] ? $total : $td;
                                 $figures = $row['total'] ? $report['totals'] : [
                                     'entitled' => $balance->entitled, 'carriedIn' => $balance->carriedIn, 'adjustments' => $balance->adjustments,
-                                    'used' => $balance->used, 'pending' => $balance->pending, 'available' => $hasBalance ? $balance->available() : 0,
+                                    'used' => $balance->used, 'pending' => $balance->pending, 'available' => \App\Support\LeaveReport::available($balance),
                                 ];
-                                $notUsableYet = ! $row['total'] && $hasBalance && $balance->usableFrom !== null;
+                                // A leaver's last year: Available is what they had at their
+                                // last day, the figure untaken leave is read from.
+                                $atLastDay = ! $row['total'] && $hasBalance && $balance->availableAtLastDay() !== null;
+                                $notUsableYet = ! $row['total'] && $hasBalance && $balance->usableFrom !== null && ! $atLastDay;
                             @endphp
                             <tr @class(['relative', 'font-semibold' => $row['total']])>
                                 <td class="table-pin-lead px-4 py-4 sm:pl-6 sm:pr-3">
@@ -135,7 +138,7 @@
                                         @foreach (array_filter([
                                             $row['joined'] ? 'Joined '.DisplayDate::compact($row['joined']) : null,
                                             $row['left'] ? 'Left '.DisplayDate::compact($row['left']) : null,
-                                            $balance->earnedToLastDay !== null ? 'Earned to last day: '.LeaveDays::label($balance->earnedToLastDay) : null,
+                                            $atLastDay ? 'Full-year balance: '.LeaveDays::label($balance->available()) : null,
                                             ($row['toilRemainder'] ?? 0) > 0 ? \App\Support\Duration::format($row['toilRemainder']).' toward the next half day' : null,
                                         ]) as $line)
                                             <span class="block max-w-[8.75rem] text-xs text-slate-500 sm:max-w-none dark:text-slate-400">{{ $line }}</span>
@@ -155,7 +158,12 @@
                                     <td class="{{ $cell }} {{ $row['total'] ? '' : 'text-slate-500 dark:text-slate-400' }}">{{ $days($figures['pending']) }}</td>
                                     {{-- Bold; a negative keeps the text colour and its minus
                                     sign — colour is for attendance status, not balances. --}}
-                                    <td class="px-3 py-4 text-right font-semibold tabular-nums whitespace-nowrap text-slate-900 dark:text-slate-100">{{ LeaveDays::label($figures['available']) }}</td>
+                                    <td class="px-3 py-4 text-right font-semibold tabular-nums whitespace-nowrap text-slate-900 dark:text-slate-100">
+                                        {{ LeaveDays::label($figures['available']) }}
+                                        @if ($atLastDay)
+                                            <span class="block text-xs font-normal text-slate-500 dark:text-slate-400">at last day</span>
+                                        @endif
+                                    </td>
                                 @else
                                     <td class="{{ $cell }}">{{ $days($figures['used']) }}</td>
                                 @endif

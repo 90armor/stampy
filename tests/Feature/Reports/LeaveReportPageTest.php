@@ -78,7 +78,7 @@ class LeaveReportPageTest extends TestCase
         // Kyaw: used 20, pending 1 (muted), available −3 — the number as it is, bold, not red.
         $this->assertStringContainsString('20 days', $html);
         $this->assertMatchesRegularExpression('#text-slate-500 dark:text-slate-400">1 day</td>#', $html);
-        $this->assertMatchesRegularExpression('#font-semibold tabular-nums whitespace-nowrap text-slate-900 dark:text-slate-100">-3 days</td>#', $html);
+        $this->assertMatchesRegularExpression('#font-semibold tabular-nums whitespace-nowrap text-slate-900 dark:text-slate-100">\s*-3 days\s*(<!--\[if (END)?BLOCK\]><!\[endif\]-->\s*)*</td>#', $html);
         $this->assertStringNotContainsString('text-red', $html);
         // Su joined in March: Annual isn't usable yet, so Time off's line, not a 0.
         $this->assertStringContainsString('Joined Mon 2 Mar', $html);
@@ -144,14 +144,14 @@ class LeaveReportPageTest extends TestCase
 
         $this->assertSame('Leave report, 2026 — All departments — All employees — generated 2026-06-15 09:10 (Asia/Phnom_Penh)', $lines[0][0]);
         $this->assertSame('Pending is as of the export time.', $lines[1][0]);
-        $this->assertSame(['Code', 'Name', 'Department', 'Joined', 'Left', 'Type', 'Balance', 'Entitled', 'Carried in', 'Adjustments', 'Used', 'Pending', 'Available', 'Usable from'], $lines[3]);
+        $this->assertSame(['Code', 'Name', 'Department', 'Joined', 'Left', 'Type', 'Balance', 'Entitled', 'Carried in', 'Adjustments', 'Used', 'Pending', 'Available', 'Available at last day', 'Usable from'], $lines[3]);
         $this->assertSame([
-            ['EMP-0002', 'Kyaw Kyaw', 'Engineering', '', '', 'Annual', 'Yes', '18.0', '0.0', '0.0', '20.0', '0.0', '-2.0', ''],
-            ['EMP-0005', 'Su Su', 'Engineering', '2026-03-02', '', 'Annual', 'Yes', '0.0', '0.0', '0.0', '0.0', '0.0', '0.0', '2027-03-02'],
-            ['Total', '', '', '', '', 'Annual', 'Yes', '18.0', '0.0', '0.0', '20.0', '0.0', '-2.0', ''],
-            ['EMP-0002', 'Kyaw Kyaw', 'Engineering', '', '', 'Unpaid', 'No', '', '', '', '2.0', '0.0', '', ''],
-            ['EMP-0005', 'Su Su', 'Engineering', '2026-03-02', '', 'Unpaid', 'No', '', '', '', '0.0', '0.0', '', ''],
-            ['Total', '', '', '', '', 'Unpaid', 'No', '', '', '', '2.0', '0.0', '', ''],
+            ['EMP-0002', 'Kyaw Kyaw', 'Engineering', '', '', 'Annual', 'Yes', '18.0', '0.0', '0.0', '20.0', '0.0', '-2.0', '', ''],
+            ['EMP-0005', 'Su Su', 'Engineering', '2026-03-02', '', 'Annual', 'Yes', '0.0', '0.0', '0.0', '0.0', '0.0', '0.0', '', '2027-03-02'],
+            ['Total', '', '', '', '', 'Annual', 'Yes', '18.0', '0.0', '0.0', '20.0', '0.0', '-2.0', '', ''],
+            ['EMP-0002', 'Kyaw Kyaw', 'Engineering', '', '', 'Unpaid', 'No', '', '', '', '2.0', '0.0', '', '', ''],
+            ['EMP-0005', 'Su Su', 'Engineering', '2026-03-02', '', 'Unpaid', 'No', '', '', '', '0.0', '0.0', '', '', ''],
+            ['Total', '', '', '', '', 'Unpaid', 'No', '', '', '', '2.0', '0.0', '', '', ''],
         ], array_slice($lines, 4));
 
         // Each type's Total is the page's.

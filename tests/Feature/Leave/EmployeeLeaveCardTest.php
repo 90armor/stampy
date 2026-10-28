@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\WorkSchedule;
 use App\Services\Leave\LeaveBalance;
 use App\Services\Leave\LeaveRequestService;
+use App\Support\LeaveDays;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -123,11 +124,21 @@ class EmployeeLeaveCardTest extends TestCase
             ->assertSee('Filed Annual leave for Employee — approved.');
     }
 
-    public function test_a_leaver_shows_what_was_earned_to_their_last_day(): void
+    public function test_a_leaver_shows_what_they_had_at_their_last_day(): void
     {
+        // Since Phase 5b.2 the bold Available is at their last day — the grant
+        // pro-rated to it — and the full-year figure is a muted line, as on
+        // the leave report.
         $this->employee->update(['status' => 'inactive', 'left_on' => '2026-06-10']);
+        $balance = app(LeaveBalance::class)->for($this->employee->fresh(), $this->annual, 2026);
+        $this->assertNotNull($balance->availableAtLastDay());
+        $this->assertLessThan($balance->available(), $balance->availableAtLastDay());
 
-        Livewire::actingAs($this->admin)->test(LeaveCard::class, ['employee' => $this->employee->fresh()])
-            ->assertSee('Earned to last day:');
+        $html = Livewire::actingAs($this->admin)->test(LeaveCard::class, ['employee' => $this->employee->fresh()])
+            ->assertSee('Full-year balance: '.LeaveDays::label($balance->available()))
+            ->html();
+
+        $this->assertMatchesRegularExpression('#'.preg_quote(LeaveDays::format($balance->availableAtLastDay()), '#').'(\s|<!--\[if BLOCK\]><!\[endif\]-->)*<span class="block text-xs font-normal text-slate-500 dark:text-slate-400">at last day</span>#', $html);
+        $this->assertStringNotContainsString('Earned to last day', $html);
     }
 }

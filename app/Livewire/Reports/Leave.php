@@ -60,8 +60,8 @@ class Leave extends Component
             fwrite($out, "\xEF\xBB\xBF");
             fputcsv($out, ['Leave report, '.$year.' — '.($department ?? 'All departments').' — '.$view.' — generated '.$exportedAt->format('Y-m-d H:i').' ('.config('app.timezone').')']);
             fputcsv($out, ['Pending is as of the export time.']);
-            fputcsv($out, ['Each row is the employee\'s balance as Time off shows it, in days. A type with no balance has only its used and pending days. Time off in lieu lists only employees who have earned some. Joined and Left only when inside the year.']);
-            fputcsv($out, ['Code', 'Name', 'Department', 'Joined', 'Left', 'Type', 'Balance', 'Entitled', 'Carried in', 'Adjustments', 'Used', 'Pending', 'Available', 'Usable from']);
+            fputcsv($out, ['Each row is the employee\'s balance as Time off shows it, in days. A type with no balance has only its used and pending days. Time off in lieu lists only employees who have earned some. Joined and Left only when inside the year. Available is the full year; for someone who left in the year, Available at last day is what they had at their last day (their grant pro-rated to it).']);
+            fputcsv($out, ['Code', 'Name', 'Department', 'Joined', 'Left', 'Type', 'Balance', 'Entitled', 'Carried in', 'Adjustments', 'Used', 'Pending', 'Available', 'Available at last day', 'Usable from']);
 
             foreach ($reports as [$type, $report]) {
                 // A type nobody has (Time off in lieu before anyone earns
@@ -83,9 +83,15 @@ class Leave extends Component
                         $hasBalance ? $decimal($balance->adjustments) : '',
                         $decimal($balance->used), $decimal($balance->pending),
                         $hasBalance ? $decimal($balance->available()) : '',
+                        $balance->availableAtLastDay() !== null ? $decimal($balance->availableAtLastDay()) : '',
                         $balance->usableFrom?->format('Y-m-d'),
                     ]);
                 }
+
+                // The page's Total sums each row's bold Available (a leaver's at
+                // their last day); here each column is summed as it stands.
+                $balances = collect($report['rows'])->pluck('balance');
+                $leavers = $balances->filter(fn ($balance) => $balance->availableAtLastDay() !== null);
 
                 $totals = $report['totals'];
                 fputcsv($out, [
@@ -94,7 +100,8 @@ class Leave extends Component
                     $hasBalance ? $decimal($totals['carriedIn']) : '',
                     $hasBalance ? $decimal($totals['adjustments']) : '',
                     $decimal($totals['used']), $decimal($totals['pending']),
-                    $hasBalance ? $decimal($totals['available']) : '',
+                    $hasBalance ? $decimal($balances->sum(fn ($balance) => $balance->available())) : '',
+                    $leavers->isNotEmpty() ? $decimal($leavers->sum(fn ($balance) => $balance->availableAtLastDay())) : '',
                     '',
                 ]);
             }

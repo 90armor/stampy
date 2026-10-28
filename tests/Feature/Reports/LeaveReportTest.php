@@ -44,6 +44,7 @@ class LeaveReportTest extends TestCase
             'available' => $balance->hasBalance ? $balance->available() : null,
             'usableFrom' => $balance->usableFrom?->format('Y-m-d'),
             'earnedToLastDay' => $balance->earnedToLastDay,
+            'availableAtLastDay' => $balance->availableAtLastDay(),
         ];
     }
 
@@ -102,6 +103,14 @@ class LeaveReportTest extends TestCase
         $row = collect($report['rows'])->first(fn ($row) => $row['employee']->is($leaver));
         $this->assertNotNull($row['left']);
         $this->assertEveryRowEqualsTheBalance($report, $annual, today()->year);
+
+        // Their bold Available is at their last day, the same on the profile's
+        // Leave card (the balances partial Time off shares).
+        $balance = $row['balance'];
+        $this->assertSame($balance->carriedIn + $balance->earnedToLastDay + $balance->adjustments - $balance->used - $balance->pending, LeaveReport::available($balance));
+        \Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Employees\LeaveCard::class, ['employee' => $leaver->fresh()])
+            ->assertSee('Full-year balance: '.LeaveDays::label($balance->available()))
+            ->assertSee('at last day');
     }
 
     public function test_the_edge_cases_show_what_time_off_shows(): void
@@ -134,6 +143,17 @@ class LeaveReportTest extends TestCase
         $leaverRow = collect($annualReport['rows'])->first(fn ($row) => $row['employee']->is($leaver));
         $this->assertSame('2026-04-30', $leaverRow['left']->format('Y-m-d'));
         $this->assertNotNull($leaverRow['balance']->earnedToLastDay);
+        // Available at their last day: the grant pro-rated to it, with the
+        // same carry, adjustments, use and pending — what the row shows and
+        // the Total sums.
+        $atLastDay = $leaverRow['balance']->availableAtLastDay();
+        $this->assertSame($leaverRow['balance']->carriedIn + $leaverRow['balance']->earnedToLastDay - $leaverRow['balance']->used, $atLastDay);
+        // Created after they left, they were never granted the year
+        // (LeaveGranter skips them), so their full-year balance is 0 and what
+        // they earned to the day is more.
+        $this->assertSame(0, $leaverRow['balance']->entitled);
+        $this->assertSame($atLastDay, LeaveReport::available($leaverRow['balance']));
+        $this->assertNull($joinerRow['balance']->availableAtLastDay());
 
         // A joiner this year: Medical pro-rated from the join date.
         $medicalRow = collect(LeaveReport::forYear(2026, $medical, $admin)['rows'])->first(fn ($row) => $row['employee']->is($joiner));
@@ -215,5 +235,43 @@ class LeaveReportTest extends TestCase
         $outside = LeaveReport::forYear(2026, $medical, $managerUser, $operations->id);
         $this->assertNull($outside['department']);
         $this->assertSame(['EMP-0001', 'EMP-0002'], $codes($outside));
+    }
+
+    public function test_a_leaver_whose_annual_was_not_usable_yet_has_what_they_earned(): void
+    {
+        $this->travelTo(Carbon::parse('2026-06-15 12:00:00'));
+        foreach (['admin', 'manager', 'employee'] as $role) {
+            Role::firstOrCreate(['name' => $role]);
+        }
+        WorkSchedule::factory()->create(['is_default' => true]);
+        $admin = User::factory()->create()->assignRole('admin');
+        $annual = LeaveType::factory()->create(['name' => 'Annual', 'days_per_year' => 18, 'min_service_months' => 12, 'seniority_bonus' => false, 'carry_over_cap' => 6]);
+        // Joined 2 Feb, left 29 May: Annual would have been usable next February.
+        $brief = Employee::factory()->inactive('2026-05-29')->create(['join_date' => '2026-02-02', 'employee_code' => 'EMP-0009']);
+        LeaveAdjustment::factory()->create(['employee_id' => $brief->id, 'leave_type_id' => $annual->id, 'year' => 2026, 'days' => '1.0', 'created_by' => $admin->id, 'note' => 'Correction']);
+
+        $report = LeaveReport::forYear(2026, $annual, $admin);
+        $balance = $report['rows'][0]['balance'];
+
+        $this->assertNotNull($balance->usableFrom);
+        $this->assertSame(0, $balance->entitled);
+        // Earned to last day, plus the adjustment — no grant, no carry.
+        $this->assertSame($balance->earnedToLastDay + 10, $balance->availableAtLastDay());
+        $this->assertSame($balance->availableAtLastDay(), $report['totals']['available']);
+        $this->assertEveryRowEqualsTheBalance($report, $annual, 2026);
+
+        // The row shows the figures, not "Usable from": they've left.
+        \Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Reports\Leave::class)
+            ->assertDontSee('Usable from')
+            ->assertSee(LeaveDays::label($balance->availableAtLastDay()))
+            ->assertSee('at last day');
+
+        // The CSV's "Available at last day" column, filled for a leaver only.
+        $download = \Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Reports\Leave::class)->call('download');
+        $lines = array_map('str_getcsv', explode("\n", trim(substr(base64_decode(data_get($download->effects, 'download.content')), 3))));
+        $header = $lines[3];
+        $row = collect($lines)->first(fn ($line) => $line[0] === 'EMP-0009' && $line[5] === 'Annual');
+        $this->assertSame(LeaveDays::toDecimal($balance->availableAtLastDay()), $row[array_search('Available at last day', $header, true)]);
+        $this->assertSame(LeaveDays::toDecimal($balance->available()), $row[array_search('Available', $header, true)]);
     }
 }
