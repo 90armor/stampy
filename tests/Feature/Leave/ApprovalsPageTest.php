@@ -191,7 +191,7 @@ class ApprovalsPageTest extends TestCase
 
         // Phase 6b: who decided it and when, before the service is reached.
         $page->call('decide')
-            ->assertSee('Already approved by '.$this->admin->name.' on '.DisplayDate::compact(today()).'.')
+            ->assertSee($leave->employee->full_name."'s leave request (".$leave->leaveType->name.', '.DisplayDate::compact($leave->start_date).') was already approved by '.$this->admin->name.' on '.DisplayDate::compact(today()).'.')
             ->assertSee('Nothing waiting for you');
     }
 

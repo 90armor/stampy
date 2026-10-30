@@ -5,13 +5,14 @@ namespace Tests\Feature\Leave;
 use App\Contracts\Approvable;
 use App\Enums\LeaveStatus;
 use App\Enums\OvertimeCompensation;
+use App\Enums\OvertimeStatus;
 use App\Livewire\Leave\Approvals;
 use App\Models\Employee;
 use App\Models\Leave;
 use App\Models\LeaveType;
-use App\Models\OvertimeRequest;
 use App\Models\User;
 use App\Models\WorkSchedule;
+use App\Services\Approval\ApprovalInbox;
 use App\Services\Leave\LeaveRequestService;
 use App\Services\Overtime\OvertimeRequestService;
 use Carbon\Carbon;
@@ -80,6 +81,12 @@ class StaleDecisionTest extends TestCase
             : app(OvertimeRequestService::class)->submit($this->employee, Carbon::parse('2026-06-17'), Carbon::parse('2026-06-17 17:00'), Carbon::parse('2026-06-17 19:00'), OvertimeCompensation::Pay, null, $this->employee->user)['request'];
     }
 
+    /** The request as its queue row names it: one person often has several waiting. */
+    private function subject(string $type): string
+    {
+        return $type === 'leave' ? 'leave request (Annual, Mon 22 Jun)' : 'overtime request (Wed 17 Jun, 5:00 PM – 7:00 PM)';
+    }
+
     private function service(Approvable $request): LeaveRequestService|OvertimeRequestService
     {
         return app($request instanceof Leave ? LeaveRequestService::class : OvertimeRequestService::class);
@@ -103,7 +110,7 @@ class StaleDecisionTest extends TestCase
 
         $page->call('decide')
             ->assertSet('showDecision', false)
-            ->assertSee('Kyaw Kyaw cancelled this request.')
+            ->assertSee('Kyaw Kyaw cancelled their '.$this->subject($type).'.')
             ->assertSee('Nothing waiting for you')
             ->assertDontSee('You don')
             // The item may have been far down the list: the notice scrolls into view.
@@ -122,7 +129,7 @@ class StaleDecisionTest extends TestCase
 
         $page->call('openDecision', $request->id, 'reject', $type, 1)
             ->assertSet('showDecision', false)
-            ->assertSee('Kyaw Kyaw cancelled this request.');
+            ->assertSee('Kyaw Kyaw cancelled their '.$this->subject($type).'.');
     }
 
     #[DataProvider('types')]
@@ -138,7 +145,7 @@ class StaleDecisionTest extends TestCase
         $page->set('note', 'Not this week.')
             ->call('decide')
             ->assertSet('showDecision', false)
-            ->assertSee('Already approved by Admin on Mon 15 Jun.');
+            ->assertSee("Kyaw Kyaw's ".$this->subject($type).' was already approved by Admin on Mon 15 Jun.');
 
         $this->assertSame('approved', $request->fresh()->status->value);
     }
@@ -153,7 +160,7 @@ class StaleDecisionTest extends TestCase
         $this->service($request)->reject($request, $this->admin, 'Too busy.');
 
         $page->call('decide')
-            ->assertSee('Already rejected by Admin on Mon 15 Jun.');
+            ->assertSee("Kyaw Kyaw's ".$this->subject($type).' was already rejected by Admin on Mon 15 Jun.');
     }
 
     #[DataProvider('types')]
@@ -168,7 +175,7 @@ class StaleDecisionTest extends TestCase
 
         $page->call('openDecision', $request->id, 'approve', $type, 1)
             ->assertSet('showDecision', false)
-            ->assertSee('Already moved on to admin approval.');
+            ->assertSee("Kyaw Kyaw's ".$this->subject($type).' has already moved on to admin approval.');
 
         $this->assertSame(2, $request->fresh()->current_step);
     }
@@ -203,5 +210,97 @@ class StaleDecisionTest extends TestCase
 
         $this->assertSame(LeaveStatus::Pending, $leave->fresh()->status);
         $this->assertSame(2, $leave->fresh()->current_step);
+    }
+
+    #[DataProvider('types')]
+    public function test_an_admin_who_cancelled_it_is_named_with_whose_request_it_was(string $type): void
+    {
+        $request = $this->pending($type);
+        $page = Livewire::actingAs($this->manager->user)->test(Approvals::class);
+
+        $this->service($request)->cancel($request, $this->admin);
+
+        $page->call('openDecision', $request->id, 'approve', $type, 1)
+            ->assertSee("Admin cancelled Kyaw Kyaw's ".$this->subject($type).'.');
+    }
+
+    public function test_the_notice_goes_on_the_next_approve_or_reject(): void
+    {
+        $leave = $this->pending('leave');
+        $overtime = $this->pending('overtime');
+        $page = Livewire::actingAs($this->manager->user)->test(Approvals::class);
+
+        app(LeaveRequestService::class)->cancel($leave, $this->employee->user);
+
+        $page->call('openDecision', $leave->id, 'approve', 'leave', 1)
+            ->assertSee('Kyaw Kyaw cancelled their leave request')
+            // The next decision opened: no old notice above it.
+            ->call('openDecision', $overtime->id, 'reject', 'overtime', 1)
+            ->assertSet('stale', null)
+            ->assertDontSee('Kyaw Kyaw cancelled their leave request')
+            ->set('note', 'Not this week.')
+            ->call('decide')
+            ->assertSet('stale', null)
+            ->assertSee("Rejected Kyaw Kyaw's overtime on Wed 17 Jun.");
+    }
+
+    /**
+     * The sidebar badge and the menu-button dot are rendered with the page;
+     * every render of Approvals sends them the count of the list it shows, so
+     * after a stale removal or a decision they agree with it — for a manager
+     * (Waiting for you) and an admin (Waiting for admin; no overrides here,
+     * whose non-stuck items the badge leaves out by design).
+     */
+    public function test_the_badge_follows_the_queue_after_a_stale_removal_and_a_decision(): void
+    {
+        // The manager: two requests at step 1.
+        $leave = $this->pending('leave');
+        $overtime = $this->pending('overtime');
+        $manager = $this->manager->user;
+        $page = Livewire::actingAs($manager)->test(Approvals::class);
+        $this->assertBadgeIsTheQueue($page, $manager, 2);
+
+        app(LeaveRequestService::class)->cancel($leave, $this->employee->user);
+        $page->call('openDecision', $leave->id, 'approve', 'leave', 1);
+        $this->assertBadgeIsTheQueue($page, $manager, 1);
+
+        $page->call('openDecision', $overtime->id, 'approve', 'overtime', 1)->call('decide');
+        $this->assertBadgeIsTheQueue($page, $manager, 0);
+
+        // The admin: two requests at step 2.
+        $leave = $this->pending('leave');
+        app(LeaveRequestService::class)->approve($leave, $manager);
+        $this->assertSame(2, $overtime->fresh()->current_step);
+        $page = Livewire::actingAs($this->admin)->test(Approvals::class);
+        $this->assertBadgeIsTheQueue($page, $this->admin, 2);
+
+        app(LeaveRequestService::class)->cancel($leave, $this->employee->user);
+        $page->call('openDecision', $leave->id, 'approve', 'leave', 2);
+        $this->assertBadgeIsTheQueue($page, $this->admin, 1);
+
+        $page->call('openDecision', $overtime->id, 'approve', 'overtime', 2)->call('decide');
+        $this->assertBadgeIsTheQueue($page, $this->admin, 0);
+        $this->assertSame(OvertimeStatus::Approved, $overtime->fresh()->status);
+    }
+
+    public function test_the_sidebar_badge_and_the_menu_dot_listen_for_the_refresh(): void
+    {
+        $this->pending('leave');
+
+        $this->actingAs($this->manager->user)->get(route('approvals.index'))
+            ->assertSeeHtml('x-on:approval-badge.window="count = $event.detail.count"')
+            ->assertSeeHtml('x-on:approval-badge.window="waiting = $event.detail.count"')
+            ->assertSee('Open sidebar — 1 approval waiting');
+    }
+
+    private function assertBadgeIsTheQueue($page, User $user, int $expected): void
+    {
+        $queue = count($page->viewData('stepOne')) + count($page->viewData('stepTwo'));
+
+        $this->assertSame($expected, $queue);
+        $this->assertSame([], $page->viewData('overrides'));
+        $page->assertDispatched('approval-badge', count: $expected);
+        // What the badge shows on the next page load.
+        $this->assertSame($expected, ApprovalInbox::count($user));
     }
 }

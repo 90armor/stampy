@@ -50,8 +50,19 @@ $navItems = [
                     @endif
                     <x-icon :name="$item['icon']" class="w-5 h-5 shrink-0 {{ $active ? 'text-primary-700 dark:text-primary-300' : 'text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200' }}" />
                     {{ $item['label'] }}
-                    @if (($item['badge'] ?? 0) > 0)
-                        <span class="ml-auto rounded-md bg-primary-600 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-white dark:bg-primary-500" aria-label="{{ $item['badge'] }} waiting">{{ $item['badge'] }}</span>
+                    @if (array_key_exists('badge', $item))
+                        {{-- Rendered with the page, so the Approvals page sends the count of
+                        the list it has just shown after every decision (approval-badge). --}}
+                        <span
+                            x-data="{ count: {{ (int) $item['badge'] }} }"
+                            x-on:approval-badge.window="count = $event.detail.count"
+                            x-show="count > 0"
+                            x-text="count"
+                            x-bind:aria-label="count + ' waiting'"
+                            @if ($item['badge'] === 0) style="display: none" @endif
+                            class="ml-auto rounded-md bg-primary-600 px-1.5 py-0.5 text-xs font-semibold tabular-nums text-white dark:bg-primary-500"
+                            aria-label="{{ $item['badge'] }} waiting"
+                        >{{ $item['badge'] }}</span>
                     @endif
                 </a>
             @else

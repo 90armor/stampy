@@ -228,23 +228,43 @@ class Approvals extends Component
             return null;
         }
 
-        $request->loadMissing(['employee', 'cancelledBy', 'approvalSteps.decidedBy']);
+        $request->loadMissing(['employee.user', 'cancelledBy', 'approvalSteps.decidedBy']);
         $decided = fn (array $outcomes) => $request->approvalSteps
             ->filter(fn (ApprovalStep $s) => in_array($s->outcome, $outcomes, true))
             ->sortBy('step')
             ->last();
         $by = fn (?ApprovalStep $s) => $s === null ? '.' : ' by '.($s->decidedBy?->name ?? 'an admin').' on '.DisplayDate::compact($s->decided_at).'.';
+        // Which request, as its queue row names it: one person often has several waiting.
+        $what = $this->staleSubject($request);
+        $whose = $request->employee->full_name."'s {$what}";
+        $canceller = $request->cancelledBy;
 
         return match ($request->status->value) {
-            'cancelled' => ($request->cancelledBy?->name ?? $request->employee->full_name).' cancelled this request.',
-            'approved' => 'Already approved'.$by($decided([ApprovalOutcome::Approved, ApprovalOutcome::SelfApproved])),
-            'rejected' => 'Already rejected'.$by($decided([ApprovalOutcome::Rejected])),
+            'cancelled' => match (true) {
+                $canceller === null => "{$whose} was cancelled.",
+                $canceller->is($request->employee->user) => "{$canceller->name} cancelled their {$what}.",
+                default => "{$canceller->name} cancelled {$whose}.",
+            },
+            'approved' => "{$whose} was already approved".$by($decided([ApprovalOutcome::Approved, ApprovalOutcome::SelfApproved])),
+            'rejected' => "{$whose} was already rejected".$by($decided([ApprovalOutcome::Rejected])),
             default => match (true) {
                 $step === null || $request->current_step === $step => null,
-                $request->current_step === ApprovalFlow::ADMIN_STEP => 'Already moved on to admin approval.',
-                default => 'This request has changed since the page loaded.',
+                $request->current_step === ApprovalFlow::ADMIN_STEP => "{$whose} has already moved on to admin approval.",
+                default => "{$whose} has changed since the page loaded.",
             },
         };
+    }
+
+    /** "leave request (Annual, Mon 3 Nov)", "overtime request (Thu 29 Oct, 5:00 PM – 7:00 PM)" — the queue rows' formats. */
+    private function staleSubject(Approvable $request): string
+    {
+        if ($request instanceof OvertimeRequest) {
+            return 'overtime request ('.$request->displayDateAndWindow().')';
+        }
+
+        $request->loadMissing('leaveType');
+
+        return 'leave request ('.$request->leaveType->name.', '.str_replace(' · ', ', ', $request->displayDates()).')';
     }
 
     private function showStale(string $why): void
@@ -267,6 +287,10 @@ class Approvals extends Component
 
         $user = auth()->user();
         $inbox = ApprovalInbox::for($user);
+        // The sidebar badge and the menu-button dot are rendered with the page,
+        // outside this component: every render — a decision, a stale removal —
+        // sends them the count of the list it shows (Phase 6b).
+        $this->dispatch('approval-badge', count: ApprovalInbox::countOf($inbox));
         $visible = EmployeeScope::for($user, 'Approvals')->ids;
         $describeOne = fn (Approvable $item) => $item instanceof OvertimeRequest
             ? $this->describeOvertime($item, $overtime)

@@ -19,6 +19,7 @@ use App\Models\Position;
 use App\Models\User;
 use App\Services\Attendance\DailySummaryBuilder;
 use App\Services\EmployeeLifecycle;
+use App\Services\Leave\LeaveDayCounter;
 use App\Services\Leave\LeaveRequestService;
 use App\Services\Overtime\OvertimeRequestService;
 use Illuminate\Support\Carbon;
@@ -107,6 +108,10 @@ $kh = $makeEmployee(['user_id' => $khUser->id, 'employee_code' => 'AUD-007', 'fu
 $punchWorkdays($kh, $today->copy()->subDays(30), $today->copy()->subDay());
 $leaves = app(LeaveRequestService::class);
 $future = $today->copy()->addWeeks(2)->startOfWeek();
+// A week of holidays (9–11 Nov) has no working day to request: try the next one.
+for ($i = 0; $i < 3 && array_sum(app(LeaveDayCounter::class)->count($kh->fresh(), $annual, $future, $future->copy()->addDays(2))) === 0; $i++) {
+    $future->addWeek();
+}
 $leaves->submit($kh->fresh(), $annual, $future, $future->copy()->addDays(2), null,
     str_repeat('My grandmother in Battambang is having surgery and I need to travel there to look after her during the recovery, arrange the hospital paperwork with my cousins, and make sure the house is ready for her return. ', 4).'ចាំបាច់ត្រូវទៅជួយគ្រួសារ។',
     $khUser);
