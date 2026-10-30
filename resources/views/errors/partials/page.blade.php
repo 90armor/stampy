@@ -26,7 +26,7 @@
         <x-slot name="header">{{ $header ?? $title }}</x-slot>
 
         <x-card>
-            <x-empty-state :icon="$icon" :title="$title" :description="$description">
+            <x-empty-state :icon="$icon" :title="$title" :description="$description" heading="h1">
                 <x-slot name="action">
                     <x-button variant="primary" href="{{ $action['href'] ?? route('dashboard') }}">{{ $action['label'] ?? 'Go to dashboard' }}</x-button>
                 </x-slot>
@@ -35,8 +35,10 @@
     </x-app-layout>
 @else
     <x-guest-layout>
+        <x-slot:pageTitle>{{ $header ?? $title }}</x-slot:pageTitle>
+
         <x-card>
-            <x-empty-state :icon="$icon" :title="$title" :description="$description">
+            <x-empty-state :icon="$icon" :title="$title" :description="$description" heading="h1">
                 <x-slot name="action">
                     <x-button variant="primary" href="{{ $action['href'] ?? route('login') }}">{{ $action['label'] ?? 'Go to login' }}</x-button>
                 </x-slot>

@@ -13,6 +13,7 @@ use App\Services\Overtime\OvertimeRequestService;
 use App\Support\AttendanceTime;
 use App\Support\DisplayDate;
 use App\Support\Duration;
+use App\Support\EmployeePicker;
 use App\Support\OvertimeSummary;
 use Illuminate\Support\Carbon;
 use Livewire\Attributes\On;
@@ -334,14 +335,7 @@ class RequestModal extends Component
             'employee' => $employee,
             // Time off only while there's a TOIL type to credit it to (Phase 4b).
             'timeOffOffered' => $settings->toil_leave_type_id !== null,
-            'matches' => $this->forOthers && $employee === null && trim($this->employeeSearch) !== ''
-                ? Employee::query()
-                    ->where(fn ($query) => $query->where('full_name', 'like', '%'.trim($this->employeeSearch).'%')
-                        ->orWhere('employee_code', 'like', '%'.trim($this->employeeSearch).'%'))
-                    ->orderBy('full_name')
-                    ->limit(8)
-                    ->get()
-                : collect(),
+            ...EmployeePicker::search($this->forOthers && $employee === null ? $this->employeeSearch : ''),
             // Mirrors the service's own date rules (the server stays the authority).
             'minDate' => $this->forOthers ? $employee?->join_date?->format('Y-m-d') : today()->subDays($settings->claim_window_days)->format('Y-m-d'),
             'maxDate' => today()->addDays(OvertimeRequestService::PLANNED_DAYS_AHEAD)->format('Y-m-d'),

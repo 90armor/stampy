@@ -161,7 +161,7 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
             return redirect()->route('policies.index', ['tab' => $request->query('tab')]);
         }
 
-        return view('organization');
+        return view('organization', ['tab' => $request->query('tab') === 'positions' ? 'positions' : 'departments']);
     })->name('organization.index');
 });
 

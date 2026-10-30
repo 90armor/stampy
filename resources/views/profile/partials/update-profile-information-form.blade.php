@@ -18,7 +18,7 @@
             @if ($user->employee)
                 {{-- HR data, admin-owned (see ProfileController::update(), which enforces
                 this server-side — the readonly attribute here is presentation only). --}}
-                <x-text-input id="name" name="name" type="text" class="mt-1 block w-full cursor-not-allowed !bg-slate-50 !text-slate-500 dark:!bg-slate-900 dark:!text-slate-600" :value="$user->employee->full_name" readonly aria-readonly="true" />
+                <x-text-input id="name" name="name" type="text" class="mt-1 block w-full cursor-not-allowed !bg-slate-50 !text-slate-500 dark:!bg-slate-900 dark:!text-slate-400" :value="$user->employee->full_name" readonly aria-readonly="true" />
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">{{ __('Your name is managed by an admin and set from your employee record.') }}</p>
             @else
                 <x-text-input id="name" name="name" type="text" class="mt-1 block w-full" :value="old('name', $user->name)" required autofocus autocomplete="name" />

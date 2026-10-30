@@ -1,6 +1,6 @@
 <x-guest-layout>
-    <h2 class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Choose a new password</h2>
-    <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Make it something you haven't used before.</p>
+    <h1 class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Choose a new password</h1>
+    <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Make it something you haven't used before.</p>
 
     <form method="POST" action="{{ route('password.store') }}" class="mt-8 space-y-5">
         @csrf

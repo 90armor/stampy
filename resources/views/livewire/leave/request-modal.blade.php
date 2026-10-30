@@ -38,11 +38,11 @@
                     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div>
                             <x-input-label for="leave_start" value="From" />
-                            <x-date-picker id="leave_start" model="start_date" label="First day" :min="$minDate" :max="$maxDate" />
+                            <x-date-picker id="leave_start" model="start_date" label="From" :min="$minDate" :max="$maxDate" />
                         </div>
                         <div>
                             <x-input-label for="leave_end" value="To" />
-                            <x-date-picker id="leave_end" model="end_date" label="Last day" :min="$minDate" :max="$maxDate" placeholder="Same day" clearable />
+                            <x-date-picker id="leave_end" model="end_date" label="To" :min="$minDate" :max="$maxDate" placeholder="Same day" hint="Same day if empty" clearable />
                         </div>
                     </div>
                     {{-- The dates' errors, and the request-as-a-whole ones (balance), full

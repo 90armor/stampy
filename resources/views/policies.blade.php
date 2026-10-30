@@ -1,4 +1,4 @@
-<x-app-layout>
+<x-app-layout :section="$tabs[$tab]">
     <x-slot name="header">Policies</x-slot>
 
     {{-- The rules attendance, leave and overtime are counted by: working time

@@ -127,7 +127,7 @@ The Daily Attendance date control is a trigger (showing the range in the `Displa
 - **Bounds.** `min`/`max` mirror the field's server-side rule, and days outside them are muted, `aria-disabled` and can't be picked: a punch from the employee's join date to today; an assignment's effective date from the join date; bulk reassignment at most 60 days back. Holiday and join dates are unbounded. The server rule stays the authority.
 - **Footer: Today and Clear.** **Today** sits on the right and picks today; it is shown only when today is inside the field's `min`/`max` (an employee who joins next month gets no Today on their punch or assignment date). **Clear** sits on the left and only on a field whose server rule is `nullable` (`clearable`): it empties the value, the trigger returns to its placeholder, the popover closes and focus returns to the trigger. A required field gets no Clear — picking again already replaces the value. Every date field today is required (holiday date, join date, both effective dates, punch date), so none shows Clear yet. Typing a date is not possible. The Daily Attendance range has neither button: Reset filters and the Today preset cover both.
 - **In a modal.** The popover is `position: fixed` and placed against the trigger — below it when it fits, otherwise above (the join date flips up in the employee form), with the panel scrolling within the space if neither fits — so a modal's scrolling body can't clip it. It stays inside the modal's DOM, so the modal's focus trap includes it. Escape closes only the picker while it is open; with the picker closed, Escape reaches the modal as before.
-- **Below 640px** a native date input on the same property, with the same `min`/`max`, takes the trigger's place.
+- **Below 640px** a native date input on the same property, with the same `min`/`max`, takes the trigger's place. A native input has no placeholder, so a field whose placeholder explains an empty value also passes `hint`, shown under it: the leave request's To says "Same day if empty" (Phase 6d).
 
 ## Leave and holidays in the attendance views
 
@@ -173,7 +173,7 @@ The Attendance table prioritizes scanability:
 
 ## Responsive behavior
 
-On narrow screens, preserve the full table and native horizontal scrolling instead of hiding columns, converting rows into cards, or compressing data until it becomes unreadable. The table has a readable minimum width and its container uses `overflow-x-auto`.
+On narrow screens, preserve the full table and native horizontal scrolling instead of hiding columns, converting rows into cards, or compressing data until it becomes unreadable. Every such table sits in `<x-table-scroll>`, a labelled region a keyboard user can focus and scroll with the arrow keys ([Design System](DESIGN_SYSTEM.md#tables-and-data-lists)). The table has a readable minimum width and its container uses `overflow-x-auto`.
 
 A short, non-interactive “Scroll to view all columns” cue appears above the table whenever the table is wider than its card, and requires no JavaScript. Its breakpoint follows the measured table width, not a generic desktop breakpoint: the Daily Attendance table's natural width is about 1119px, which first fits at a 1440px viewport (1134px card), so its cue is hidden only from `min-[1440px]`; the Employees table (about 959px, `min-w-[60rem]`) fits from `xl` (974px card), so its cue is hidden from `xl`. The cue is supplementary; native scrolling remains the interaction.
 

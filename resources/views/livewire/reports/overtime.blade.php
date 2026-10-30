@@ -50,7 +50,7 @@
             {{-- Wider than a phone (and than 1024 with the sidebar): the Employee
             column stays pinned while the figures scroll under it, and the end
             edge fades while more columns lie beyond. No column is hidden. --}}
-            <div x-data="scrollEdges" @scroll.passive="measure()" class="scroll-fade-end mt-3 overflow-x-auto rounded-b-xl">
+            <x-table-scroll label="Overtime report" x-data="scrollEdges" @scroll.passive="measure()" class="scroll-fade-end mt-3 rounded-b-xl">
                 <table class="w-full min-w-[56rem] text-sm">
                     <thead>
                         <tr class="relative text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -91,7 +91,7 @@
                         </tr>
                     </tbody>
                 </table>
-            </div>
+            </x-table-scroll>
         @endif
     </x-card>
 </div>

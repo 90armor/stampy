@@ -145,7 +145,7 @@ class HolidayCalendarDisplayTest extends TestCase
                 ->call('openDay', '2026-03-02')
                 ->html();
 
-            $this->assertStringContainsString('leading-tight text-slate-600 dark:text-slate-400 sm:block" title="Test Holiday"', $html, $status->value);
+            $this->assertStringContainsString('leading-tight text-slate-600 dark:text-slate-400 sm:block">', $html, $status->value);
             $this->assertMatchesRegularExpression('/<p class="mt-0\.5 flex items-center gap-1 text-sm text-slate-500 dark:text-slate-400">\s*<svg[^>]*>.*?<\/svg>\s*Test Holiday/s', $html, $status->value);
             $this->assertStringNotContainsString('text-fuchsia-700 dark:text-fuchsia-300 sm:block', $html, $status->value);
             $this->assertStringNotContainsString('font-medium text-fuchsia-700', $html, $status->value);

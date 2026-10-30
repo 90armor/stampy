@@ -11,6 +11,7 @@ use App\Models\LeaveType;
 use App\Services\Leave\LeavePreview;
 use App\Services\Leave\LeaveRequestService;
 use App\Support\DisplayDate;
+use App\Support\EmployeePicker;
 use App\Support\LeaveDays;
 use Illuminate\Support\Carbon;
 use Livewire\Attributes\On;
@@ -280,14 +281,7 @@ class RequestModal extends Component
         return view('livewire.leave.request-modal', [
             'employee' => $employee,
             'types' => LeaveType::query()->where('is_active', true)->orderBy('id')->get(),
-            'matches' => $this->forOthers && $employee === null && trim($this->employeeSearch) !== ''
-                ? Employee::query()
-                    ->where(fn ($query) => $query->where('full_name', 'like', '%'.trim($this->employeeSearch).'%')
-                        ->orWhere('employee_code', 'like', '%'.trim($this->employeeSearch).'%'))
-                    ->orderBy('full_name')
-                    ->limit(8)
-                    ->get()
-                : collect(),
+            ...EmployeePicker::search($this->forOthers && $employee === null ? $this->employeeSearch : ''),
             // Mirrors the service's own date rules (the server stays the authority).
             'minDate' => $this->forOthers ? $employee?->join_date?->format('Y-m-d') : today()->subDays(LeaveRequestService::RETROACTIVE_DAYS)->format('Y-m-d'),
             'maxDate' => "{$latestYear}-12-31",

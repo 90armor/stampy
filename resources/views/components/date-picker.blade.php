@@ -14,13 +14,15 @@ plain wire:model it replaces. Rules: docs/ATTENDANCE_UI.md, Date picker.
   the authority.
 - clearable: only for a field whose rule is nullable — adds Clear to the
   footer. A required field gets none: picking again already replaces it.
+- hint: what an empty value means, for a field whose placeholder says so: the
+  native input below 640px has no placeholder, so it shows this under the field.
 - The footer's Today shows only when today is inside min/max.
 - Other attributes (wire:loading.attr, autofocus, a width) go on the trigger.
 
 From 640px the trigger opens the shared calendar in a popover; below 640px a
 native date input, bound to the same property, takes its place — the same
 split as the Daily Attendance range. --}}
-@props(['id', 'model', 'label', 'min' => null, 'max' => null, 'placeholder' => 'Select a date', 'clearable' => false])
+@props(['id', 'model', 'label', 'min' => null, 'max' => null, 'placeholder' => 'Select a date', 'clearable' => false, 'hint' => null])
 
 @php
     $today = today()->format('Y-m-d');
@@ -46,6 +48,7 @@ split as the Daily Attendance range. --}}
             :aria-expanded="panelOpen"
             aria-haspopup="dialog"
             aria-controls="{{ $id }}-panel"
+            @if ($hint) aria-describedby="{{ $id }}-hint" @endif
             :aria-label="@js($label) + ', ' + (displayLong || 'no date selected')"
             {{ $attributes->merge(['class' => 'inline-flex h-control w-full items-center justify-between gap-2 rounded-lg border border-slate-border bg-white px-3 text-left text-sm leading-5 text-slate-900 shadow-sm transition hover:bg-slate-50 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-500 dark:bg-slate-750 dark:text-slate-100 dark:hover:bg-slate-600/30 dark:disabled:bg-slate-800 dark:disabled:text-slate-600']) }}
         >
@@ -92,9 +95,13 @@ split as the Daily Attendance range. --}}
         type="date"
         id="{{ $id }}-native"
         aria-label="{{ $label }}"
+        @if ($hint) aria-describedby="{{ $id }}-hint" @endif
         wire:model="{{ $model }}"
         @if ($min) min="{{ $min }}" @endif
         @if ($max) max="{{ $max }}" @endif
         class="block h-control w-full min-w-0 rounded-lg border-slate-border bg-white text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 dark:bg-slate-750 dark:text-slate-100 sm:hidden"
     >
+    @if ($hint)
+        <p id="{{ $id }}-hint" class="mt-1 text-xs text-slate-500 sm:hidden dark:text-slate-400">{{ $hint }}</p>
+    @endif
 </div>

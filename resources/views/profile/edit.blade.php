@@ -1,6 +1,9 @@
 <x-app-layout>
     <x-slot name="header">Profile</x-slot>
 
+    {{-- Outside the stack: the page shows its name in the topbar, and a first child would space the card below it. --}}
+    <h1 class="sr-only">Profile</h1>
+
     <div class="max-w-2xl space-y-6">
         {{-- A user with no linked employee record (not yet onboarded to
              self-service, or a plain login-only account) sees only the

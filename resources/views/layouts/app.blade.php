@@ -5,7 +5,14 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ config('app.name', 'Laravel') }}</title>
+        {{-- From what the topbar shows, never written per view (App\Support\PageTitle).
+        On a page with section tabs, data-tab-title is what tabBar (resources/js/app.js)
+        fills in when the tab changes without a reload. --}}
+        @isset($section)
+            <title data-tab-title="{{ \App\Support\PageTitle::for($header ?? null, $breadcrumbs ?? null, ':tab') }}">{{ \App\Support\PageTitle::for($header ?? null, $breadcrumbs ?? null, $section) }}</title>
+        @else
+            <title>{{ \App\Support\PageTitle::for($header ?? null, $breadcrumbs ?? null) }}</title>
+        @endisset
 
         <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 
@@ -56,8 +63,13 @@
                     });
                 },
                 sidebarFocusables() {
-                    return [...this.$refs.sidebarPanel.querySelectorAll('a, button, [tabindex]:not([tabindex=\'-1\'])')]
+                    return [this.$refs.skipLink, ...this.$refs.sidebarPanel.querySelectorAll('a, button, [tabindex]:not([tabindex=\'-1\'])')]
                         .filter((element) => ! element.hasAttribute('disabled'));
+                },
+                skipToContent() {
+                    this.sidebarTrigger = null;
+                    this.sidebarOpen = false;
+                    this.$nextTick(() => this.$refs.main.focus());
                 },
                 trapSidebarTab(event) {
                     const focusable = this.sidebarFocusables();
@@ -77,6 +89,18 @@
             }"
             class="h-screen flex overflow-hidden"
         >
+            {{-- The first focusable element on every app page, hidden until focused.
+            With the phone drawer open it's part of the drawer's focus trap (sidebarFocusables),
+            and skipToContent() closes the drawer without handing focus back to the menu button.
+            A click handler rather than the bare fragment, so ?tab= URLs don't gain a #main-content. --}}
+            <a
+                href="#main-content"
+                x-ref="skipLink"
+                @click.prevent="skipToContent()"
+                @keydown.tab="if (sidebarOpen) trapSidebarTab($event)"
+                class="sr-only rounded-lg bg-white text-sm font-medium text-primary-700 shadow-lg ring-2 ring-primary-500 focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[70] focus:px-4 focus:py-2.5 focus:outline-none dark:bg-slate-750 dark:text-primary-300"
+            >Skip to content</a>
+
             <!-- Desktop sidebar -->
             <div class="hidden lg:flex lg:shrink-0">
                 @include('layouts.partials.sidebar')
@@ -99,7 +123,7 @@
             <div class="flex flex-1 flex-col overflow-hidden">
                 @include('layouts.partials.topbar', ['header' => $header ?? null, 'breadcrumbs' => $breadcrumbs ?? null])
 
-                <main class="flex-1 overflow-y-auto">
+                <main id="main-content" x-ref="main" tabindex="-1" class="flex-1 overflow-y-auto focus:outline-none">
                     <div class="max-w-7xl 2xl:max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                         {{ $slot }}
                     </div>

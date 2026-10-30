@@ -305,8 +305,9 @@ class CalendarViewTest extends TestCase
         // only ellipsizes what still doesn't — confirmed visually at both
         // mobile and desktop widths, in a real browser, since this is a
         // wrapping/layout behaviour no server-rendered-HTML assertion can
-        // check on its own. title= stays as a fallback for names that are
-        // still cut off after two lines.
+        // check on its own. A name still cut off after two lines stays whole
+        // in the cell's accessible label and the day modal (no native title=,
+        // which shows on hover only — Phase 6d).
         $employee = Employee::factory()->create();
         Holiday::factory()->create(['date' => '2026-03-05', 'name' => 'Company Anniversary (demo)']);
 
@@ -315,7 +316,8 @@ class CalendarViewTest extends TestCase
             ->set('month', self::SUNDAY_START_MONTH)
             ->assertDontSeeHtml('class="w-full truncate')
             ->assertSeeHtml('class="hidden w-full line-clamp-2')
-            ->assertSeeHtml('title="Company Anniversary (demo)"')
+            ->assertDontSeeHtml('title="Company Anniversary (demo)"')
+            ->assertSeeHtml(', Holiday: Company Anniversary (demo)"')
             ->assertSee('Company Anniversary (demo)')
             // Below sm the name would clip, so a small flag marks the holiday
             // instead, and the day number and icon stack rather than collide.

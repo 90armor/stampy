@@ -2,7 +2,7 @@ import { chromium } from 'playwright';
 import fs from 'node:fs';
 
 export const BASE = 'http://localhost:8000';
-export const REPO = new URL('../../../', import.meta.url).pathname;
+export const REPO = process.env.STAMPY_REPO ?? new URL('../../../', import.meta.url).pathname;
 export const OUT = `${REPO}docs/audit/shots`;
 export const DATA = `${REPO}storage/app/audit-data`;
 // axe-core is resolved from wherever playwright + axe-core are installed (see README).

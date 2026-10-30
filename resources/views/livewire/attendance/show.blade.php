@@ -88,6 +88,7 @@
                 icon="user-x"
                 title="Your account isn't linked to an employee record"
                 description="There's nothing to show here yet — contact an admin to get this login linked to an employee profile."
+                heading="h1"
             />
         </x-card>
     @else
@@ -369,16 +370,13 @@
                                     not one, and a single-line ellipsis was cutting off names that
                                     didn't need to be cut at all. Still bounded — a genuinely long
                                     name clamps with an ellipsis on the 2nd line rather than
-                                    growing the cell — and title= stays as a full-text fallback for
-                                    whatever's still cut off; @title doesn't need a touch/at-rest
-                                    equivalent the way an interactive control would (1.2's rule),
-                                    since it's supplementary here, not the only way to read the
-                                    name — line-clamp already shows as much as fits. --}}
+                                    growing the cell. A clipped name stays whole in the cell's accessible
+                                    label and in the day modal. --}}
                                     {{-- Below sm there is no room for the name without clipping it,
                                     so the cell shows a small flag instead (the name stays in the
                                     cell's accessible label and in the day modal). A cell whose
                                     status icon is already the holiday flag needs no second one. --}}
-                                    <span class="hidden w-full line-clamp-2 text-[10px] font-medium leading-tight text-slate-600 dark:text-slate-400 sm:block" title="{{ $holiday }}">
+                                    <span class="hidden w-full line-clamp-2 text-[10px] font-medium leading-tight text-slate-600 dark:text-slate-400 sm:block">
                                         {{ $holiday }}
                                     </span>
                                     @unless ($style['icon'] === 'flag')
@@ -482,7 +480,7 @@
                 $canManagePunches = auth()->user()->can('update', $employee);
                 $emDash = '<span class="text-slate-300 dark:text-slate-600">—</span>';
             @endphp
-            <div class="overflow-x-auto">
+            <x-table-scroll label="Attendance by day">
                 <table class="min-w-full">
                     <thead>
                         <tr class="relative whitespace-nowrap text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -625,7 +623,7 @@
                             </tbody>
                         @endforeach
                 </table>
-            </div>
+            </x-table-scroll>
         @endif
         </x-card>
 
