@@ -8,6 +8,7 @@ use App\Support\LeaveDays;
 use App\Support\LeaveReport;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -24,6 +25,13 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class Leave extends Component
 {
+    /**
+     * Whether the report is computed: the Reports page computes only the tab
+     * it opens on, and each other tab the first time it's shown (open(),
+     * Phase 6c). Until then render() shows a loading state and nothing else.
+     */
+    public bool $opened = true;
+
     #[Url(as: 'year', history: true)]
     public string $year = '';
 
@@ -144,9 +152,20 @@ class Leave extends Component
         return $report;
     }
 
+    /** The Reports page has shown this tab for the first time: compute it now. */
+    #[On('report-open')]
+    public function open(): void
+    {
+        $this->opened = true;
+    }
+
     public function render()
     {
         $this->authorize('reports.leave');
+
+        if (! $this->opened) {
+            return view('livewire.reports.placeholder', ['report' => 'leave report']);
+        }
 
         $year = $this->selectedYear();
         $types = LeaveReport::types($year);

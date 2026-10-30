@@ -15,16 +15,19 @@ use App\Models\OvertimeRequest;
 use App\Models\OvertimeSettings;
 use App\Services\Approval\ApprovalFlow;
 use App\Services\Approval\ApprovalInbox;
+use App\Services\Leave\Balance;
 use App\Services\Leave\LeaveBalance;
 use App\Services\Leave\LeaveDayCounter;
 use App\Services\Leave\LeaveRequestService;
 use App\Services\Overtime\OvertimeRequestService;
+use App\Support\ApprovalBadge;
 use App\Support\AttendanceTime;
 use App\Support\DisplayDate;
 use App\Support\Duration;
 use App\Support\EmployeeScope;
 use App\Support\LeaveDays;
 use App\Support\OvertimeSummary;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
@@ -286,21 +289,25 @@ class Approvals extends Component
         $this->authorize('decideAny', Leave::class);
 
         $user = auth()->user();
-        $inbox = ApprovalInbox::for($user);
+        [$inbox, $status] = ApprovalInbox::withStatus($user);
+        $waiting = ApprovalInbox::countOf($inbox, $status);
         // The sidebar badge and the menu-button dot are rendered with the page,
         // outside this component: every render — a decision, a stale removal —
-        // sends them the count of the list it shows (Phase 6b).
-        $this->dispatch('approval-badge', count: ApprovalInbox::countOf($inbox));
+        // sends them the count of the list it shows (Phase 6b), and on a full
+        // page load they show it without counting again (Phase 6c).
+        ApprovalBadge::remember($user, $waiting);
+        $this->dispatch('approval-badge', count: $waiting);
         $visible = EmployeeScope::for($user, 'Approvals')->ids;
+        $facts = $this->facts($inbox['stepOne']->concat($inbox['stepTwo'])->concat($inbox['overrides']), $balances, $counter, $overtime, $visible);
         $describeOne = fn (Approvable $item) => $item instanceof OvertimeRequest
-            ? $this->describeOvertime($item, $overtime)
-            : $this->describe($item, $balances, $counter, $visible);
+            ? $this->describeOvertime($item, $facts)
+            : $this->describe($item, $facts);
         $describe = fn (Collection $items) => $items->map($describeOne)->all();
         // Only the override group says "Stuck": it's why an admin steps in there.
         $describeOverrides = fn (Collection $items) => $items->map(fn (Approvable $item) => [
             ...$describeOne($item),
-            'stuck' => ApprovalInbox::isStuck($item),
-            'awayReason' => ApprovalInbox::awayReason($item),
+            'stuck' => $status[ApprovalInbox::key($item)]['stuck'],
+            'awayReason' => $status[ApprovalInbox::key($item)]['awayReason'],
         ])->all();
 
         $deciding = $this->decidingId === null ? null : ($this->decidingType === 'overtime'
@@ -324,22 +331,76 @@ class Approvals extends Component
     }
 
     /**
+     * Everything the cards read, loaded once for every request on the page
+     * rather than per card (Phase 6c): relations, each leave's cost, the
+     * balances after it (LeaveBalance::forMany(), per balance type and year),
+     * "Also off" (one query, each card's share filtered here exactly as its
+     * own query did) and what each past overtime request's punches would
+     * credit (OvertimeRequestService::creditsFor()).
+     *
+     * @param  Collection<int, Approvable>  $items
+     * @param  int[]|null  $visible  EmployeeScope's ids for this approver (null = everyone)
+     * @return array{costs: array<int, array<int, int>>, balances: array<string, Balance>, alsoOff: Collection<int, Leave>, credits: array<int, array<string, mixed>>}
+     */
+    private function facts(Collection $items, LeaveBalance $balances, LeaveDayCounter $counter, OvertimeRequestService $overtime, ?array $visible): array
+    {
+        $leaves = EloquentCollection::make($items->filter(fn (Approvable $item) => $item instanceof Leave)->values()->all())
+            ->loadMissing(['employee.department', 'employee.scheduleAssignments', 'leaveType.deductsFrom', 'approvalSteps.decidedBy']);
+        $overtimeRequests = EloquentCollection::make($items->filter(fn (Approvable $item) => $item instanceof OvertimeRequest)->values()->all())
+            ->loadMissing(['employee.department', 'approvalSteps.decidedBy']);
+
+        $holidays = LeaveDayCounter::holidaysFor($leaves);
+        $costs = $leaves->mapWithKeys(fn (Leave $leave) => [$leave->id => $counter->countLeave($leave, $holidays)])->all();
+
+        // Whose balance of which type, for which year: one forMany() per pair.
+        $wanted = [];
+        foreach ($leaves as $leave) {
+            $balanceType = $leave->leaveType->deductsFrom ?? $leave->leaveType;
+
+            foreach ($balanceType->hasBalance() ? array_keys($costs[$leave->id]) : [] as $year) {
+                $wanted[$balanceType->id.'|'.$year] ??= ['type' => $balanceType, 'year' => $year, 'employees' => []];
+                $wanted[$balanceType->id.'|'.$year]['employees'][$leave->employee->id] = $leave->employee;
+            }
+        }
+        $found = [];
+        foreach ($wanted as $key => $want) {
+            foreach ($balances->forMany($want['employees'], $want['type'], $want['year']) as $employeeId => $balance) {
+                $found[$key.'|'.$employeeId] = $balance;
+            }
+        }
+
+        $alsoOff = $leaves->isEmpty() ? collect() : Leave::query()
+            ->whereIn('status', [LeaveStatus::Pending->value, LeaveStatus::Approved->value])
+            ->whereHas('employee', fn ($query) => $query->whereIn('department_id', $leaves->pluck('employee.department_id')->filter()->unique()))
+            ->when($visible !== null, fn ($query) => $query->whereIn('employee_id', $visible))
+            ->whereDate('start_date', '<=', $leaves->max('end_date')->format('Y-m-d'))
+            ->whereDate('end_date', '>=', $leaves->min('start_date')->format('Y-m-d'))
+            ->with(['employee', 'leaveType'])
+            ->orderBy('start_date')
+            ->orderBy('id')
+            ->get();
+
+        $past = $overtimeRequests->filter(fn (OvertimeRequest $request) => ! $request->date->isFuture())->values();
+
+        return ['costs' => $costs, 'balances' => $found, 'alsoOff' => $alsoOff, 'credits' => $overtime->creditsFor($past)];
+    }
+
+    /**
      * What one overtime request card shows: the request, and for a claim or a
      * planned date that has passed, what the day's punches would credit if it
      * were approved (OvertimeRequestService::wouldCredit() — the builder's own
-     * calculation).
+     * calculation — through creditsFor(), in facts()).
      *
+     * @param  array<string, mixed>  $facts  facts()
      * @return array<string, mixed>
      */
-    private function describeOvertime(OvertimeRequest $request, OvertimeRequestService $service): array
+    private function describeOvertime(OvertimeRequest $request, array $facts): array
     {
-        $request->loadMissing(['employee.department', 'approvalSteps.decidedBy']);
-
         $worked = null;
         $workedHint = null;
 
         if (! $request->date->isFuture()) {
-            $would = $service->wouldCredit($request);
+            ['would' => $would, 'requested' => $requested] = $facts['credits'][$request->id];
             $credit = $would['credit'] ?? null;
             $categories = $credit === null ? [] : array_filter([
                 'workday' => $credit->workday, 'night' => $credit->night, 'rest_day' => $credit->restDay, 'holiday' => $credit->holiday,
@@ -349,7 +410,6 @@ class Approvals extends Component
                 ? ' ('.collect($categories)->keys()->map(fn ($key) => strtolower(OvertimeSummary::CATEGORIES[$key][0]))->implode(', ').')'
                 : '';
             // Less than requested is written against the request, so it can't be read past.
-            $requested = $service->approvedMinutes($request);
             $short = $credit !== null && $credit->total() < $requested;
             $worked = match (true) {
                 $would === null || ($would['in'] === null && $would['out'] === null) => 'No punches on record for this day yet: nothing would be credited until they\'re added.',
@@ -383,32 +443,29 @@ class Approvals extends Component
     /**
      * What one request card shows.
      *
-     * @param  int[]|null  $visible  EmployeeScope's ids for this approver (null = everyone)
+     * @param  array<string, mixed>  $facts  facts()
      * @return array<string, mixed>
      */
-    private function describe(Leave $leave, LeaveBalance $balances, LeaveDayCounter $counter, ?array $visible): array
+    private function describe(Leave $leave, array $facts): array
     {
-        $leave->loadMissing(['employee.department', 'leaveType.deductsFrom', 'approvalSteps.decidedBy']);
         $employee = $leave->employee;
-        $cost = $counter->countLeave($leave);
+        $cost = $facts['costs'][$leave->id];
         $balanceType = $leave->leaveType->deductsFrom ?? $leave->leaveType;
 
         // Pending leave is already reserved, so available() is the balance after this request.
         $after = ! $balanceType->hasBalance() ? [] : collect(array_keys($cost))
-            ->map(fn (int $year) => ['year' => $year, 'available' => LeaveDays::format($balances->for($employee, $balanceType, $year)->available())])
+            ->map(fn (int $year) => ['year' => $year, 'available' => LeaveDays::format($facts['balances'][$balanceType->id.'|'.$year.'|'.$employee->id]->available())])
             ->all();
 
-        $alsoOff = Leave::query()
-            ->whereIn('status', [LeaveStatus::Pending->value, LeaveStatus::Approved->value])
-            ->where('employee_id', '!=', $employee->id)
-            ->whereHas('employee', fn ($query) => $query->where('department_id', $employee->department_id))
-            ->when($visible !== null, fn ($query) => $query->whereIn('employee_id', $visible))
-            ->whereDate('start_date', '<=', $leave->end_date->format('Y-m-d'))
-            ->whereDate('end_date', '>=', $leave->start_date->format('Y-m-d'))
-            ->with(['employee', 'leaveType'])
-            ->orderBy('start_date')
-            ->orderBy('id')
-            ->get()
+        // Others in the same department off in these dates, from facts()'s one query.
+        $start = $leave->start_date->format('Y-m-d');
+        $end = $leave->end_date->format('Y-m-d');
+        $alsoOff = $facts['alsoOff']
+            ->filter(fn (Leave $other) => $other->employee_id !== $employee->id
+                && $employee->department_id !== null
+                && $other->employee->department_id === $employee->department_id
+                && $other->start_date->format('Y-m-d') <= $end
+                && $other->end_date->format('Y-m-d') >= $start)
             // One entry per person — the count is of people, not requests —
             // in the order of their first leave in these dates.
             ->groupBy('employee_id')

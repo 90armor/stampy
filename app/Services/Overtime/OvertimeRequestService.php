@@ -9,6 +9,7 @@ use App\Enums\OvertimeKind;
 use App\Enums\OvertimeStatus;
 use App\Exceptions\OvertimeValidationException;
 use App\Exceptions\StaleDecisionException;
+use App\Models\DailyAttendance;
 use App\Models\Employee;
 use App\Models\Leave;
 use App\Models\OvertimeRequest;
@@ -25,10 +26,12 @@ use App\Services\Attendance\OvertimeCredit;
 use App\Support\AttendanceTime;
 use App\Support\DisplayDate;
 use App\Support\Duration;
+use App\Support\HolidayRange;
 use App\Support\WorkdayCalendar;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -237,6 +240,60 @@ class OvertimeRequestService
     }
 
     /**
+     * wouldCredit() and approvedMinutes() for many requests at once (the
+     * Approvals page), keyed by request id: the same calculation, with each
+     * day's row, the holidays and the employees' approved leave loaded once
+     * for all of them rather than per request.
+     *
+     * @param  Collection<int, OvertimeRequest>  $requests
+     * @return array<int, array{would: array{in: ?Carbon, out: ?Carbon, credit: OvertimeCredit}|null, requested: int}>
+     */
+    public function creditsFor(Collection $requests): array
+    {
+        if ($requests->isEmpty()) {
+            return [];
+        }
+
+        EloquentCollection::make($requests->pluck('employee')->all())->loadMissing('scheduleAssignments');
+        $ids = $requests->pluck('employee_id')->unique()->values();
+        $from = $requests->min('date');
+        $to = $requests->max('date');
+        $holidays = WorkdayCalendar::preload($from, $to);
+        $leaves = Leave::query()
+            ->whereIn('employee_id', $ids)
+            ->where('status', LeaveStatus::Approved->value)
+            ->whereDate('start_date', '<=', $to->format('Y-m-d'))
+            ->whereDate('end_date', '>=', $from->format('Y-m-d'))
+            ->with('leaveType')
+            ->orderBy('id')
+            ->get()
+            ->groupBy('employee_id');
+        $rows = DailyAttendance::query()
+            ->whereIn('employee_id', $ids)
+            ->whereBetween('work_date', [$from->format('Y-m-d'), $to->format('Y-m-d')])
+            ->get()
+            ->keyBy(fn (DailyAttendance $row) => $row->employee_id.'|'.$row->work_date->format('Y-m-d'));
+
+        $credits = [];
+
+        foreach ($requests as $request) {
+            $day = $this->day($request->employee, $request->date->copy(), ['holidays' => $holidays, 'leaves' => $leaves->get($request->employee_id, collect())]);
+            $row = $rows->get($request->employee_id.'|'.$request->date->format('Y-m-d'));
+
+            $credits[$request->id] = [
+                'would' => $row === null ? null : [
+                    'in' => $row->first_in,
+                    'out' => $row->last_out,
+                    'credit' => $this->creditFromPunches($request, $row->first_in, $row->last_out, $day) ?? new OvertimeCredit($request->id),
+                ],
+                'requested' => $this->creditableMinutes($day, $request->starts_at, $request->ends_at),
+            ];
+        }
+
+        return $credits;
+    }
+
+    /**
      * What a window would credit with the day's real punches — the builder's
      * own calculation (approved leave included) — or null without both.
      *
@@ -249,7 +306,7 @@ class OvertimeRequestService
         }
 
         $employee = $window->employee ?? Employee::find($window->employee_id);
-        $leaveDay = $employee !== null ? LeaveDay::on($this->leavesOn($employee, $day['date']->copy(), [LeaveStatus::Approved]), $day['date']) : LeaveDay::none();
+        $leaveDay = $employee !== null ? LeaveDay::on($this->approvedLeavesOn($employee, $day['date']->copy(), $day['preloaded']), $day['date']) : LeaveDay::none();
 
         return $this->calculator->calculate($window, $firstIn, $lastOut, $day['schedule'], $day['date'], $day['isScheduledWorkday'], $day['isHoliday'], $leaveDay, OvertimeSettings::current());
     }
@@ -707,17 +764,17 @@ class OvertimeRequestService
      *
      * @return array{schedule: WorkSchedule, date: Carbon, window: ExpectedWindow, isScheduledWorkday: bool, isHoliday: bool, hasHours: bool, scheduledMinutes: int}
      */
-    private function day(Employee $employee, Carbon $date): array
+    private function day(Employee $employee, Carbon $date, ?array $preloaded = null): array
     {
         $schedule = $employee->scheduleOn($date);
         $isScheduledWorkday = WorkdayCalendar::isScheduledWorkday($schedule, $date);
-        $isHoliday = WorkdayCalendar::isHoliday($date);
+        $isHoliday = $preloaded !== null ? $preloaded['holidays']->has($date) : WorkdayCalendar::isHoliday($date);
         $hasHours = $isScheduledWorkday && ! $isHoliday;
         $window = ExpectedWindow::for($schedule, $date);
         $scheduledMinutes = 0;
 
         if ($hasHours) {
-            $leaveDay = LeaveDay::on($this->leavesOn($employee, $date, [LeaveStatus::Approved]), $date);
+            $leaveDay = LeaveDay::on($this->approvedLeavesOn($employee, $date, $preloaded), $date);
             $worked = $leaveDay->isHalfDay() && $schedule->break_start !== null ? ExpectedWindow::for($schedule, $date, $leaveDay->half) : $window;
             $seconds = $worked->end->getTimestamp() - $worked->start->getTimestamp();
             $scheduledMinutes = $leaveDay->isHalfDay()
@@ -725,7 +782,7 @@ class OvertimeRequestService
                 : intdiv($seconds, 60) - $schedule->break_minutes;
         }
 
-        return compact('schedule', 'date', 'window', 'isScheduledWorkday', 'isHoliday', 'hasHours', 'scheduledMinutes');
+        return compact('schedule', 'date', 'window', 'isScheduledWorkday', 'isHoliday', 'hasHours', 'scheduledMinutes', 'preloaded');
     }
 
     /**
@@ -754,6 +811,27 @@ class OvertimeRequestService
         }
 
         return $leaves->first(fn (Leave $leave) => $leave->half === null) ?? $leaves->first();
+    }
+
+    /**
+     * leavesOn() for approved leave — from $preloaded's leaves (creditsFor():
+     * the employee's approved leave, in id order) when there are any, the
+     * same filter in PHP, else from the database.
+     *
+     * @param  array{holidays: HolidayRange, leaves: Collection<int, Leave>}|null  $preloaded
+     * @return Collection<int, Leave>
+     */
+    private function approvedLeavesOn(Employee $employee, Carbon $date, ?array $preloaded)
+    {
+        if ($preloaded === null) {
+            return $this->leavesOn($employee, $date, [LeaveStatus::Approved]);
+        }
+
+        $day = $date->format('Y-m-d');
+
+        return $preloaded['leaves']
+            ->filter(fn (Leave $leave) => $leave->start_date->format('Y-m-d') <= $day && $leave->end_date->format('Y-m-d') >= $day)
+            ->values();
     }
 
     /**

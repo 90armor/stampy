@@ -57,15 +57,31 @@ final class WorkdayCalendar
     }
 
     /**
+     * The holidays of $from..$to loaded once, for a caller that asks about
+     * many dates across one or several walks (ApprovalInbox's working-day
+     * counts, many leaves counted at once). A date outside the range still
+     * gets the right answer, with a query.
+     */
+    public static function preload(CarbonInterface $from, CarbonInterface $to): HolidayRange
+    {
+        return new HolidayRange($from->format('Y-m-d'), $to->format('Y-m-d'), self::holidaysBetween($from, $to));
+    }
+
+    /**
      * A working day for this employee: a workday of the schedule in force on
      * $date (Employee::scheduleOn()) that isn't a holiday. $holidays is an
-     * optional holidaysBetween() result covering $date, to save the query.
+     * optional holidaysBetween() result covering $date, or a preload(), to
+     * save the query.
      *
-     * @param  array<string, true>|null  $holidays
+     * @param  array<string, true>|HolidayRange|null  $holidays
      */
-    public static function isWorkday(Employee $employee, CarbonInterface $date, ?array $holidays = null): bool
+    public static function isWorkday(Employee $employee, CarbonInterface $date, array|HolidayRange|null $holidays = null): bool
     {
-        $isHoliday = $holidays !== null ? isset($holidays[$date->format('Y-m-d')]) : self::isHoliday($date);
+        $isHoliday = match (true) {
+            $holidays instanceof HolidayRange => $holidays->has($date),
+            $holidays !== null => isset($holidays[$date->format('Y-m-d')]),
+            default => self::isHoliday($date),
+        };
 
         return self::isScheduledWorkday($employee->scheduleOn($date), $date) && ! $isHoliday;
     }

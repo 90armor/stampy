@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 class LeaveType extends Model
 {
@@ -162,12 +163,30 @@ class LeaveType extends Model
      */
     public function isShownFor(Employee $employee): bool
     {
+        return $this->shownFor(collect([$employee]))[$employee->id];
+    }
+
+    /**
+     * isShownFor() for many employees at once (the leave report), keyed by id:
+     * at most two queries, whatever their number.
+     *
+     * @param  Collection<int, Employee>  $employees
+     * @return array<int, bool>
+     */
+    public function shownFor(Collection $employees): array
+    {
+        $ids = $employees->pluck('id')->all();
+
         if (! $this->balance_source->isEarned()) {
-            return true;
+            return array_fill_keys($ids, true);
         }
 
-        return $this->adjustments()->where('employee_id', $employee->id)->exists()
-            || ($this->toilRemainderFor($employee) ?? 0) > 0;
+        $adjusted = array_flip($this->adjustments()->whereIn('employee_id', $ids)->distinct()->pluck('employee_id')->all());
+        // The remainder only matters for someone without an adjustment.
+        $rest = array_values(array_filter($ids, fn (int $id) => ! isset($adjusted[$id])));
+        $remainders = $rest === [] ? [] : $this->toilRemaindersFor($rest);
+
+        return collect($ids)->mapWithKeys(fn (int $id) => [$id => isset($adjusted[$id]) || ($remainders[$id] ?? 0) > 0])->all();
     }
 
     /**
@@ -177,9 +196,20 @@ class LeaveType extends Model
      */
     public function toilRemainderFor(Employee $employee): ?int
     {
+        return $this->toilRemaindersFor([$employee->id])[$employee->id];
+    }
+
+    /**
+     * toilRemainderFor() for many employees at once, keyed by id.
+     *
+     * @param  list<int>  $employeeIds
+     * @return array<int, ?int>
+     */
+    public function toilRemaindersFor(array $employeeIds): array
+    {
         return OvertimeSettings::current()->toil_leave_type_id === $this->id
-            ? app(TimeOffInLieuReconciler::class)->remainderMinutes($employee)
-            : null;
+            ? app(TimeOffInLieuReconciler::class)->remainderMinutesFor($employeeIds)
+            : array_fill_keys($employeeIds, null);
     }
 
     public function deductsFrom(): BelongsTo

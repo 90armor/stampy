@@ -89,13 +89,29 @@ class TimeOffInLieuReconciler
      */
     public function remainderMinutes(Employee $employee): ?int
     {
+        return $this->remainderMinutesFor([$employee->id])[$employee->id];
+    }
+
+    /**
+     * remainderMinutes() for many employees at once (the leave report), keyed
+     * by id: one query, whatever their number.
+     *
+     * @param  list<int>  $employeeIds
+     * @return array<int, ?int>
+     */
+    public function remainderMinutesFor(array $employeeIds): array
+    {
         $settings = OvertimeSettings::current();
 
         if ($settings->toil_leave_type_id === null) {
-            return null;
+            return array_fill_keys($employeeIds, null);
         }
 
-        return intdiv($this->creditedMinutes($employee) * $settings->toil_ratio_percent, 100) % $settings->toil_block_minutes;
+        $credited = $this->creditedMinutesFor($employeeIds);
+
+        return collect($employeeIds)
+            ->mapWithKeys(fn (int $id) => [$id => intdiv(($credited[$id] ?? 0) * $settings->toil_ratio_percent, 100) % $settings->toil_block_minutes])
+            ->all();
     }
 
     /**
@@ -125,14 +141,30 @@ class TimeOffInLieuReconciler
     /** All-time credited minutes on the employee's approved time_off requests. */
     private function creditedMinutes(Employee $employee): int
     {
-        return (int) DailyAttendance::query()
+        return $this->creditedMinutesFor([$employee->id])[$employee->id] ?? 0;
+    }
+
+    /**
+     * The minutes credited on each employee's approved time_off requests, all
+     * time, keyed by id (an employee with none is left out).
+     *
+     * @param  list<int>  $employeeIds
+     * @return array<int, int>
+     */
+    private function creditedMinutesFor(array $employeeIds): array
+    {
+        return DailyAttendance::query()
             ->join('overtime_requests', 'overtime_requests.id', '=', 'daily_attendances.overtime_request_id')
-            ->where('daily_attendances.employee_id', $employee->id)
-            ->where('overtime_requests.employee_id', $employee->id)
+            ->whereIn('daily_attendances.employee_id', $employeeIds)
+            ->whereColumn('overtime_requests.employee_id', 'daily_attendances.employee_id')
             ->where('overtime_requests.status', OvertimeStatus::Approved->value)
             ->where('overtime_requests.compensation', OvertimeCompensation::TimeOff->value)
-            ->sum(DB::raw('daily_attendances.overtime_workday_minutes + daily_attendances.overtime_night_minutes'
-                .' + daily_attendances.overtime_rest_day_minutes + daily_attendances.overtime_holiday_minutes'));
+            ->groupBy('daily_attendances.employee_id')
+            ->selectRaw('daily_attendances.employee_id as employee_id, sum(daily_attendances.overtime_workday_minutes + daily_attendances.overtime_night_minutes'
+                .' + daily_attendances.overtime_rest_day_minutes + daily_attendances.overtime_holiday_minutes) as minutes')
+            ->pluck('minutes', 'employee_id')
+            ->map(fn ($minutes) => (int) $minutes)
+            ->all();
     }
 
     private function systemAdjustments(Employee $employee, OvertimeSettings $settings)

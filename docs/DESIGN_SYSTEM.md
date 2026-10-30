@@ -285,6 +285,7 @@ Dropdowns and popovers are opaque, elevated content surfaces. Modals use `<x-mod
 - A spinner supplements text and carries `aria-hidden="true"`; status copy carries the meaning.
 - For Livewire regions, prefer a local loading state near the affected content over blocking the full application shell.
 - Avoid skeletons unless latency and layout stability on a representative page justify them.
+- A Reports tab not opened yet (Phase 6c) shows a local status in a card where its report will be — a spinner beside "Loading the leave report…" (`livewire/reports/placeholder`, `role="status"`) — not a skeleton; it's on screen only for the round trip of the tab's first opening.
 
 ## Error pages
 

@@ -11,6 +11,7 @@ use App\Models\OvertimeRequest;
 use App\Models\User;
 use App\Services\Attendance\LeaveDay;
 use App\Support\DisplayDate;
+use App\Support\HolidayRange;
 use App\Support\WorkdayCalendar;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
@@ -46,20 +47,76 @@ class ApprovalInbox
      */
     public static function for(User $user): array
     {
+        return self::load($user)[0];
+    }
+
+    /**
+     * for() with each override's status, keyed by key() — whether it's stuck
+     * (isStuck()) and its away line (awayReason()) — from one evaluation for
+     * all of them: what the Approvals page shows (the order, "Stuck" and the
+     * away lines).
+     *
+     * @return array{0: array{stepOne: Collection<int, Approvable>, stepTwo: Collection<int, Approvable>, overrides: Collection<int, Approvable>}, 1: array<string, array{stuck: bool, awayReason: ?string}>}
+     */
+    public static function withStatus(User $user): array
+    {
+        return self::load($user, reasons: true);
+    }
+
+    public static function count(User $user): int
+    {
+        [$inbox, $stuck] = self::load($user);
+
+        return self::countOf($inbox, $stuck);
+    }
+
+    /**
+     * count() for an inbox already loaded — the Approvals page refreshes the
+     * badge from the list it has just rendered (Phase 6b), so the two can't
+     * disagree. $status is withStatus()'s, when the caller has it already.
+     *
+     * @param  array{stepOne: Collection, stepTwo: Collection, overrides: Collection}  $inbox
+     * @param  array<string, array{stuck: bool, awayReason: ?string}>|null  $status
+     */
+    public static function countOf(array $inbox, ?array $status = null): int
+    {
+        $status ??= self::evaluate($inbox['overrides'], today(), reasons: false);
+
+        return $inbox['stepOne']->count()
+            + $inbox['stepTwo']->count()
+            + $inbox['overrides']->filter(fn (Approvable $item) => $status[self::key($item)]['stuck'])->count();
+    }
+
+    /** A request's key in withStatus()'s status: its type and id. */
+    public static function key(Approvable $item): string
+    {
+        return $item->getMorphClass().'#'.$item->getKey();
+    }
+
+    /**
+     * The three groups, and whether each override is stuck (withStatus()'s
+     * shape; the away lines only with $reasons) — computed once, for the
+     * order and for count().
+     *
+     * @return array{0: array{stepOne: Collection<int, Approvable>, stepTwo: Collection<int, Approvable>, overrides: Collection<int, Approvable>}, 1: array<string, array{stuck: bool, awayReason: ?string}>}
+     */
+    private static function load(User $user, bool $reasons = false): array
+    {
         $ownEmployeeId = $user->employee?->id;
         $managed = $user->hasAnyRole(['manager', 'admin']) && $user->employee !== null
             ? $user->employee->subordinateIds()
             : [];
 
         // Both types' pending requests at $step (only $employeeIds', when given), soonest first.
-        $pending = function (int $step, ?array $employeeIds = null) use ($ownEmployeeId): Collection {
+        // $with is what the stuck rule reads: the requester's login and schedules.
+        $pending = function (int $step, ?array $employeeIds = null, array $with = []) use ($ownEmployeeId): Collection {
             $query = fn ($query) => $query
                 ->where('current_step', $step)
                 ->when($ownEmployeeId !== null, fn ($query) => $query->where('employee_id', '!=', $ownEmployeeId))
                 ->when($employeeIds !== null, fn ($query) => $query->whereIn('employee_id', $employeeIds));
 
-            return Leave::query()->where('status', LeaveStatus::Pending->value)->tap($query)->with(['employee', 'leaveType'])->get()
-                ->concat(OvertimeRequest::query()->where('status', OvertimeStatus::Pending->value)->tap($query)->with('employee')->get())
+            return Leave::query()->where('status', LeaveStatus::Pending->value)->tap($query)->with(['employee', 'leaveType', ...$with])->get()
+                ->concat(OvertimeRequest::query()->where('status', OvertimeStatus::Pending->value)->tap($query)->with(['employee', ...$with])->get())
                 ->sortBy([
                     fn (Approvable $a, Approvable $b) => $a->approvalDate() <=> $b->approvalDate(),
                     fn (Approvable $a, Approvable $b) => $a->created_at <=> $b->created_at,
@@ -70,37 +127,20 @@ class ApprovalInbox
         $stepOne = $managed === [] ? collect() : $pending(ApprovalFlow::MANAGER_STEP, $managed);
 
         if (! $user->hasRole('admin')) {
-            return ['stepOne' => $stepOne, 'stepTwo' => collect(), 'overrides' => collect()];
+            return [['stepOne' => $stepOne, 'stepTwo' => collect(), 'overrides' => collect()], []];
         }
 
-        return [
+        $overrides = $pending(ApprovalFlow::MANAGER_STEP, with: ['employee.user', 'employee.scheduleAssignments'])
+            ->reject(fn (Approvable $item) => $stepOne->contains(fn (Approvable $mine) => $mine->is($item)))
+            ->values();
+        $stuck = self::evaluate($overrides, today(), $reasons);
+
+        return [[
             'stepOne' => $stepOne,
             'stepTwo' => $pending(ApprovalFlow::ADMIN_STEP),
             // sortBy is stable, so the date order holds within each half.
-            'overrides' => $pending(ApprovalFlow::MANAGER_STEP)
-                ->reject(fn (Approvable $item) => $stepOne->contains(fn (Approvable $mine) => $mine->is($item)))
-                ->sortBy(fn (Approvable $item) => self::isStuck($item) ? 0 : 1)
-                ->values(),
-        ];
-    }
-
-    public static function count(User $user): int
-    {
-        return self::countOf(self::for($user));
-    }
-
-    /**
-     * count() for an inbox already loaded — the Approvals page refreshes the
-     * badge from the list it has just rendered (Phase 6b), so the two can't
-     * disagree.
-     *
-     * @param  array{stepOne: Collection, stepTwo: Collection, overrides: Collection}  $inbox
-     */
-    public static function countOf(array $inbox): int
-    {
-        return $inbox['stepOne']->count()
-            + $inbox['stepTwo']->count()
-            + $inbox['overrides']->filter(fn (Approvable $item) => self::isStuck($item))->count();
+            'overrides' => $overrides->sortBy(fn (Approvable $item) => $stuck[self::key($item)]['stuck'] ? 0 : 1)->values(),
+        ], $stuck];
     }
 
     /**
@@ -122,24 +162,7 @@ class ApprovalInbox
      */
     public static function isStuck(Approvable $item, ?CarbonInterface $today = null): bool
     {
-        $today = ($today ?? today())->copy()->startOfDay();
-        $deadline = self::stuckDeadline($item);
-
-        if ($deadline !== null && $deadline->lte($today)) {
-            return true;
-        }
-
-        if (self::workdaysAfter($item, $item->created_at->copy()->startOfDay(), 2)->lte($today)) {
-            return true;
-        }
-
-        // Away only blocks the request if nobody who can decide it is back
-        // before the deadline: a manager back two weeks before it starts
-        // decides it then, and an admin's override would pre-empt them. With
-        // no start (a claim), being away blocks it until they're back at all.
-        $away = self::away($item, $today);
-
-        return $away !== null && ($deadline === null || $away['backOn']->gte($deadline));
+        return self::evaluate(collect([$item]), ($today ?? today())->copy()->startOfDay(), reasons: false)[self::key($item)]['stuck'];
     }
 
     /**
@@ -153,29 +176,109 @@ class ApprovalInbox
      */
     public static function awayReason(Approvable $item, ?CarbonInterface $today = null): ?string
     {
-        return self::away($item, ($today ?? today())->copy()->startOfDay())['reason'] ?? null;
+        return self::evaluate(collect([$item]), ($today ?? today())->copy()->startOfDay(), reasons: true)[self::key($item)]['awayReason'];
+    }
+
+    /**
+     * isStuck() for each of $items, and with $reasons each one's awayReason()
+     * — the one implementation of both. Whatever more than one request needs
+     * is loaded once: the holidays of every working-day walk below
+     * (WorkdayCalendar::preload()), and, only when some request needs the
+     * away rule, the step-1 candidates with their schedules and their leave.
+     *
+     * @param  Collection<int, Approvable>  $items
+     * @return array<string, array{stuck: bool, awayReason: ?string}>
+     */
+    private static function evaluate(Collection $items, CarbonInterface $today, bool $reasons): array
+    {
+        if ($items->isEmpty()) {
+            return [];
+        }
+
+        $holidays = self::holidaysFor($items, $today);
+        $approvers = null;
+        $loadApprovers = function () use (&$approvers, $today): array {
+            if ($approvers === null) {
+                $candidates = app(ApprovalFlow::class)->stepOneCandidates();
+                $employees = $candidates->pluck('employee')->filter()->values();
+                \Illuminate\Database\Eloquent\Collection::make($employees)->loadMissing('scheduleAssignments');
+                $leaves = Leave::query()
+                    ->whereIn('employee_id', $employees->pluck('id'))
+                    ->where('status', LeaveStatus::Approved->value)
+                    ->whereDate('end_date', '>=', $today)
+                    ->get()
+                    ->groupBy('employee_id');
+                $approvers = [$candidates, $leaves];
+            }
+
+            return $approvers;
+        };
+
+        $status = [];
+
+        foreach ($items as $item) {
+            $deadline = self::stuckDeadline($item, $holidays);
+            $stuck = ($deadline !== null && $deadline->lte($today))
+                || self::workdaysAfter($item, $item->created_at->copy()->startOfDay(), 2, $holidays)->lte($today);
+            $away = null;
+
+            if (! $stuck || $reasons) {
+                $away = self::away($item, $today, $holidays, ...$loadApprovers());
+            }
+
+            // Away only blocks the request if nobody who can decide it is back
+            // before the deadline: a manager back two weeks before it starts
+            // decides it then, and an admin's override would pre-empt them. With
+            // no start (a claim), being away blocks it until they're back at all.
+            $stuck = $stuck || ($away !== null && ($deadline === null || $away['backOn']->gte($deadline)));
+
+            $status[self::key($item)] = ['stuck' => $stuck, 'awayReason' => $away['reason'] ?? null];
+        }
+
+        return $status;
+    }
+
+    /**
+     * The holidays of every day evaluate() may walk for $items: from the
+     * month before the earliest start, to two months after today (absence()'s
+     * cap) or a month after the latest submission (workdaysAfter()'s).
+     *
+     * @param  Collection<int, Approvable>  $items
+     */
+    private static function holidaysFor(Collection $items, CarbonInterface $today): HolidayRange
+    {
+        $from = $today->copy()->addDay();
+        $to = $today->copy()->addDays(62);
+
+        foreach ($items as $item) {
+            $created = $item->created_at->copy()->startOfDay();
+            $from = $from->min($created->copy()->addDay());
+            $to = $to->max($created->copy()->addDays(31));
+
+            if (($start = $item->approvalStartsOn()) !== null) {
+                $from = $from->min($start->copy()->startOfDay()->subDays(31));
+                $to = $to->max($start->copy()->startOfDay());
+            }
+        }
+
+        return WorkdayCalendar::preload($from, $to);
     }
 
     /**
      * The step-1 approvers' absence covering $today: the line to show, and
      * backOn — the first working day any of them is back.
      *
+     * @param  Collection<int, User>  $candidates  ApprovalFlow::stepOneCandidates()
+     * @param  Collection<int, Collection<int, Leave>>  $leaves  the candidates' approved leaves ending today or later, by employee
      * @return array{reason: string, backOn: CarbonInterface}|null
      */
-    private static function away(Approvable $item, CarbonInterface $today): ?array
+    private static function away(Approvable $item, CarbonInterface $today, HolidayRange $holidays, Collection $candidates, Collection $leaves): ?array
     {
-        $approvers = app(ApprovalFlow::class)->stepOneApprovers($item);
+        $approvers = app(ApprovalFlow::class)->stepOneApprovers($item, $candidates);
 
         if ($approvers->isEmpty()) {
             return null;
         }
-
-        $leaves = Leave::query()
-            ->whereIn('employee_id', $approvers->pluck('employee.id'))
-            ->where('status', LeaveStatus::Approved->value)
-            ->whereDate('end_date', '>=', $today)
-            ->get()
-            ->groupBy('employee_id');
 
         $away = [];
         $backOn = null;
@@ -188,7 +291,7 @@ class ApprovalInbox
             }
 
             $role = $approver->hasRole('admin') ? 'admin' : 'manager';
-            [$until, $back] = self::absence($approver->employee, $own, $today);
+            [$until, $back] = self::absence($approver->employee, $own, $today, $holidays);
             $backOn = $backOn === null || $back->lt($backOn) ? $back : $backOn;
             // "Wai Yan Aung (manager) is on leave until Wed 7 Oct; Aye Aye Mon (manager) until Tue 6 Oct"
             $away[] = "{$approver->employee->full_name} ({$role}) ".($away === [] ? 'is on leave until ' : 'until ').DisplayDate::compact($until);
@@ -207,14 +310,14 @@ class ApprovalInbox
      * @param  Collection<int, Leave>  $leaves  the employee's approved leaves ending today or later
      * @return array{0: CarbonInterface, 1: CarbonInterface}
      */
-    private static function absence(Employee $employee, Collection $leaves, CarbonInterface $today): array
+    private static function absence(Employee $employee, Collection $leaves, CarbonInterface $today, HolidayRange $holidays): array
     {
         $until = $today->copy();
 
         for ($day = $today->copy()->addDay(), $step = 0; $step < 62; $day = $day->copy()->addDay(), $step++) {
             if (LeaveDay::on($leaves, $day)->fullDay) {
                 $until = $day->copy();
-            } elseif (WorkdayCalendar::isWorkday($employee, $day)) {
+            } elseif (WorkdayCalendar::isWorkday($employee, $day, $holidays)) {
                 return [$until, $day];
             }
         }
@@ -228,7 +331,7 @@ class ApprovalInbox
      * working days (on a Friday, a Tuesday start). A request already under
      * way is past it. Capped at a month. Null with no start (a claim).
      */
-    private static function stuckDeadline(Approvable $item): ?CarbonInterface
+    private static function stuckDeadline(Approvable $item, HolidayRange $holidays): ?CarbonInterface
     {
         $start = $item->approvalStartsOn();
 
@@ -240,7 +343,7 @@ class ApprovalInbox
 
         for ($found = 0, $step = 0; $found < 2 && $step < 31; $step++) {
             $day = $day->subDay();
-            $found += WorkdayCalendar::isWorkday($item->approvalSubject(), $day) ? 1 : 0;
+            $found += WorkdayCalendar::isWorkday($item->approvalSubject(), $day, $holidays) ? 1 : 0;
         }
 
         return $day;
@@ -250,13 +353,13 @@ class ApprovalInbox
      * The $count-th working day of the requester after $from. Capped at a
      * month, so a schedule with no working days can't loop.
      */
-    private static function workdaysAfter(Approvable $item, CarbonInterface $from, int $count): CarbonInterface
+    private static function workdaysAfter(Approvable $item, CarbonInterface $from, int $count, HolidayRange $holidays): CarbonInterface
     {
         $day = $from->copy();
 
         for ($found = 0, $step = 0; $found < $count && $step < 31; $step++) {
             $day = $day->addDay();
-            $found += WorkdayCalendar::isWorkday($item->approvalSubject(), $day) ? 1 : 0;
+            $found += WorkdayCalendar::isWorkday($item->approvalSubject(), $day, $holidays) ? 1 : 0;
         }
 
         return $day;

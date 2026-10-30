@@ -24,6 +24,13 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class Overtime extends Component
 {
+    /**
+     * Whether the report is computed: the Reports page computes only the tab
+     * it opens on, and each other tab the first time it's shown (open(),
+     * Phase 6c). Until then render() shows a loading state and nothing else.
+     */
+    public bool $opened = true;
+
     /** 'Y-m'. */
     #[Url(as: 'month', history: true)]
     public string $month = '';
@@ -90,9 +97,20 @@ class Overtime extends Component
         return Carbon::createFromFormat('Y-m-d', $this->month.'-01')->startOfDay();
     }
 
+    /** The Reports page has shown this tab for the first time: compute it now. */
+    #[On('report-open')]
+    public function open(): void
+    {
+        $this->opened = true;
+    }
+
     public function render()
     {
         $this->authorize('reports.overtime');
+
+        if (! $this->opened) {
+            return view('livewire.reports.placeholder', ['report' => 'overtime report']);
+        }
 
         $month = $this->selectedMonth();
         $options = [];

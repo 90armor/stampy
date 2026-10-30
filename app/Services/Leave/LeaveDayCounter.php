@@ -6,6 +6,7 @@ use App\Enums\LeaveCounting;
 use App\Models\Employee;
 use App\Models\Leave;
 use App\Models\LeaveType;
+use App\Support\HolidayRange;
 use App\Support\LeaveDays;
 use App\Support\WorkdayCalendar;
 use Carbon\Carbon;
@@ -28,15 +29,18 @@ use Carbon\CarbonInterface;
 class LeaveDayCounter
 {
     /**
+     * $holidays is a WorkdayCalendar::preload() covering the dates, for a
+     * caller counting many leaves at once; without it, one query here.
+     *
      * @return array<int, int> tenths, keyed by year; years with nothing to count are left out
      */
-    public function count(Employee $employee, LeaveType $type, CarbonInterface $start, CarbonInterface $end, bool $halfDay = false): array
+    public function count(Employee $employee, LeaveType $type, CarbonInterface $start, CarbonInterface $end, bool $halfDay = false, ?HolidayRange $holidays = null): array
     {
         $from = Carbon::instance($start)->startOfDay();
         $to = Carbon::instance($end)->startOfDay();
         $perDay = $halfDay ? LeaveDays::HALF : LeaveDays::DAY;
         $byCalendar = $type->counts === LeaveCounting::CalendarDays;
-        $holidays = $byCalendar ? [] : WorkdayCalendar::holidaysBetween($from, $to);
+        $holidays = $byCalendar ? [] : ($holidays ?? WorkdayCalendar::holidaysBetween($from, $to));
 
         $byYear = [];
 
@@ -52,8 +56,25 @@ class LeaveDayCounter
     /**
      * @return array<int, int> tenths, keyed by year
      */
-    public function countLeave(Leave $leave): array
+    public function countLeave(Leave $leave, ?HolidayRange $holidays = null): array
     {
-        return $this->count($leave->employee, $leave->leaveType, $leave->start_date, $leave->end_date, $leave->half !== null);
+        return $this->count($leave->employee, $leave->leaveType, $leave->start_date, $leave->end_date, $leave->half !== null, $holidays);
+    }
+
+    /**
+     * The holidays of every date $leaves cover, in one query — for
+     * countLeave() over many of them.
+     *
+     * @param  iterable<Leave>  $leaves
+     */
+    public static function holidaysFor(iterable $leaves): ?HolidayRange
+    {
+        $leaves = collect($leaves);
+
+        if ($leaves->isEmpty()) {
+            return null;
+        }
+
+        return WorkdayCalendar::preload($leaves->min('start_date'), $leaves->max('end_date'));
     }
 }
