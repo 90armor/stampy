@@ -7,7 +7,7 @@
     @endphp
     <x-modal name="leave-type-form-modal" :show="true" entangle="showModal" backdrop="bg-slate-900/50" maxWidth="lg" panelClass="mb-6">
         <div class="mx-4 border-b border-slate-divider py-4 sm:mx-6 sm:py-5">
-            <h3 class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ $editing ? 'Edit — '.$editing->name : 'New leave type' }}</h3>
+            <x-modal.title>{{ $editing ? 'Edit — '.$editing->name : 'New leave type' }}</x-modal.title>
         </div>
 
         <form id="leave-type-form" wire:submit="save" class="px-4 py-2 sm:px-6">
@@ -33,7 +33,7 @@
                 </section>
 
                 <section class="py-4">
-                    <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Balance</h4>
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Balance</h3>
                     <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div class="sm:col-span-2" @if ($locked) aria-describedby="leave-type-lock-help" @endif>
                             <x-input-label for="leave_type_balance" value="Balance" />
@@ -104,7 +104,7 @@
                 </section>
 
                 <section class="py-4" @if ($locked) aria-describedby="leave-type-lock-help" @endif>
-                    <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Requests</h4>
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Requests</h3>
                     <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
                             <x-input-label for="leave_type_counts" value="Counts" />

@@ -1,6 +1,6 @@
 <div>
     <div>
-        <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Schedule</h2>
+        <h2 tabindex="-1" data-section-heading class="text-lg font-semibold text-slate-900 dark:text-slate-100 focus:outline-none">Schedule</h2>
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Effective-dated work schedule assignments.</p>
     </div>
 
@@ -34,7 +34,6 @@
                             args: [{{ $currentAssignment->id }}],
                         })"
                         class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-500 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-                        title="Delete assignment"
                         aria-label="Delete {{ $currentAssignment->workSchedule->name }} schedule assignment effective {{ \App\Support\DisplayDate::compact($currentAssignment->effective_from) }}"
                     >
                         <x-icon name="trash" class="h-5 w-5" />
@@ -83,7 +82,7 @@
          — only its attendance rebuild failed partway — so it's a warning
          (amber), not a failure (red). --}}
     @error('rebuild')
-        <div class="mt-3 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-900">
+        <div tabindex="-1" data-focus-notice class="mt-3 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" role="status">
             {{ $message }}
         </div>
     @enderror
@@ -114,7 +113,6 @@
                                     args: [{{ $assignment->id }}],
                                 })"
                                 class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-500 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-                                title="Delete assignment"
                                 aria-label="Delete {{ $assignment->workSchedule->name }} schedule assignment effective {{ \App\Support\DisplayDate::compact($assignment->effective_from) }}"
                             >
                                 <x-icon name="trash" class="h-5 w-5" />
@@ -136,7 +134,7 @@
             panelClass="mt-16"
         >
             <div class="mx-6 border-b border-slate-divider py-5">
-                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-100">Assign Schedule</h3>
+                <x-modal.title>Assign Schedule</x-modal.title>
             </div>
 
             <form wire:submit="assign" class="px-6 py-4 space-y-4">

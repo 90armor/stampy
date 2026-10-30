@@ -82,10 +82,13 @@ export const sets = {
         ['time-off', '/time-off'],
         ['my-attendance', '/my-attendance'],
     ]],
+    // Can't sign in since Phase 6b (their last day has passed): only the refusal.
     e4: ['audit.leaver', [
-        ['dashboard', '/dashboard'],
-        ['my-attendance', '/my-attendance'],
-        ['time-off', '/time-off'],
+        ['login-refused', '/login', { action: async (page) => {
+            await page.fill('#email', 'audit.leaver');
+            await page.fill('#password', 'password');
+            await Promise.all([page.waitForLoadState('networkidle'), page.click('button[type=submit]')]);
+        } }],
     ]],
     a1: ['audit.admin', [
         ['dashboard', '/dashboard'],

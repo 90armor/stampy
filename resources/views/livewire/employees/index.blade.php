@@ -26,7 +26,7 @@
     <x-card :padding="false">
     <div class="flex flex-wrap items-center justify-between gap-3 p-5 pb-0 sm:p-6 sm:pb-0">
         <div class="min-w-0">
-            <h2 class="flex items-baseline gap-x-2 text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">
+            <h2 tabindex="-1" data-section-heading class="flex items-baseline gap-x-2 text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100 focus:outline-none">
                 All employees
                 <span class="text-xs font-normal text-slate-500 dark:text-slate-400">{{ $employees->total() }} {{ $employees->total() === 1 ? 'employee' : 'employees' }}</span>
             </h2>

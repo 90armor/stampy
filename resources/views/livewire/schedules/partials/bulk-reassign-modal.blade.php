@@ -8,7 +8,7 @@
         panelClass="mb-6"
     >
         <div class="mx-6 border-b border-slate-divider py-5">
-            <h3 class="text-base font-semibold text-slate-900 dark:text-slate-100">Bulk Reassign</h3>
+            <x-modal.title>Bulk Reassign</x-modal.title>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Move everyone currently on one schedule to another.</p>
         </div>
 

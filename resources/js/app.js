@@ -14,6 +14,94 @@ document.addEventListener('focusin', (event) => {
     }
 });
 
+// Where focus goes when a modal or confirmation closes (docs/DESIGN_SYSTEM.md,
+// Modals and focus). capture() runs as it opens, settle() once it has closed:
+//   1. the message that action just showed;
+//   2. the trigger, if it's still there and still the same control;
+//   3. the heading of the section it was in;
+//   4. <main>.
+// Never "the next thing in the list": a repeated Enter must not approve a
+// second request. A re-render can reuse a removed row's button for the next
+// row, which is why the trigger is compared with what it was, not only looked for.
+window.stampyFocus = {
+    usable(element) {
+        return !! element && element.isConnected && element.getClientRects().length > 0 && ! element.hasAttribute('disabled');
+    },
+    signature(element) {
+        return [element.getAttribute('wire:click'), element.getAttribute('aria-label'), element.textContent.replace(/\s+/g, ' ').trim()].join('|');
+    },
+    capture(trigger) {
+        const notices = new Map();
+        document.querySelectorAll('[data-focus-notice]').forEach((notice) => notices.set(notice, notice.textContent.trim()));
+        const heading = trigger
+            ? [...document.querySelectorAll('[data-section-heading]')]
+                .filter((candidate) => this.usable(candidate) && candidate.compareDocumentPosition(trigger) & Node.DOCUMENT_POSITION_FOLLOWING)
+                .pop()
+            : null;
+
+        // Frozen, so Alpine's reactivity leaves it (and its elements) alone.
+        return Object.freeze({
+            trigger,
+            signature: trigger ? this.signature(trigger) : null,
+            notices,
+            heading: heading ?? null,
+            // A confirmation opened from inside a modal goes back into that modal.
+            dialog: trigger?.closest?.('[aria-modal="true"]') ?? null,
+        });
+    },
+    notices() {
+        return [...document.querySelectorAll('[data-focus-notice]')].filter((notice) => this.usable(notice));
+    },
+    freshNotice(context) {
+        return this.notices().find((notice) => context.notices.get(notice) !== notice.textContent.trim());
+    },
+    triggerIntact(context) {
+        return this.usable(context.trigger) && this.signature(context.trigger) === context.signature;
+    },
+    resolve(context) {
+        return this.freshNotice(context)
+            ?? (this.triggerIntact(context) ? context.trigger : null)
+            // A second identical message leaves the first in place, unchanged:
+            // with the trigger gone, the action did happen, and this is its message.
+            ?? this.notices()[0]
+            ?? (this.usable(context.dialog) ? context.dialog.querySelector('[data-modal-title]') ?? context.dialog : null)
+            ?? (this.usable(context.heading) ? context.heading : null)
+            ?? document.querySelector('main');
+    },
+    settle(context) {
+        let target = this.resolve(context);
+        target?.focus();
+
+        // The rest of the page can answer a round trip later (the request modal
+        // closes, then Time off hears about it): a message that arrives then
+        // still wins, and a trigger that goes then is still gone. Unless the
+        // user has moved on by then.
+        const observer = new MutationObserver(() => {
+            if (document.activeElement !== target && document.activeElement !== document.body) return;
+
+            const next = this.freshNotice(context) ?? (target === context.trigger && ! this.triggerIntact(context) ? this.resolve(context) : null);
+            if (next && next !== target) {
+                target = next;
+                target.focus();
+            }
+        });
+        observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['wire:click', 'aria-label'] });
+        setTimeout(() => observer.disconnect(), 5000);
+    },
+};
+
+// A date field's <label for> points at the picker's trigger, which is hidden
+// below 640px in favour of the native input (<x-date-picker>). Clicking the label
+// focuses whichever of the two is showing.
+document.addEventListener('click', (event) => {
+    const label = event.target.closest?.('label[for]');
+    const native = label ? document.getElementById(`${label.htmlFor}-native`) : null;
+    if (! native?.hasAttribute('data-date-native')) return;
+
+    event.preventDefault();
+    (native.getClientRects().length ? native : document.getElementById(label.htmlFor)).focus();
+});
+
 document.addEventListener('alpine:init', () => {
     // Pinned trailing table columns (.table-pin in resources/css/app.css). Put on
     // a table's overflow-x-auto container. Keeps two facts in sync with layout

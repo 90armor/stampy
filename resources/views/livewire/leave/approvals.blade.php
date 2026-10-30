@@ -11,30 +11,30 @@
     </div>
 
     @if ($notice)
-        <div class="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800 ring-1 ring-inset ring-green-600/20 dark:bg-green-900/20 dark:text-green-300 dark:ring-green-500/30" role="status">{{ $notice }}</div>
+        <div tabindex="-1" data-focus-notice class="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800 ring-1 ring-inset ring-green-600/20 dark:bg-green-900/20 dark:text-green-300 dark:ring-green-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" role="status">{{ $notice }}</div>
     @endif
     @if ($stale)
         {{-- Phase 6b: the request moved on while the page was open — calm, not an error.
         The item clicked may be far down the list, so the notice scrolls into view;
         keyed by its text, so a second notice is a new element and scrolls again. --}}
-        <div wire:key="stale-{{ md5($stale) }}" x-data x-init="$el.scrollIntoView({ block: 'center' })" class="flex items-start gap-x-2 rounded-lg bg-white px-4 py-3 text-sm text-slate-700 ring-1 ring-inset ring-slate-border dark:bg-slate-800 dark:text-slate-300" role="status">
+        <div wire:key="stale-{{ md5($stale) }}" x-data x-init="$el.scrollIntoView({ block: 'center' })" tabindex="-1" data-focus-notice class="flex items-start gap-x-2 rounded-lg bg-white px-4 py-3 text-sm text-slate-700 ring-1 ring-inset ring-slate-border dark:bg-slate-800 dark:text-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" role="status">
             <x-icon name="info" class="mt-0.5 h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" />
             <span>{{ $stale }}</span>
         </div>
     @endif
     @if ($problem)
-        <div class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-900" role="status">{{ $problem }}</div>
+        <div tabindex="-1" data-focus-notice class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" role="status">{{ $problem }}</div>
     @endif
 
     @if ($nothing)
         <x-card>
-            <x-empty-state icon="inbox" title="Nothing waiting for you" description="Leave and overtime requests that need your decision appear here." />
+            <x-empty-state icon="inbox" title="Nothing waiting for you" description="Leave and overtime requests that need your decision appear here." heading="h2" />
         </x-card>
     @else
         @if ($stepOne !== [] || ! $isAdmin)
             <x-card :padding="false">
                 <div class="{{ $cardHeader }}">
-                    <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Waiting for you</h2>
+                    <h2 tabindex="-1" data-section-heading class="text-lg font-semibold text-slate-900 dark:text-slate-100 focus:outline-none">Waiting for you</h2>
                     <p class="{{ $cardMeta }}">{{ count($stepOne) }}</p>
                 </div>
                 @if ($stepOne === [])
@@ -52,7 +52,7 @@
         @if ($isAdmin)
             <x-card :padding="false">
                 <div class="{{ $cardHeader }}">
-                    <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Waiting for admin</h2>
+                    <h2 tabindex="-1" data-section-heading class="text-lg font-semibold text-slate-900 dark:text-slate-100 focus:outline-none">Waiting for admin</h2>
                     <p class="{{ $cardMeta }}">{{ count($stepTwo) }}</p>
                 </div>
                 @if ($stepTwo === [])
@@ -70,7 +70,7 @@
                 <x-card :padding="false">
                     <div class="{{ $cardHeader }} pb-5">
                         <div>
-                            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">You can override</h2>
+                            <h2 tabindex="-1" data-section-heading class="text-lg font-semibold text-slate-900 dark:text-slate-100 focus:outline-none">You can override</h2>
                             <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Waiting for a manager. Deciding one completes both steps.</p>
                         </div>
                         <button type="button" wire:click="$toggle('showOverrides')" class="shrink-0 rounded-lg px-2 py-1 text-sm font-medium text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400" aria-expanded="{{ $showOverrides ? 'true' : 'false' }}">
@@ -93,10 +93,10 @@
         <x-modal name="leave-decision-modal" :show="true" entangle="showDecision" backdrop="bg-slate-900/50" maxWidth="md" panelClass="mt-6 sm:mt-16">
             <form wire:submit="decide">
                 <div class="mx-4 border-b border-slate-divider py-4 sm:mx-6 sm:py-5">
-                    <h3 class="text-base font-semibold text-slate-900 dark:text-slate-100">
+                    <x-modal.title>
                         {{ $decision === 'reject' ? 'Reject' : 'Approve' }} {{ $deciding->employee->full_name }}'s
                         {{ $deciding instanceof \App\Models\OvertimeRequest ? 'overtime on '.$deciding->displayDateAndWindow() : $deciding->leaveType->name.' leave' }}
-                    </h3>
+                    </x-modal.title>
                 </div>
                 <div class="space-y-4 px-4 py-4 sm:px-6">
                     @if ($decision === 'approve' && $decidesBoth)

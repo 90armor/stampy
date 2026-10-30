@@ -230,6 +230,68 @@ class AccessibilityFoundationsTest extends TestCase
             ->assertDontSee('title="Founders Test Day"', false);
     }
 
+    public function test_no_element_carries_a_native_title_except_an_abbreviation(): void
+    {
+        $offenders = [];
+        foreach (File::allFiles(resource_path('views')) as $file) {
+            preg_match_all('/<([a-z][\w-]*)\b[^>]*?\stitle="/s', $file->getContents(), $tags);
+            foreach ($tags[1] as $name) {
+                if ($name !== 'abbr' && ! str_starts_with($name, 'x-')) {
+                    $offenders[] = $file->getRelativePathname().': <'.$name.'>';
+                }
+            }
+        }
+
+        $this->assertSame([], $offenders, 'A native title shows on hover only: docs/DESIGN_SYSTEM.md, Interaction states.');
+    }
+
+    public function test_the_shell_has_header_and_nav_landmarks(): void
+    {
+        $xpath = $this->xpath($this->actingAs($this->admin)->get('/dashboard')->getContent());
+
+        $this->assertGreaterThan(0, $xpath->query('//header')->length);
+        $this->assertSame(2, $xpath->query('//aside//nav[@aria-label="Main"]')->length, 'desktop and drawer, only one shown at a time');
+    }
+
+    public function test_the_theme_toggle_names_what_it_will_do(): void
+    {
+        $topbar = File::get(resource_path('views/layouts/partials/topbar.blade.php'));
+
+        $this->assertStringContainsString(":aria-label=\"isDark ? 'Switch to light mode' : 'Switch to dark mode'\"", $topbar);
+    }
+
+    public function test_the_guest_pages_are_titled_by_their_heading(): void
+    {
+        $this->get('/forgot-password')->assertSee('<title>Reset your password – '.config('app.name').'</title>', false);
+
+        foreach ([
+            'reset-password' => 'Choose a new password',
+            'confirm-password' => 'Confirm your password',
+            'force-password-change' => 'Choose a permanent password',
+        ] as $view => $heading) {
+            $source = File::get(resource_path("views/auth/{$view}.blade.php"));
+            $this->assertStringContainsString("<x-slot:pageTitle>{$heading}</x-slot:pageTitle>", $source);
+            $this->assertMatchesRegularExpression('/<h1 [^>]*>'.preg_quote($heading, '/').'<\/h1>/', $source);
+        }
+    }
+
+    public function test_the_employee_pickers_results_show_the_standard_focus_ring(): void
+    {
+        $this->assertStringContainsString(
+            'focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500',
+            File::get(resource_path('views/livewire/partials/employee-picker.blade.php')),
+        );
+    }
+
+    public function test_a_date_fields_label_focuses_whichever_control_is_showing(): void
+    {
+        $this->assertStringContainsString('data-date-native', File::get(resource_path('views/components/date-picker.blade.php')));
+
+        $js = File::get(resource_path('js/app.js'));
+        $this->assertStringContainsString("hasAttribute('data-date-native')", $js);
+        $this->assertStringContainsString('native.getClientRects().length ? native : document.getElementById(label.htmlFor)', $js);
+    }
+
     public function test_pagination_has_no_aria_label_on_its_disabled_spans(): void
     {
         $view = File::get(resource_path('views/vendor/livewire/tailwind.blade.php'));

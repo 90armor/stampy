@@ -37,7 +37,7 @@ wire:ignore, or a re-render would blank what Alpine put there. --}}
             <ul class="mt-2 max-h-56 overflow-y-auto rounded-lg border border-slate-border bg-white dark:bg-slate-750" aria-label="Matching employees">
                 @foreach ($matches as $match)
                     <li>
-                        <button type="button" wire:click="selectEmployee({{ $match->id }})" class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-50 focus:bg-slate-50 focus:outline-none dark:text-slate-100 dark:hover:bg-slate-600/30 dark:focus:bg-slate-600/30">
+                        <button type="button" wire:click="selectEmployee({{ $match->id }})" class="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-slate-900 hover:bg-slate-50 focus:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-100 dark:hover:bg-slate-600/30 dark:focus:bg-slate-600/30">
                             <span class="truncate">{{ $match->full_name }}</span>
                             <span class="shrink-0 text-xs text-slate-500 dark:text-slate-400">{{ $match->employee_code }}{{ $match->status === 'inactive' ? ' · inactive' : '' }}{{ $match->user_id === null ? ' · no login' : '' }}</span>
                         </button>

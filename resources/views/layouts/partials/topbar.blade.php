@@ -1,4 +1,4 @@
-<div class="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-x-4 border-b border-slate-border bg-white/70 backdrop-blur-xl px-4 sm:px-6 dark:bg-slate-800/60">
+<header class="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-x-4 border-b border-slate-border bg-white/70 backdrop-blur-xl px-4 sm:px-6 dark:bg-slate-800/60">
     @php $waiting = \App\Support\ApprovalBadge::count(auth()->user()); @endphp
     {{-- Below lg the sidebar is a drawer, so its Approvals badge is hidden until
     opened: a dot on the menu button says something is waiting (Phase 3e). --}}
@@ -39,11 +39,11 @@
         <div class="flex items-center gap-x-3">
             <button
                 type="button"
-                x-data="{}"
-                @click="document.documentElement.classList.toggle('dark'); localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light')"
+                x-data="{ isDark: document.documentElement.classList.contains('dark') }"
+                x-on:livewire:navigated.window="isDark = document.documentElement.classList.contains('dark')"
+                @click="document.documentElement.classList.toggle('dark'); isDark = document.documentElement.classList.contains('dark'); localStorage.setItem('theme', isDark ? 'dark' : 'light')"
                 class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-600/30 dark:hover:text-slate-200"
-                aria-label="Toggle dark mode"
-                title="Toggle dark mode"
+                :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
             >
                 <x-icon name="sun" class="w-5 h-5 hidden dark:block" />
                 <x-icon name="moon" class="w-5 h-5 dark:hidden" />
@@ -86,4 +86,4 @@
             </x-dropdown>
         </div>
     </div>
-</div>
+</header>

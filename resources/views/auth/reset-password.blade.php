@@ -1,4 +1,6 @@
 <x-guest-layout>
+    <x-slot:pageTitle>Choose a new password</x-slot:pageTitle>
+
     <h1 class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Choose a new password</h1>
     <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">Make it something you haven't used before.</p>
 

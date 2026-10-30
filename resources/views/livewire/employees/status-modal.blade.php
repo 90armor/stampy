@@ -17,9 +17,9 @@
                     <x-icon name="exclamation-triangle" class="h-5 w-5" />
                 </div>
                 <div class="min-w-0 flex-1 pt-1.5">
-                    <h3 class="text-base font-semibold text-slate-900 dark:text-slate-100">
+                    <x-modal.title>
                         {{ $action === 'deactivate' ? 'Deactivate employee' : 'Reactivate employee' }}
-                    </h3>
+                    </x-modal.title>
                     <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
                         @if ($action === 'deactivate')
                             Deactivate {{ $employee->full_name }}? They will no longer appear in active lists. Attendance history up to their last day is preserved.

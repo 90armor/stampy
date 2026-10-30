@@ -8,9 +8,9 @@
         panelClass="mb-6"
     >
         <div class="mx-6 border-b border-slate-divider py-5">
-            <h3 class="text-base font-semibold text-slate-900 dark:text-slate-100">
+            <x-modal.title>
                 {{ $editing ? 'Edit — '.$editing->name : 'Add Schedule' }}
-            </h3>
+            </x-modal.title>
         </div>
 
         <form id="schedule-form" wire:submit="save" class="px-6 py-2">
@@ -32,7 +32,7 @@
 
             <div class="divide-y divide-slate-divider">
                 <section class="py-4">
-                    <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Identity</h4>
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Identity</h3>
                     <div class="mt-3">
                         <x-input-label for="schedule_name" value="Name" />
                         <x-text-input id="schedule_name" type="text" wire:model="name" autofocus />
@@ -41,7 +41,7 @@
                 </section>
 
                 <section class="py-4" @if ($editingIsLocked) aria-describedby="schedule-lock-help" @endif>
-                    <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Working hours</h4>
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Working hours</h3>
                     <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
                             <x-input-label id="schedule_start_time-label" for="schedule_start_time" value="Start time" />
@@ -58,7 +58,7 @@
                 </section>
 
                 <section class="py-4" @if ($editingIsLocked) aria-describedby="schedule-lock-help" @endif>
-                    <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Attendance rules</h4>
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Attendance rules</h3>
                     <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
                             <x-input-label for="schedule_grace" value="Grace period" />
@@ -111,7 +111,7 @@
                 </fieldset>
 
                 <section class="py-4">
-                    <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Default behavior</h4>
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Default behavior</h3>
                     <label class="mt-3 flex items-start gap-2.5">
                         <input type="checkbox" wire:model="is_default" @disabled($editing?->is_default) class="mt-0.5">
                         <span>

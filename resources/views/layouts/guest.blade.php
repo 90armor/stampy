@@ -33,7 +33,7 @@
     <body class="font-sans text-slate-900 antialiased dark:text-slate-100">
         <div class="min-h-screen min-h-dvh grid grid-cols-1 lg:grid-cols-[46%_54%] bg-slate-100 dark:bg-slate-900 bg-shell">
             <!-- Hero panel -->
-            <section class="hidden lg:flex flex-col bg-primary-700 text-white px-16 py-12">
+            <aside class="hidden lg:flex flex-col bg-primary-700 text-white px-16 py-12">
                 <x-logo-lockup size="32" variant="dark" />
 
                 <div class="flex flex-1 items-center">
@@ -49,7 +49,7 @@
                         </p>
                     </div>
                 </div>
-            </section>
+            </aside>
 
             <!-- Form panel -->
             <main class="relative flex items-start justify-center px-6 py-20 sm:px-12 sm:py-24 lg:items-center lg:py-10">

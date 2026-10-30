@@ -1,4 +1,6 @@
 <x-guest-layout>
+    <x-slot:pageTitle>Choose a permanent password</x-slot:pageTitle>
+
     <h1 class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Choose a permanent password</h1>
     <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">
         An admin reset your password. Pick a new one to continue — you won't be able to use the rest of the app until you do.

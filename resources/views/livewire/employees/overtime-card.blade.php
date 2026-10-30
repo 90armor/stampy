@@ -13,7 +13,7 @@
 <div>
     <div class="flex flex-col gap-3 px-4 pt-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
         <div>
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Overtime</h2>
+            <h2 tabindex="-1" data-section-heading class="text-lg font-semibold text-slate-900 dark:text-slate-100 focus:outline-none">Overtime</h2>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Credited overtime and requests.</p>
         </div>
         @if ($canFile)
@@ -26,10 +26,10 @@
     </div>
 
     @if ($notice)
-        <div class="mx-4 mt-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800 ring-1 ring-inset ring-green-600/20 dark:bg-green-900/20 dark:text-green-300 dark:ring-green-500/30 sm:mx-6" role="status">{{ $notice }}</div>
+        <div tabindex="-1" data-focus-notice class="mx-4 mt-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800 ring-1 ring-inset ring-green-600/20 dark:bg-green-900/20 dark:text-green-300 dark:ring-green-500/30 sm:mx-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" role="status">{{ $notice }}</div>
     @endif
     @if ($warning)
-        <div class="mx-4 mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-900 sm:mx-6">{{ $warning }}</div>
+        <div tabindex="-1" data-focus-notice class="mx-4 mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-900 sm:mx-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" role="status">{{ $warning }}</div>
     @endif
 
     {{-- This month and last: pay by category with its rates, time off as a plain total (1:1). --}}

@@ -19,7 +19,7 @@ $navItems = [
 ];
 @endphp
 
-<div class="flex h-full w-[242px] flex-col bg-white/70 backdrop-blur-xl border-r border-slate-border dark:bg-slate-800/60">
+<aside class="flex h-full w-[242px] flex-col bg-white/70 backdrop-blur-xl border-r border-slate-border dark:bg-slate-800/60">
     <div class="flex h-16 shrink-0 items-center px-6">
         <a href="{{ route('dashboard') }}" wire:navigate class="flex items-center gap-2.5 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
             <x-logo size="28" />
@@ -27,7 +27,7 @@ $navItems = [
         </a>
     </div>
 
-    <nav class="flex-1 space-y-1 px-3 py-4">
+    <nav aria-label="Main" class="flex-1 space-y-1 px-3 py-4">
         @foreach ($navItems as $item)
             @continue(! $item['visible'])
             @if ($item['label'] === 'Attendance')
@@ -73,7 +73,6 @@ $navItems = [
                     role="link"
                     aria-disabled="true"
                     class="flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-500 dark:text-slate-400 cursor-not-allowed"
-                    title="Coming in a later phase"
                 >
                     <x-icon :name="$item['icon']" class="w-5 h-5 shrink-0 text-slate-300 dark:text-slate-600" />
                     {{ $item['label'] }}
@@ -82,4 +81,4 @@ $navItems = [
             @endif
         @endforeach
     </nav>
-</div>
+</aside>
