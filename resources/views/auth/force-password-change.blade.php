@@ -1,6 +1,6 @@
 <x-guest-layout>
-    <h2 class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Choose a permanent password</h2>
-    <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
+    <h1 class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Choose a permanent password</h1>
+    <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">
         An admin reset your password. Pick a new one to continue — you won't be able to use the rest of the app until you do.
     </p>
 

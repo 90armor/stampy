@@ -1,4 +1,4 @@
-<x-app-layout>
+<x-app-layout :section="$tabs[$tab]">
     <x-slot name="header">Reports</x-slot>
 
     {{-- One page, a tab per report (Phase 5b). Only the tabs the user may see

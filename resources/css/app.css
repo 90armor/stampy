@@ -243,3 +243,9 @@ input:-webkit-autofill:focus {
 .scroll-fade-end.scroll-more-after {
     --scroll-fade-after: 2.5rem;
 }
+/* A mask also clips what's outside the box: while the scroller has keyboard
+   focus it's off, so the focus ring (<x-table-scroll>) shows on all four sides. */
+.scroll-fade-end:focus-visible {
+    -webkit-mask-image: none;
+    mask-image: none;
+}

@@ -38,10 +38,12 @@
 
                 <div class="flex flex-1 items-center">
                     <div class="max-w-md">
-                        <h1 class="text-5xl font-semibold leading-[1.05] tracking-tight">
+                        {{-- Not a heading: it's the same on every page and hidden below lg.
+                        Each page's own title, in the form panel, is its h1. --}}
+                        <p class="text-5xl font-semibold leading-[1.05] tracking-tight">
                             Make every workday<br>
                             <em class="font-serif font-normal not-italic text-accent-300">count.</em>
-                        </h1>
+                        </p>
                         <p class="mt-6 text-primary-100 leading-relaxed">
                             One calm, connected place for your team's attendance, leave, and overtime.
                         </p>
@@ -50,7 +52,7 @@
             </section>
 
             <!-- Form panel -->
-            <section class="relative flex items-start justify-center px-6 py-20 sm:px-12 sm:py-24 lg:items-center lg:py-10">
+            <main class="relative flex items-start justify-center px-6 py-20 sm:px-12 sm:py-24 lg:items-center lg:py-10">
                 <button
                     type="button"
                     x-data="{ isDark: document.documentElement.classList.contains('dark') }"
@@ -66,12 +68,12 @@
                 <div class="w-full max-w-[26rem]">
                     <div class="mb-8 flex flex-col items-center text-center sm:mb-10 lg:hidden">
                         <x-logo-lockup size="40" />
-                        <p class="mt-2 text-sm text-slate-500">attendance, stamped in seconds</p>
+                        <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">attendance, stamped in seconds</p>
                     </div>
 
                     {{ $slot }}
                 </div>
-            </section>
+            </main>
         </div>
 
         @livewireScripts

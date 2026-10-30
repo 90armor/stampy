@@ -64,17 +64,28 @@ document.addEventListener('alpine:init', () => {
     // whichever edge has more tabs beyond it (.tab-bar-scroller in
     // resources/css/app.css), and keeps the active tab — the page's `tab` —
     // in view: on load, and whenever it changes. Scrolls only this container,
-    // never the page (scrollIntoView could move the page vertically too).
+    // never the page (scrollIntoView could move the page vertically too). A
+    // change also renames the browser tab, since no reload will (App\Support\PageTitle).
     window.Alpine.data('tabBar', () => ({
         init() {
             this.observer = new ResizeObserver(() => this.measure());
             this.observer.observe(this.$el);
             this.observer.observe(this.$el.firstElementChild);
             this.$nextTick(() => this.reveal());
-            this.$watch('tab', () => this.$nextTick(() => this.reveal()));
+            this.$watch('tab', () => this.$nextTick(() => {
+                this.reveal();
+                this.retitle();
+            }));
         },
         destroy() {
             this.observer?.disconnect();
+        },
+        retitle() {
+            const title = document.querySelector('title[data-tab-title]');
+            const active = this.$el.querySelector('[aria-current="page"]');
+            if (title && active) {
+                document.title = title.dataset.tabTitle.replace(':tab', active.textContent.trim());
+            }
         },
         reveal() {
             const el = this.$el;

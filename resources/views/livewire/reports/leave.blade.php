@@ -94,7 +94,7 @@
             figures scroll under it, and the end edge fades while more columns
             lie beyond. The chevron is each row's only link, to the profile's
             Leave card. --}}
-            <div x-data="scrollEdges" @scroll.passive="measure()" class="scroll-fade-end mt-3 overflow-x-auto rounded-b-xl">
+            <x-table-scroll label="Leave report" x-data="scrollEdges" @scroll.passive="measure()" class="scroll-fade-end mt-3 rounded-b-xl">
                 <table @class(['w-full text-sm', 'min-w-[46rem]' => $hasBalance])>
                     <thead>
                         <tr class="relative text-left align-bottom text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -184,7 +184,7 @@
                         @endforeach
                     </tbody>
                 </table>
-            </div>
+            </x-table-scroll>
         @endif
     </x-card>
 </div>

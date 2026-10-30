@@ -104,7 +104,7 @@ class NeutralScaleTest extends TestCase
             }
             preg_match_all('/<([\w.:-]+)\b([^>]*?)>/s', $file->getContents(), $tags, PREG_SET_ORDER);
             foreach ($tags as [$tag, $name, $attributes]) {
-                if (in_array($name, ['x-icon', 'svg', 'path'], true) || ! preg_match('/(?<![:\w-])text-slate-400\b/', $attributes)) {
+                if (in_array($name, ['x-icon', 'svg', 'path'], true) || ! preg_match('/(?<![:\w-])(?<!:!)text-slate-400\b/', $attributes)) {
                     continue;
                 }
                 if (isset($iconOnly[$relative]) && str_contains($attributes, $iconOnly[$relative])) {

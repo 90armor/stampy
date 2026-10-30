@@ -115,7 +115,7 @@
             status and the row's actions stay on screen while the rest scrolls.
             wire:ignore.self so a re-render doesn't strip what pinnedColumns
             sets on this element; the rows inside still morph normally. --}}
-            <div class="overflow-x-auto transition-opacity" wire:loading.class="opacity-60" wire:ignore.self x-data="pinnedColumns" @scroll.passive="measure()">
+            <x-table-scroll label="Employees" class="transition-opacity" wire:loading.class="opacity-60" wire:ignore.self x-data="pinnedColumns" @scroll.passive="measure()">
             {{-- Column order (owner decision, docs/ATTENDANCE_UI.md): Employee,
             Department, Position, Start date, then Status and Actions. --}}
             <table class="w-full min-w-[60rem]">
@@ -224,7 +224,7 @@
                     @endforeach
                 </tbody>
             </table>
-            </div>
+            </x-table-scroll>
         </div>
 
         {{-- No footer (and no empty divider band) when everything fits on one page. --}}

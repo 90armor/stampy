@@ -75,7 +75,7 @@ $current = 'z-10 cursor-default font-semibold border-primary-600 bg-primary-50 t
                         <span>
                             {{-- Previous Page Link --}}
                             @if ($paginator->onFirstPage())
-                                <span aria-disabled="true" aria-label="{{ __('pagination.previous') }}">
+                                <span aria-disabled="true">
                                     <span class="{{ $item }} {{ $disabled }} w-9 rounded-l-lg" aria-hidden="true">
                                         <x-icon name="chevron-left" class="h-5 w-5" />
                                     </span>
@@ -119,7 +119,7 @@ $current = 'z-10 cursor-default font-semibold border-primary-600 bg-primary-50 t
                                     <x-icon name="chevron-right" class="h-5 w-5" />
                                 </button>
                             @else
-                                <span aria-disabled="true" aria-label="{{ __('pagination.next') }}">
+                                <span aria-disabled="true">
                                     <span class="{{ $item }} {{ $disabled }} -ml-px w-9 rounded-r-lg" aria-hidden="true">
                                         <x-icon name="chevron-right" class="h-5 w-5" />
                                     </span>

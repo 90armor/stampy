@@ -571,6 +571,6 @@ class EmployeeManagementTest extends TestCase
         // Three cells, one row at every width — no wrapped multi-row grid
         // that could orphan a cell.
         $this->assertStringContainsString('grid grid-cols-3 divide-x divide-slate-divider', $html);
-        $this->assertSame(3, substr_count($html, 'min-w-0 px-6 py-4 lg:flex'));
+        $this->assertSame(3, substr_count($html, 'min-w-0 px-6 py-4 lg:grid'));
     }
 }

@@ -95,6 +95,8 @@ export const sets = {
     ]],
 };
 
+// Imported by axe-6d.mjs for the page list; run directly, it shoots.
+if (process.argv[1]?.endsWith('pages.mjs')) {
 const wanted = process.argv.slice(2);
 await withBrowser(async (browser) => {
     const groups = (wanted.length ? wanted : Object.keys(sets)).map((k) => [k, ...sets[k]]);
@@ -103,3 +105,4 @@ await withBrowser(async (browser) => {
         await Promise.all(groups.slice(i, i + 3).map(([k, user, pages]) => shootAll(browser, k, user, pages)));
     }
 });
+}

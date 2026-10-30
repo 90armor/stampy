@@ -4,8 +4,8 @@
         Back to sign in
     </a>
 
-    <h2 class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Reset your password</h2>
-    <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
+    <h1 class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Reset your password</h1>
+    <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">
         Enter your username or email. If your account has an email on file, we'll send a link to choose a new password.
     </p>
 
