@@ -43,20 +43,33 @@ class ApprovalFlow
     }
 
     /**
+     * $candidates is stepOneCandidates(), for a caller asking about many
+     * requests at once (ApprovalInbox); without it they're loaded here.
+     *
+     * @param  Collection<int, User>|null  $candidates
      * @return Collection<int, User>
      */
-    public function stepOneApprovers(Approvable $approvable): Collection
+    public function stepOneApprovers(Approvable $approvable, ?Collection $candidates = null): Collection
     {
         $subject = $approvable->approvalSubject();
         $requesterId = $this->requester($approvable)?->id;
 
-        return User::role(['manager', 'admin'])
-            ->with('employee')
-            ->get()
+        return ($candidates ?? $this->stepOneCandidates())
             ->filter(fn (User $user) => $user->id !== $requesterId
                 && $user->employee !== null
                 && $user->employee->isManagerOf($subject))
             ->values();
+    }
+
+    /**
+     * Everyone who could be a step-1 approver of some request: the users with
+     * the manager or admin role, with their employee records.
+     *
+     * @return Collection<int, User>
+     */
+    public function stepOneCandidates(): Collection
+    {
+        return User::role(['manager', 'admin'])->with('employee')->get();
     }
 
     /**

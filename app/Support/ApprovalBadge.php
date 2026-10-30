@@ -28,4 +28,15 @@ final class ApprovalBadge
 
         return $attributes->get($key);
     }
+
+    /**
+     * The Approvals page has just counted the list it shows (ApprovalInbox::
+     * countOf()): the badge and the menu-button dot in the same response show
+     * that number instead of loading the inbox a second time. A full-page
+     * component renders before its layout, so this comes first.
+     */
+    public static function remember(User $user, int $count): void
+    {
+        request()->attributes->set('approval-badge.'.$user->getKey(), $count);
+    }
 }

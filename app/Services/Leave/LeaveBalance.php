@@ -10,6 +10,8 @@ use App\Models\LeaveEntitlement;
 use App\Models\LeaveType;
 use App\Support\LeaveDays;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\Collection;
 
 /**
  * An employee's balance of one leave type for one year (CLAUDE.md, Phase 3,
@@ -45,54 +47,102 @@ class LeaveBalance
 
     public function for(Employee $employee, LeaveType $type, int $year): Balance
     {
+        return $this->forMany([$employee], $type, $year)[$employee->id];
+    }
+
+    /**
+     * for() for many employees at once (the leave report, Approvals), keyed
+     * by employee id: every row's stored facts — grants, adjustments, leaves
+     * and the holidays they cover — are loaded in one query each for all of
+     * them, then each Balance is computed exactly as for() computes it, since
+     * for() is this with one employee.
+     *
+     * @param  iterable<Employee>  $employees
+     * @return array<int, Balance>
+     */
+    public function forMany(iterable $employees, LeaveType $type, int $year): array
+    {
+        $employees = collect($employees)->keyBy('id');
+
+        if ($employees->isEmpty()) {
+            return [];
+        }
+
+        $ids = $employees->keys()->all();
+        $usage = $this->usage($employees, $type, $year);
+
         if (! $type->hasBalance()) {
             // No balance to show, but its days still count (Unpaid,
             // Maternity, Special — the leave report's Used, Phase 5b): the
             // same usage count as below, so there's one definition.
-            [$approved, $pending, $usedByType, $pendingByType] = $this->usage($employee, $type, $year);
+            return $employees->map(function (Employee $employee) use ($usage, $type, $year) {
+                [$approved, $pending, $usedByType, $pendingByType] = $usage[$employee->id];
 
-            return new Balance(
-                type: $type,
-                year: $year,
-                hasBalance: false,
-                used: $approved[$year] ?? 0,
-                pending: $pending[$year] ?? 0,
-                usedByType: $usedByType,
-                pendingByType: $pendingByType,
-            );
+                return new Balance(
+                    type: $type,
+                    year: $year,
+                    hasBalance: false,
+                    used: $approved[$year] ?? 0,
+                    pending: $pending[$year] ?? 0,
+                    usedByType: $usedByType,
+                    pendingByType: $pendingByType,
+                );
+            })->all();
         }
 
-        $entitlements = ! $type->isGrantedYearly() ? [] : LeaveEntitlement::query()
-            ->where('employee_id', $employee->id)
+        $entitlements = ! $type->isGrantedYearly() ? collect() : LeaveEntitlement::query()
+            ->whereIn('employee_id', $ids)
             ->where('leave_type_id', $type->id)
             ->get()
-            ->mapWithKeys(fn (LeaveEntitlement $row) => [$row->year => LeaveDays::fromDecimal($row->days)])
-            ->all();
+            ->groupBy('employee_id')
+            ->map(fn ($rows) => $rows->mapWithKeys(fn (LeaveEntitlement $row) => [$row->year => LeaveDays::fromDecimal($row->days)])->all());
 
         $adjustments = LeaveAdjustment::query()
-            ->where('employee_id', $employee->id)
+            ->whereIn('employee_id', $ids)
             ->where('leave_type_id', $type->id)
-            ->selectRaw('year, sum(days) as total')
-            ->groupBy('year')
-            ->pluck('total', 'year')
-            ->map(fn ($total) => LeaveDays::fromDecimal((string) $total))
-            ->all();
+            ->selectRaw('employee_id, year, sum(days) as total')
+            ->groupBy('employee_id', 'year')
+            ->get()
+            ->groupBy('employee_id')
+            ->map(fn ($rows) => $rows->mapWithKeys(fn ($row) => [$row->year => LeaveDays::fromDecimal((string) $row->total)])->all());
 
-        [$approved, $pending, $usedByType, $pendingByType] = $this->usage($employee, $type, $year);
+        // An earned type: this year's system-posted days are its entitlement.
+        $earned = ! $type->balance_source->isEarned() ? collect() : LeaveAdjustment::query()
+            ->whereIn('employee_id', $ids)
+            ->where('leave_type_id', $type->id)
+            ->where('year', $year)
+            ->whereNull('created_by')
+            ->whereNotNull('overtime_request_id')
+            ->selectRaw('employee_id, sum(days) as total')
+            ->groupBy('employee_id')
+            ->pluck('total', 'employee_id')
+            ->map(fn ($total) => LeaveDays::fromDecimal((string) $total));
+
+        return $employees->map(fn (Employee $employee) => $this->balance(
+            $employee, $type, $year,
+            $entitlements->get($employee->id, []),
+            $adjustments->get($employee->id, []),
+            $earned->get($employee->id, 0),
+            $usage[$employee->id],
+        ))->all();
+    }
+
+    /**
+     * One employee's Balance of a type with a balance, from its stored facts.
+     *
+     * @param  array<int, int>  $entitlements  grants by year
+     * @param  array<int, int>  $adjustments  adjustment totals by year
+     * @param  int  $earned  an earned type's system-posted days this year
+     * @param  array{0: array<int, int>, 1: array<int, int>, 2: array<string, int>, 3: array<string, int>}  $usage
+     */
+    private function balance(Employee $employee, LeaveType $type, int $year, array $entitlements, array $adjustments, int $earned, array $usage): Balance
+    {
+        [$approved, $pending, $usedByType, $pendingByType] = $usage;
 
         $eligibleOn = CarbonImmutable::instance($this->calculator->eligibleOn($employee, $type));
         $carriedIn = $this->carriedInto($year, $type, $entitlements, $adjustments, $approved, $eligibleOn);
         $used = $approved[$year] ?? 0;
         $usedFromCarry = min($used, $carriedIn);
-
-        // An earned type: this year's system-posted days are its entitlement.
-        $earned = ! $type->balance_source->isEarned() ? 0 : LeaveDays::fromDecimal((string) LeaveAdjustment::query()
-            ->where('employee_id', $employee->id)
-            ->where('leave_type_id', $type->id)
-            ->where('year', $year)
-            ->whereNull('created_by')
-            ->whereNotNull('overtime_request_id')
-            ->sum('days'));
 
         return new Balance(
             type: $type,
@@ -114,47 +164,55 @@ class LeaveBalance
 
     /**
      * Approved and pending usage of $type — its own leaves and those of types
-     * that deduct from it — per year, plus $year's breakdown by leave type.
+     * that deduct from it — per year, plus $year's breakdown by leave type,
+     * for each employee (keyed by id).
      *
-     * @return array{0: array<int, int>, 1: array<int, int>, 2: array<string, int>, 3: array<string, int>}
+     * @param  Collection<int, Employee>  $employees  keyed by id
+     * @return array<int, array{0: array<int, int>, 1: array<int, int>, 2: array<string, int>, 3: array<string, int>}>
      */
-    private function usage(Employee $employee, LeaveType $type, int $year): array
+    private function usage(Collection $employees, LeaveType $type, int $year): array
     {
         $typeIds = LeaveType::query()->where('deducts_from_leave_type_id', $type->id)->pluck('id')->push($type->id);
 
         $leaves = Leave::query()
-            ->where('employee_id', $employee->id)
+            ->whereIn('employee_id', $employees->keys())
             ->whereIn('leave_type_id', $typeIds)
             ->whereIn('status', [LeaveStatus::Approved->value, LeaveStatus::Pending->value])
             ->with('leaveType')
             ->get();
+        $holidays = LeaveDayCounter::holidaysFor($leaves);
+        $byEmployee = $leaves->groupBy('employee_id');
+        // The counter reads each date's schedule (Employee::scheduleOn()).
+        EloquentCollection::make($employees->only($byEmployee->keys()->all())->values())->loadMissing('scheduleAssignments');
 
-        $approved = $pending = $usedByType = $pendingByType = [];
+        return $employees->map(function (Employee $employee) use ($byEmployee, $holidays, $year) {
+            $approved = $pending = $usedByType = $pendingByType = [];
 
-        foreach ($leaves as $leave) {
-            $leave->setRelation('employee', $employee);
-            $isApproved = $leave->status === LeaveStatus::Approved;
+            foreach ($byEmployee->get($employee->id, []) as $leave) {
+                $leave->setRelation('employee', $employee);
+                $isApproved = $leave->status === LeaveStatus::Approved;
 
-            foreach ($this->counter->countLeave($leave) as $leaveYear => $days) {
-                if ($isApproved) {
-                    $approved[$leaveYear] = ($approved[$leaveYear] ?? 0) + $days;
-                } else {
-                    $pending[$leaveYear] = ($pending[$leaveYear] ?? 0) + $days;
-                }
-
-                if ($leaveYear === $year) {
-                    $name = $leave->leaveType->name;
-
+                foreach ($this->counter->countLeave($leave, $holidays) as $leaveYear => $days) {
                     if ($isApproved) {
-                        $usedByType[$name] = ($usedByType[$name] ?? 0) + $days;
+                        $approved[$leaveYear] = ($approved[$leaveYear] ?? 0) + $days;
                     } else {
-                        $pendingByType[$name] = ($pendingByType[$name] ?? 0) + $days;
+                        $pending[$leaveYear] = ($pending[$leaveYear] ?? 0) + $days;
+                    }
+
+                    if ($leaveYear === $year) {
+                        $name = $leave->leaveType->name;
+
+                        if ($isApproved) {
+                            $usedByType[$name] = ($usedByType[$name] ?? 0) + $days;
+                        } else {
+                            $pendingByType[$name] = ($pendingByType[$name] ?? 0) + $days;
+                        }
                     }
                 }
             }
-        }
 
-        return [$approved, $pending, $usedByType, $pendingByType];
+            return [$approved, $pending, $usedByType, $pendingByType];
+        })->all();
     }
 
     /**

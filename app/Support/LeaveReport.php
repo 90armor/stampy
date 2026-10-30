@@ -14,6 +14,7 @@ use App\Services\Leave\EntitlementCalculator;
 use App\Services\Leave\LeaveBalance;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 /**
  * The yearly leave report (Phase 5b): for one leave type and year, one row
@@ -28,9 +29,10 @@ use Illuminate\Database\Eloquent\Builder;
  * (LeaveType::isShownFor()), so the report agrees with Time off; everyone
  * else is left out, not a row of zeros.
  *
- * One LeaveBalance per row, so queries grow with the rows (about seven an
- * employee): measured at 50 employees, one type took 72 ms and every type
- * (the CSV) 185 ms — not worth a second, batched calculation to keep equal.
+ * Every row is computed at once (LeaveBalance::forMany(), LeaveType::
+ * shownFor() and toilRemaindersFor()), the same Balance for() gives one
+ * employee, so the queries don't grow with the rows (Phase 6c; until then
+ * about seven an employee).
  */
 final class LeaveReport
 {
@@ -73,16 +75,18 @@ final class LeaveReport
             ->when($departmentId !== null, fn (Builder $query) => $query->where('department_id', $departmentId))
             ->with('department')
             ->orderBy('employee_code')
-            ->get()
-            ->filter(fn (Employee $employee) => $type->isShownFor($employee));
+            ->get();
+        $shown = $type->shownFor($employees);
+        $employees = $employees->filter(fn (Employee $employee) => $shown[$employee->id]);
 
-        $balances = app(LeaveBalance::class);
+        $balances = app(LeaveBalance::class)->forMany($employees, $type, $year);
+        $remainders = $type->toilRemaindersFor($employees->pluck('id')->all());
         $calculator = app(EntitlementCalculator::class);
         $rows = [];
         $totals = array_fill_keys(self::FIGURES, 0);
 
         foreach ($employees as $employee) {
-            $balance = $balances->for($employee, $type, $year);
+            $balance = $balances[$employee->id];
 
             foreach (self::FIGURES as $figure) {
                 $totals[$figure] += $figure !== 'available' ? $balance->{$figure} : self::available($balance);
@@ -94,7 +98,7 @@ final class LeaveReport
                 'left' => $employee->left_on?->year === $year ? $employee->left_on : null,
                 'balance' => $balance,
                 'earnedSoFar' => $balance->usableFrom !== null ? $calculator->earnedSoFar($employee, $type, today()) : null,
-                'toilRemainder' => $type->toilRemainderFor($employee),
+                'toilRemainder' => $remainders[$employee->id],
             ];
         }
 
@@ -143,9 +147,9 @@ final class LeaveReport
      * that has a leave, grant or adjustment that year. Annual (the first with
      * a yearly grant) first is the caller's default.
      *
-     * @return \Illuminate\Support\Collection<int, LeaveType>
+     * @return Collection<int, LeaveType>
      */
-    public static function types(int $year): \Illuminate\Support\Collection
+    public static function types(int $year): Collection
     {
         $from = Carbon::create($year)->startOfYear()->format('Y-m-d');
         $to = Carbon::create($year)->endOfYear()->format('Y-m-d');
