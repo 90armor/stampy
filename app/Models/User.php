@@ -3,6 +3,8 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Support\DisplayDate;
+use Carbon\CarbonInterface;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -45,6 +47,28 @@ class User extends Authenticatable
         return $this->must_change_password
             && $this->temporary_password_expires_at !== null
             && $this->temporary_password_expires_at->isPast();
+    }
+
+    /**
+     * The last day of employment, once it has passed — the account has no
+     * access from the day after (Phase 6b). left_on is the last working day,
+     * so they can still sign in on it. Null for a current employee and for a
+     * user with no employee record (an unlinked admin is never cut off).
+     * Reads the employee relation, cached on this instance, so the sign-in
+     * check and EnsureStillEmployed cost at most the one query the sidebar
+     * makes anyway.
+     */
+    public function employmentEndedOn(): ?CarbonInterface
+    {
+        $leftOn = $this->employee?->left_on;
+
+        return $leftOn !== null && $leftOn->lt(today()) ? $leftOn : null;
+    }
+
+    /** What a leaver is told at sign-in, and when their open session is ended. */
+    public static function employmentEndedMessage(CarbonInterface $leftOn): string
+    {
+        return 'Your employment ended on '.DisplayDate::compact($leftOn).'. Contact HR if you need access.';
     }
 
     /**

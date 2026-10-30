@@ -166,3 +166,21 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
 });
 
 require __DIR__.'/auth.php';
+
+// An unmatched URL (Phase 6b): without a route the web group never runs, so
+// no session starts and a signed-in user got the guest 404. As a fallback
+// route it does, and errors/partials/page picks the app shell for them. A
+// model that isn't found (/employees/99999) was already a 404 in the shell.
+// Every method, not Route::fallback()'s GET only (which turned an unknown POST
+// into a 405) — and since a catch-all for every method would otherwise also
+// swallow a wrong method on a real URL, that case is still a 405.
+Route::any('{fallbackPlaceholder}', function (Request $request) {
+    $allowed = collect(Route::getRoutes()->getRoutes())
+        ->reject(fn ($route) => $route->isFallback)
+        ->filter(fn ($route) => $route->matches($request, false))
+        ->flatMap(fn ($route) => $route->methods())
+        ->unique();
+
+    abort_if($allowed->isNotEmpty(), 405, '', ['Allow' => $allowed->implode(', ')]);
+    abort(404);
+})->where('fallbackPlaceholder', '.*')->fallback();

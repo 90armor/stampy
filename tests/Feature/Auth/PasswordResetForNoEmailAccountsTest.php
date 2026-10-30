@@ -2,11 +2,12 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Livewire\Employees\FormModal;
 use App\Models\Employee;
 use App\Models\User;
-use Illuminate\Auth\Notifications\ResetPassword;
 use App\Models\WorkSchedule;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -213,6 +214,12 @@ class PasswordResetForNoEmailAccountsTest extends TestCase
         $response->assertRedirect(route('dashboard', absolute: false));
     }
 
+    /**
+     * Phase 6b (audit F09): the guidance is part of the one message every
+     * request gets — "No email? Ask an admin…" — rather than an error only an
+     * account with no email would see, which told anyone that the username
+     * existed. Still nothing is sent.
+     */
     public function test_a_user_with_no_email_gets_the_guidance_message_on_forgot_password(): void
     {
         Notification::fake();
@@ -221,11 +228,9 @@ class PasswordResetForNoEmailAccountsTest extends TestCase
 
         $response = $this->post('/forgot-password', ['email' => 'no.email.user']);
 
-        $response->assertSessionHasErrors('email');
-        $this->assertStringContainsString(
-            'no email on file',
-            collect(session('errors')->get('email'))->implode(' ')
-        );
+        $response->assertSessionHasNoErrors();
+        $response->assertSessionHas('status', PasswordResetLinkController::SENT);
+        $this->assertStringContainsString('No email? Ask an admin to reset your password.', PasswordResetLinkController::SENT);
 
         Notification::assertNothingSent();
     }

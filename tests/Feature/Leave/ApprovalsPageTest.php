@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\WorkSchedule;
 use App\Services\Approval\ApprovalInbox;
 use App\Services\Leave\LeaveRequestService;
+use App\Support\DisplayDate;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -178,7 +179,7 @@ class ApprovalsPageTest extends TestCase
         $this->assertSame(LeaveStatus::Approved, $leave->fresh()->status);
     }
 
-    public function test_a_stale_decision_shows_the_services_message_and_refreshes(): void
+    public function test_a_stale_decision_says_who_decided_it_and_refreshes(): void
     {
         $leave = $this->request($this->employee, '2026-06-22', '2026-06-22');
 
@@ -188,8 +189,9 @@ class ApprovalsPageTest extends TestCase
         // Meanwhile an admin decides it.
         $this->service()->approve($leave, $this->admin);
 
+        // Phase 6b: who decided it and when, before the service is reached.
         $page->call('decide')
-            ->assertSee('This request has already been approved.')
+            ->assertSee($leave->employee->full_name."'s leave request (".$leave->leaveType->name.', '.DisplayDate::compact($leave->start_date).') was already approved by '.$this->admin->name.' on '.DisplayDate::compact(today()).'.')
             ->assertSee('Nothing waiting for you');
     }
 

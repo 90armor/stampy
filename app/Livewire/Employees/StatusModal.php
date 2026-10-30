@@ -3,6 +3,7 @@
 namespace App\Livewire\Employees;
 
 use App\Exceptions\AffectedLeavesChangedException;
+use App\Exceptions\SelfDeactivationException;
 use App\Models\Employee;
 use App\Services\EmployeeLifecycle;
 use App\Support\DisplayDate;
@@ -74,6 +75,11 @@ class StatusModal extends Component
 
         $this->open($employee, 'deactivate');
         $this->left_on = today()->format('Y-m-d');
+
+        // The buttons don't offer it, but say why if it's reached anyway (Phase 6b).
+        if ($employee->user_id !== null && $employee->user_id === auth()->id()) {
+            $this->addError('left_on', SelfDeactivationException::MESSAGE);
+        }
     }
 
     #[On('reactivate-employee')]
@@ -94,6 +100,12 @@ class StatusModal extends Component
             $this->authorize('deactivate', $this->employee);
 
             abort_unless($this->employee->status === 'active', 422, 'This employee is already inactive.');
+
+            if ($this->employee->user_id !== null && $this->employee->user_id === auth()->id()) {
+                $this->addError('left_on', SelfDeactivationException::MESSAGE);
+
+                return;
+            }
 
             $joinDate = $this->employee->join_date->format('Y-m-d');
             $today = today()->format('Y-m-d');
@@ -124,6 +136,10 @@ class StatusModal extends Component
             } catch (AffectedLeavesChangedException $e) {
                 $this->affectedLeaves = $e->effects();
                 $this->affectedFor = $this->left_on;
+
+                return;
+            } catch (SelfDeactivationException $e) {
+                $this->addError('left_on', $e->getMessage());
 
                 return;
             }

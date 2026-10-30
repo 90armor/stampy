@@ -13,6 +13,15 @@
     @if ($notice)
         <div class="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800 ring-1 ring-inset ring-green-600/20 dark:bg-green-900/20 dark:text-green-300 dark:ring-green-500/30" role="status">{{ $notice }}</div>
     @endif
+    @if ($stale)
+        {{-- Phase 6b: the request moved on while the page was open — calm, not an error.
+        The item clicked may be far down the list, so the notice scrolls into view;
+        keyed by its text, so a second notice is a new element and scrolls again. --}}
+        <div wire:key="stale-{{ md5($stale) }}" x-data x-init="$el.scrollIntoView({ block: 'center' })" class="flex items-start gap-x-2 rounded-lg bg-white px-4 py-3 text-sm text-slate-700 ring-1 ring-inset ring-slate-border dark:bg-slate-800 dark:text-slate-300" role="status">
+            <x-icon name="info" class="mt-0.5 h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" />
+            <span>{{ $stale }}</span>
+        </div>
+    @endif
     @if ($problem)
         <div class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-900" role="status">{{ $problem }}</div>
     @endif

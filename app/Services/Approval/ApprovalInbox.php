@@ -86,8 +86,18 @@ class ApprovalInbox
 
     public static function count(User $user): int
     {
-        $inbox = self::for($user);
+        return self::countOf(self::for($user));
+    }
 
+    /**
+     * count() for an inbox already loaded — the Approvals page refreshes the
+     * badge from the list it has just rendered (Phase 6b), so the two can't
+     * disagree.
+     *
+     * @param  array{stepOne: Collection, stepTwo: Collection, overrides: Collection}  $inbox
+     */
+    public static function countOf(array $inbox): int
+    {
         return $inbox['stepOne']->count()
             + $inbox['stepTwo']->count()
             + $inbox['overrides']->filter(fn (Approvable $item) => self::isStuck($item))->count();

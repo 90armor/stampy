@@ -48,8 +48,8 @@ $item comes from Leave\Approvals::describe(). --}}
             @endif
         </div>
         <div class="flex shrink-0 gap-3">
-            <x-button type="button" variant="secondary" wire:click="openDecision({{ $leave->id }}, 'reject')">Reject</x-button>
-            <x-button type="button" variant="primary" wire:click="openDecision({{ $leave->id }}, 'approve')">Approve</x-button>
+            <x-button type="button" variant="secondary" wire:click="openDecision({{ $leave->id }}, 'reject', 'leave', {{ $leave->current_step ?? 'null' }})">Reject</x-button>
+            <x-button type="button" variant="primary" wire:click="openDecision({{ $leave->id }}, 'approve', 'leave', {{ $leave->current_step ?? 'null' }})">Approve</x-button>
         </div>
     </div>
 </li>

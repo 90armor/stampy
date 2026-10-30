@@ -44,8 +44,8 @@ approval-item. $item comes from Leave\Approvals::describeOvertime(). --}}
             @endif
         </div>
         <div class="flex shrink-0 gap-3">
-            <x-button type="button" variant="secondary" wire:click="openDecision({{ $request->id }}, 'reject', 'overtime')">Reject</x-button>
-            <x-button type="button" variant="primary" wire:click="openDecision({{ $request->id }}, 'approve', 'overtime')">Approve</x-button>
+            <x-button type="button" variant="secondary" wire:click="openDecision({{ $request->id }}, 'reject', 'overtime', {{ $request->current_step ?? 'null' }})">Reject</x-button>
+            <x-button type="button" variant="primary" wire:click="openDecision({{ $request->id }}, 'approve', 'overtime', {{ $request->current_step ?? 'null' }})">Approve</x-button>
         </div>
     </div>
 </li>

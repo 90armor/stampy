@@ -18,6 +18,10 @@
         </include>
     </source>
     <php>
+        <!-- The whole suite peaked at 125 MB of PHP's default 128 MB with 1069
+             tests (measured before Phase 6b) and ran out with more; one process
+             runs every test, so it needs the headroom. -->
+        <ini name="memory_limit" value="512M"/>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>

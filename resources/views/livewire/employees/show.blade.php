@@ -6,7 +6,12 @@
         </a>
     </div>
 
-    <header class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    @php $ownRecord = $employee->status === 'active' && $employee->user_id !== null && $employee->user_id === auth()->id() && auth()->user()->can('deactivate', $employee); @endphp
+    <header @class([
+        'flex flex-col gap-4',
+        'sm:flex-row sm:items-center sm:justify-between' => ! $ownRecord,
+        'sm:grid sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:gap-x-3 sm:gap-y-1' => $ownRecord,
+    ])>
         <div class="flex min-w-0 items-center gap-x-4">
             <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-base font-semibold bg-slate-100 text-slate-600 dark:bg-slate-750 dark:text-slate-300">
                 {{ strtoupper(substr($employee->full_name, 0, 1)) }}
@@ -23,8 +28,16 @@
         </div>
 
         {{-- Each button is gated by the ability its own action checks
-        (FormModal: update; StatusModal: deactivate, or update to reactivate). --}}
-        <div class="flex flex-wrap items-center gap-3 self-start sm:self-auto">
+        (FormModal: update; StatusModal: deactivate, or update to reactivate).
+        On your own record Deactivate is disabled and says why at rest: from sm
+        the group dissolves into the header's grid (contents), so the buttons
+        stay centred on the name in row 1 and the hint sits in row 2 under
+        Deactivate, as wide as it (w-0 min-w-full, the Bulk Reassign pattern);
+        on a phone it runs under both buttons. --}}
+        <div @class([
+            'flex flex-wrap items-center gap-3 self-start sm:self-auto' => ! $ownRecord,
+            'grid grid-cols-[auto_auto] items-center justify-start gap-3 sm:contents' => $ownRecord,
+        ])>
             @can('update', $employee)
                 <x-button type="button" variant="secondary" wire:click="$dispatch('edit-employee', { id: {{ $employee->id }} })">
                     <x-icon name="pencil" class="w-5 h-5" />
@@ -33,10 +46,18 @@
             @endcan
             @if ($employee->status === 'active')
                 @can('deactivate', $employee)
-                    <x-button type="button" variant="secondary" wire:click="$dispatch('deactivate-employee', { id: {{ $employee->id }} })">
-                        <x-icon name="user-x" class="w-5 h-5" />
-                        Deactivate
-                    </x-button>
+                    @if ($ownRecord)
+                        {{-- Phase 6b: never your own record (EmployeeLifecycle refuses it too). --}}
+                        <x-button type="button" variant="secondary" disabled aria-describedby="deactivate-self-hint">
+                            <x-icon name="user-x" class="w-5 h-5" />
+                            Deactivate
+                        </x-button>
+                    @else
+                        <x-button type="button" variant="secondary" wire:click="$dispatch('deactivate-employee', { id: {{ $employee->id }} })">
+                            <x-icon name="user-x" class="w-5 h-5" />
+                            Deactivate
+                        </x-button>
+                    @endif
                 @endcan
             @else
                 @can('update', $employee)
@@ -45,6 +66,9 @@
                         Reactivate
                     </x-button>
                 @endcan
+            @endif
+            @if ($ownRecord)
+                <p id="deactivate-self-hint" class="col-span-2 text-xs text-slate-600 sm:col-span-1 sm:col-start-3 sm:w-0 sm:min-w-full dark:text-slate-400">{{ \App\Exceptions\SelfDeactivationException::MESSAGE }}</p>
             @endif
         </div>
     </header>

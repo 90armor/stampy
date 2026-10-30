@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\File;
 use Tests\TestCase;
@@ -40,13 +41,15 @@ class NeutralScaleTest extends TestCase
 
     public function test_neutral_lines_use_only_the_divider_and_border_tokens(): void
     {
-        // Two documented exceptions (docs/DESIGN_SYSTEM.md, Lines): the slate
+        // Three documented exceptions (docs/DESIGN_SYSTEM.md, Lines): the slate
         // badge's ring belongs to the badge colour system, like every status
         // badge's ring (the day modal's Off pill mirrors that badge); a
-        // disabled checked checkbox's border is its fill.
+        // disabled checked checkbox's border is its fill; a focusable disabled
+        // control's focus ring is a focus indicator, not a line (Phase 6b).
         $allowed = [
             'resources/views/components/badge.blade.php' => ['ring-slate-500/10', 'ring-slate-500/20'],
             'resources/views/livewire/attendance/show.blade.php' => ['ring-slate-500/10', 'ring-slate-500/20'],
+            'resources/views/livewire/employees/index.blade.php' => ['ring-slate-500', 'ring-slate-400'],
             'resources/css/app.css' => ['border-slate-500'],
         ];
         $offenders = [];
@@ -123,8 +126,8 @@ class NeutralScaleTest extends TestCase
 
     public function test_the_am_pm_suffix_is_a_muted_colour_never_a_lowered_opacity(): void
     {
-        $plain = Blade::render('<x-time :time="$t" />', ['t' => \Carbon\Carbon::parse('2026-09-28 08:40')]);
-        $marked = Blade::render('<x-time :time="$t" marked />', ['t' => \Carbon\Carbon::parse('2026-09-28 08:40')]);
+        $plain = Blade::render('<x-time :time="$t" />', ['t' => Carbon::parse('2026-09-28 08:40')]);
+        $marked = Blade::render('<x-time :time="$t" marked />', ['t' => Carbon::parse('2026-09-28 08:40')]);
 
         // 70% opacity measured 2.6–4.3:1; slate-600 / dark slate-400 reach 4.5:1 on every fill.
         $this->assertMatchesRegularExpression('/<span class="ml-0\.5 text-\[max\(10px,0\.8em\)\] font-normal text-slate-600 dark:text-slate-400">AM<\/span>/', $plain);
@@ -159,7 +162,7 @@ class NeutralScaleTest extends TestCase
         }
         // Sections laid directly on the page: the section tabs (Organization, Policies) and each tab's intro.
         $tabBar = File::get(resource_path('views/components/tab-bar.blade.php'));
-        $this->assertStringContainsString("font-medium text-slate-600 hover:border-slate-border", $tabBar);
+        $this->assertStringContainsString('font-medium text-slate-600 hover:border-slate-border', $tabBar);
         foreach (['departments', 'positions', 'holidays', 'schedules'] as $tab) {
             $view = File::get(resource_path("views/livewire/{$tab}/index.blade.php"));
             $this->assertMatchesRegularExpression('/<h2\b[^>]*>.*?<\/h2>\s*<p class="mt-1 text-sm text-slate-600 dark:text-slate-400">/s', $view, "{$tab} intro");
@@ -170,4 +173,3 @@ class NeutralScaleTest extends TestCase
         $this->assertSame([], $offenders);
     }
 }
-

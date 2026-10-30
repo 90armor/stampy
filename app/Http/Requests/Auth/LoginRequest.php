@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -74,6 +75,16 @@ class LoginRequest extends FormRequest
 
             throw ValidationException::withMessages([
                 'auth' => __('This temporary password has expired. Please ask an admin for a new one.'),
+            ]);
+        }
+
+        // A leaver (Phase 6b): checked only once the password is known to be
+        // right, so the message can't tell anyone that an account exists.
+        if (($leftOn = $user->employmentEndedOn()) !== null) {
+            Auth::logout();
+
+            throw ValidationException::withMessages([
+                'auth' => User::employmentEndedMessage($leftOn),
             ]);
         }
 
