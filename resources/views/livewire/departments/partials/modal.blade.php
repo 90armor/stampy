@@ -8,9 +8,9 @@
         panelClass="mt-16"
     >
         <div class="mx-6 border-b border-slate-divider py-5">
-            <h3 class="text-base font-semibold text-slate-900 dark:text-slate-100">
+            <x-modal.title>
                 {{ $editing ? 'Edit — '.$editing->name : 'Add Department' }}
-            </h3>
+            </x-modal.title>
         </div>
 
         <form id="department-form" wire:submit="save" class="px-6 py-2">

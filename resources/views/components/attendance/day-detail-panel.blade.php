@@ -35,12 +35,12 @@ divergence here would be a real correctness bug, not just a style one. --}}
 <div>
     {{-- Title left, action right (the card-header pattern). --}}
     <div class="flex min-h-[2.375rem] items-center justify-between gap-3">
-        <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+        <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">
             Raw punches
             @if ($rows->isNotEmpty())
                 <span class="ml-1 font-normal text-slate-500 dark:text-slate-400">{{ $rows->count() }}</span>
             @endif
-        </h4>
+        </h3>
         @if ($canEdit && ! $isAdding)
             <x-button type="button" variant="secondary" wire:click="startAddingPunch('{{ $dayKey }}')" :autofocus="$initialFocus">
                 <x-icon name="plus" class="h-5 w-5" />

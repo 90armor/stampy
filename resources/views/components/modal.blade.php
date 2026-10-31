@@ -5,6 +5,11 @@
     'entangle' => null,
     'backdrop' => 'bg-slate-950/60 backdrop-blur-sm',
     'panelClass' => 'mb-6',
+    // The accessible name when the modal has no visible title to point at.
+    'label' => null,
+    // The current step of a modal with more than one (form, review): a change
+    // moves focus (docs/DESIGN_SYSTEM.md, Modals and focus).
+    'step' => null,
 ])
 
 @php
@@ -20,6 +25,10 @@ $maxWidth = [
     // silently produce no CSS. Add a name here for any one-off width.
     'employee-form' => 'sm:max-w-[620px]',
 ][$maxWidth];
+
+// Built here, not with @if in the tag below: Livewire marks the block with a comment
+// unless it can tell it's inside a tag, and the => in x-data's arrow functions fools it.
+$accessibleName = $label ? 'aria-label="'.e($label).'"' : 'aria-labelledby="'.e($name).'-title"';
 
 $showJs = $entangle ? "\$wire.entangle('{$entangle}').live" : \Illuminate\Support\Js::from($show);
 @endphp
@@ -40,19 +49,27 @@ $showJs = $entangle ? "\$wire.entangle('{$entangle}').live" : \Illuminate\Suppor
     inside one, which was luck, not something to keep relying on.
 --}}
 {{--
-    Focus: opening always moves focus into the dialog (focusInitial()), and
-    closing returns it to the trigger (rememberTrigger()), falling back to
-    the last element focused outside any modal, tracked page-wide in
-    resources/js/app.js: a modal can be rendered only once it opens, so a
-    fresh instance starts with show already true and no history — hence
-    also the `if (show) opened()` at init. No comments inside x-init: Alpine compiles
-    it as an expression and a // line breaks it.
+    Focus (docs/DESIGN_SYSTEM.md, Modals and focus): opening always moves focus
+    into the dialog (focusInitial()), Tab stays in it however the contents
+    re-render (trap(), reclaim()), and closing follows one order
+    (stampyFocus in resources/js/app.js). The trigger falls back to the last
+    element focused outside any modal, tracked page-wide there: a modal can be
+    rendered only once it opens, so a fresh instance starts with show already
+    true and no history — hence also the `if (show) opened()` at init. No
+    comments inside x-init: Alpine compiles it as an expression and a // line
+    breaks it.
 --}}
 <template x-teleport="body">
 <div
     x-data="{
         show: {{ $showJs }},
         triggerEl: null,
+        focusContext: null,
+        lastFocused: null,
+        ready: false,
+        observer: null,
+        step: null,
+        firstStep: null,
         focusables() {
             // All focusable element types...
             let selector = 'a, button, input:not([type=\'hidden\']), textarea, select, details, [tabindex]:not([tabindex=\'-1\'])'
@@ -83,28 +100,79 @@ $showJs = $entangle ? "\$wire.entangle('{$entangle}').live" : \Illuminate\Suppor
         },
         opened() {
             this.rememberTrigger();
+            this.focusContext = window.stampyFocus.capture(this.triggerEl);
+            this.ready = false;
             document.body.classList.add('overflow-y-hidden');
             $nextTick(() => requestAnimationFrame(() => this.focusInitial()));
         },
+        // Every way a modal closes: show flips (Escape, the backdrop, the
+        // server's entangled value), or Livewire removes it from the page. The
+        // same order either way (stampyFocus in resources/js/app.js), once the
+        // render that closed it has finished.
+        closed() {
+            document.body.classList.remove('overflow-y-hidden');
+            const context = this.focusContext;
+            this.focusContext = null;
+            if (context) setTimeout(() => window.stampyFocus.settle(context));
+        },
+        destroy() {
+            this.observer?.disconnect();
+            this.closed();
+        },
         focusInitial(tries = 30) {
-            if (! this.show || $el.contains(document.activeElement)) return;
+            if (! this.show) return;
+            if ($el.contains(document.activeElement)) { this.ready = true; return; }
             const marked = [...$el.querySelectorAll('[autofocus]')].find(el => ! el.hasAttribute('disabled') && el.offsetParent !== null);
             const target = marked || this.firstFocusable();
-            if (target) { target.focus(); return; }
-            if (tries > 0) requestAnimationFrame(() => this.focusInitial(tries - 1));
+            if (target) { target.focus(); this.ready = true; return; }
+            if (tries > 0) { requestAnimationFrame(() => this.focusInitial(tries - 1)); return; }
+            this.ready = true;
+        },
+        title() { return $el.querySelector('[data-modal-title]') },
+        reclaim() { (this.title() || this.firstFocusable() || $el).focus() },
+        // A confirmation opened from inside this modal sits on top of it, and owns focus.
+        covered() {
+            const other = document.activeElement?.closest('[aria-modal=\'true\']');
+            return other && other !== $el && ! $el.contains(other);
+        },
+        // On window, not the dialog: with focus on <body> or the page behind,
+        // a listener here would never hear the key.
+        trap(event) {
+            if (! this.show || this.covered()) return;
+            event.preventDefault();
+            if (! $el.contains(document.activeElement)) { (this.firstFocusable() || $el).focus(); return; }
+            (event.shiftKey ? this.prevFocusable() : this.nextFocusable())?.focus();
+        },
+        currentStep() { return $el.querySelector('[data-modal-step]')?.dataset.modalStep },
+        watchContents() {
+            this.step = this.firstStep = this.currentStep();
+            this.observer = new MutationObserver(() => this.contentsChanged());
+            this.observer.observe($el, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-modal-step', 'disabled'] });
+        },
+        // A re-render can remove the focused element. A new step moves focus on
+        // purpose: its heading, or going back, the first step's first field.
+        contentsChanged() {
+            if (! this.show || ! this.ready) return;
+            const step = this.currentStep();
+            if (step !== this.step) {
+                this.step = step;
+                $nextTick(() => step === this.firstStep ? this.firstFocusable()?.focus() : this.title()?.focus());
+            } else if (! document.activeElement || document.activeElement === document.body) {
+                // A button disabled for its round trip drops focus, and gets it
+                // back when it's enabled again (a validation error, say).
+                const last = this.lastFocused;
+                if (! last || ! $el.contains(last)) { this.reclaim(); } else if (! last.disabled) { last.focus(); }
+            }
         },
     }"
     x-init="
+        watchContents();
         if (show) { opened(); }
         $watch('show', value => {
             if (value) {
                 opened();
             } else {
-                document.body.classList.remove('overflow-y-hidden');
-                if (triggerEl && document.body.contains(triggerEl) && typeof triggerEl.focus === 'function') {
-                    triggerEl.focus();
-                }
-                triggerEl = null;
+                closed();
             }
         })
     "
@@ -112,12 +180,15 @@ $showJs = $entangle ? "\$wire.entangle('{$entangle}').live" : \Illuminate\Suppor
     x-on:close-modal.window="$event.detail == '{{ $name }}' ? show = false : null"
     x-on:close.stop="show = false"
     x-on:keydown.escape.window="show = false"
-    x-on:keydown.tab.prevent="$event.shiftKey || nextFocusable().focus()"
-    x-on:keydown.shift.tab.prevent="prevFocusable().focus()"
+    x-on:keydown.tab.window="trap($event)"
+    x-on:focusin.window="if (show && ! covered() && ! $el.contains($event.target)) reclaim()"
+    x-on:focusin="lastFocused = $event.target"
     x-show="show"
     role="dialog"
     aria-modal="true"
-    class="fixed inset-0 overflow-y-auto overscroll-contain px-4 py-6 sm:px-0 z-50"
+    {!! $accessibleName !!}
+    tabindex="-1"
+    class="fixed inset-0 overflow-y-auto overscroll-contain px-4 py-6 focus:outline-none sm:px-0 z-50"
     style="display: {{ $show ? 'block' : 'none' }};"
 >
     <div
@@ -144,6 +215,9 @@ $showJs = $entangle ? "\$wire.entangle('{$entangle}').live" : \Illuminate\Suppor
         x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
         x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
     >
+        @if ($step !== null)
+            <span hidden data-modal-step="{{ $step }}"></span>
+        @endif
         {{ $slot }}
     </div>
 </div>

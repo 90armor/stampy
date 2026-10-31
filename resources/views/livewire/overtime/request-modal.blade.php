@@ -1,14 +1,14 @@
 <div>
 @if ($showModal)
-    <x-modal name="overtime-request-modal" :show="true" entangle="showModal" backdrop="bg-slate-900/50" maxWidth="md" panelClass="mt-6 sm:mt-16">
+    <x-modal name="overtime-request-modal" :step="$step" :show="true" entangle="showModal" backdrop="bg-slate-900/50" maxWidth="md" panelClass="mt-6 sm:mt-16">
         <div class="mx-4 border-b border-slate-divider py-4 sm:mx-6 sm:py-5">
-            <h3 class="text-base font-semibold text-slate-900 dark:text-slate-100">
+            <x-modal.title>
                 @if ($step === 'review')
                     Review {{ $forOthers ? 'overtime' : 'your request' }}
                 @else
                     {{ $forOthers ? 'File overtime for an employee' : 'Request overtime' }}
                 @endif
-            </h3>
+            </x-modal.title>
         </div>
 
         @if ($step === 'form')

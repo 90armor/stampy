@@ -1,4 +1,6 @@
 <x-guest-layout>
+    <x-slot:pageTitle>Confirm your password</x-slot:pageTitle>
+
     <h1 class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Confirm your password</h1>
     <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">
         {{ __('This is a secure area. Please confirm your password before continuing.') }}

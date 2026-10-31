@@ -7,10 +7,11 @@
         backdrop="bg-slate-900/50"
         maxWidth="employee-form"
         panelClass="mt-10"
+        :step="$resetPasswordValue ? 'password-reset' : ($generatedPassword ? 'account-created' : 'form')"
     >
         @if ($resetPasswordValue)
             <div class="p-6">
-                <h3 class="text-base font-semibold text-green-700 dark:text-green-400">Password reset</h3>
+                <x-modal.title look="text-base font-semibold text-green-700 dark:text-green-400">Password reset</x-modal.title>
                 <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
                     Share this temporary password with {{ $editing->full_name }}. It's shown once and can't be retrieved later — resetting again replaces it. It expires in 48 hours and must be changed on first login.
                 </p>
@@ -23,7 +24,7 @@
             </div>
         @elseif ($generatedPassword)
             <div class="p-6">
-                <h3 class="text-base font-semibold text-green-700 dark:text-green-400">Employee saved — account created</h3>
+                <x-modal.title look="text-base font-semibold text-green-700 dark:text-green-400">Employee saved — account created</x-modal.title>
                 <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
                     Share these credentials with {{ $full_name }}. This password is shown once and cannot be retrieved later.
                 </p>
@@ -38,9 +39,9 @@
             </div>
         @else
             <div class="mx-6 border-b border-slate-divider py-5">
-                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-100">
+                <x-modal.title>
                     {{ $editing ? 'Edit — '.$editing->full_name : 'Add Employee' }}
-                </h3>
+                </x-modal.title>
             </div>
 
             {{-- Plain block flow (not flex) on purpose: max-height on a flex-grow

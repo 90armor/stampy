@@ -1,4 +1,6 @@
 <x-guest-layout>
+    <x-slot:pageTitle>Reset your password</x-slot:pageTitle>
+
     <a href="{{ route('login') }}" wire:navigate class="mb-6 inline-flex items-center gap-x-1 text-sm font-semibold text-primary-700 hover:text-primary-800 dark:text-accent-300 dark:hover:text-accent-200">
         <x-icon name="chevron-right" class="w-5 h-5 rotate-180" />
         Back to sign in

@@ -1,7 +1,7 @@
 <div class="space-y-6">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Departments</h2>
+            <h2 tabindex="-1" data-section-heading class="text-lg font-semibold text-slate-900 dark:text-slate-100 focus:outline-none">Departments</h2>
             <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">Define the teams employees belong to.</p>
         </div>
         <x-button variant="primary" wire:click="create" wire:loading.attr="disabled" wire:target="create" class="self-start sm:self-auto">

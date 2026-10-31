@@ -659,7 +659,7 @@
                 <div class="p-6">
                     <div class="flex items-start justify-between gap-4">
                         <div>
-                            <h3 class="text-lg font-semibold text-slate-900 dark:text-slate-100">{{ \App\Support\DisplayDate::long($modalDate) }}</h3>
+                            <x-modal.title look="text-lg font-semibold text-slate-900 dark:text-slate-100">{{ \App\Support\DisplayDate::long($modalDate) }}</x-modal.title>
                             <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{{ $employee->full_name }}</p>
                             @if ($modalHoliday)
                                 {{-- Muted, like the calendar cell's name: the status pill on
@@ -762,7 +762,7 @@
                             };
                         @endphp
                         <div class="mt-5 border-t border-slate-divider pt-4">
-                            <h4 class="text-xs font-medium text-slate-500 dark:text-slate-400">Leave</h4>
+                            <h3 class="text-xs font-medium text-slate-500 dark:text-slate-400">Leave</h3>
                             <ul class="mt-2 space-y-2">
                                 @foreach ($dayLeaves as $item)
                                     @php
@@ -808,7 +808,7 @@
                                 : null;
                         @endphp
                         <div class="mt-5 border-t border-slate-divider pt-4">
-                            <h4 class="text-xs font-medium text-slate-500 dark:text-slate-400">Overtime</h4>
+                            <h3 class="text-xs font-medium text-slate-500 dark:text-slate-400">Overtime</h3>
                             <div class="mt-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                                 <div class="min-w-0">
                                     <div class="flex flex-wrap items-center gap-2">

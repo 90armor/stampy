@@ -8,7 +8,7 @@ use Tests\TestCase;
 
 /**
  * <x-modal> always moves focus into the dialog when it opens and returns it
- * to the trigger when it closes (docs/DESIGN_SYSTEM.md, Overlays). It used to
+ * to the trigger when it closes (docs/DESIGN_SYSTEM.md, Modals and focus). It used to
  * do so only for a call that passed `focusable`, which none did, so the
  * calendar's day modal left focus on the page behind it.
  */
@@ -32,7 +32,8 @@ class ModalFocusTest extends TestCase
     {
         $html = Blade::render('<x-modal name="probe"><button type="button">Ok</button></x-modal>');
 
-        $this->assertStringContainsString('triggerEl.focus()', $html);
+        $this->assertStringContainsString('window.stampyFocus.capture(this.triggerEl)', $html);
+        $this->assertStringContainsString('window.stampyFocus.settle(context)', $html);
         $this->assertStringContainsString('window.stampyLastFocusOutsideModal', $html);
         // The page-wide tracker lives in app.js, outside any modal instance.
         $this->assertStringContainsString('window.stampyLastFocusOutsideModal = event.target', File::get(resource_path('js/app.js')));

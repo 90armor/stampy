@@ -13,7 +13,7 @@
 <div>
     <div class="flex flex-col gap-3 px-4 pt-5 sm:flex-row sm:items-start sm:justify-between sm:px-6">
         <div>
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Leave</h2>
+            <h2 tabindex="-1" data-section-heading class="text-lg font-semibold text-slate-900 dark:text-slate-100 focus:outline-none">Leave</h2>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Balances, requests and adjustments.</p>
         </div>
         <div class="flex flex-wrap items-center gap-3">
@@ -40,10 +40,10 @@
     </div>
 
     @if ($notice)
-        <div class="mx-4 mt-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800 ring-1 ring-inset ring-green-600/20 dark:bg-green-900/20 dark:text-green-300 dark:ring-green-500/30 sm:mx-6" role="status">{{ $notice }}</div>
+        <div tabindex="-1" data-focus-notice class="mx-4 mt-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800 ring-1 ring-inset ring-green-600/20 dark:bg-green-900/20 dark:text-green-300 dark:ring-green-500/30 sm:mx-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" role="status">{{ $notice }}</div>
     @endif
     @if ($warning)
-        <div class="mx-4 mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-900 sm:mx-6">{{ $warning }}</div>
+        <div tabindex="-1" data-focus-notice class="mx-4 mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-900 sm:mx-6 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" role="status">{{ $warning }}</div>
     @endif
 
     @include('livewire.leave.partials.balances', ['balanceRows' => $balanceRows])
@@ -109,7 +109,7 @@
     @if ($canAdjust && $showAdjustment)
         <x-modal name="leave-adjustment-modal" :show="true" entangle="showAdjustment" backdrop="bg-slate-900/50" maxWidth="md" panelClass="mt-6 sm:mt-16">
             <div class="mx-4 border-b border-slate-divider py-4 sm:mx-6 sm:py-5">
-                <h3 class="text-base font-semibold text-slate-900 dark:text-slate-100">Adjust {{ $employee->full_name }}'s balance</h3>
+                <x-modal.title>Adjust {{ $employee->full_name }}'s balance</x-modal.title>
             </div>
             <form id="leave-adjustment-form" wire:submit="saveAdjustment" class="space-y-4 px-4 py-4 sm:px-6">
                 <p class="text-sm text-slate-600 dark:text-slate-300">Adjustments can't be edited or deleted: fix a mistake with a reversing entry. Opening balances — leave taken or carried before go-live — go in here too.</p>

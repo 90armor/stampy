@@ -1,7 +1,7 @@
 <div class="space-y-6">
     <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Holidays</h2>
+            <h2 tabindex="-1" data-section-heading class="text-lg font-semibold text-slate-900 dark:text-slate-100 focus:outline-none">Holidays</h2>
             <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">Configure company-wide dates that affect attendance.</p>
         </div>
 

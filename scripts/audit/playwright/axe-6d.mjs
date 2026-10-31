@@ -60,7 +60,7 @@ async function capture(page, persona, slug, path, action, width, theme) {
         if (action) await action(page);
         title = await page.title();
         h1 = await page.evaluate(() => [...document.querySelectorAll('h1')].filter((h) => h.getClientRects().length).map((h) => h.innerText.trim().replace(/\s+/g, ' ')));
-        if (! action) await fullShot(page, `${dir}/shots/${slug}-${persona}-${width}-${theme}.png`, width);
+        if (! slug.startsWith('modal-')) await fullShot(page, `${dir}/shots/${slug}-${persona}-${width}-${theme}.png`, width);
         axe = await axeRun(page);
     } catch (e) {
         axe = [{ id: 'harness-error', impact: 'harness', help: e.message.slice(0, 200), nodes: [] }];
@@ -76,7 +76,7 @@ await withBrowser(async (browser) => {
         for (const theme of ['light', 'dark']) {
             const ctx = await themedContext(browser, state, theme);
             const page = await ctx.newPage();
-            for (const [slug, path] of pages) for (const width of [390, 1024, 1440]) await capture(page, persona, slug, path, null, width, theme);
+            for (const [slug, path, opts] of pages) for (const width of [390, 1024, 1440]) await capture(page, persona, slug, path, opts?.action ?? null, width, theme);
             for (const [slug, path, action] of extras[persona] ?? []) for (const width of [390, 1440]) await capture(page, persona, slug, path, action, width, theme);
             await ctx.close();
         }

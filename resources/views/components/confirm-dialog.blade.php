@@ -27,6 +27,7 @@ delete click in one tab silently arms the other tab's (hidden) dialog too. --}}
         method: null,
         args: [],
         triggerEl: null,
+        focusContext: null,
         focusables() {
             return [...this.$refs.panel.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex=\'-1\'])')]
                 .filter((element) => ! element.hasAttribute('disabled'));
@@ -58,13 +59,18 @@ delete click in one tab silently arms the other tab's (hidden) dialog too. --}}
                 }
             });
         },
+        // The action can remove the trigger or reuse it for another row, so once
+        // it has finished focus follows the same order as a modal's close.
         proceed() {
-            if (this.method) { $wire.call(this.method, ...this.args); }
+            const context = this.focusContext;
+            const call = this.method ? $wire.call(this.method, ...this.args) : null;
             this.close();
+            if (call) { Promise.resolve(call).finally(() => window.stampyFocus.settle(context)); }
         },
     }"
     x-on:{{ $event }}.window="
         triggerEl = document.activeElement;
+        focusContext = window.stampyFocus.capture(triggerEl);
         title = $event.detail.title;
         message = $event.detail.message ?? '';
         confirmText = $event.detail.confirmText ?? 'Confirm';
@@ -102,7 +108,7 @@ delete click in one tab silently arms the other tab's (hidden) dialog too. --}}
                         <x-icon name="exclamation-triangle" class="w-5 h-5" />
                     </div>
                     <div class="flex-1 pt-1.5">
-                        <h3 id="{{ $dialogId }}-title" class="text-base font-semibold text-slate-900 dark:text-slate-100" x-text="title"></h3>
+                        <h2 id="{{ $dialogId }}-title" class="text-base font-semibold text-slate-900 dark:text-slate-100" x-text="title"></h2>
                         <p id="{{ $dialogId }}-description" class="mt-1 text-sm text-slate-500 dark:text-slate-400" x-show="message" x-text="message"></p>
                     </div>
                 </div>

@@ -30,10 +30,10 @@
     </div>
 
     @if ($notice)
-        <div class="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800 ring-1 ring-inset ring-green-600/20 dark:bg-green-900/20 dark:text-green-300 dark:ring-green-500/30" role="status">{{ $notice }}</div>
+        <div tabindex="-1" data-focus-notice class="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800 ring-1 ring-inset ring-green-600/20 dark:bg-green-900/20 dark:text-green-300 dark:ring-green-500/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" role="status">{{ $notice }}</div>
     @endif
     @if ($warning)
-        <div class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-900">{{ $warning }}</div>
+        <div tabindex="-1" data-focus-notice class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-700 ring-1 ring-inset ring-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" role="status">{{ $warning }}</div>
     @endif
 
     @if (! $employee)
@@ -72,7 +72,7 @@
 
         <x-card :padding="false">
             <div class="{{ $cardHeader }} px-4 pt-5 sm:px-6">
-                <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">My requests</h2>
+                <h2 tabindex="-1" data-section-heading class="text-lg font-semibold text-slate-900 dark:text-slate-100 focus:outline-none">My requests</h2>
                 @if ($requests->isNotEmpty())<p class="{{ $cardMeta }}">{{ $requests->count() }} {{ Str::plural('request', $requests->count()) }}</p>@endif
             </div>
 

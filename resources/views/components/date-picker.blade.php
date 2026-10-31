@@ -6,6 +6,8 @@ plain wire:model it replaces. Rules: docs/ATTENDANCE_UI.md, Date picker.
   <x-date-picker id="holiday_date" model="date" label="Date" />
 
 - id: the trigger's id, so the field's <x-input-label for> still points at it.
+  Clicking that label focuses the trigger or, below 640px, the native input
+  (resources/js/app.js).
 - model: the Livewire property ('YYYY-MM-DD').
 - label: the field's name, for the trigger's and the native input's
   accessible names (a label's text alone would hide the chosen date).
@@ -99,6 +101,7 @@ split as the Daily Attendance range. --}}
         wire:model="{{ $model }}"
         @if ($min) min="{{ $min }}" @endif
         @if ($max) max="{{ $max }}" @endif
+        data-date-native
         class="block h-control w-full min-w-0 rounded-lg border-slate-border bg-white text-sm text-slate-900 shadow-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500 dark:bg-slate-750 dark:text-slate-100 sm:hidden"
     >
     @if ($hint)
