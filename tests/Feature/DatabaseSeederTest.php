@@ -90,6 +90,19 @@ class DatabaseSeederTest extends TestCase
         $this->assertSame([], $problems);
     }
 
+    public function test_the_seed_runs_when_someones_latest_present_day_is_a_worked_holiday(): void
+    {
+        // Sat 31 Oct 2026: EMP-0025's last Present day was the holiday on Thu 29
+        // Oct. LeaveSeeder chose it for a half day of leave, which charges nothing
+        // there, so the service refused it and the whole seed aborted, on this date
+        // and so for every test that seeds.
+        $this->travelTo('2026-10-31 13:00:00');
+
+        $this->seed();
+
+        $this->assertGreaterThan(0, OvertimeRequest::count());
+    }
+
     public function test_seeded_attendance_never_includes_a_punch_later_than_now(): void
     {
         // Mid-shift, so today's generated day has punches on both sides of now.

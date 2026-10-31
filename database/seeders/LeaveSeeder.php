@@ -233,9 +233,11 @@ class LeaveSeeder extends DemoSeeder
     }
 
     /**
-     * Their most recent past day with $status, inside the retroactive limit
+     * Their most recent past workday with $status, inside the retroactive limit
      * and this year — last year has no grant (grants only start from the
-     * current year), so a past day there couldn't be paid for.
+     * current year), so a past day there couldn't be paid for. A workday, because
+     * a worked holiday or weekend is Present too, and leave there charges nothing,
+     * which the service refuses.
      */
     private function pastDay(Employee $employee, AttendanceStatus $status): ?Carbon
     {
@@ -245,7 +247,8 @@ class LeaveSeeder extends DemoSeeder
             ->whereDate('work_date', '<', today())
             ->whereDate('work_date', '>=', today()->subDays(LeaveRequestService::RETROACTIVE_DAYS - 2)->max(today()->startOfYear()))
             ->orderByDesc('work_date')
-            ->first();
+            ->get()
+            ->first(fn (DailyAttendance $row) => WorkdayCalendar::isWorkday($employee, $row->work_date));
 
         return $row?->work_date->copy();
     }
