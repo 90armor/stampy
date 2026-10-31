@@ -30,6 +30,7 @@ async function moment(p, what, expected) {
     if (! d.visible && d.kind !== 'body') noRing.add(`${current}: ${label(d)}`);
     rows.push({ journey: current, what, landed: label(d), ok });
     console.log(`${ok ? 'ok  ' : 'BAD '} ${what} → ${label(d)}`);
+    if (! ok) console.log('     on screen: ' + await p.evaluate(() => [...document.querySelectorAll('[role=dialog] .text-red-600, [role=dialog] .text-red-700, [role=dialog] [class*=text-red], [data-focus-notice]')].filter((e) => e.getClientRects().length).map((e) => e.innerText.trim().slice(0, 120)).join(' | ') + ' · dialogs open: ' + [...document.querySelectorAll('[role=dialog][aria-labelledby]')].filter((e) => e.getClientRects().length).length));
 }
 async function tabTo(p, re, max = 70, shift = false) {
     for (let i = 0; i < max; i++) {
@@ -68,6 +69,9 @@ async function pickDate(p, width, weeks, digits) {
     if (width < 640) { await p.keyboard.type(digits); return; }
     await enter(p); await p.waitForTimeout(300);
     for (let i = 0; i < weeks; i++) await p.keyboard.press('ArrowDown');
+    // Run on a weekend, that lands on a day off, which a leave can't be made of.
+    const day = new Date(Date.now() + weeks * 7 * 86400000).getDay();
+    for (let i = 0; i < (day === 6 ? 1 : day === 0 ? 2 : 0); i++) await p.keyboard.press('ArrowLeft');
     await enter(p); await p.waitForTimeout(300);
 }
 
@@ -228,13 +232,15 @@ async function policiesEdit(b, width, day) {
     await enter(p);
     await moment(p, 'Save, the row stays', new RegExp('^button: ' + editName.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     // A save that moves the row out of the year on screen: the trigger goes.
-    await enter(p); await p.waitForLoadState('networkidle'); await p.waitForTimeout(400);
+    await enter(p);
+    await moment(p, 'Edit opens the modal again', /Date/);
     if (width < 640) {
         await p.keyboard.type(day);
     } else {
-        await enter(p); await p.waitForTimeout(300);
+        await enter(p); await p.waitForTimeout(400);
         for (let i = 0; i < 60; i++) await p.keyboard.press('ArrowDown');
-        await enter(p); await p.waitForTimeout(300);
+        await p.waitForTimeout(400);
+        await enter(p); await p.waitForTimeout(400);
     }
     await tabTo(p, /^button: (Save|Update)/, 10);
     await enter(p);
@@ -243,7 +249,9 @@ async function policiesEdit(b, width, day) {
 }
 
 await withBrowser(async (b) => {
-    for (const [width, fileDay, fileWeeks, holiday] of [[1440, '09122026', 6, ''], [390, '16122026', 0, '22062027']]) {
+    // One width per run (WIDTH=1440 or 390), each on a fresh seed: a request one width
+    // files holds its date, and each run uses up the manager's queue.
+    for (const [width, fileDay, fileWeeks, holiday] of [[1440, '09122026', 6, ''], [390, '16122026', 0, '22062027']].filter(([w]) => ! process.env.WIDTH || String(w) === process.env.WIDTH)) {
         console.log(`\n## ${width}`);
         for (const [name, run] of [
             ['leave', () => leaveJourney(b, width)],

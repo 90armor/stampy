@@ -140,7 +140,18 @@ await withBrowser(async (b) => {
             await c.close();
         }
 
-        // Rule 3 through a confirmation: deleting a department's row.
+        // Rule 3 through a confirmation: deleting a holiday's row takes the trigger with it.
+        {
+            const { c, p } = await page(b, admin, 'light', width);
+            await p.goto(`${BASE}/policies?tab=holidays`, { waitUntil: 'networkidle' });
+            await p.locator('button[aria-label^="Delete "]:visible').first().focus();
+            await p.keyboard.press('Enter'); await settle(p, 400);
+            await p.getByRole('alertdialog').getByRole('button', { name: /delete/i }).focus();
+            await p.keyboard.press('Enter'); await settle(p, 900);
+            check('rule 3, through a confirmation: the section heading', (await active(p)).startsWith('h2[section]:Holidays'), await active(p));
+            await c.close();
+        }
+
         // Rule 4, <main>: Deactivate on a profile; the trigger becomes Reactivate.
         {
             const { c, p } = await page(b, admin, 'light', width);
