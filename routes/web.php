@@ -64,11 +64,15 @@ Route::get('/dashboard', function () {
             ->filter(fn (Department $department) => $department->employees_count > 0)
             ->values();
 
+        // Everyone the card counts, loaded once: it shows the first few and
+        // the rest in place behind "Show all" (Phase 6e).
+        $needsAttention = DashboardAttendance::needsAttention($employeeIds, null);
+
         $attendance = [
             'today' => DashboardAttendance::todayBreakdown($employeeIds),
             'live' => DashboardAttendance::liveToday($employeeIds),
-            'needsAttention' => DashboardAttendance::needsAttention($employeeIds),
-            'needsAttentionTotal' => DashboardAttendance::needsAttentionTotal($employeeIds),
+            'needsAttention' => $needsAttention,
+            'needsAttentionTotal' => count($needsAttention),
             'trend' => DashboardAttendance::weeklyTrend($employeeIds),
             'departments' => DashboardAttendance::departmentAttendance($departments, $employeeIds),
             'recent' => DashboardAttendance::recentActivity($employeeIds),

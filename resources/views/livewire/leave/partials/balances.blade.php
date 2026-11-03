@@ -8,10 +8,8 @@ employee profile's Leave card (Phase 3e). $balanceRows: list of
 
     // Adjustments only appear when someone has one this year.
     $showAdjustments = collect($balanceRows)->contains(fn ($row) => $row['balance']->adjustments !== 0);
-    // A type not usable yet: when it becomes usable, and why (F08). No
-    // "earned so far" figure: days that can't be used read as days to use.
-    $usableLine = fn ($balance, $row) => 'Usable from '.DisplayDate::compact($balance->usableFrom)
-        .($row['type']->min_service_months ? ', after '.$row['type']->min_service_months.' '.Str::plural('month', $row['type']->min_service_months)."' service" : '');
+    // A type not usable yet: when it becomes usable, and why (F08; LeaveType::usableFromLabel()).
+    $usableLine = fn ($balance, $row) => $row['type']->usableFromLabel($balance->usableFrom);
     // A leaver's last year: Available is what they had at their last day
     // (Balance::availableAtLastDay() — the grant pro-rated to it), the figure
     // untaken leave is read from; the full-year balance moves to a muted line.

@@ -192,6 +192,27 @@ await withBrowser(async (b) => {
             await c.close();
         }
 
+        // Needs attention's Show all (Phase 6e follow-up): one button, its label
+        // flips, focus stays on it, and it stays in view as the list opens.
+        {
+            const { c, p } = await page(b, admin, 'light', width);
+            await p.goto(`${BASE}/dashboard`, { waitUntil: 'networkidle' });
+            const toggle = p.locator('button[aria-controls="needs-attention-list"]');
+            if (await toggle.count()) {
+                const closed = (await toggle.innerText()).trim();
+                await toggle.focus(); await p.keyboard.press('Enter'); await p.waitForTimeout(400);
+                const opened = await p.evaluate(() => { const e = document.activeElement; const r = e.getBoundingClientRect(); return { label: e.innerText.trim(), expanded: e.getAttribute('aria-expanded'), inView: r.top >= 0 && r.bottom <= window.innerHeight, hidden: document.querySelectorAll('#needs-attention-list > li[style*="display: none"]').length }; });
+                check('Show all: focus stays on the button, its label flips', opened.label === 'Show less' && opened.expanded === 'true', `${closed} → ${JSON.stringify(opened)}`);
+                check('Show all: every person shown, the button still in view', opened.hidden === 0 && opened.inView, JSON.stringify(opened));
+                await p.keyboard.press('Enter'); await p.waitForTimeout(400);
+                const back = await p.evaluate(() => ({ label: document.activeElement.innerText.trim(), expanded: document.activeElement.getAttribute('aria-expanded') }));
+                check('Show less: back to the first few, focus still on the button', back.label === closed && back.expanded === 'false', JSON.stringify(back));
+            } else {
+                check('Show all: the dashboard counts more people than it lists', false, 'no Show all button');
+            }
+            await c.close();
+        }
+
         // Rule 3 through a confirmation: deleting a holiday's row takes the trigger with it.
         {
             const { c, p } = await page(b, admin, 'light', width);

@@ -13,6 +13,7 @@ use App\Models\WorkSchedule;
 use App\Support\DashboardAttendance;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -719,6 +720,49 @@ class DashboardTest extends TestCase
                 && $list->every(fn ($item) => $item['badge'] === null);
         });
         $response->assertSeeInOrder(['Later Lena', '1h 20m late', 'Late Lou', '45m late', 'Not Yet Nina', 'Not in yet · due 8:00 AM']);
+    }
+
+    public function test_needs_attention_lists_everyone_it_counts_the_rest_behind_show_all(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 18:00:00'));
+        $admin = $this->admin();
+        $absent = fn (int $n) => Employee::factory()->count($n)->create()
+            ->each(fn (Employee $employee) => $this->attendanceRow($employee, AttendanceStatus::Absent));
+
+        $absent(10);
+        // Once unmeasured: the first request also fills caches the second finds warm.
+        $this->actingAs($admin)->get(route('dashboard'));
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+        $html = $this->actingAs($admin)->get(route('dashboard'))->assertOk()->getContent();
+        $queriesAt10 = count(DB::getQueryLog());
+        DB::flushQueryLog();
+
+        // All ten are on the page; the two past NEEDS_ATTENTION_SHOWN wait behind the button.
+        $list = substr($html, strpos($html, 'id="needs-attention-list"'));
+        $this->assertSame(10, substr_count(substr($list, 0, strpos($list, '</ul>')), '<li'));
+        $this->assertSame(2, substr_count($html, 'x-show="all" x-cloak'));
+        $this->assertStringContainsString('aria-controls="needs-attention-list"', $html);
+        $this->assertStringContainsString('>Show all 10</span>', $html);
+        $this->assertStringContainsString("'Show less'", $html);
+
+        // Loaded with the page: twenty more people cost no more queries.
+        $absent(20);
+        DB::flushQueryLog();
+        $this->actingAs($admin)->get(route('dashboard'))->assertSee('Show all 30');
+        $this->assertSame($queriesAt10, count(DB::getQueryLog()));
+        DB::disableQueryLog();
+    }
+
+    public function test_no_show_all_when_the_list_already_has_everyone(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 18:00:00'));
+        Employee::factory()->count(8)->create()->each(fn (Employee $employee) => $this->attendanceRow($employee, AttendanceStatus::Absent));
+
+        $this->actingAs($this->admin())->get(route('dashboard'))
+            ->assertSee('8 today')
+            ->assertDontSee('Show all')
+            ->assertDontSee('x-show="all"', false);
     }
 
     public function test_before_start_plus_grace_a_punchless_employee_is_not_listed_as_not_in_yet(): void

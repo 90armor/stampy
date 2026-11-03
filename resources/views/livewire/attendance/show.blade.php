@@ -62,11 +62,11 @@
     // mistaken for "did not work" or "day off" at a glance.
     $notCalculatedStyle = ['icon' => 'minus', 'bg' => 'bg-slate-50 dark:bg-slate-750/40', 'text' => 'text-slate-500 dark:text-slate-400', 'ring' => 'ring-slate-divider'];
 
-    // A day that hasn't happened yet (F07): no row because there's nothing to
-    // calculate, so no status, no icon and no label — the card surface and a
-    // muted number. An upcoming holiday keeps its flag (muted: it's a date to
-    // know about, not a status yet) and its name.
-    $upcomingStyle = ['icon' => null, 'bg' => 'bg-white dark:bg-slate-800', 'text' => 'text-slate-500 dark:text-slate-400', 'iconText' => 'text-slate-500 dark:text-slate-400', 'weight' => 'font-medium', 'ring' => 'ring-slate-divider'];
+    // A day with nothing to calculate (F07) — one that hasn't happened yet, or
+    // one before the employee joined: no status, no icon and no label — the
+    // card surface and a muted number. A holiday keeps its flag (muted: it's
+    // a date to know about, not a status) and its name.
+    $quietStyle = ['icon' => null, 'bg' => 'bg-white dark:bg-slate-800', 'text' => 'text-slate-500 dark:text-slate-400', 'iconText' => 'text-slate-500 dark:text-slate-400', 'weight' => 'font-medium', 'ring' => 'ring-slate-divider'];
 
     $weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -206,12 +206,7 @@
             happened yet have nothing to calculate, and saying so every month
             read like a fault. Today is past once the scheduler has closed it. --}}
             @if ($missingWorkdays !== [])
-                @php
-                    $missingLabels = array_map(fn ($date) => \App\Support\DisplayDate::compact($date), $missingWorkdays);
-                    $missingList = count($missingLabels) > 3
-                        ? implode(', ', array_slice($missingLabels, 0, 2)).' and '.(count($missingLabels) - 2).' more workdays'
-                        : (count($missingLabels) === 1 ? $missingLabels[0] : implode(', ', array_slice($missingLabels, 0, -1)).' and '.end($missingLabels));
-                @endphp
+                @php $missingList = \App\Support\AttendanceGaps::label($missingWorkdays); @endphp
                 <div class="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-800 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-500/30">
                     <x-icon name="exclamation-triangle" class="mt-0.5 h-5 w-5 shrink-0" />
                     <span>
@@ -305,19 +300,19 @@
                             // Colour comes from displayVariant(), which is status-only:
                             // a Present day with a timing exception is still a green
                             // 'present' cell; the marked time below carries the timing.
-                            $upcoming = $cell['inMonth'] && ! $record && isset($upcomingDays[$cellDateKey]);
+                            $quiet = $cell['inMonth'] && ! $record && isset($quietDays[$cellDateKey]);
                             if (! $cell['inMonth']) {
                                 $style = null;
                             } elseif ($record) {
                                 $style = $variantStyles[$record->displayVariant()];
-                            } elseif ($upcoming) {
-                                $style = [...$upcomingStyle, 'icon' => $holiday ? 'flag' : null];
+                            } elseif ($quiet) {
+                                $style = [...$quietStyle, 'icon' => $holiday ? 'flag' : null];
                             } else {
                                 $style = $notCalculatedStyle;
                             }
 
-                            // An upcoming day has no status to name.
-                            $statusLabel = $record ? $record->status->label() : ($upcoming ? null : 'Not calculated');
+                            // A quiet day (upcoming, or before they joined) has no status to name.
+                            $statusLabel = $record ? $record->status->label() : ($quiet ? null : 'Not calculated');
                             $lateMinutesLabel = $lateArrival ? $record->late_minutes.' minute'.($record->late_minutes === 1 ? '' : 's') : null;
                             $earlyMinutesLabel = $earlyDeparture ? $record->early_leave_minutes.' minute'.($record->early_leave_minutes === 1 ? '' : 's') : null;
                             // Leave annotations (Phase 3e): the half on a half-day leave day,
@@ -467,8 +462,8 @@
                 grid, not decoration. flex-wrap keeps it from overflowing on
                 narrow (mobile) widths; it just breaks onto more lines. --}}
                 <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-divider pt-3 text-xs text-slate-500 dark:text-slate-400">
-                    {{-- "Not calculated" only when a cell shows it: an upcoming day isn't one (F07). --}}
-                    @foreach ($days->contains(fn ($day) => ! $day['record'] && ! isset($upcomingDays[$day['date']->format('Y-m-d')])) ? $legendItems : array_slice($legendItems, 0, -1) as $item)
+                    {{-- "Not calculated" only when a cell shows it: a quiet day isn't one (F07). --}}
+                    @foreach ($days->contains(fn ($day) => ! $day['record'] && ! isset($quietDays[$day['date']->format('Y-m-d')])) ? $legendItems : array_slice($legendItems, 0, -1) as $item)
                         <span class="inline-flex items-center gap-1.5">
                             <x-icon :name="$item['icon']" class="h-5 w-5 shrink-0 {{ $item['text'] }}" />
                             {{ $item['label'] }}
@@ -581,13 +576,13 @@
                                     </td>
                                 @else
                                     {{-- No row at all. A day that hasn't happened yet has no
-                                    status (F07): an empty value, like the cells beside it.
+                                    status (F07), and neither has a day before they joined: an empty value, like the cells beside it.
                                     Otherwise the builder hasn't reached this date — deliberately
                                     distinct from "absent": absent means the builder ran and found
                                     no punches on a scheduled workday; this means it hasn't run at
                                     all, so nothing here should read as a judgement about attendance. --}}
                                     <td class="px-6 py-2 text-sm">
-                                        @if (isset($upcomingDays[$dayKey]))
+                                        @if (isset($quietDays[$dayKey]))
                                             {!! $emDash !!}
                                         @else
                                             <x-badge color="slate">Not calculated</x-badge>
@@ -661,7 +656,7 @@
                 @php
                     $modalDate = \Illuminate\Support\Carbon::createFromFormat('Y-m-d', $viewingDay);
                     $modalRecord = $recordsByDate->get($viewingDay);
-                    $modalUpcoming = ! $modalRecord && isset($upcomingDays[$viewingDay]);
+                    $modalQuiet = ! $modalRecord && isset($quietDays[$viewingDay]);
                     $modalStyle = $modalRecord ? $variantStyles[$modalRecord->displayVariant()] : $notCalculatedStyle;
                     // The schedule actually used for this day's calculation
                     // when a row exists; falls back to scheduleOn() for this
@@ -698,8 +693,8 @@
                         the status-only displayVariant() — a late day is a green "Present". The
                         Late / Early leave fields below (and the amber marked In/Out times)
                         carry the timing; a chip here would just repeat them. --}}
-                        {{-- An upcoming day has no status, so no pill (F07). --}}
-                        @unless ($modalUpcoming)
+                        {{-- A quiet day has no status, so no pill (F07). --}}
+                        @unless ($modalQuiet)
                             <div class="flex flex-wrap items-center justify-end gap-1.5">
                                 <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium ring-1 ring-inset {{ $modalStyle['pill'] ?? $modalStyle['bg'].' '.$modalStyle['ring'] }} {{ $modalStyle['text'] }}">
                                     <x-icon :name="$modalStyle['icon']" class="h-3.5 w-3.5" />

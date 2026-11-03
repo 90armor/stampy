@@ -34,6 +34,9 @@ class DashboardAttendance
      * day (Incomplete) still means the person came in, and counting it keeps
      * the Department card's total equal to the strip's At work + Left.
      */
+    /** How many people Needs attention lists before "Show all". */
+    public const NEEDS_ATTENTION_SHOWN = 8;
+
     private const CHECKED_IN = '(daily_attendances.first_in is not null or daily_attendances.last_out is not null)';
 
     /**
@@ -138,14 +141,16 @@ class DashboardAttendance
      * grace_minutes — start_time, or the PM start on an AM-leave day
      * (DailyAttendance::isNotInYet()), and its "due" time is that start. Neither late nor "not in yet" is a
      * status, so neither carries a badge. Capped at $limit, most urgent
-     * first; needsAttentionTotal() is the uncapped count for the header.
+     * first, or everyone with null — the dashboard loads everyone once and
+     * shows the first NEEDS_ATTENTION_SHOWN, the rest behind "Show all"
+     * (Phase 6e); needsAttentionTotal() is the uncapped count.
      *
      * @param  int[]|null  $employeeIds
      * @return list<array{name: string, kind: string, label: string, badge: ?string, detail: ?string}>
      */
-    public static function needsAttention(?array $employeeIds, int $limit = 8): array
+    public static function needsAttention(?array $employeeIds, ?int $limit = self::NEEDS_ATTENTION_SHOWN): array
     {
-        return self::needsAttentionItems($employeeIds)->take($limit)->map(function (array $item) {
+        return self::needsAttentionItems($employeeIds)->when($limit !== null, fn (Collection $items) => $items->take($limit))->map(function (array $item) {
             $row = $item['row'];
 
             [$label, $badge, $detail] = match ($item['kind']) {

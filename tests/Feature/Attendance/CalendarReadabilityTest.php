@@ -403,6 +403,8 @@ class CalendarReadabilityTest extends TestCase
 
     public function test_a_present_day_with_an_early_leave_keeps_the_green_present_cell(): void
     {
+        // March in the past: an upcoming day would share the cell surface it counts (F07).
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $employee = Employee::factory()->create();
         DailyAttendance::factory()->create([
             'employee_id' => $employee->id,

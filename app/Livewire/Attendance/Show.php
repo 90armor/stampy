@@ -13,6 +13,7 @@ use App\Models\OvertimeRequest;
 use App\Services\Attendance\DailySummaryBuilder;
 use App\Services\Leave\LeaveDayCounter;
 use App\Services\Overtime\OvertimeRequestService;
+use App\Support\AttendanceGaps;
 use App\Support\AttendanceSummary;
 use App\Support\AttendanceTime;
 use App\Support\DisplayDate;
@@ -555,55 +556,39 @@ class Show extends Component
     }
 
     /**
-     * The month's days with no row, split by why (F07). A day that hasn't
-     * happened yet — tomorrow on, or today before it closes — is upcoming: a
-     * quiet cell, never "Not calculated". A workday before that, inside the
-     * employment period, with no row is missing: the builder should have
-     * reached it, and only those make the page say so. Days off and days
-     * outside the employment period are neither: the builder writes an off
-     * row for the first and none for the second.
+     * The month's days with no row, split by why (F07). A day with nothing
+     * to calculate is quiet — a plain cell, never "Not calculated": one that
+     * hasn't happened yet (tomorrow on, or today before it closes), or one
+     * before the employee joined (Phase 6e follow-up). A workday after that,
+     * inside the employment period, with no row is missing: the builder should
+     * have reached it, and only those make the page say so. Days off are
+     * neither: the builder writes an off row for them.
      *
      * @param  Collection<string, DailyAttendance>  $existing
      * @param  Collection<string, string>  $holidays  holidaysByDate(), already loaded for the month
-     * @return array{upcoming: array<string, true>, missing: list<Carbon>}
+     * @return array{quiet: array<string, true>, missing: list<Carbon>}
      */
     private function calculationGaps(Collection $existing, Collection $holidays): array
     {
         $start = $this->monthStart();
         $end = $start->copy()->endOfMonth()->startOfDay();
-        $lastPast = now()->gte($this->todayClosesAt()) ? today() : today()->subDay();
-        $holidayDates = $holidays->map(fn () => true)->all();
+        $lastPast = AttendanceGaps::lastPastDay($this->employee);
 
-        $upcoming = [];
-        $missing = [];
-
+        $quiet = [];
         for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
-            $key = $date->format('Y-m-d');
-
-            if ($existing->has($key)) {
-                continue;
-            }
-
-            if ($date->gt($lastPast)) {
-                $upcoming[$key] = true;
-            } elseif ($this->employee->isActiveOn($date) && WorkdayCalendar::isWorkday($this->employee, $date, $holidayDates)) {
-                $missing[] = $date->copy();
+            if (! $existing->has($date->format('Y-m-d')) && ($date->gt($lastPast) || $date->lt($this->employee->join_date))) {
+                $quiet[$date->format('Y-m-d')] = true;
             }
         }
 
-        return ['upcoming' => $upcoming, 'missing' => $missing];
-    }
+        // The shared definition of a missing workday (AttendanceGaps), as Daily attendance's notice uses.
+        $missing = AttendanceGaps::missingWorkdays(
+            $this->employee, $start, $end,
+            $existing->map(fn () => true)->all(),
+            $holidays->map(fn () => true)->all(),
+        );
 
-    /**
-     * When today stops being upcoming: the first scheduled run after today's
-     * schedule end (AttendanceSchedule builds today every 15 minutes), the
-     * moment the scheduler finalises a day with no punches.
-     */
-    private function todayClosesAt(): Carbon
-    {
-        $schedule = $this->employee->scheduleOn(today());
-
-        return Carbon::parse(today()->format('Y-m-d').' '.$schedule->end_time)->addMinutes(15);
+        return ['quiet' => $quiet, 'missing' => $missing];
     }
 
     /**
@@ -674,7 +659,7 @@ class Show extends Component
             'holidaysByDate' => $holidays,
             'dayLeaves' => $this->dayLeaves(),
             'dayOvertime' => $this->viewingDay !== null ? $this->dayOvertime($existing->get($this->viewingDay)) : null,
-            'upcomingDays' => $gaps['upcoming'],
+            'quietDays' => $gaps['quiet'],
             'missingWorkdays' => $gaps['missing'],
             // Same reasoning as $layoutData just above: nobody reaches
             // /my-attendance via the list (it's a sidebar destination, and a

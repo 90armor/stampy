@@ -15,10 +15,11 @@ use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
- * F07: a day with no row because it hasn't happened yet is upcoming — a quiet
- * cell with no status — and the amber notice appears only for a past workday
- * with no row. Today is past once the scheduler has closed it (the schedule's
- * end plus one 15-minute run).
+ * F07: a day with no row because it hasn't happened yet — or, since the
+ * follow-up, because it's before the employee joined — is a quiet cell with no
+ * status, and the amber notice appears only for a past workday with no row.
+ * Today is past once the scheduler has closed it (the schedule's end plus one
+ * 15-minute run).
  */
 class UpcomingDaysTest extends TestCase
 {
@@ -101,6 +102,25 @@ class UpcomingDaysTest extends TestCase
         $this->page('table')
             ->assertSee('Not calculated')
             ->assertSeeHtml('<strong>Tue 14 Apr</strong>');
+    }
+
+    public function test_days_before_the_join_date_are_quiet_too(): void
+    {
+        // Joined Wed 8 Apr; 8–14 Apr built. 1–7 Apr were before they joined:
+        // nothing to calculate, so no "Not calculated" and no notice.
+        $joiner = Employee::factory()->create(['join_date' => '2026-04-08']);
+        for ($date = Carbon::parse('2026-04-08'); $date->lte(Carbon::parse('2026-04-14')); $date->addDay()) {
+            app(DailySummaryBuilder::class)->build($joiner, $date->copy());
+        }
+
+        foreach (['calendar', 'table'] as $view) {
+            Livewire::actingAs(User::factory()->create()->assignRole('admin'))
+                ->test(Show::class, ['employee' => $joiner])
+                ->set('month', '2026-04')
+                ->set('view', $view)
+                ->assertDontSee('been calculated for')
+                ->assertDontSee('Not calculated');
+        }
     }
 
     public function test_an_upcoming_days_modal_has_no_status_pill(): void

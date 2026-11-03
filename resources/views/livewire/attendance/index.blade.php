@@ -355,12 +355,14 @@
         </fieldset>
         </div>
 
-        @if ($maxBuiltDate && $toDate > $maxBuiltDate)
+        {{-- Only for a past workday in the range with missing rows (F07, AttendanceGaps):
+        days that haven't happened have nothing to calculate. --}}
+        @if ($missingDates !== [])
             <div class="mx-6 mb-6 flex items-start gap-2 rounded-lg bg-amber-50 p-4 text-sm text-amber-800 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-300 dark:ring-amber-500/30">
                 <x-icon name="exclamation-triangle" class="mt-0.5 h-5 w-5 shrink-0" />
                 <span>
-                    Attendance has only been calculated up to <strong>{{ \App\Support\DisplayDate::compact(\Illuminate\Support\Carbon::parse($maxBuiltDate)) }}</strong>.
-                    Dates after that aren't missing punches — they simply haven't been processed yet.
+                    Attendance hasn't been calculated for everyone on <strong>{{ \App\Support\AttendanceGaps::label($missingDates) }}</strong> yet.
+                    Those aren't missing punches — they haven't been processed yet.
                 </span>
             </div>
         @endif

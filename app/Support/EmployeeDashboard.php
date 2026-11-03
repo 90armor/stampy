@@ -10,7 +10,6 @@ use App\Models\Leave;
 use App\Models\LeaveType;
 use App\Models\OvertimeRequest;
 use App\Models\User;
-use App\Services\Leave\EntitlementCalculator;
 use App\Services\Leave\LeaveBalance;
 use App\Services\Leave\LeaveDayCounter;
 use Carbon\CarbonImmutable;
@@ -26,7 +25,7 @@ use Carbon\CarbonInterface;
  * overtime under Upcoming, and the month's credited overtime
  * (OvertimeSummary).
  * Every figure comes from the shared definitions — LeaveBalance,
- * EntitlementCalculator, LeaveDayCounter, LeaveDecisions and
+ * LeaveDayCounter, LeaveDecisions and
  * AttendanceSummary — the same ones Time off and My attendance show, so the
  * pages can't disagree. The dashboard doesn't mark decisions seen: they stay
  * here until Time off is opened, for at most DECISIONS_DAYS.
@@ -37,12 +36,11 @@ final class EmployeeDashboard
     public const DECISIONS_DAYS = 30;
 
     /**
-     * @return array{decided: list<Leave|OvertimeRequest>, balances: list<array{name: string, available: int, fullYear: ?int, usableFrom: ?CarbonImmutable, earnedSoFar: ?int, toilRemainder: ?int}>, next: ?array{leave: Leave, days: int}, month: array<string, int>, pending: list<array{leave: Leave, days: int}>, overtime: list<OvertimeRequest>, overtimeThisMonth: int}
+     * @return array{decided: list<Leave|OvertimeRequest>, balances: list<array{name: string, available: int, fullYear: ?int, usableFrom: ?CarbonImmutable, usableLine: ?string, toilRemainder: ?int}>, next: ?array{leave: Leave, days: int}, month: array<string, int>, pending: list<array{leave: Leave, days: int}>, overtime: list<OvertimeRequest>, overtimeThisMonth: int}
      */
     public static function for(Employee $employee, User $user): array
     {
         $balances = app(LeaveBalance::class);
-        $calculator = app(EntitlementCalculator::class);
         $counter = app(LeaveDayCounter::class);
 
         $withDays = function (Leave $leave) use ($employee, $counter) {
@@ -87,7 +85,7 @@ final class EmployeeDashboard
                 ->get()
                 ->filter(fn (LeaveType $type) => $type->isShownFor($employee))
                 ->values()
-                ->map(function (LeaveType $type) use ($employee, $balances, $calculator) {
+                ->map(function (LeaveType $type) use ($employee, $balances) {
                     $balance = $balances->for($employee, $type, today()->year);
 
                     return [
@@ -97,7 +95,8 @@ final class EmployeeDashboard
                         'available' => LeaveReport::available($balance),
                         'fullYear' => $balance->availableAtLastDay() !== null ? $balance->available() : null,
                         'usableFrom' => $balance->availableAtLastDay() === null ? $balance->usableFrom : null,
-                        'earnedSoFar' => $calculator->earnedSoFar($employee, $type, today()),
+                        // When and why, as Time off says it (Phase 6e: no earned-so-far figure).
+                        'usableLine' => $balance->availableAtLastDay() === null && $balance->usableFrom !== null ? $type->usableFromLabel($balance->usableFrom) : null,
                         'toilRemainder' => $type->toilRemainderFor($employee),
                     ];
                 })
