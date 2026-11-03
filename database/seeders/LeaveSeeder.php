@@ -144,10 +144,13 @@ class LeaveSeeder extends DemoSeeder
 
         // Worked on approved leave: a day someone punched despite a full-day
         // leave — today when someone has punched, so Needs attention lists
-        // it; otherwise their last worked day.
+        // it; otherwise their last worked day. Today only if it's a workday:
+        // on a holiday or a weekend the leave would charge nothing, which the
+        // service refuses.
         $worked = $this->firstTodayWhere(['EMP-0020', 'EMP-0021', 'EMP-0024', 'EMP-0026'], fn (DailyAttendance $row) => $row->first_in !== null)
             ?? $this->employee('EMP-0020');
-        $workedDay = $worked->dailyAttendances()->whereDate('work_date', $today)->whereNotNull('first_in')->exists()
+        $workedDay = WorkdayCalendar::isWorkday($worked, $today)
+            && $worked->dailyAttendances()->whereDate('work_date', $today)->whereNotNull('first_in')->exists()
             ? $today
             : $this->pastDay($worked, AttendanceStatus::Present);
         if ($workedDay) {
