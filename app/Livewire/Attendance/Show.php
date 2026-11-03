@@ -111,7 +111,9 @@ class Show extends Component
 
     private function monthStart(): Carbon
     {
-        return Carbon::createFromFormat('Y-m', $this->month)->startOfMonth();
+        // '!': the day is the 1st, not today's — 'Y-m' alone took today's day,
+        // so on 31 Mar "2026-02" was 31 Feb, which rolled over into March.
+        return Carbon::createFromFormat('!Y-m', $this->month)->startOfMonth();
     }
 
     public function startAddingPunch(string $date): void

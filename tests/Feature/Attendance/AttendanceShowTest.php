@@ -239,6 +239,21 @@ class AttendanceShowTest extends TestCase
         $this->assertSame(0, $summary['absent']);
     }
 
+    public function test_a_shorter_month_opens_as_itself_on_the_31st(): void
+    {
+        // 'Y-m' alone took today's day: on 31 Mar, February became "31 Feb",
+        // rolled over into March, and Previous month stayed on March.
+        $this->travelTo(Carbon::parse('2026-03-31 12:00:00'));
+        $employee = Employee::factory()->create();
+
+        $component = Livewire::actingAs($this->admin())->test(Show::class, ['employee' => $employee])
+            ->call('previousMonth')
+            ->assertSet('month', '2026-02')
+            ->assertSee('February 2026');
+
+        $this->assertSame(28, $component->instance()->render()->getData()['days']->count());
+    }
+
     public function test_month_summary_counts_match_the_calculated_rows(): void
     {
         $employee = Employee::factory()->create();
