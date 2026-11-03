@@ -193,6 +193,8 @@ class CalendarViewTest extends TestCase
 
     public function test_a_day_with_no_record_renders_as_not_calculated_in_the_calendar(): void
     {
+        // March in the past, so a day with no row is missing, not upcoming.
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $employee = Employee::factory()->create();
 
         $component = Livewire::actingAs($this->admin())
@@ -327,6 +329,8 @@ class CalendarViewTest extends TestCase
 
     public function test_every_cell_carries_an_accessible_label(): void
     {
+        // March in the past, so a day with no row is missing, not upcoming.
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $employee = Employee::factory()->create();
         DailyAttendance::factory()->create([
             'employee_id' => $employee->id,

@@ -3,7 +3,7 @@
 // page that needs it, and only registers the chart types it actually uses.
 //
 // One bar per day: the attendance rate (present + incomplete, Phase 2.7). A non-working day
-// (every scoped row Off or Holiday) has a null value and a marker instead,
+// (more than half the scope Off or on Holiday) has a null value and a marker instead,
 // drawn as a muted "Off"/"Holiday" label on the baseline — never a 0% bar,
 // which would read as "nobody came in". Bars use primary-500, the same green
 // as the department attendance bars, so the page has one data-viz green.
@@ -56,12 +56,13 @@ const markerLabels = {
 
             // A marker wider than its slot ("Not calculated" at phone width)
             // wraps onto two lines, bottom-aligned, rather than spilling into
-            // its neighbours.
+            // its neighbours — at its " · " if it has one ("Off · 2 worked"
+            // becomes "Off" over "2 worked"), else after the first word.
             const slot = chartArea.width / Math.max(1, markers.length) - 4;
-            const words = marker.split(' ');
-            if (ctx.measureText(marker).width > slot && words.length > 1) {
-                ctx.fillText(words.slice(1).join(' '), x, y);
-                ctx.fillText(words[0], x, y - 14);
+            const parts = marker.includes(' · ') ? marker.split(' · ') : [marker.split(' ')[0], marker.split(' ').slice(1).join(' ')];
+            if (ctx.measureText(marker).width > slot && parts[1]) {
+                ctx.fillText(parts.slice(1).join(' · '), x, y);
+                ctx.fillText(parts[0], x, y - 14);
             } else {
                 ctx.fillText(marker, x, y);
             }

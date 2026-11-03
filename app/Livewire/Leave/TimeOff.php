@@ -9,7 +9,6 @@ use App\Models\Leave;
 use App\Models\LeaveEntitlement;
 use App\Models\LeaveType;
 use App\Services\Leave\Balance;
-use App\Services\Leave\EntitlementCalculator;
 use App\Services\Leave\LeaveBalance;
 use App\Services\Leave\LeaveDayCounter;
 use App\Services\Leave\LeaveRequestService;
@@ -22,7 +21,7 @@ use Livewire\Component;
  * Time off (Phase 3e): the signed-in employee's leave balances and requests,
  * and the entry points to the request modal (Leave\RequestModal) — their own
  * request, and "File for an employee" for an admin. Every figure comes from
- * the leave services (LeaveBalance, LeaveDayCounter, EntitlementCalculator);
+ * the leave services (LeaveBalance, LeaveDayCounter, LeaveRequestService);
  * nothing here re-derives a rule.
  *
  * Requests decided since the user last opened the page carry a "New" marker
@@ -78,7 +77,7 @@ class TimeOff extends Component
         $this->warning = $result['rebuildError'];
     }
 
-    public function render(EntitlementCalculator $calculator, LeaveBalance $balances, LeaveDayCounter $counter)
+    public function render(LeaveBalance $balances, LeaveDayCounter $counter, LeaveRequestService $service)
     {
         $this->authorize('timeOff', Leave::class);
 
@@ -93,8 +92,12 @@ class TimeOff extends Component
         return view('livewire.leave.time-off', [
             'employee' => $employee,
             'years' => $years,
-            'balanceRows' => $employee !== null ? $this->balanceRows($employee, $calculator, $balances) : [],
-            'otherTypes' => LeaveType::query()->where('is_active', true)->where('balance_source', LeaveBalanceSource::None->value)->with('deductsFrom')->orderBy('id')->get(),
+            'balanceRows' => $employee !== null ? $this->balanceRows($employee, $balances) : [],
+            // Types without a balance of their own — less any they can't use
+            // yet, such as Special before Annual's service requirement (F08).
+            'otherTypes' => LeaveType::query()->where('is_active', true)->where('balance_source', LeaveBalanceSource::None->value)->with('deductsFrom')->orderBy('id')->get()
+                ->reject(fn (LeaveType $type) => $employee !== null && $service->unavailableReason($employee, $type) !== null)
+                ->values(),
             'requests' => $employee !== null ? $this->requests($employee, $counter) : collect(),
             'canFileForOthers' => $user->can('fileForOthers', Leave::class),
         ])->layout('layouts.app', ['header' => 'Time off']);
@@ -117,9 +120,9 @@ class TimeOff extends Component
      * One row per active type with a balance worth showing
      * (LeaveType::isShownFor()).
      *
-     * @return list<array{type: LeaveType, balance: Balance, earnedSoFar: ?int, toilRemainder: ?int}>
+     * @return list<array{type: LeaveType, balance: Balance, toilRemainder: ?int}>
      */
-    private function balanceRows(Employee $employee, EntitlementCalculator $calculator, LeaveBalance $balances): array
+    private function balanceRows(Employee $employee, LeaveBalance $balances): array
     {
         return LeaveType::query()
             ->where('is_active', true)
@@ -130,7 +133,6 @@ class TimeOff extends Component
             ->map(fn (LeaveType $type) => [
                 'type' => $type,
                 'balance' => $balances->for($employee, $type, $this->year),
-                'earnedSoFar' => $calculator->earnedSoFar($employee, $type, today()),
                 'toilRemainder' => $type->toilRemainderFor($employee),
             ])
             ->values()

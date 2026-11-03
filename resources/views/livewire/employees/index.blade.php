@@ -7,7 +7,7 @@
         @can('create', \App\Models\Employee::class)
             <x-button type="button" variant="primary" wire:click="$dispatch('create-employee')">
                 <x-icon name="plus" class="w-5 h-5" />
-                Add Employee
+                Add employee
             </x-button>
         @endcan
     </div>
@@ -27,7 +27,7 @@
     <div class="flex flex-wrap items-center justify-between gap-3 p-5 pb-0 sm:p-6 sm:pb-0">
         <div class="min-w-0">
             <h2 tabindex="-1" data-section-heading class="flex items-baseline gap-x-2 text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100 focus:outline-none">
-                All employees
+                {{ $listTitle }}
                 <span class="text-xs font-normal text-slate-500 dark:text-slate-400">{{ $employees->total() }} {{ $employees->total() === 1 ? 'employee' : 'employees' }}</span>
             </h2>
         </div>
@@ -110,7 +110,7 @@
                 <x-icon name="chevron-right" class="h-5 w-5" />
             </div>
             {{-- From sm to below xl the Status and Actions columns are pinned to the right
-            edge (.table-pin in resources/css/app.css; pinnedColumns in
+            edge (Status alone when there's no Actions column) (.table-pin in resources/css/app.css; pinnedColumns in
             resources/js/app.js keeps the offset and edge shadow in sync), so
             status and the row's actions stay on screen while the rest scrolls.
             wire:ignore.self so a re-render doesn't strip what pinnedColumns
@@ -129,7 +129,9 @@
                         <th class="px-6 py-3">Position</th>
                         <th class="px-6 py-3">Start date</th>
                         <th class="table-pin table-pin-start px-6 py-3">Status</th>
-                        <th class="table-pin table-pin-end px-6 py-3 text-right">Actions</th>
+                        @if ($showActions)
+                            <th class="table-pin table-pin-end px-6 py-3 text-right">Actions</th>
+                        @endif
                     </tr>
                 </thead>
                 <tbody>
@@ -160,6 +162,7 @@
                                     {{ ucfirst($employee->status) }}
                                 </x-badge>
                             </td>
+                            @if ($showActions)
                             <td class="table-pin table-pin-end px-6 py-4 text-right">
                                 <div class="flex items-center justify-end gap-1">
                                     @can('update', $employee)
@@ -220,6 +223,7 @@
                                     @endcan
                                 </div>
                             </td>
+                            @endif
                         </tr>
                     @endforeach
                 </tbody>

@@ -17,13 +17,13 @@
 
             <x-button variant="primary" wire:click="create" wire:loading.attr="disabled" wire:target="create">
                 <x-icon name="plus" class="w-5 h-5" />
-                New Holiday
+                New holiday
             </x-button>
         </div>
     </div>
 
     @error('delete')
-        <div class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-900">
+        <div role="alert" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-900">
             {{ $message }}
         </div>
     @enderror
@@ -36,7 +36,7 @@
                 description="Add a holiday to mark it company-wide on everyone's calendar."
             >
                 <x-slot name="action">
-                    <x-button variant="primary" wire:click="create" wire:loading.attr="disabled" wire:target="create">New Holiday</x-button>
+                    <x-button variant="primary" wire:click="create" wire:loading.attr="disabled" wire:target="create">New holiday</x-button>
                 </x-slot>
             </x-empty-state>
         @else

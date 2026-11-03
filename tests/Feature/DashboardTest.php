@@ -10,6 +10,7 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\User;
 use App\Models\WorkSchedule;
+use App\Support\DashboardAttendance;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
@@ -481,6 +482,33 @@ class DashboardTest extends TestCase
             ->assertSee('Sat Off', false);
     }
 
+    public function test_a_day_mostly_off_is_a_marker_that_counts_who_worked(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 12:00:00'));
+        [$a, $b, $c, $d] = Employee::factory()->count(4)->create()->all();
+
+        // Sat 7 Mar: three of four off, one came in — more than half off.
+        $this->attendanceRow($a, AttendanceStatus::Present, ['work_date' => '2026-03-07', 'first_in' => Carbon::parse('2026-03-07 09:00'), 'last_out' => Carbon::parse('2026-03-07 13:00')]);
+        foreach ([$b, $c, $d] as $employee) {
+            $this->attendanceRow($employee, AttendanceStatus::Off, ['work_date' => '2026-03-07']);
+        }
+        // Tue 10 Mar: exactly half off is not more than half — a bar (1 of 4).
+        $this->attendanceRow($a, AttendanceStatus::Present, ['work_date' => '2026-03-10']);
+        $this->attendanceRow($b, AttendanceStatus::Absent, ['work_date' => '2026-03-10']);
+        $this->attendanceRow($c, AttendanceStatus::Off, ['work_date' => '2026-03-10']);
+        $this->attendanceRow($d, AttendanceStatus::Off, ['work_date' => '2026-03-10']);
+
+        $this->actingAs($this->admin())
+            ->get(route('dashboard'))
+            ->assertViewHas('attendance', function ($attendance) {
+                $byDate = collect($attendance['trend'])->keyBy('date');
+
+                return $byDate['2026-03-07']['value'] === null && $byDate['2026-03-07']['marker'] === 'Off · 1 worked'
+                    && $byDate['2026-03-10']['value'] === 25.0 && $byDate['2026-03-10']['marker'] === null;
+            })
+            ->assertSee('Sat Off · 1 worked', false);
+    }
+
     public function test_dashboard_cards_use_title_and_meta_headers_without_eyebrows(): void
     {
         $this->travelTo(Carbon::parse('2026-03-11 12:00:00'));
@@ -601,7 +629,7 @@ class DashboardTest extends TestCase
         // An inactive employee's row is outside the active partition.
         $this->attendanceRow($inactive, AttendanceStatus::Present, ['first_in' => $at(), 'last_out' => Carbon::parse('2026-03-11 11:00:00')]);
 
-        $live = \App\Support\DashboardAttendance::liveToday(null);
+        $live = DashboardAttendance::liveToday(null);
 
         // Partitioned by punches: an out-punch means Left, even with no in-punch.
         $this->assertSame(8, $live['total']);
@@ -718,7 +746,7 @@ class DashboardTest extends TestCase
         $this->attendanceRow(Employee::factory()->create(), AttendanceStatus::Present, ['first_in' => $in('08:20'), 'last_out' => $in('14:00'), 'late_minutes' => 20, 'early_leave_minutes' => 180]);
         $this->attendanceRow(Employee::factory()->create(), AttendanceStatus::InProgress);
 
-        $live = \App\Support\DashboardAttendance::liveToday(null);
+        $live = DashboardAttendance::liveToday(null);
 
         $this->assertSame(['atWork' => 3, 'atWorkLate' => 2, 'left' => 1, 'leftLate' => 1, 'leftEarly' => 1, 'notIn' => 1], array_intersect_key($live, array_flip(['atWork', 'atWorkLate', 'left', 'leftLate', 'leftEarly', 'notIn'])));
         // Late is an annotation on a group, never a fourth group: the
@@ -739,4 +767,3 @@ class DashboardTest extends TestCase
         $this->assertStringContainsString('% checked in so far`', $chart);
     }
 }
-

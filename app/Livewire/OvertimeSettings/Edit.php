@@ -34,9 +34,15 @@ class Edit extends Component
 
     public int $weekly_rest_day = 7;
 
-    public int $max_overtime_minutes_per_day = 120;
+    /**
+     * The daily limits, entered and shown in hours (F25) — '2', '1.5', in
+     * quarter hours — and stored as minutes, as before. A stored value that
+     * isn't a whole quarter hour shows exactly ('1 h 50 min') and is kept
+     * as it is while the field is left alone.
+     */
+    public string $max_overtime_hours = '2';
 
-    public int $max_work_minutes_per_day = 600;
+    public string $max_work_hours = '10';
 
     public int $claim_window_days = 7;
 
@@ -71,13 +77,20 @@ class Edit extends Component
             'night_starts' => ['required', 'date_format:H:i'],
             'night_ends' => ['required', 'date_format:H:i'],
             'weekly_rest_day' => ['required', 'integer', 'between:1,7'],
-            'max_overtime_minutes_per_day' => $whole,
-            'max_work_minutes_per_day' => $whole,
             'claim_window_days' => $whole,
             'toil_ratio_percent' => $whole,
             'toil_block_minutes' => $whole,
             'toil_leave_type_id' => ['nullable', 'integer', 'exists:leave_types,id'],
         ]);
+
+        $limits = [];
+        foreach (self::LIMITS as $property => [$column, $label]) {
+            $limits[$column] = $this->minutesFrom($property, $label, (int) $settings->{$column});
+        }
+
+        if ($this->getErrorBag()->isNotEmpty()) {
+            return;
+        }
 
         $data = [
             'workday_rate_percent' => $this->workday_rate_percent,
@@ -87,8 +100,7 @@ class Edit extends Component
             'night_starts' => "{$this->night_starts}:00",
             'night_ends' => "{$this->night_ends}:00",
             'weekly_rest_day' => $this->weekly_rest_day,
-            'max_overtime_minutes_per_day' => $this->max_overtime_minutes_per_day,
-            'max_work_minutes_per_day' => $this->max_work_minutes_per_day,
+            ...$limits,
             'claim_window_days' => $this->claim_window_days,
         ];
 
@@ -104,7 +116,9 @@ class Edit extends Component
         try {
             $settings->update($data);
         } catch (InvalidOvertimeSettingsException $e) {
-            $this->addError($e->field ?? 'form', $e->getMessage());
+            // A limit's own rule lands on its hours field.
+            $field = collect(self::LIMITS)->search(fn (array $limit) => $limit[0] === $e->field) ?: $e->field;
+            $this->addError($field ?? 'form', $e->getMessage());
 
             return;
         } catch (OvertimeSettingsLockedException $e) {
@@ -117,11 +131,69 @@ class Edit extends Component
         $this->notice = 'Saved the overtime settings.';
     }
 
+    /** property => [column, the field's label in messages] */
+    private const LIMITS = [
+        'max_overtime_hours' => ['max_overtime_minutes_per_day', 'Overtime a day'],
+        'max_work_hours' => ['max_work_minutes_per_day', 'Work a day'],
+    ];
+
+    /** The longest a daily limit can be: a day. */
+    private const MAX_LIMIT_HOURS = 24;
+
+    /**
+     * A limit field's minutes, or $stored if the field still shows the
+     * stored value exactly; null, with an error on the field, when it isn't
+     * a number of quarter hours from a quarter hour to a day.
+     */
+    private function minutesFrom(string $property, string $label, int $stored): ?int
+    {
+        $value = trim($this->{$property});
+
+        if ($value === self::hours($stored)) {
+            return $stored;
+        }
+
+        if ($value === '') {
+            $this->addError($property, "Enter ".lcfirst($label)." in hours, such as 2 or 1.5.");
+
+            return null;
+        }
+
+        $hours = preg_match('/^\d+(\.\d+)?$/', preg_replace('/\s*h$/i', '', $value)) ? (float) preg_replace('/\s*h$/i', '', $value) : null;
+        $minutes = $hours !== null ? $hours * 60 : null;
+
+        if ($minutes === null || fmod($minutes, 15) !== 0.0) {
+            $this->addError($property, "Enter ".lcfirst($label)." in quarter hours, such as 2, 1.5 or 1.25.");
+        } elseif ($minutes < 15) {
+            $this->addError($property, "{$label} must be at least a quarter of an hour (0.25 h).");
+        } elseif ($hours > self::MAX_LIMIT_HOURS) {
+            $this->addError($property, "{$label} can be at most ".self::MAX_LIMIT_HOURS.' hours.');
+        } else {
+            return (int) $minutes;
+        }
+
+        return null;
+    }
+
+    /** Minutes as the field shows them: '2', '1.5', '0.25' — or exactly, '1 h 50 min', off a quarter hour. */
+    public static function hours(int $minutes): string
+    {
+        if ($minutes % 15 === 0) {
+            return rtrim(rtrim(number_format($minutes / 60, 2, '.', ''), '0'), '.');
+        }
+
+        return trim((intdiv($minutes, 60) > 0 ? intdiv($minutes, 60).' h ' : '').($minutes % 60).' min');
+    }
+
     private function fillFrom(OvertimeSettings $settings): void
     {
         foreach (['workday_rate_percent', 'night_rate_percent', 'rest_day_rate_percent', 'holiday_rate_percent', 'weekly_rest_day',
-            'max_overtime_minutes_per_day', 'max_work_minutes_per_day', 'claim_window_days', 'toil_ratio_percent', 'toil_block_minutes'] as $field) {
+            'claim_window_days', 'toil_ratio_percent', 'toil_block_minutes'] as $field) {
             $this->{$field} = (int) $settings->{$field};
+        }
+
+        foreach (self::LIMITS as $property => [$column]) {
+            $this->{$property} = self::hours((int) $settings->{$column});
         }
 
         $this->night_starts = substr($settings->night_starts, 0, 5);

@@ -98,7 +98,7 @@ class PositionManagementTest extends TestCase
             ->call('save')
             ->assertHasErrors(['name']);
 
-        // Reopening "Add Position" (without saving) must not still show
+        // Reopening "Add position" (without saving) must not still show
         // the previous submit's error.
         $component->call('create')->assertHasNoErrors();
     }

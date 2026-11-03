@@ -68,6 +68,52 @@ class OvertimeSettingsPageTest extends TestCase
         $this->assertSame([175, '21:00:00', 6, 14, $this->toil->id], [$settings->night_rate_percent, $settings->night_starts, $settings->weekly_rest_day, $settings->claim_window_days, $settings->toil_leave_type_id]);
     }
 
+    public function test_the_limits_are_hours_stored_as_minutes(): void
+    {
+        Livewire::actingAs($this->admin)->test(Edit::class)
+            ->assertSet('max_overtime_hours', '2')
+            ->assertSet('max_work_hours', '10')
+            ->assertSee('Changes apply to overtime from today. Days already calculated keep their categories. Ask your developer if past days must change.')
+            ->assertDontSee('php artisan')
+            ->set('max_overtime_hours', '1.5')
+            ->set('max_work_hours', '9.75')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertSame([90, 585], [OvertimeSettings::current()->max_overtime_minutes_per_day, OvertimeSettings::current()->max_work_minutes_per_day]);
+    }
+
+    public function test_a_limit_must_be_quarter_hours_and_says_so_in_hours(): void
+    {
+        foreach (['1.3' => 'in quarter hours', 'two' => 'in quarter hours', '0' => 'at least a quarter of an hour', '25' => 'at most 24 hours', '' => 'in hours'] as $value => $message) {
+            Livewire::actingAs($this->admin)->test(Edit::class)
+                ->set('max_overtime_hours', $value)
+                ->call('save')
+                ->assertHasErrors('max_overtime_hours')
+                ->assertSee($message);
+        }
+
+        $this->assertSame(120, OvertimeSettings::current()->max_overtime_minutes_per_day);
+    }
+
+    public function test_a_stored_limit_off_a_quarter_hour_shows_exactly_and_stays_until_changed(): void
+    {
+        OvertimeSettings::current()->update(['max_overtime_minutes_per_day' => 110]);
+
+        Livewire::actingAs($this->admin)->test(Edit::class)
+            ->assertSet('max_overtime_hours', '1 h 50 min')
+            ->set('claim_window_days', 10)
+            ->call('save')
+            ->assertHasNoErrors();
+        $this->assertSame(110, OvertimeSettings::current()->max_overtime_minutes_per_day);
+
+        Livewire::actingAs($this->admin)->test(Edit::class)
+            ->set('max_overtime_hours', '2')
+            ->call('save')
+            ->assertHasNoErrors();
+        $this->assertSame(120, OvertimeSettings::current()->max_overtime_minutes_per_day);
+    }
+
     public function test_the_models_rules_land_on_their_fields(): void
     {
         Livewire::actingAs($this->admin)->test(Edit::class)

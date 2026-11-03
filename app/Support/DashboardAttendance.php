@@ -231,8 +231,11 @@ class DashboardAttendance
      * incomplete day was attended, a punch is just missing). Every day gets
      * a value, a marker, or both, so no bar is ever blank without saying why:
      *
-     * - Off / Holiday: every scoped row is Off or Holiday — not a working day,
-     *   no bar. Leave: everyone expected is on full-day leave — no bar.
+     * - Off / Holiday: more than half of the scoped employees are Off or on
+     *   Holiday — not a working day, no bar, and the marker says how many
+     *   worked anyway ("Off · 2 worked": anyone with a punch). A bar there
+     *   would measure a weekend's two volunteers against everyone and read as
+     *   a collapse (F13). Leave: everyone expected is on full-day leave — no bar.
      * - Pending: the day is still open — today while todayIsPending(), or an
      *   earlier day with an In progress row still inside its pairing window
      *   (an in-only row; a late in-punch can keep yesterday open past
@@ -292,7 +295,7 @@ class DashboardAttendance
             $checkedIn = (int) $rows->sum('checked_in');
             $attended = (int) $byStatus->only($attendedStatuses)->sum();
             $isToday = $key === $todayKey;
-            $isNonWorkingDay = $statuses->isNotEmpty() && $statuses->every(fn (string $status) => in_array($status, $nonWorking, true));
+            $isNonWorkingDay = $byStatus->only($nonWorking)->sum() * 2 > $total;
             $hasOpenRows = $statuses->contains(AttendanceStatus::InProgress->value);
             $isOpen = $isToday ? $todayPending : ($hasOpenRows && ! $isStale);
             $leaveRow = $rows->firstWhere('status', AttendanceStatus::Leave);
@@ -302,7 +305,7 @@ class DashboardAttendance
                 : (int) $leaveRow?->total);
 
             [$value, $marker, $pending] = match (true) {
-                $isNonWorkingDay => [null, $statuses->contains(AttendanceStatus::Off->value) ? 'Off' : 'Holiday', false],
+                $isNonWorkingDay => [null, ($statuses->contains(AttendanceStatus::Off->value) ? 'Off' : 'Holiday').($checkedIn > 0 ? " · {$checkedIn} worked" : ''), false],
                 // Everyone expected that day is on full-day leave.
                 $expected <= 0 && $statuses->contains(AttendanceStatus::Leave->value) => [null, 'Leave', false],
                 $isToday && $todayPending => [$checkedIn > 0 ? round($checkedIn / $expected * 100, 1) : null, 'Today', true],

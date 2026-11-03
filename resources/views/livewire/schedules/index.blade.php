@@ -13,7 +13,7 @@
         {{-- A disabled control says why, at rest — not in a tooltip, which
         touch can't reach. From sm the hint sits in the cell under Bulk
         Reassign, as wide as that button (w-0 min-w-full: it wraps rather than
-        widening the column), so it can't read as New Schedule's; on a phone
+        widening the column), so it can't read as New schedule's; on a phone
         it runs under both buttons. --}}
         <div class="grid grid-cols-[auto_auto] justify-start gap-x-3 gap-y-2 sm:justify-end">
             <x-button
@@ -25,11 +25,11 @@
                 :disabled="$allSchedules->count() < 2"
                 :aria-describedby="$allSchedules->count() < 2 ? 'bulk-reassign-hint' : null"
             >
-                Bulk Reassign
+                Bulk reassign
             </x-button>
             <x-button variant="primary" wire:click="create" wire:loading.attr="disabled" wire:target="create">
                 <x-icon name="plus" class="w-5 h-5" />
-                New Schedule
+                New schedule
             </x-button>
             @if ($allSchedules->count() < 2)
                 <p id="bulk-reassign-hint" class="col-span-2 text-xs text-slate-600 sm:col-span-1 sm:w-0 sm:min-w-full dark:text-slate-400">Create a second schedule to reassign employees.</p>
@@ -38,7 +38,7 @@
     </div>
 
     @error('delete')
-        <div class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-900">
+        <div role="alert" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-900">
             {{ $message }}
         </div>
     @enderror
@@ -51,7 +51,7 @@
                 description="Add a schedule to define the hours new employees are assigned by default."
             >
                 <x-slot name="action">
-                    <x-button variant="primary" wire:click="create" wire:loading.attr="disabled" wire:target="create">New Schedule</x-button>
+                    <x-button variant="primary" wire:click="create" wire:loading.attr="disabled" wire:target="create">New schedule</x-button>
                 </x-slot>
             </x-empty-state>
         @else

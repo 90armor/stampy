@@ -74,13 +74,13 @@ In-progress or not-yet-calculated attendance is **pending**, and every trend day
 
 | A trend day that is… | Shows |
 |---|---|
-| Off or Holiday (every scoped row) | no bar, a muted `Off` / `Holiday` marker |
+| Off or Holiday — **more than half** of the scoped employees active that day are Off or on Holiday (Phase 6e) | no bar, a muted `Off` / `Holiday` marker that counts anyone who worked — anyone with a punch — as `Off · 2 worked`; a bar would measure two weekend volunteers against everyone and read as a collapse. Exactly half is not more than half: a bar |
 | Today, while pending (any In progress row, or an active employee with no row yet — `todayIsPending()`) | a hollow provisional bar (a `primary-100` fill inside a `primary-500` outline, dark `primary-900` inside `primary-400` — at least 3:1 against the card, `docs/DESIGN_SYSTEM.md`, Dashboard) of **checked in so far** — anyone with a punch, in or out — and a `Today` marker; no bar while nobody has checked in |
 | An earlier day still open (an in-only row inside its pairing window — a 9:30 in-punch keeps yesterday open until 03:30) | the same provisional bar and a `Pending` marker |
 | A past day with no rows, or with In progress rows whose window has already closed (the builder didn't run) | no bar, a muted `Not calculated` marker |
 | Closed | the rate as a `primary-500` bar; a closed workday with 0 attended gets a `0%` marker |
 
-Markers too wide for their slot (`Not calculated` at phone width) wrap onto two lines. The **Department card** shows counts, never a bare percentage: `Checked in N / M` with the provisional (hollow) fill while today is pending, `Attended N / M` once it has closed.
+Markers too wide for their slot (`Not calculated` at phone width) wrap onto two lines — at the ` · ` when there is one, so `Off · 2 worked` reads `Off` over `2 worked`. The **Department card** shows counts, never a bare percentage: `Checked in N / M` with the provisional (hollow) fill while today is pending, `Attended N / M` once it has closed.
 
 ## Status counts vs. the live strip
 
@@ -120,12 +120,26 @@ The Daily Attendance date control is a trigger (showing the range in the `Displa
 
 ### Single mode
 
-`<x-date-picker id model label [min] [max]>` replaces the native date input in every date field: holiday date, join date, a schedule assignment's effective date, bulk reassignment's effective date, and a manual punch's date. Time inputs stay native. `DatePickerTest` fails on a bare `type="date"` input anywhere else.
+`<x-date-picker id model label [min] [max] [clearable] [placeholder] [hint]>` replaces the native date input in every date field (Phase 6e lists them all):
+
+| Field | `id` | Clear |
+|---|---|---|
+| Holiday date (Policies → Holidays) | `holiday_date` | no |
+| Join date (employee form) | `emp_join_date` | no |
+| A schedule assignment's effective date (profile) | `assign_effective_from` | no |
+| Bulk reassignment's effective date (Policies → Schedules) | `bulk_effective_from` | no |
+| A manual punch's date (day modal, table row) | `new_punch_date_{date}` | no |
+| Leave request From | `leave_start` | no |
+| Leave request To — empty means the same day | `leave_end` | **yes** |
+| Overtime request date | `overtime_date` | no |
+| Deactivation's last day (status modal) | `status_left_on` | no |
+
+Time fields are `<x-time-input>` (`docs/DESIGN_SYSTEM.md`, Time input). `DatePickerTest` fails on a bare `type="date"` input anywhere else.
 
 - **Trigger** looks like the text inputs beside it (`rounded-lg`, the control surface and border, `text-sm`), with a calendar icon and the date in the `DisplayDate` compact form (`Tue 29 Sep`; year only outside the current year), or a muted `Select a date`. It keeps the field's `id`, so the `<x-input-label for>` still points at it, and its accessible name is the label plus the date (`Date, Thursday, 15 October 2026`), since a label alone would hide the value.
 - **Picking** writes the property deferred, like the plain `wire:model` it replaces — the value travels with the form's next request — then closes the popover and returns focus to the trigger. A single date is a one-day range, so it is the filled endpoint; there is no band and no quick ranges. Zoomed out, the month or year holding the date is filled.
-- **Bounds.** `min`/`max` mirror the field's server-side rule, and days outside them are muted, `aria-disabled` and can't be picked: a punch from the employee's join date to today; an assignment's effective date from the join date; bulk reassignment at most 60 days back. Holiday and join dates are unbounded. The server rule stays the authority.
-- **Footer: Today and Clear.** **Today** sits on the right and picks today; it is shown only when today is inside the field's `min`/`max` (an employee who joins next month gets no Today on their punch or assignment date). **Clear** sits on the left and only on a field whose server rule is `nullable` (`clearable`): it empties the value, the trigger returns to its placeholder, the popover closes and focus returns to the trigger. A required field gets no Clear — picking again already replaces the value. Every date field today is required (holiday date, join date, both effective dates, punch date), so none shows Clear yet. Typing a date is not possible. The Daily Attendance range has neither button: Reset filters and the Today preset cover both.
+- **Bounds.** `min`/`max` mirror the field's server-side rule, and days outside them are muted, `aria-disabled` and can't be picked: a punch from the employee's join date to today; an assignment's effective date from the join date; bulk reassignment at most 60 days back; a leave from 30 days back (an admin filing for someone: their join date) to the end of the last year that can be requested; an overtime date inside the claim window or planning horizon; a last day from the join date to today. Holiday and join dates are unbounded. The server rule stays the authority.
+- **Footer: Today and Clear.** **Today** sits on the right and picks today; it is shown only when today is inside the field's `min`/`max` (an employee who joins next month gets no Today on their punch or assignment date). **Clear** sits on the left and only on a field whose server rule is `nullable` (`clearable`): it empties the value, the trigger returns to its placeholder, the popover closes and focus returns to the trigger. A required field gets no Clear — picking again already replaces the value. Only the leave request's To is nullable (empty is the same day as From), so it is the one field with Clear; every other date field is required. Typing a date is not possible. The Daily Attendance range has neither button: Reset filters and the Today preset cover both.
 - **In a modal.** The popover is `position: fixed` and placed against the trigger — below it when it fits, otherwise above (the join date flips up in the employee form), with the panel scrolling within the space if neither fits — so a modal's scrolling body can't clip it. It stays inside the modal's DOM, so the modal's focus trap includes it. Escape closes only the picker while it is open; with the picker closed, Escape reaches the modal as before.
 - **Below 640px** a native date input on the same property, with the same `min`/`max`, takes the trigger's place. The field's label focuses whichever of the two is showing, so a tap on `From` lands in the native input. A native input has no placeholder, so a field whose placeholder explains an empty value also passes `hint`, shown under it: the leave request's To says "Same day if empty" (Phase 6d).
 

@@ -8,7 +8,6 @@ use App\Models\Leave;
 use App\Models\LeaveAdjustment;
 use App\Models\LeaveEntitlement;
 use App\Models\LeaveType;
-use App\Services\Leave\EntitlementCalculator;
 use App\Services\Leave\LeaveBalance;
 use App\Services\Leave\LeaveDayCounter;
 use App\Support\LeaveDays;
@@ -136,7 +135,7 @@ class LeaveCard extends Component
             ->all();
     }
 
-    public function render(EntitlementCalculator $calculator, LeaveBalance $balances, LeaveDayCounter $counter)
+    public function render(LeaveBalance $balances, LeaveDayCounter $counter)
     {
         // Every request ends here — re-assert access (CLAUDE.md, Authorization).
         $this->authorize('view', $this->employee);
@@ -163,7 +162,6 @@ class LeaveCard extends Component
                 ->map(fn (LeaveType $type) => [
                     'type' => $type,
                     'balance' => $balances->for($this->employee, $type, $this->year),
-                    'earnedSoFar' => $calculator->earnedSoFar($this->employee, $type, today()),
                     'toilRemainder' => $type->toilRemainderFor($this->employee),
                 ])->values()->all(),
             'requests' => $this->requests($counter),

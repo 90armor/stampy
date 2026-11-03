@@ -13,6 +13,7 @@ use App\Exceptions\StaleLeaveDecisionException;
 use App\Models\Employee;
 use App\Models\Holiday;
 use App\Models\Leave;
+use App\Models\LeaveAdjustment;
 use App\Models\LeaveEntitlement;
 use App\Models\LeaveType;
 use App\Models\OvertimeRequest;
@@ -475,8 +476,7 @@ class LeaveRequestService
         }
 
         $nextYear = today()->year + 1;
-        $nextYearGranted = LeaveEntitlement::query()->where('employee_id', $employee->id)->where('year', $nextYear)->exists();
-        $lastYear = $nextYearGranted ? $nextYear : today()->year;
+        $lastYear = $this->lastRequestableYear($employee);
 
         if ($end->year > $lastYear) {
             $add('end_date', $end->year === $nextYear
@@ -490,7 +490,10 @@ class LeaveRequestService
                 $eligibleOn = $this->calculator->eligibleOn($employee, $serviceType);
 
                 if ($start->lt($eligibleOn)) {
-                    $add('start_date', "{$serviceType->name} leave can be used from ".DisplayDate::compact($eligibleOn).'.');
+                    // Worded as the request modal's disabled option (unavailableReason()).
+                    $add('start_date', $serviceType->is($type)
+                        ? "{$type->name} leave can be used from ".DisplayDate::compact($eligibleOn).'.'
+                        : "{$type->name} leave uses {$serviceType->name}, which can be used from ".DisplayDate::compact($eligibleOn).'.');
                 }
             }
         }
@@ -573,7 +576,10 @@ class LeaveRequestService
         // 6. Balance, per year of the cost, against the type that holds it.
         $balanceType = $type->deductsFrom ?? $type;
 
-        if ($balanceType->hasBalance()) {
+        if ($balanceType->balance_source->isEarned() && ! $this->hasEarned($employee, $balanceType)) {
+            // Nothing earned, so nothing available in any year: the modal's "none earned yet".
+            $add('leave', "No {$balanceType->name} earned yet.");
+        } elseif ($balanceType->hasBalance()) {
             foreach ($cost as $year => $days) {
                 $available = $this->balances->for($employee, $balanceType, $year)->available();
 
@@ -587,6 +593,54 @@ class LeaveRequestService
         $throwIfAny();
 
         return $cost;
+    }
+
+    /**
+     * Why $employee can't use $type on any date that could be requested now,
+     * as the request modal's disabled option says it (F08) — or null when
+     * some date could pass. Only two of validate()'s rules rule a type out
+     * whatever the dates: the service requirement (stage 2, the type's own
+     * or its target's) met only after the last date leave can be requested
+     * (stage 1's year limit), and an earned balance (stage 6) with nothing
+     * ever earned. Every other refusal depends on the dates, so the type
+     * stays choosable and submit says why. Not a rule of its own: validate()
+     * refuses the same requests, with the same words.
+     */
+    public function unavailableReason(Employee $employee, LeaveType $type): ?string
+    {
+        $lastDay = Carbon::create($this->lastRequestableYear($employee), 12, 31);
+
+        foreach (array_filter([$type, $type->deductsFrom]) as $serviceType) {
+            if ($serviceType->min_service_months) {
+                $eligibleOn = $this->calculator->eligibleOn($employee, $serviceType);
+
+                if ($eligibleOn->gt($lastDay)) {
+                    return ($serviceType->is($type) ? '' : "uses {$serviceType->name}, ").'from '.DisplayDate::compact($eligibleOn);
+                }
+            }
+        }
+
+        $balanceType = $type->deductsFrom ?? $type;
+
+        return $balanceType->balance_source->isEarned() && ! $this->hasEarned($employee, $balanceType)
+            ? 'none earned yet'
+            : null;
+    }
+
+    /** The last year leave can be requested in: this year, or next year once it's granted. */
+    private function lastRequestableYear(Employee $employee): int
+    {
+        $nextYear = today()->year + 1;
+
+        return LeaveEntitlement::query()->where('employee_id', $employee->id)->where('year', $nextYear)->exists()
+            ? $nextYear
+            : today()->year;
+    }
+
+    /** An earned type (Time off in lieu) has a balance only through its adjustments: none, nothing to use. */
+    private function hasEarned(Employee $employee, LeaveType $type): bool
+    {
+        return LeaveAdjustment::query()->where('employee_id', $employee->id)->where('leave_type_id', $type->id)->exists();
     }
 
     /**

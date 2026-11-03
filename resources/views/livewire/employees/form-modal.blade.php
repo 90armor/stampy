@@ -40,7 +40,7 @@
         @else
             <div class="mx-6 border-b border-slate-divider py-5">
                 <x-modal.title>
-                    {{ $editing ? 'Edit — '.$editing->full_name : 'Add Employee' }}
+                    {{ $editing ? 'Edit — '.$editing->full_name : 'Add employee' }}
                 </x-modal.title>
             </div>
 
@@ -264,7 +264,7 @@
 
             <div class="mx-6 flex items-center justify-end gap-3 border-t border-slate-divider py-4">
                 <x-button type="button" variant="secondary" wire:click="$set('showModal', false)">Cancel</x-button>
-                <x-button type="submit" form="employee-form" variant="primary">Save Employee</x-button>
+                <x-button type="submit" form="employee-form" variant="primary">Save employee</x-button>
             </div>
         @endif
     </x-modal>

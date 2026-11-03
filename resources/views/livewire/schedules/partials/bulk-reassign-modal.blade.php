@@ -8,7 +8,7 @@
         panelClass="mb-6"
     >
         <div class="mx-6 border-b border-slate-divider py-5">
-            <x-modal.title>Bulk Reassign</x-modal.title>
+            <x-modal.title>Bulk reassign</x-modal.title>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Move everyone currently on one schedule to another.</p>
         </div>
 
@@ -35,7 +35,7 @@
 
         <form wire:submit="bulkReassign" class="space-y-5 px-6 py-4">
             @error('form')
-                <div class="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-900">
+                <div role="alert" class="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-900">
                     {{ $message }}
                 </div>
             @enderror

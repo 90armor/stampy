@@ -80,8 +80,14 @@ class Index extends Component
             ->orderBy('full_name')
             ->paginate(10);
 
+        $user = auth()->user();
+
         return view('livewire.employees.index', [
             'employees' => $employees,
+            // F24: the card says whose list it is — the whole company only when the scope is.
+            'listTitle' => $scope->ids === null ? 'All employees' : 'Your team',
+            // No Actions column when no row on the page has an action (a manager's team).
+            'showActions' => $employees->contains(fn (Employee $employee) => $user->can('update', $employee) || $user->can('deactivate', $employee)),
             'departments' => Department::query()
                 ->when($scope->ids !== null, fn ($query) => $query->whereHas('employees', fn ($q) => $q->whereIn('id', $scope->ids)))
                 ->orderBy('name')

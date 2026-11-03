@@ -15,7 +15,7 @@
         <div class="rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800 ring-1 ring-inset ring-green-600/20 dark:bg-green-900/20 dark:text-green-300 dark:ring-green-500/30" role="status">{{ $notice }}</div>
     @endif
     @error('form')
-        <div class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-900">{{ $message }}</div>
+        <div role="alert" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-900">{{ $message }}</div>
     @enderror
 
     <x-card :padding="false">
@@ -35,7 +35,7 @@
                     @endforeach
                 </div>
                 <p class="{{ $hint }}">Each overtime minute counts in one category — holiday, then rest day, then night, then workday — so the rates must run holiday ≥ rest day ≥ night ≥ workday ≥ 100%. A rate only changes the monthly report's arithmetic: the minutes already credited stay as they are.</p>
-                <x-input-error :messages="$errors->get('rates')" class="mt-1" />
+                <x-input-error for="ot_workday_rate_percent ot_night_rate_percent ot_rest_day_rate_percent ot_holiday_rate_percent" :messages="$errors->get('rates')" class="mt-1" />
             </section>
 
             <section class="px-4 py-5 sm:px-6">
@@ -61,30 +61,26 @@
                         <x-input-error :messages="$errors->get('weekly_rest_day')" class="mt-1" />
                     </div>
                 </div>
-                <p class="{{ $hint }}">Night hours earn the night rate; the weekly rest day earns the rest-day rate (any other day off counts as a workday). A change applies to days built from now on — past days keep their categories until rebuilt: <code class="text-[11px]">php artisan attendance:build-daily --from=YYYY-MM-DD --to=YYYY-MM-DD</code>.</p>
+                <p class="{{ $hint }}">Night hours earn the night rate; the weekly rest day earns the rest-day rate (any other day off counts as a workday). Changes apply to overtime from today. Days already calculated keep their categories. Ask your developer if past days must change.</p>
             </section>
 
             <section class="px-4 py-5 sm:px-6">
                 <h3 class="{{ $sectionTitle }}">Limits</h3>
                 <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div>
-                        <x-input-label for="ot_max_overtime" value="Overtime a day, at most" />
-                        <div class="relative">
-                            <x-text-input id="ot_max_overtime" type="number" min="1" wire:model="max_overtime_minutes_per_day" class="pr-16" />
-                            <span class="{{ $suffix }}">minutes</span>
+                    {{-- Hours, in quarter hours, stored as minutes (F25). A text field, not a
+                    number: a stored value off a quarter hour shows exactly ("1 h 50 min"),
+                    and then the "h" suffix would repeat what the value says. --}}
+                    @foreach (['max_overtime_hours' => ['ot_max_overtime', 'Overtime a day, at most', 'On a day with scheduled hours. A day off or a holiday has only the total below.'], 'max_work_hours' => ['ot_max_work', 'Work a day, at most', 'Scheduled hours plus overtime. An admin can go over either limit with a reason.']] as $field => [$id, $label, $help])
+                        <div>
+                            <x-input-label :for="$id" :value="$label" />
+                            <div class="relative">
+                                <x-text-input :id="$id" type="text" inputmode="decimal" wire:model="{{ $field }}" class="pr-8" />
+                                @if (preg_match('/^[\d.]+$/', $this->{$field}))<span class="{{ $suffix }}">h</span>@endif
+                            </div>
+                            <p class="{{ $hint }}">{{ $help }}</p>
+                            <x-input-error :messages="$errors->get($field)" class="mt-1" />
                         </div>
-                        <p class="{{ $hint }}">On a day with scheduled hours. A day off or a holiday has only the total below.</p>
-                        <x-input-error :messages="$errors->get('max_overtime_minutes_per_day')" class="mt-1" />
-                    </div>
-                    <div>
-                        <x-input-label for="ot_max_work" value="Work a day, at most" />
-                        <div class="relative">
-                            <x-text-input id="ot_max_work" type="number" min="1" wire:model="max_work_minutes_per_day" class="pr-16" />
-                            <span class="{{ $suffix }}">minutes</span>
-                        </div>
-                        <p class="{{ $hint }}">Scheduled hours plus overtime. An admin can go over either limit with a reason.</p>
-                        <x-input-error :messages="$errors->get('max_work_minutes_per_day')" class="mt-1" />
-                    </div>
+                    @endforeach
                 </div>
             </section>
 

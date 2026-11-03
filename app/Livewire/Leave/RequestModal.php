@@ -265,7 +265,7 @@ class RequestModal extends Component
         $this->resetErrorBag();
     }
 
-    public function render()
+    public function render(LeaveRequestService $service)
     {
         $employee = $this->employeeId !== null ? Employee::find($this->employeeId) : null;
 
@@ -278,9 +278,15 @@ class RequestModal extends Component
             ? $nextYear
             : today()->year;
 
+        $types = LeaveType::query()->where('is_active', true)->with('deductsFrom')->orderBy('id')->get();
+
         return view('livewire.leave.request-modal', [
             'employee' => $employee,
-            'types' => LeaveType::query()->where('is_active', true)->orderBy('id')->get(),
+            'types' => $types,
+            // Types the employee can't use on any date they could pick, with why.
+            'unavailable' => $this->showModal && $employee !== null
+                ? $types->mapWithKeys(fn (LeaveType $type) => [$type->id => $service->unavailableReason($employee, $type)])->filter()->all()
+                : [],
             ...EmployeePicker::search($this->forOthers && $employee === null ? $this->employeeSearch : ''),
             // Mirrors the service's own date rules (the server stays the authority).
             'minDate' => $this->forOthers ? $employee?->join_date?->format('Y-m-d') : today()->subDays(LeaveRequestService::RETROACTIVE_DAYS)->format('Y-m-d'),

@@ -127,16 +127,68 @@ await withBrowser(async (b) => {
             await c.close();
         }
 
-        // A validation error: the modal stays, focus stays on the action.
+        // A validation error (Phase 6e): the modal stays, focus moves to the
+        // first invalid field, which is marked invalid and described by its message.
+        const invalidState = (p, id) => p.evaluate((id) => {
+            const field = document.getElementById(id);
+            const error = (field?.getAttribute('aria-describedby') ?? '').split(/\s+/).map((e) => document.getElementById(e)).find((e) => e?.hasAttribute('data-input-error'));
+            return { invalid: field?.getAttribute('aria-invalid'), message: error?.textContent.trim() ?? null, focused: document.activeElement === field };
+        }, id);
         {
             const { c, p } = await page(b, manager, 'light', width);
             await p.goto(`${BASE}/approvals`, { waitUntil: 'networkidle' });
-            await p.getByRole('button', { name: 'Reject', exact: true }).first().focus();
+            const trigger = p.getByRole('button', { name: 'Reject', exact: true }).first();
+            await trigger.focus();
             await p.keyboard.press('Enter'); await settle(p);
             const dialog = p.getByRole('dialog');
             await dialog.getByRole('button', { name: 'Reject', exact: true }).focus();
             await p.keyboard.press('Enter'); await settle(p, 800);
-            check('Reject with no reason: the error shows, focus stays on Reject', (await dialog.getByText(/reason|required/i).count()) > 0 && (await active(p)).startsWith('button:Reject'), await active(p));
+            const state = await invalidState(p, 'decision_note');
+            check('validation: Reject with no reason → focus on the reason', state.focused, await active(p));
+            check('validation: the reason is aria-invalid and described by its message', state.invalid === 'true' && /reason/i.test(state.message ?? ''), JSON.stringify(state));
+            // 6d2's close rules still hold after an error: Escape → the trigger.
+            await p.keyboard.press('Escape'); await settle(p, 600);
+            check('validation: Escape after an error → the trigger', (await active(p)).startsWith('button:Reject'), await active(p));
+            await c.close();
+        }
+        {
+            // A two-step modal: Review with no type.
+            const { c, p } = await page(b, employee, 'light', width);
+            await p.goto(`${BASE}/time-off`, { waitUntil: 'networkidle' });
+            await p.getByRole('button', { name: /request leave/i }).first().focus();
+            await p.keyboard.press('Enter'); await settle(p);
+            await p.getByRole('button', { name: 'Review' }).focus();
+            await p.keyboard.press('Enter'); await settle(p, 800);
+            const state = await invalidState(p, 'leave_type');
+            check('validation: Review with no type → focus on the type', state.focused, await active(p));
+            check('validation: the type is aria-invalid and described by its message', state.invalid === 'true' && /type/i.test(state.message ?? ''), JSON.stringify(state));
+            // Fixing it clears the mark on the next round trip.
+            await p.selectOption('#leave_type', { label: 'Medical' });
+            await p.getByRole('button', { name: 'Review' }).focus();
+            await p.keyboard.press('Enter'); await settle(p, 800);
+            const dates = await invalidState(p, width === 1440 ? 'leave_start' : 'leave_start-native');
+            check('validation: then no date → focus on the date, the type no longer invalid', dates.focused && (await invalidState(p, 'leave_type')).invalid === null, `${await active(p)} ${JSON.stringify(dates)}`);
+            await c.close();
+        }
+        {
+            // Labels in a column of their own (the organization modals).
+            const { c, p } = await page(b, admin, 'light', width);
+            await p.goto(`${BASE}/organization`, { waitUntil: 'networkidle' });
+            await p.getByRole('button', { name: 'New department' }).first().click(); await settle(p);
+            await p.getByRole('dialog').getByRole('button', { name: /^save/i }).focus();
+            await p.keyboard.press('Enter'); await settle(p, 800);
+            const state = await invalidState(p, 'dept_name');
+            check('validation: a two-column form → focus on the field', state.focused && state.invalid === 'true' && !! state.message, `${await active(p)} ${JSON.stringify(state)}`);
+            await c.close();
+        }
+        {
+            // Not a modal: Policies → Overtime, a limit off the quarter hour.
+            const { c, p } = await page(b, admin, 'light', width);
+            await p.goto(`${BASE}/policies?tab=overtime`, { waitUntil: 'networkidle' });
+            await p.fill('#ot_max_overtime', '1.3');
+            await p.locator('button[type=submit][form=overtime-settings-form]').click(); await settle(p, 800);
+            const state = await invalidState(p, 'ot_max_overtime');
+            check('validation: a page form → focus on the field, its message in hours', state.focused && state.invalid === 'true' && /quarter hours/.test(state.message ?? ''), JSON.stringify(state));
             await c.close();
         }
 

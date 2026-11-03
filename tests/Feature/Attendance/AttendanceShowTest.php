@@ -212,7 +212,8 @@ class AttendanceShowTest extends TestCase
     public function test_a_day_with_no_daily_attendance_row_renders_as_not_calculated(): void
     {
         $employee = Employee::factory()->create();
-        $month = today()->startOfMonth();
+        // Last month, so its other days are past: missing, not upcoming.
+        $month = today()->subMonthNoOverflow()->startOfMonth();
 
         // Only the month's first workday has been calculated; every other
         // day in the month must show as "Not calculated", not "Absent" —

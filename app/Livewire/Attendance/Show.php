@@ -555,6 +555,58 @@ class Show extends Component
     }
 
     /**
+     * The month's days with no row, split by why (F07). A day that hasn't
+     * happened yet — tomorrow on, or today before it closes — is upcoming: a
+     * quiet cell, never "Not calculated". A workday before that, inside the
+     * employment period, with no row is missing: the builder should have
+     * reached it, and only those make the page say so. Days off and days
+     * outside the employment period are neither: the builder writes an off
+     * row for the first and none for the second.
+     *
+     * @param  Collection<string, DailyAttendance>  $existing
+     * @param  Collection<string, string>  $holidays  holidaysByDate(), already loaded for the month
+     * @return array{upcoming: array<string, true>, missing: list<Carbon>}
+     */
+    private function calculationGaps(Collection $existing, Collection $holidays): array
+    {
+        $start = $this->monthStart();
+        $end = $start->copy()->endOfMonth()->startOfDay();
+        $lastPast = now()->gte($this->todayClosesAt()) ? today() : today()->subDay();
+        $holidayDates = $holidays->map(fn () => true)->all();
+
+        $upcoming = [];
+        $missing = [];
+
+        for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
+            $key = $date->format('Y-m-d');
+
+            if ($existing->has($key)) {
+                continue;
+            }
+
+            if ($date->gt($lastPast)) {
+                $upcoming[$key] = true;
+            } elseif ($this->employee->isActiveOn($date) && WorkdayCalendar::isWorkday($this->employee, $date, $holidayDates)) {
+                $missing[] = $date->copy();
+            }
+        }
+
+        return ['upcoming' => $upcoming, 'missing' => $missing];
+    }
+
+    /**
+     * When today stops being upcoming: the first scheduled run after today's
+     * schedule end (AttendanceSchedule builds today every 15 minutes), the
+     * moment the scheduler finalises a day with no punches.
+     */
+    private function todayClosesAt(): Carbon
+    {
+        $schedule = $this->employee->scheduleOn(today());
+
+        return Carbon::parse(today()->format('Y-m-d').' '.$schedule->end_time)->addMinutes(15);
+    }
+
+    /**
      * The month's counts — the shared definition (AttendanceSummary), which
      * the employee dashboard uses too.
      *
@@ -607,15 +659,8 @@ class Show extends Component
                 ['label' => $this->employee->full_name],
             ]];
 
-        // Derived from $existing (already fetched above) rather than a
-        // fresh MAX(work_date) query — Attendance\Index's list page can
-        // afford a real global query since it's the only date-range fact
-        // on that page, but here the query-count budget is already spent
-        // on the two queries every render needs, and this page only ever
-        // needs to know how far the CURRENT month got, which $existing
-        // already answers for free.
-        $lastBuiltInMonth = $existing->keys()->sort()->last();
         $holidays = $this->holidaysByDate();
+        $gaps = $this->calculationGaps($existing, $holidays);
 
         return view('livewire.attendance.show', [
             'days' => $days,
@@ -629,8 +674,8 @@ class Show extends Component
             'holidaysByDate' => $holidays,
             'dayLeaves' => $this->dayLeaves(),
             'dayOvertime' => $this->viewingDay !== null ? $this->dayOvertime($existing->get($this->viewingDay)) : null,
-            'lastBuiltInMonth' => $lastBuiltInMonth,
-            'monthFullyBuilt' => $lastBuiltInMonth === $days->last()['date']->format('Y-m-d'),
+            'upcomingDays' => $gaps['upcoming'],
+            'missingWorkdays' => $gaps['missing'],
             // Same reasoning as $layoutData just above: nobody reaches
             // /my-attendance via the list (it's a sidebar destination, and a
             // plain employee can't open /attendance at all), so a "Back to

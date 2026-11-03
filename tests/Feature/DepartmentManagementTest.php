@@ -147,7 +147,7 @@ class DepartmentManagementTest extends TestCase
             ->call('save')
             ->assertHasErrors(['name']);
 
-        // Reopening "Add Department" (without saving) must not still show
+        // Reopening "Add department" (without saving) must not still show
         // the previous submit's error.
         $component->call('create')->assertHasNoErrors();
     }

@@ -48,7 +48,7 @@ class ScheduleManagementTest extends TestCase
         Livewire::actingAs($this->admin())
             ->test(Index::class)
             ->assertSeeHtml('aria-describedby="bulk-reassign-hint"')
-            // Under Bulk Reassign and as wide as it from sm, not under both buttons.
+            // Under Bulk reassign and as wide as it from sm, not under both buttons.
             ->assertSeeHtml('<p id="bulk-reassign-hint" class="col-span-2 text-xs text-slate-600 sm:col-span-1 sm:w-0 sm:min-w-full')
             ->assertSeeHtml('sm:items-start')
             ->assertSee('Create a second schedule to reassign employees.');
@@ -237,7 +237,7 @@ class ScheduleManagementTest extends TestCase
             ->assertSee('id="schedule-lock-help"', false)
             // The time field is shown but locked: the segmented field and its native fallback.
             ->assertSee("timeInput({ model: 'start_time'", false)
-            ->assertSee("disabled: true })", false)
+            ->assertSee('disabled: true })', false)
             ->assertSeeHtml('id="schedule_start_time-native"');
     }
 
