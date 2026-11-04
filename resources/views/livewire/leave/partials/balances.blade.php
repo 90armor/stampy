@@ -1,6 +1,6 @@
 {{-- The balance table for one employee and year — Time off and the
 employee profile's Leave card (Phase 3e). $balanceRows: list of
-['type' => LeaveType, 'balance' => Balance, 'earnedSoFar' => ?int,
+['type' => LeaveType, 'balance' => Balance,
 'toilRemainder' => ?int (Time off in lieu's saved minutes, Phase 4d)]. --}}
 @php
     use App\Support\DisplayDate;
@@ -8,9 +8,8 @@ employee profile's Leave card (Phase 3e). $balanceRows: list of
 
     // Adjustments only appear when someone has one this year.
     $showAdjustments = collect($balanceRows)->contains(fn ($row) => $row['balance']->adjustments !== 0);
-    // A type not usable yet: when it becomes usable, and what's been earned meanwhile.
-    $usableLine = fn ($balance, $row) => 'Usable from '.DisplayDate::compact($balance->usableFrom)
-        .($row['earnedSoFar'] !== null ? ' · '.LeaveDays::label($row['earnedSoFar']).' earned so far' : '');
+    // A type not usable yet: when it becomes usable, and why (F08; LeaveType::usableFromLabel()).
+    $usableLine = fn ($balance, $row) => $row['type']->usableFromLabel($balance->usableFrom);
     // A leaver's last year: Available is what they had at their last day
     // (Balance::availableAtLastDay() — the grant pro-rated to it), the figure
     // untaken leave is read from; the full-year balance moves to a muted line.

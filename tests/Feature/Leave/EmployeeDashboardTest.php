@@ -85,14 +85,15 @@ class EmployeeDashboardTest extends TestCase
             ->assertDontSee('Pending approvals');
     }
 
-    public function test_a_type_not_usable_yet_says_when_it_will_be(): void
+    public function test_a_type_not_usable_yet_says_when_and_why_with_no_earned_figure(): void
     {
         $this->annual->update(['min_service_months' => 12]);
         $newcomer = $this->person('Newcomer', 'employee', null, '2026-03-01');
 
+        // The balances card's wording (Phase 6e): days not usable yet aren't counted out.
         $this->actingAs($newcomer->user)->get(route('dashboard'))
-            ->assertSee('Usable from '.DisplayDate::compact(Carbon::parse('2027-03-01')))
-            ->assertSee('earned so far')
+            ->assertSee('Usable from '.DisplayDate::compact(Carbon::parse('2027-03-01')).", after 12 months' service")
+            ->assertDontSee('earned so far')
             ->assertSee('No leave requested or coming up.');
     }
 

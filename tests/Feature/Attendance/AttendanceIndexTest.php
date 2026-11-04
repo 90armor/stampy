@@ -9,6 +9,7 @@ use App\Models\Department;
 use App\Models\Employee;
 use App\Models\User;
 use App\Models\WorkSchedule;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
@@ -255,16 +256,32 @@ class AttendanceIndexTest extends TestCase
         $this->assertSame(1, $component->instance()->render()->getData()['attendances']->currentPage());
     }
 
-    public function test_date_range_past_the_last_built_date_shows_the_notice(): void
+    public function test_a_range_reaching_into_the_future_shows_no_notice(): void
     {
-        $admin = $this->admin();
+        // Wed 11 Mar at noon: today isn't closed yet, and the days after it
+        // haven't happened — nothing is missing (F07's rule, Phase 6e follow-up).
+        $this->travelTo(Carbon::parse('2026-03-11 12:00:00'));
+        $this->attendanceRow('2026-03-11', AttendanceStatus::InProgress, ['join_date' => '2026-03-11']);
 
-        $this->attendanceRow(today()->format('Y-m-d'), AttendanceStatus::Present);
-
-        Livewire::actingAs($admin)
+        Livewire::actingAs($this->admin())
             ->test(Index::class)
-            ->set('toDate', today()->addDays(5)->format('Y-m-d'))
-            ->assertSee('only been calculated up to');
+            ->set('toDate', '2026-03-16')
+            ->assertDontSee('been calculated for')
+            ->assertDontSee('only been calculated up to');
+    }
+
+    public function test_a_past_workday_with_missing_rows_is_named(): void
+    {
+        $this->travelTo(Carbon::parse('2026-03-11 12:00:00'));
+        $employee = Employee::factory()->create(['join_date' => '2026-03-09']);
+        $this->attendanceRowForEmployee($employee, '2026-03-09', AttendanceStatus::Present);
+
+        Livewire::actingAs($this->admin())
+            ->test(Index::class)
+            ->set('fromDate', '2026-03-07')
+            ->set('toDate', '2026-03-11')
+            // Sat 7 and Sun 8 are before they joined; Mon 9 is built; Tue 10 isn't.
+            ->assertSeeHtml('<strong>Tue 10 Mar</strong>');
     }
 
     public function test_admin_sees_every_employees_attendance(): void

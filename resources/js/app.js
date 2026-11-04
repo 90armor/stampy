@@ -90,6 +90,104 @@ window.stampyFocus = {
     },
 };
 
+// Validation errors (Phase 6e, docs/DESIGN_SYSTEM.md, Forms). Every error list
+// (<x-input-error>, [data-input-error]) is tied to its field: aria-invalid="true"
+// on the field and the list's id in its aria-describedby, so a screen reader
+// reads the message with the field. When an action — a submit, not a live
+// update — comes back with errors, focus moves to the first invalid field: in
+// the open modal if there is one, else in the component. Re-linked after every
+// Livewire update, since a re-render puts back the server's attributes.
+window.stampyErrors = {
+    visible(element) {
+        return !! element && element.isConnected && element.getClientRects().length > 0;
+    },
+    // A field and its stand-ins: a date or time field's phone input (-native),
+    // and a time field's segments, which take the place of its toggle.
+    controls(id) {
+        const main = document.getElementById(id);
+        if (! main) return [];
+        const segments = document.querySelector(`[role="group"][aria-labelledby="${id}-label"]`);
+        return [segments ?? main, document.getElementById(`${id}-native`)].filter(Boolean);
+    },
+    // The fields a list describes: its `for` ids, else the one whose label
+    // shares its wrapper, else (a form with labels in a column of their own)
+    // the control beside it.
+    targets(error) {
+        const wrapper = error.parentElement;
+        const ids = error.dataset.for
+            ? error.dataset.for.split(/\s+/)
+            : [wrapper?.querySelector('label[for]')?.htmlFor
+                ?? wrapper?.querySelector('input:not([type="hidden"])[id], select[id], textarea[id], button[aria-haspopup][id]')?.id].filter(Boolean);
+        return ids.flatMap((id) => this.controls(id));
+    },
+    link() {
+        document.querySelectorAll('[data-error-ids]').forEach((control) => {
+            const ours = control.dataset.errorIds.split(' ');
+            const rest = (control.getAttribute('aria-describedby') ?? '').split(/\s+/).filter((id) => id && ! ours.includes(id));
+            rest.length ? control.setAttribute('aria-describedby', rest.join(' ')) : control.removeAttribute('aria-describedby');
+            const before = control.dataset.errorInvalidBefore;
+            before ? control.setAttribute('aria-invalid', before) : control.removeAttribute('aria-invalid');
+            delete control.dataset.errorIds;
+            delete control.dataset.errorInvalidBefore;
+        });
+
+        document.querySelectorAll('[data-input-error]').forEach((error, index) => {
+            const targets = this.targets(error);
+            if (! targets.length) return;
+
+            if (! error.id) {
+                const id = `${targets[0].id || error.dataset.for?.split(/\s+/)[0] || 'field'}-error`;
+                error.id = document.getElementById(id) ? `${id}-${index}` : id;
+            }
+
+            targets.forEach((control) => {
+                const described = (control.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
+                control.setAttribute('aria-describedby', [...described, error.id].join(' '));
+                if (! control.dataset.errorIds) control.dataset.errorInvalidBefore = control.getAttribute('aria-invalid') ?? '';
+                control.dataset.errorIds = [control.dataset.errorIds, error.id].filter(Boolean).join(' ');
+                control.setAttribute('aria-invalid', 'true');
+            });
+        });
+    },
+    focusFirst(scope) {
+        for (const error of scope.querySelectorAll('[data-input-error]')) {
+            const control = this.targets(error).find((candidate) => this.visible(candidate));
+            if (! control) continue;
+            // A group (a time field's segments, a fieldset of checkboxes): its first part.
+            (control.matches('[role="group"], fieldset') ? control.querySelector('[role="spinbutton"], input') : control)?.focus();
+            return;
+        }
+    },
+    // The open modal on top, if any — a modal's contents are teleported out of
+    // its component — else the component itself.
+    scope(componentEl) {
+        const dialogs = [...document.querySelectorAll('[role="dialog"][aria-modal="true"]')].filter((dialog) => this.visible(dialog));
+        return dialogs.pop() ?? componentEl;
+    },
+};
+
+document.addEventListener('livewire:init', () => {
+    window.Livewire.hook('commit', ({ component, commit, succeed }) => {
+        succeed(({ snapshot }) => {
+            const memo = (typeof snapshot === 'string' ? JSON.parse(snapshot) : snapshot)?.memo;
+            const failed = commit.calls.length > 0 && Object.keys(memo?.errors ?? {}).length > 0;
+            // Once the render has settled: the morph that puts back the
+            // server's attributes lands after this callback, and the modal's
+            // own focus moves (a step change, a button enabled again) run then too.
+            setTimeout(() => {
+                window.stampyErrors.link();
+                if (failed) window.stampyErrors.focusFirst(window.stampyErrors.scope(component.el));
+            });
+        });
+    });
+});
+
+// A form posted the plain way (sign-in, password, profile) comes back as a new page.
+document.addEventListener('DOMContentLoaded', () => {
+    window.stampyErrors.link();
+    if (document.querySelector('[data-input-error]')) window.stampyErrors.focusFirst(document);
+});
+
 // A date field's <label for> points at the picker's trigger, which is hidden
 // below 640px in favour of the native input (<x-date-picker>). Clicking the label
 // focuses whichever of the two is showing.
@@ -121,8 +219,9 @@ document.addEventListener('alpine:init', () => {
         },
         measure() {
             const el = this.$el;
-            const end = el.querySelector('thead th:last-child');
-            if (end) el.style.setProperty('--pin-end-width', `${end.offsetWidth}px`);
+            // No end column (the Employees table without Actions): the start column pins at the edge.
+            const end = el.querySelector('thead th.table-pin-end');
+            el.style.setProperty('--pin-end-width', `${end ? end.offsetWidth : 0}px`);
             el.classList.toggle('table-pin-overflowing', el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
         },
     }));

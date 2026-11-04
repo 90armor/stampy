@@ -101,13 +101,54 @@ class TimeOffTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/<td class="px-6 py-4 font-medium[^"]*">\s*(Special|Unpaid)\s*</', $html);
     }
 
-    public function test_a_type_not_yet_usable_says_when_and_how_much_is_earned(): void
+    public function test_a_type_not_yet_usable_says_when_and_why_with_no_earned_figure(): void
     {
         $joiner = $this->person('Joiner', 'employee', $this->manager, ['join_date' => '2026-03-01']);
 
-        // 1 Mar – 15 Jun: 18 × 107/365 = 5.28 → 5.5 earned so far.
+        // F08: days earned toward a type they can't use read as days to use.
         Livewire::actingAs($joiner->user)->test(TimeOff::class)
-            ->assertSee('Usable from Mon 1 Mar 2027 · 5.5 days earned so far');
+            ->assertSee("Usable from Mon 1 Mar 2027, after 12 months' service")
+            ->assertDontSee('earned so far')
+            // Special deducts from Annual, so it isn't available to them either.
+            ->assertSee('Also available: Unpaid.')
+            ->assertDontSee('Special (deducted from Annual)');
+    }
+
+    public function test_the_request_modal_lists_unusable_types_disabled_with_the_reason(): void
+    {
+        $joiner = $this->person('Joiner', 'employee', $this->manager, ['join_date' => '2026-03-01']);
+        $toil = LeaveType::factory()->earned()->create(['name' => 'Time off in lieu']);
+
+        $html = $this->modal($joiner->user)->call('open')->html();
+
+        $this->assertMatchesRegularExpression('/<option value="'.$this->annual->id.'" disabled[^>]*>Annual — from Mon 1 Mar 2027<\/option>/', $html);
+        $this->assertStringContainsString('>Special — uses Annual, from Mon 1 Mar 2027</option>', $html);
+        $this->assertMatchesRegularExpression('/<option value="'.$toil->id.'" disabled[^>]*>Time off in lieu — none earned yet<\/option>/', $html);
+        // Unpaid has no rule they don't meet.
+        $this->assertMatchesRegularExpression('/<option value="\d+"\s*>Unpaid<\/option>/', $html);
+
+        // Someone eligible sees Annual and Special as usual.
+        $html = $this->modal()->call('open')->html();
+        $this->assertMatchesRegularExpression('/<option value="'.$this->annual->id.'"\s*>Annual<\/option>/', $html);
+    }
+
+    public function test_the_service_refuses_an_unusable_type_in_the_options_words(): void
+    {
+        $joiner = $this->person('Joiner', 'employee', $this->manager, ['join_date' => '2026-03-01']);
+        $special = LeaveType::where('name', 'Special')->first();
+        $toil = LeaveType::factory()->earned()->create(['name' => 'Time off in lieu']);
+
+        $this->modal($joiner->user)->call('open')
+            ->set('leave_type_id', $special->id)->set('start_date', '2026-06-19')
+            ->call('review')
+            ->assertHasErrors(['start_date'])
+            ->assertSee('Special leave uses Annual, which can be used from Mon 1 Mar 2027.');
+
+        $this->modal()->call('open')
+            ->set('leave_type_id', $toil->id)->set('start_date', '2026-06-19')
+            ->call('review')
+            ->assertHasErrors(['leave'])
+            ->assertSee('No Time off in lieu earned yet.');
     }
 
     // ── Requesting ─────────────────────────────────────────────────────

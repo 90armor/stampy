@@ -562,6 +562,24 @@ class EmployeeManagementTest extends TestCase
         $this->assertStringNotContainsString('lg:grid-cols-[minmax(18rem,1fr)_14rem_11rem]', $html);
     }
 
+    public function test_a_manager_sees_their_team_with_no_empty_actions_column(): void
+    {
+        $managerUser = User::factory()->create()->assignRole('manager');
+        $manager = Employee::factory()->create(['user_id' => $managerUser->id]);
+        Employee::factory()->create(['manager_id' => $manager->id]);
+
+        $html = Livewire::actingAs($managerUser)->test(Index::class)->html();
+
+        preg_match_all('/<th[^>]*>\s*(.*?)\s*<\/th>/s', $html, $matches);
+        $headers = array_map(fn ($cell) => trim(strip_tags($cell)), $matches[1]);
+        $this->assertSame(['Employee', 'Department', 'Position', 'Start date', 'Status'], $headers);
+        $this->assertStringContainsString('Your team', $html);
+        $this->assertStringNotContainsString('All employees', $html);
+
+        $admin = User::factory()->create()->assignRole('admin');
+        $this->assertStringContainsString('All employees', Livewire::actingAs($admin)->test(Index::class)->html());
+    }
+
     public function test_the_stat_strip_is_one_row_of_three_at_every_width_with_card_padding(): void
     {
         $admin = User::factory()->create()->assignRole('admin');

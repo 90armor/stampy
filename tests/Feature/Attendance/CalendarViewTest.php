@@ -193,6 +193,8 @@ class CalendarViewTest extends TestCase
 
     public function test_a_day_with_no_record_renders_as_not_calculated_in_the_calendar(): void
     {
+        // March in the past, so a day with no row is missing, not upcoming.
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $employee = Employee::factory()->create();
 
         $component = Livewire::actingAs($this->admin())
@@ -298,6 +300,8 @@ class CalendarViewTest extends TestCase
 
     public function test_a_long_holiday_name_wraps_instead_of_truncating_to_one_line(): void
     {
+        // March in the past: an upcoming holiday's flag sits in the icon slot instead (F07).
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         // "Company Anniversary (demo)" (HolidaySeeder's own wording) used to
         // hard-truncate to one line ("Company Anniversary (dem…") even
         // though the cell has vertical room for two. line-clamp-2 (not
@@ -327,6 +331,8 @@ class CalendarViewTest extends TestCase
 
     public function test_every_cell_carries_an_accessible_label(): void
     {
+        // March in the past, so a day with no row is missing, not upcoming.
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $employee = Employee::factory()->create();
         DailyAttendance::factory()->create([
             'employee_id' => $employee->id,

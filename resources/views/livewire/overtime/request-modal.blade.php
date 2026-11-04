@@ -39,7 +39,7 @@
                         </div>
                     </div>
                     {{-- The window's errors, and the day's limits, full width under the row. --}}
-                    <x-input-error :messages="array_merge($errors->get('start_time'), $errors->get('end_time'), $errors->get('starts_at'), $errors->get('ends_at'), $errors->get('overtime'))" class="mt-1" />
+                    <x-input-error for="overtime_start overtime_end" :messages="array_merge($errors->get('start_time'), $errors->get('end_time'), $errors->get('starts_at'), $errors->get('ends_at'), $errors->get('overtime'))" class="mt-1" />
                 </div>
 
                 <div>
@@ -112,7 +112,7 @@
                         <x-input-error :messages="$errors->get('limit_override_reason')" class="mt-1" />
                     </div>
                 @endif
-                <x-input-error :messages="$errors->get('overtime')" class="mt-1" />
+                <x-input-error :messages="$errors->get('overtime')" class="mt-1" alert />
 
                 <p class="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
                     <x-icon name="info" class="mt-0.5 h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" />

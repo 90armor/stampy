@@ -50,6 +50,8 @@ class CalendarReadabilityTest extends TestCase
 
     public function test_the_legend_lists_all_six_statuses_with_their_icons(): void
     {
+        // March in the past and unbuilt, so its days show as Not calculated.
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $employee = Employee::factory()->create();
 
         $component = Livewire::actingAs($this->admin())
@@ -93,42 +95,62 @@ class CalendarReadabilityTest extends TestCase
             ->assertDontSee('>Workdays<');
     }
 
-    public function test_a_partially_built_month_shows_the_calculated_up_to_notice(): void
+    public function test_a_past_month_with_a_missing_workday_names_it(): void
     {
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $employee = Employee::factory()->create();
+        $builder = app(DailySummaryBuilder::class);
 
-        // Only the first 5 days of March are built; the month has 31.
-        for ($day = 1; $day <= 5; $day++) {
-            DailyAttendance::factory()->create([
-                'employee_id' => $employee->id,
-                'work_date' => sprintf('2026-03-%02d', $day),
-                'status' => AttendanceStatus::Present,
-            ]);
+        // Every day of March built except Thu 5 Mar, a workday.
+        for ($cursor = Carbon::parse('2026-03-01'); $cursor->format('Y-m') === self::MONTH; $cursor->addDay()) {
+            if ($cursor->format('Y-m-d') !== '2026-03-05') {
+                $builder->build($employee, $cursor->copy());
+            }
         }
 
         Livewire::actingAs($this->admin())
             ->test(Show::class, ['employee' => $employee])
             ->set('month', self::MONTH)
-            ->assertSee('only been calculated up to')
-            ->assertSee('Thu 5 Mar');
+            ->assertSee('been calculated for')
+            ->assertSeeHtml('<strong>Thu 5 Mar</strong>')
+            ->assertDontSee('only been calculated up to');
     }
 
-    public function test_a_month_with_nothing_built_shows_a_generic_notice_not_a_date(): void
+    public function test_a_missing_day_off_is_not_reported(): void
     {
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $employee = Employee::factory()->create();
+        $builder = app(DailySummaryBuilder::class);
+
+        // Sun 8 Mar, a day off, has no row: nothing for the builder to have
+        // found there, so no notice.
+        for ($cursor = Carbon::parse('2026-03-01'); $cursor->format('Y-m') === self::MONTH; $cursor->addDay()) {
+            if ($cursor->format('Y-m-d') !== '2026-03-08') {
+                $builder->build($employee, $cursor->copy());
+            }
+        }
 
         Livewire::actingAs($this->admin())
             ->test(Show::class, ['employee' => $employee])
             ->set('month', self::MONTH)
-            // Not the apostrophe-containing form: that's literal static
-            // Blade text (not passed through {{ }}), so it isn't
-            // HTML-entity-escaped the way assertSee's own escaping of the
-            // search string would expect.
-            ->assertSee('been calculated for this month yet');
+            ->assertDontSee('been calculated for');
+    }
+
+    public function test_a_past_month_with_nothing_built_counts_its_workdays(): void
+    {
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
+        $employee = Employee::factory()->create();
+
+        // March 2026 has 22 workdays: the first two named, then the rest counted.
+        Livewire::actingAs($this->admin())
+            ->test(Show::class, ['employee' => $employee])
+            ->set('month', self::MONTH)
+            ->assertSeeHtml('<strong>Mon 2 Mar, Tue 3 Mar and 20 more workdays</strong>');
     }
 
     public function test_a_fully_built_month_shows_no_notice(): void
     {
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $employee = Employee::factory()->create();
         $builder = app(DailySummaryBuilder::class);
 
@@ -141,8 +163,7 @@ class CalendarReadabilityTest extends TestCase
         Livewire::actingAs($this->admin())
             ->test(Show::class, ['employee' => $employee])
             ->set('month', self::MONTH)
-            ->assertDontSee('only been calculated up to')
-            ->assertDontSee("hasn't been calculated");
+            ->assertDontSee('been calculated for');
     }
 
     public function test_a_day_with_an_early_departure_appends_it_to_the_cells_accessible_label(): void
@@ -382,6 +403,8 @@ class CalendarReadabilityTest extends TestCase
 
     public function test_a_present_day_with_an_early_leave_keeps_the_green_present_cell(): void
     {
+        // March in the past: an upcoming day would share the cell surface it counts (F07).
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $employee = Employee::factory()->create();
         DailyAttendance::factory()->create([
             'employee_id' => $employee->id,

@@ -239,9 +239,11 @@ class LeaveSubmitTest extends TestCase
     {
         $joiner = $this->person('Joiner', 'employee', $this->manager, ['join_date' => '2026-01-05']);
 
-        foreach ([$this->annual, $this->special] as $type) {
+        // Special's message names the type asked for and the one it uses, as
+        // the request modal's disabled option does (F08).
+        foreach ([[$this->annual, 'Annual leave can be used from Tue 5 Jan 2027.'], [$this->special, 'Special leave uses Annual, which can be used from Tue 5 Jan 2027.']] as [$type, $message]) {
             $errors = $this->refused(fn () => $this->submit('2026-06-22', '2026-06-22', $type, $joiner));
-            $this->assertSame(['Annual leave can be used from Tue 5 Jan 2027.'], $errors['start_date']);
+            $this->assertSame([$message], $errors['start_date']);
         }
 
         $this->assertSame(LeaveStatus::Pending, $this->submit('2026-06-22', '2026-06-22', $this->unpaid, $joiner)->status);

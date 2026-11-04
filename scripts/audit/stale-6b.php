@@ -1,9 +1,10 @@
 <?php
+
 // AUDIT-ONLY (Phase 6b screenshots). Env: STEP=create TYPE=leave|overtime → a
 // pending request from Moe Moe Khaing (EMP-0009, manager Htet Htet Oo), first
 // free date; prints its id. STEP=act ID=… TYPE=… ACTION=cancel|approve|reject|skip
 // → moves it on behind the approver's back (skip = Aye Aye Mon, the
-// skip-level manager, approves step 1).
+// skip-level manager, approves step 1; admin-cancel = the admin cancels it, Phase 6e).
 use App\Enums\OvertimeCompensation;
 use App\Models\Employee;
 use App\Models\Leave;
@@ -41,6 +42,7 @@ if (getenv('STEP') === 'create') {
 $r = $type === 'leave' ? Leave::find(getenv('ID')) : OvertimeRequest::find(getenv('ID'));
 match (getenv('ACTION')) {
     'cancel' => $service->cancel($r, $e->user),
+    'admin-cancel' => $service->cancel($r, User::where('username', 'admin')->first()),
     'approve' => $service->approve($r, User::where('username', 'admin')->first()),
     'reject' => $service->reject($r, User::where('username', 'admin')->first(), 'Not this week.'),
     'skip' => $service->approve($r, User::where('username', 'aye.aye.mon')->first()),

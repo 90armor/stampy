@@ -13,6 +13,7 @@ use App\Models\OvertimeRequest;
 use App\Services\Attendance\DailySummaryBuilder;
 use App\Services\Leave\LeaveDayCounter;
 use App\Services\Overtime\OvertimeRequestService;
+use App\Support\AttendanceGaps;
 use App\Support\AttendanceSummary;
 use App\Support\AttendanceTime;
 use App\Support\DisplayDate;
@@ -110,7 +111,9 @@ class Show extends Component
 
     private function monthStart(): Carbon
     {
-        return Carbon::createFromFormat('Y-m', $this->month)->startOfMonth();
+        // '!': the day is the 1st, not today's — 'Y-m' alone took today's day,
+        // so on 31 Mar "2026-02" was 31 Feb, which rolled over into March.
+        return Carbon::createFromFormat('!Y-m', $this->month)->startOfMonth();
     }
 
     public function startAddingPunch(string $date): void
@@ -555,6 +558,42 @@ class Show extends Component
     }
 
     /**
+     * The month's days with no row, split by why (F07). A day with nothing
+     * to calculate is quiet — a plain cell, never "Not calculated": one that
+     * hasn't happened yet (tomorrow on, or today before it closes), or one
+     * before the employee joined (Phase 6e follow-up). A workday after that,
+     * inside the employment period, with no row is missing: the builder should
+     * have reached it, and only those make the page say so. Days off are
+     * neither: the builder writes an off row for them.
+     *
+     * @param  Collection<string, DailyAttendance>  $existing
+     * @param  Collection<string, string>  $holidays  holidaysByDate(), already loaded for the month
+     * @return array{quiet: array<string, true>, missing: list<Carbon>}
+     */
+    private function calculationGaps(Collection $existing, Collection $holidays): array
+    {
+        $start = $this->monthStart();
+        $end = $start->copy()->endOfMonth()->startOfDay();
+        $lastPast = AttendanceGaps::lastPastDay($this->employee);
+
+        $quiet = [];
+        for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
+            if (! $existing->has($date->format('Y-m-d')) && ($date->gt($lastPast) || $date->lt($this->employee->join_date))) {
+                $quiet[$date->format('Y-m-d')] = true;
+            }
+        }
+
+        // The shared definition of a missing workday (AttendanceGaps), as Daily attendance's notice uses.
+        $missing = AttendanceGaps::missingWorkdays(
+            $this->employee, $start, $end,
+            $existing->map(fn () => true)->all(),
+            $holidays->map(fn () => true)->all(),
+        );
+
+        return ['quiet' => $quiet, 'missing' => $missing];
+    }
+
+    /**
      * The month's counts — the shared definition (AttendanceSummary), which
      * the employee dashboard uses too.
      *
@@ -607,15 +646,8 @@ class Show extends Component
                 ['label' => $this->employee->full_name],
             ]];
 
-        // Derived from $existing (already fetched above) rather than a
-        // fresh MAX(work_date) query — Attendance\Index's list page can
-        // afford a real global query since it's the only date-range fact
-        // on that page, but here the query-count budget is already spent
-        // on the two queries every render needs, and this page only ever
-        // needs to know how far the CURRENT month got, which $existing
-        // already answers for free.
-        $lastBuiltInMonth = $existing->keys()->sort()->last();
         $holidays = $this->holidaysByDate();
+        $gaps = $this->calculationGaps($existing, $holidays);
 
         return view('livewire.attendance.show', [
             'days' => $days,
@@ -629,8 +661,8 @@ class Show extends Component
             'holidaysByDate' => $holidays,
             'dayLeaves' => $this->dayLeaves(),
             'dayOvertime' => $this->viewingDay !== null ? $this->dayOvertime($existing->get($this->viewingDay)) : null,
-            'lastBuiltInMonth' => $lastBuiltInMonth,
-            'monthFullyBuilt' => $lastBuiltInMonth === $days->last()['date']->format('Y-m-d'),
+            'quietDays' => $gaps['quiet'],
+            'missingWorkdays' => $gaps['missing'],
             // Same reasoning as $layoutData just above: nobody reaches
             // /my-attendance via the list (it's a sidebar destination, and a
             // plain employee can't open /attendance at all), so a "Back to

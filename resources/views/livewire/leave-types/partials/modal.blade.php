@@ -12,7 +12,7 @@
 
         <form id="leave-type-form" wire:submit="save" class="px-4 py-2 sm:px-6">
             @error('form')
-                <div class="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-900">{{ $message }}</div>
+                <div role="alert" class="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-900">{{ $message }}</div>
             @enderror
 
             @if ($locked)

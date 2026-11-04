@@ -24,20 +24,25 @@
 
             @can('update', $employee)
                 @if ($assignments->count() > 1)
-                    <button
-                        type="button"
-                        @click="$dispatch('confirm-dialog-schedule-assignments', {
-                            title: 'Delete assignment',
-                            message: @js('Delete the '.$currentAssignment->workSchedule->name.' assignment effective '.\App\Support\DisplayDate::compact($currentAssignment->effective_from).'? This rebuilds this employee\'s attendance from that date.'),
-                            confirmText: 'Delete',
-                            method: 'deleteAssignment',
-                            args: [{{ $currentAssignment->id }}],
-                        })"
-                        class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-500 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-                        aria-label="Delete {{ $currentAssignment->workSchedule->name }} schedule assignment effective {{ \App\Support\DisplayDate::compact($currentAssignment->effective_from) }}"
-                    >
-                        <x-icon name="trash" class="h-5 w-5" />
-                    </button>
+                    {{-- The shared icon-button tooltip (the directory's Deactivate), saying what its label says: visible on
+                    hover and focus, wrapping (w-52) so a long schedule name stays on screen; aria-hidden, as it repeats the name. --}}
+                    <span class="group/action relative inline-flex shrink-0">
+                        <button
+                            type="button"
+                            @click="$dispatch('confirm-dialog-schedule-assignments', {
+                                title: 'Delete assignment',
+                                message: @js('Delete the '.$currentAssignment->workSchedule->name.' assignment effective '.\App\Support\DisplayDate::compact($currentAssignment->effective_from).'? This rebuilds this employee\'s attendance from that date.'),
+                                confirmText: 'Delete',
+                                method: 'deleteAssignment',
+                                args: [{{ $currentAssignment->id }}],
+                            })"
+                            class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-500 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                            aria-label="Delete {{ $currentAssignment->workSchedule->name }} schedule assignment effective {{ \App\Support\DisplayDate::compact($currentAssignment->effective_from) }}"
+                        >
+                            <x-icon name="trash" class="h-5 w-5" />
+                        </button>
+                        <span role="tooltip" aria-hidden="true" class="pointer-events-none absolute bottom-full right-0 z-10 mb-2 w-52 rounded-md bg-slate-900 px-2 py-1 text-left text-xs font-medium text-white opacity-0 shadow-sm transition-opacity group-hover/action:opacity-100 group-focus-within/action:opacity-100 dark:bg-slate-100 dark:text-slate-900">Delete {{ $currentAssignment->workSchedule->name }} schedule assignment effective {{ \App\Support\DisplayDate::compact($currentAssignment->effective_from) }}</span>
+                    </span>
                 @endif
             @endcan
         </div>
@@ -73,7 +78,7 @@
     </div>
 
     @error('delete')
-        <div class="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-900">
+        <div role="alert" class="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-900">
             {{ $message }}
         </div>
     @enderror
@@ -103,20 +108,25 @@
                         </div>
 
                         @can('update', $employee)
-                            <button
-                                type="button"
-                                @click="$dispatch('confirm-dialog-schedule-assignments', {
-                                    title: 'Delete assignment',
-                                    message: @js('Delete the '.$assignment->workSchedule->name.' assignment effective '.\App\Support\DisplayDate::compact($assignment->effective_from).'? This rebuilds this employee\'s attendance from that date.'),
-                                    confirmText: 'Delete',
-                                    method: 'deleteAssignment',
-                                    args: [{{ $assignment->id }}],
-                                })"
-                                class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-500 dark:hover:bg-red-900/30 dark:hover:text-red-400"
-                                aria-label="Delete {{ $assignment->workSchedule->name }} schedule assignment effective {{ \App\Support\DisplayDate::compact($assignment->effective_from) }}"
-                            >
-                                <x-icon name="trash" class="h-5 w-5" />
-                            </button>
+                            {{-- The shared icon-button tooltip (the directory's Deactivate), saying what its label says: visible on
+                            hover and focus, wrapping (w-52) so a long schedule name stays on screen; aria-hidden, as it repeats the name. --}}
+                            <span class="group/action relative inline-flex shrink-0">
+                                <button
+                                    type="button"
+                                    @click="$dispatch('confirm-dialog-schedule-assignments', {
+                                        title: 'Delete assignment',
+                                        message: @js('Delete the '.$assignment->workSchedule->name.' assignment effective '.\App\Support\DisplayDate::compact($assignment->effective_from).'? This rebuilds this employee\'s attendance from that date.'),
+                                        confirmText: 'Delete',
+                                        method: 'deleteAssignment',
+                                        args: [{{ $assignment->id }}],
+                                    })"
+                                    class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-500 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                                    aria-label="Delete {{ $assignment->workSchedule->name }} schedule assignment effective {{ \App\Support\DisplayDate::compact($assignment->effective_from) }}"
+                                >
+                                    <x-icon name="trash" class="h-5 w-5" />
+                                </button>
+                                <span role="tooltip" aria-hidden="true" class="pointer-events-none absolute bottom-full right-0 z-10 mb-2 w-52 rounded-md bg-slate-900 px-2 py-1 text-left text-xs font-medium text-white opacity-0 shadow-sm transition-opacity group-hover/action:opacity-100 group-focus-within/action:opacity-100 dark:bg-slate-100 dark:text-slate-900">Delete {{ $assignment->workSchedule->name }} schedule assignment effective {{ \App\Support\DisplayDate::compact($assignment->effective_from) }}</span>
+                            </span>
                         @endcan
                     </li>
                 @endforeach
@@ -134,7 +144,7 @@
             panelClass="mt-16"
         >
             <div class="mx-6 border-b border-slate-divider py-5">
-                <x-modal.title>Assign Schedule</x-modal.title>
+                <x-modal.title>Assign schedule</x-modal.title>
             </div>
 
             <form wire:submit="assign" class="px-6 py-4 space-y-4">

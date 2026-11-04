@@ -44,7 +44,9 @@ for t in \
     "2026-02-03 21:59:30" "2026-02-03 22:00:30" "2026-02-05 04:59:30" "2026-02-05 05:00:30"
 do
     log="$RUN/$(echo "$t" | tr ' :' '_-').log"
-    if docker compose exec -T -e PIN_NOW="$t" app php vendor/bin/phpunit --colors=never "$@" > "$log" 2>&1; then
+    # SeedAtAnyDateTest pins its own clock, so PIN_NOW changes nothing there:
+    # its group is left out rather than run 25 times over.
+    if docker compose exec -T -e PIN_NOW="$t" app php vendor/bin/phpunit --colors=never --exclude-group seed-sweep "$@" > "$log" 2>&1; then
         status="ok"
     else
         status="FAILED"

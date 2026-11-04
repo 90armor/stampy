@@ -9,7 +9,7 @@
     >
         <div class="mx-6 border-b border-slate-divider py-5">
             <x-modal.title>
-                {{ $editing ? 'Edit — '.$editing->name : 'Add Position' }}
+                {{ $editing ? 'Edit — '.$editing->name : 'Add position' }}
             </x-modal.title>
         </div>
 

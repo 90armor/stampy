@@ -217,11 +217,13 @@ class StaleDecisionTest extends TestCase
     {
         $request = $this->pending($type);
         $page = Livewire::actingAs($this->manager->user)->test(Approvals::class);
+        // Their name, as the "approved by …" notices give it — never "Admin".
+        $admin = User::factory()->create(['name' => 'Nilar Win'])->assignRole('admin');
 
-        $this->service($request)->cancel($request, $this->admin);
+        $this->service($request)->cancel($request, $admin);
 
         $page->call('openDecision', $request->id, 'approve', $type, 1)
-            ->assertSee("Admin cancelled Kyaw Kyaw's ".$this->subject($type).'.');
+            ->assertSee("Nilar Win cancelled Kyaw Kyaw's ".$this->subject($type).'.');
     }
 
     public function test_the_notice_goes_on_the_next_approve_or_reject(): void

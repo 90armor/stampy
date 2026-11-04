@@ -27,8 +27,10 @@
                     <x-input-label for="leave_type" value="Type of leave" />
                     <x-select id="leave_type" wire:model="leave_type_id">
                         <option value="">Choose a type</option>
+                        {{-- A type they can't use on any date they could pick stays listed,
+                        disabled, with the reason (F08; LeaveRequestService::unavailableReason()). --}}
                         @foreach ($types as $type)
-                            <option value="{{ $type->id }}">{{ $type->name }}</option>
+                            <option value="{{ $type->id }}" @disabled(isset($unavailable[$type->id]))>{{ $type->name }}{{ isset($unavailable[$type->id]) ? ' — '.$unavailable[$type->id] : '' }}</option>
                         @endforeach
                     </x-select>
                     <x-input-error :messages="$errors->get('leave_type_id')" class="{{ $fieldError }}" />
@@ -48,7 +50,7 @@
                     {{-- The dates' errors, and the request-as-a-whole ones (balance), full
                     width under the row: an overlap or a shortfall is about the dates
                     together, and a long message wrapped badly inside one column. --}}
-                    <x-input-error :messages="array_merge($errors->get('start_date'), $errors->get('end_date'), $errors->get('leave'))" class="{{ $fieldError }}" />
+                    <x-input-error for="leave_start leave_end" :messages="array_merge($errors->get('start_date'), $errors->get('end_date'), $errors->get('leave'))" class="{{ $fieldError }}" />
                 </div>
 
                 <div

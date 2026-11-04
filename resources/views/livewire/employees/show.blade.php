@@ -32,7 +32,7 @@
         On your own record Deactivate is disabled and says why at rest: from sm
         the group dissolves into the header's grid (contents), so the buttons
         stay centred on the name in row 1 and the hint sits in row 2 under
-        Deactivate, as wide as it (w-0 min-w-full, the Bulk Reassign pattern);
+        Deactivate, as wide as it (w-0 min-w-full, the Bulk reassign pattern);
         on a phone it runs under both buttons. --}}
         <div @class([
             'flex flex-wrap items-center gap-3 self-start sm:self-auto' => ! $ownRecord,

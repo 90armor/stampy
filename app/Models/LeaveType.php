@@ -8,12 +8,15 @@ use App\Exceptions\InvalidLeaveTypeException;
 use App\Exceptions\LeaveTypeInUseException;
 use App\Exceptions\LeaveTypeLockedException;
 use App\Services\Overtime\TimeOffInLieuReconciler;
+use App\Support\DisplayDate;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 class LeaveType extends Model
 {
@@ -139,6 +142,18 @@ class LeaveType extends Model
     public function hasBalance(): bool
     {
         return $this->balance_source->hasBalance();
+    }
+
+    /**
+     * A type not usable yet, in words: when, and why ("Usable from Sun 2 May
+     * 2027, after 12 months' service") — Time off, the profile's Leave card
+     * and the employee dashboard (Phase 6e). No figure of days earned so far:
+     * days that can't be used read as days to use.
+     */
+    public function usableFromLabel(CarbonInterface $usableFrom): string
+    {
+        return 'Usable from '.DisplayDate::compact($usableFrom)
+            .($this->min_service_months ? ', after '.$this->min_service_months.' '.Str::plural('month', $this->min_service_months)."' service" : '');
     }
 
     /** Whether the type is granted each year (LeaveGranter, EntitlementCalculator). */

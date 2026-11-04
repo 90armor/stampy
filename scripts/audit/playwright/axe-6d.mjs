@@ -37,6 +37,28 @@ const extras = {
             const day = p.locator('button[aria-label*="Present"], a[aria-label*="Present"], [role=button][aria-label*="Present"]').first();
             if (await day.count()) { await day.click(); await settle(p, 500); }
         }],
+        // Phase 6e: a two-column modal and a page form with a validation error.
+        ['modal-department-error', '/organization', async (p) => {
+            await p.getByRole('button', { name: 'New department' }).first().click(); await settle(p, 500);
+            await p.getByRole('dialog').getByRole('button', { name: /^save/i }).click(); await settle(p, 700);
+        }],
+        ['policies-overtime-error', '/policies?tab=overtime', async (p) => {
+            await p.fill('#ot_max_overtime', '1.3');
+            await p.locator('button[type=submit][form=overtime-settings-form]').click(); await settle(p, 700);
+        }],
+    ],
+    e1: [
+        // Phase 6e: types they can't use yet, disabled with the reason.
+        ['modal-request-leave-unusable', '/time-off', async (p) => {
+            await p.getByRole('button', { name: /request leave/i }).first().click(); await settle(p, 500);
+        }],
+    ],
+    m1: [
+        // Phase 6e: Reject with no reason.
+        ['modal-reject-error', '/approvals', async (p) => {
+            await p.getByRole('button', { name: 'Reject', exact: true }).first().click(); await settle(p, 500);
+            await p.getByRole('dialog').getByRole('button', { name: 'Reject', exact: true }).click(); await settle(p, 700);
+        }],
     ],
     e2: [
         ['modal-request-leave', '/time-off', async (p) => {
@@ -44,6 +66,11 @@ const extras = {
         }],
         ['modal-request-overtime', '/overtime', async (p) => {
             await p.getByRole('button', { name: /request overtime/i }).first().click(); await settle(p, 500);
+        }],
+        // Phase 6e: Review with nothing filled in.
+        ['modal-request-leave-error', '/time-off', async (p) => {
+            await p.getByRole('button', { name: /request leave/i }).first().click(); await settle(p, 500);
+            await p.getByRole('button', { name: 'Review' }).click(); await settle(p, 700);
         }],
     ],
 };

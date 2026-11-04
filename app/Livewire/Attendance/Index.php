@@ -6,6 +6,7 @@ use App\Enums\AttendanceStatus;
 use App\Models\DailyAttendance;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Support\AttendanceGaps;
 use App\Support\DashboardAttendance;
 use App\Support\EmployeeScope;
 use App\Support\WorkdayCalendar;
@@ -466,7 +467,9 @@ class Index extends Component
             'live' => $this->fromDate === $this->toDate && $this->fromDate === today()->format('Y-m-d')
                 ? DashboardAttendance::liveToday($this->scopedEmployeeIds())
                 : null,
-            'maxBuiltDate' => DailyAttendance::max('work_date'),
+            // F07's rule (Phase 6e follow-up): only past workdays in the range,
+            // for the people in scope, that have no row — never the future.
+            'missingDates' => AttendanceGaps::missingDates($this->scopedEmployeeIds(), Carbon::parse($this->fromDate), Carbon::parse($this->toDate)),
             'allStatuses' => AttendanceStatus::cases(),
             // Holiday names for the annotation, from the builder's own lookup.
             'holidays' => WorkdayCalendar::holidayNamesBetween(Carbon::parse($this->fromDate), Carbon::parse($this->toDate)),

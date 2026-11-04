@@ -31,7 +31,7 @@ use Carbon\Carbon;
 class HolidaySeeder extends DemoSeeder
 {
     /** [month, day, name] */
-    private const FIXED = [
+    public const FIXED = [
         [1, 1, "International New Year's Day"],
         [1, 7, 'Victory over Genocide Day'],
         [3, 8, "International Women's Day"],

@@ -134,8 +134,9 @@ divergence here would be a real correctness bug, not just a style one. --}}
                     <x-button type="submit" variant="primary">Save punch</x-button>
                 </div>
             </form>
-            <x-input-error :messages="$errors->get('newPunchDate')" class="mt-1" />
-            <x-input-error :messages="$errors->get('newPunchTime')" class="mt-1" />
-            <x-input-error :messages="$errors->get('newPunchType')" class="mt-1" />
+            {{-- Under the form, so each names its field (stampyErrors). --}}
+            <x-input-error for="new_punch_date_{{ $dayKey }}" :messages="$errors->get('newPunchDate')" class="mt-1" />
+            <x-input-error for="new_punch_time_{{ $dayKey }}" :messages="$errors->get('newPunchTime')" class="mt-1" />
+            <x-input-error for="new_punch_type_{{ $dayKey }}" :messages="$errors->get('newPunchType')" class="mt-1" />
     @endif
 </div>

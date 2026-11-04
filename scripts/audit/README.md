@@ -1,6 +1,6 @@
 # Phase 6a audit tooling — AUDIT-ONLY
 
-Throwaway tooling behind `docs/audit/UI_AUDIT.md`. None of it is app code, a seeder, a test or a dependency; delete the folder once the audit's fix slices are done.
+Throwaway tooling behind `docs/audit/UI_AUDIT.md`. None of it is app code, a seeder, a test or a dependency; delete the folder once the audit's fix slices are done — **except `playwright/focus-6d2.mjs` and the `lib.mjs` it imports, which stay** (Phase 6e): the only browser check of the modal focus rules and of validation-error focus, run before every merge (CLAUDE.md, Local environment).
 
 All PHP scripts run inside the `app` container and write to the **dev** `stampy` database.
 

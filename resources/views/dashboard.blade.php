@@ -169,13 +169,21 @@
                 <x-card class="order-1">
                     <div class="{{ $cardHeader }}">
                         <h2 class="{{ $cardTitle }}">Needs attention</h2>
-                        {{-- The real total; the list shows the most urgent 8. --}}
+                        {{-- The real total; the list shows the most urgent 8, the rest behind "Show all". --}}
                         @if ($attendance['needsAttentionTotal'] > 0)<p class="{{ $cardMeta }}">{{ $attendance['needsAttentionTotal'] }} today</p>@endif
                     </div>
                     @if (count($attendance['needsAttention']))
-                        <ul class="mt-4 divide-y divide-slate-divider">
+                        @php
+                            // Everyone the card counts is here; past the first few, the rest
+                            // open in place (Phase 6e) — no link, since Daily attendance has
+                            // no filter for these kinds together.
+                            $shown = \App\Support\DashboardAttendance::NEEDS_ATTENTION_SHOWN;
+                            $hasMore = $attendance['needsAttentionTotal'] > $shown;
+                        @endphp
+                        <div x-data="{ all: false }">
+                        <ul id="needs-attention-list" class="mt-4 divide-y divide-slate-divider">
                             @foreach ($attendance['needsAttention'] as $person)
-                                <li class="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                                <li {!! $loop->index >= $shown ? 'x-show="all" x-cloak' : '' !!} class="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
                                     <span class="{{ $avatar }}" aria-hidden="true">{{ strtoupper(substr($person['name'], 0, 1)) }}</span>
                                     <div class="min-w-0 flex-1">
                                         <p class="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{{ $person['name'] }}</p>
@@ -195,6 +203,23 @@
                                 </li>
                             @endforeach
                         </ul>
+                        @if ($hasMore)
+                            {{-- After the list, and kept in view as it opens or closes: on a
+                            phone, opening it leaves you at its end, with the rest of the
+                            dashboard just below. The same button either way, so focus stays
+                            on it; aria-expanded says which. --}}
+                            <button
+                                type="button"
+                                @click="all = ! all; $nextTick(() => $el.scrollIntoView({ block: 'nearest' }))"
+                                :aria-expanded="all.toString()"
+                                aria-controls="needs-attention-list"
+                                class="mt-3 -ml-2 inline-flex min-h-7 items-center gap-1 rounded-lg px-2 text-sm font-medium text-primary-700 transition hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:hover:bg-primary-600/35"
+                            >
+                                <span x-text="all ? 'Show less' : @js('Show all '.$attendance['needsAttentionTotal'])">Show all {{ $attendance['needsAttentionTotal'] }}</span>
+                                <x-icon name="chevron-down" class="h-5 w-5 transition" x-bind:class="all && 'rotate-180'" />
+                            </button>
+                        @endif
+                        </div>
                     @else
                         <p class="mt-4 text-sm text-slate-500 dark:text-slate-400">Nothing needs attention today.</p>
                     @endif
@@ -345,7 +370,7 @@
                                             @endif
                                         </dd>
                                     @else
-                                        <dd class="text-right text-sm text-slate-500 dark:text-slate-400">{{ 'Usable from '.\App\Support\DisplayDate::compact($balance['usableFrom']).($balance['earnedSoFar'] !== null ? ' · '.\App\Support\LeaveDays::label($balance['earnedSoFar']).' earned so far' : '') }}</dd>
+                                        <dd class="text-right text-sm text-slate-500 dark:text-slate-400">{{ $balance['usableLine'] }}</dd>
                                     @endif
                                 </div>
                             @endforeach

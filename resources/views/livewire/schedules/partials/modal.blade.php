@@ -9,13 +9,13 @@
     >
         <div class="mx-6 border-b border-slate-divider py-5">
             <x-modal.title>
-                {{ $editing ? 'Edit — '.$editing->name : 'Add Schedule' }}
+                {{ $editing ? 'Edit — '.$editing->name : 'Add schedule' }}
             </x-modal.title>
         </div>
 
         <form id="schedule-form" wire:submit="save" class="px-6 py-2">
             @error('form')
-                <div class="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-900">
+                <div role="alert" class="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-inset ring-red-200 dark:bg-red-900/20 dark:text-red-400 dark:ring-red-900">
                     {{ $message }}
                 </div>
             @enderror
@@ -93,7 +93,7 @@
                     </div>
                 </section>
 
-                <fieldset class="py-4" @disabled($editingIsLocked) @if ($editingIsLocked) aria-describedby="schedule-lock-help" @endif>
+                <fieldset id="schedule_workdays" class="py-4" @disabled($editingIsLocked) @if ($editingIsLocked) aria-describedby="schedule-lock-help" @endif>
                     <legend class="text-sm font-semibold text-slate-900 dark:text-slate-100">Workdays</legend>
                     <div class="mt-3 flex flex-wrap gap-x-4 gap-y-3">
                         @foreach ([1 => 'Mon', 2 => 'Tue', 3 => 'Wed', 4 => 'Thu', 5 => 'Fri', 6 => 'Sat', 7 => 'Sun'] as $iso => $label)
@@ -107,7 +107,7 @@
                             </label>
                         @endforeach
                     </div>
-                    <x-input-error :messages="$errors->get('workdays')" class="mt-1" />
+                    <x-input-error for="schedule_workdays" :messages="$errors->get('workdays')" class="mt-1" />
                 </fieldset>
 
                 <section class="py-4">

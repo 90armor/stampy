@@ -24,9 +24,9 @@
             <x-input-error :messages="$errors->get('password')" class="mt-2" />
         </div>
 
-        <!-- Confirm Password -->
+        <!-- Confirm password -->
         <div>
-            <x-input-label for="password_confirmation" :value="__('Confirm Password')" />
+            <x-input-label for="password_confirmation" :value="__('Confirm password')" />
 
             <x-text-input id="password_confirmation" class="block mt-1 w-full"
                                 type="password"
@@ -36,7 +36,7 @@
         </div>
 
         <x-button type="submit" variant="primary" class="w-full">
-            {{ __('Reset Password') }}
+            {{ __('Reset password') }}
         </x-button>
     </form>
 </x-guest-layout>
