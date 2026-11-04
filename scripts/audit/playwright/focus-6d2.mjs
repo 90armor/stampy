@@ -319,7 +319,8 @@ await withBrowser(async (b) => {
             check('cancel: a claim filed to cancel', !! filed, filed ?? 'every candidate day was refused');
             if (filed) {
                 await p.goto(`${BASE}/overtime`, { waitUntil: 'networkidle' });
-                const cancel = p.locator('button[aria-label^="Cancel overtime request"]', { hasText: 'Cancel' }).first();
+                // The page has each request twice — the phone list and the table — one of them hidden.
+                const cancel = p.locator('button[aria-label^="Cancel overtime request"]:visible').first();
                 check('cancel: a pending claim offers Cancel', await cancel.isVisible());
                 const label = await cancel.getAttribute('aria-label');
                 await cancel.focus(); await p.keyboard.press('Enter'); await settle(p, 400);
@@ -327,11 +328,11 @@ await withBrowser(async (b) => {
                 const text = (await dialog.first().innerText()).replace(/\s+/g, ' ');
                 check('cancel: the confirmation reads as leave\'s does', text.includes('Cancel this overtime request?') && text.includes('Keep request') && text.includes('Cancel request'), text.slice(0, 160));
                 await p.getByRole('button', { name: 'Keep request' }).click(); await settle(p, 400);
-                check('cancel: Keep request keeps it, focus back on its Cancel', await p.locator(`button[aria-label="${label}"]`).count() === 1 && (await active(p)) === `button:${label}`, await active(p));
-                await p.locator(`button[aria-label="${label}"]`).click(); await settle(p, 400);
+                check('cancel: Keep request keeps it, focus back on its Cancel', await p.locator(`button[aria-label="${label}"]:visible`).count() === 1 && (await active(p)) === `button:${label}`, await active(p));
+                await p.locator(`button[aria-label="${label}"]:visible`).click(); await settle(p, 400);
                 await p.getByRole('button', { name: 'Cancel request' }).click(); await settle(p, 900);
                 const after = await active(p);
-                check('cancel: Cancel request cancels it, focus on the notice', after.startsWith('div[notice]:Cancelled your overtime request') && await p.locator(`button[aria-label="${label}"]`).count() === 0, after);
+                check('cancel: Cancel request cancels it, focus on the notice', after.startsWith('div[notice]:Cancelled your overtime request') && await p.locator(`button[aria-label="${label}"]:visible`).count() === 0, after);
             }
             await c.close();
         }

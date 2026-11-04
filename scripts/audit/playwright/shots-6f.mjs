@@ -74,7 +74,7 @@ await withBrowser(async (b) => {
             if (claim) {
                 const { c, p } = await open(b, states[claim.user], theme, width);
                 await p.goto(`${BASE}/overtime`, { waitUntil: 'networkidle' });
-                const cancel = p.locator(`button[aria-label="${claim.label}"]`);
+                const cancel = p.locator(`button[aria-label="${claim.label}"]:visible`);
                 await cancel.scrollIntoViewIfNeeded(); await p.waitForTimeout(200);
                 await shot(p, 'f14-overtime-pending-claim-cancel');
                 await cancel.click(); await settle(p, 400);
