@@ -217,7 +217,7 @@ class PhoneErgonomicsTest extends TestCase
         $html = Livewire::actingAs($this->admin())->test(EmployeesIndex::class)->html();
 
         // Truncated by CSS only: the full name is still the cell's text.
-        $this->assertMatchesRegularExpression('/<td class="max-w-\[12rem\] truncate [^"]*">Human Resources and Administration Department<\/td>/', $html);
+        $this->assertMatchesRegularExpression('/<td class="truncate [^"]*max-xl:max-w-\[12rem\]">Human Resources and Administration Department<\/td>/', $html);
         $this->assertStringContainsString('<div class="w-max max-w-[14rem]">', $html);
     }
 }

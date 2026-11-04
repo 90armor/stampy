@@ -158,10 +158,11 @@
                                 </div>
                             </td>
                             {{-- One line (F32): a long department wrapped to four lines at
-                            1024 and made rows jump. Truncated by CSS only, so the full name
-                            is still the cell's text for a screen reader, and it's on the
-                            profile. --}}
-                            <td class="max-w-[12rem] truncate px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{{ $employee->department->name }}</td>
+                            1024 and made rows jump. Capped while the table scrolls (below xl);
+                            from xl there's room, so it shows in full as before. Truncated by
+                            CSS only, so the full name is still the cell's text for a screen
+                            reader, and it's on the profile. --}}
+                            <td class="truncate px-6 py-4 text-sm text-slate-700 dark:text-slate-300 max-xl:max-w-[12rem]">{{ $employee->department->name }}</td>
                             <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{{ $employee->position->name }}</td>
                             <td class="whitespace-nowrap px-6 py-4 text-sm tabular-nums text-slate-500 dark:text-slate-400">{{ \App\Support\DisplayDate::compact($employee->join_date) }}</td>
                             <td class="table-pin table-pin-start px-6 py-4">

@@ -1,7 +1,9 @@
 // AUDIT-ONLY (Phase 6d2): the modal focus rules in a real browser — the repo has
 // no browser runner in its suite, and focus can't be checked from PHP. One check
 // per close rule (notice, trigger, heading, <main>), never another row's Approve,
-// the trap, step changes, names. It submits and decides real requests on the dev
+// the trap, step changes, names; since Phase 6f also Daily attendance's Filters
+// disclosure and the overtime cancel confirmation. It submits, decides and
+// cancels real requests on the dev
 // database: reseed afterwards. Needs the demo seed + seed-personas.php +
 // stress-employees.php. Exits 1 on any failure.
 import { BASE, login, themedContext, withBrowser } from './lib.mjs';
