@@ -151,13 +151,15 @@
                                 @endforeach
                                 <td class="{{ $cell }} whitespace-nowrap">{{ $s['total_worked_minutes'] > 0 ? Duration::format($s['total_worked_minutes']) : '—' }}</td>
                                 <td class="{{ $cell }}">{{ $s['not_calculated'] }}</td>
+                                {{-- On paper a link is noise: the chevron goes; its empty column keeps the
+                                right edge the row's divider is inset from. --}}
                                 <td class="px-1 py-2 text-right">
                                     @unless ($row['total'])
                                         <a
                                             href="{{ route('attendance.show', ['employee' => $employee, 'month' => $month]) }}"
                                             wire:navigate
                                             aria-label="View attendance for {{ $employee->full_name }}, {{ $monthLabel }}"
-                                            class="-my-1 ml-auto inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-primary-600/35 dark:hover:text-primary-300"
+                                            class="-my-1 ml-auto inline-flex h-10 w-10 print:!hidden items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-primary-600/35 dark:hover:text-primary-300"
                                         >
                                             <x-icon name="chevron-right" class="h-5 w-5" />
                                         </a>

@@ -2,11 +2,14 @@
 // no browser runner in its suite, and focus can't be checked from PHP. One check
 // per close rule (notice, trigger, heading, <main>), never another row's Approve,
 // the trap, step changes, names; since Phase 6f also Daily attendance's Filters
-// disclosure and the overtime cancel confirmation. It submits, decides and
+// disclosure and the overtime cancel confirmation; since Phase 6g the file-for
+// title naming the chosen employee (F28) and a punch correction's missing
+// reason (F34). It submits, decides and
 // cancels real requests on the dev
 // database: reseed afterwards. Needs the demo seed + seed-personas.php +
 // stress-employees.php. Exits 1 on any failure.
-import { BASE, login, themedContext, withBrowser } from './lib.mjs';
+import { BASE, REPO, login, themedContext, withBrowser } from './lib.mjs';
+import { execSync } from 'node:child_process';
 
 const settle = async (p, ms = 500) => { await p.waitForLoadState('networkidle').catch(() => {}); await p.waitForTimeout(ms); };
 const active = (p) => p.evaluate(() => {
@@ -334,6 +337,62 @@ await withBrowser(async (b) => {
                 const after = await active(p);
                 check('cancel: Cancel request cancels it, focus on the notice', after.startsWith('div[notice]:Cancelled your overtime request') && await p.locator(`button[aria-label="${label}"]:visible`).count() === 0, after);
             }
+            await c.close();
+        }
+
+        // Phase 6g, F34: Add punch and Void each need a reason; a missing one
+        // takes focus, marked invalid and described by its message. Nothing is
+        // written: every submit here fails validation.
+        {
+            const kyaw = execSync(`docker compose exec -T app php artisan tinker --execute="echo App\\Models\\Employee::where('employee_code', 'EMP-0002')->value('id');"`, { cwd: REPO }).toString().trim().split('\n').pop();
+            const { c, p } = await page(b, admin, 'light', width);
+            await p.goto(`${BASE}/attendance/${kyaw}`, { waitUntil: 'networkidle' });
+            // The month's first Present day: a past day with punches to void.
+            const cell = p.locator(`[wire\\:click^="openDay('"][aria-label*="Present"]`).first();
+            const day = (await cell.getAttribute('wire:click')).match(/'([\d-]+)'/)[1];
+            await cell.click(); await settle(p, 600);
+            check('reason: the day modal opens on Add punch', (await active(p)).startsWith('button:Add punch'), await active(p));
+            await p.keyboard.press('Enter'); await settle(p, 600);
+            await p.evaluate((id) => { const el = document.getElementById(`${id}-native`); el.value = '07:42'; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }, `new_punch_time_${day}`);
+            await settle(p, 300);
+            await p.getByRole('dialog').getByRole('button', { name: 'Save punch' }).click(); await settle(p, 900);
+            const added = await invalidState(p, `new_punch_reason_${day}`);
+            check('reason: Save punch with none → focus on the reason', added.focused, await active(p));
+            check('reason: the reason is aria-invalid and says what to write', added.invalid === 'true' && added.message === 'Write a reason for this change.', JSON.stringify(added));
+            await p.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click(); await settle(p, 500);
+            const voids = p.getByRole('dialog').getByRole('button', { name: /^Void the / });
+            if (await voids.count()) {
+                const id = await p.evaluate(() => [...document.querySelectorAll('[role=dialog] button[wire\\:click^="startVoiding("]')].find((e) => e.getClientRects().length)?.getAttribute('wire:click').match(/\d+/)[0]);
+                await voids.first().click(); await settle(p, 700);
+                check('reason: Void opens its form, focus in the reason', (await active(p)).startsWith(`input:void_reason_${id}`) || await p.evaluate((i) => document.activeElement?.id === `void_reason_${i}`, id), await active(p));
+                await p.getByRole('dialog').getByRole('button', { name: 'Void punch' }).click(); await settle(p, 900);
+                const voided = await invalidState(p, `void_reason_${id}`);
+                check('reason: Void punch with none → focus on the reason, nothing voided', voided.focused && voided.invalid === 'true' && voided.message === 'Write a reason for this change.' && await p.getByRole('dialog').getByRole('button', { name: 'Void punch' }).isVisible(), JSON.stringify(voided));
+                await p.keyboard.press('Escape'); await settle(p, 500);
+                check('reason: Escape after an error closes the modal', (await p.getByRole('dialog').count()) === 0 || ! await p.getByRole('dialog').isVisible());
+            } else {
+                check('reason: a punch to void on a Present day', false, `no punch on ${day}`);
+            }
+            await c.close();
+        }
+
+        // Phase 6g, F28: filing for someone names them once chosen, and choosing
+        // focuses the title (6d2: the chosen result is gone, so the title).
+        {
+            const { c, p } = await page(b, admin, 'light', width);
+            await p.goto(`${BASE}/time-off`, { waitUntil: 'networkidle' });
+            await p.getByRole('button', { name: /file for an employee/i }).first().click(); await settle(p);
+            const title = () => p.evaluate(() => { const d = [...document.querySelectorAll('[role=dialog][aria-labelledby]')].find((e) => e.getClientRects().length); return document.getElementById(d?.getAttribute('aria-labelledby'))?.textContent.trim(); });
+            const line = p.getByRole('dialog').getByText('Filed by you — approved straight away, no approval steps.');
+            check('file for: the line shows from the first step', await line.isVisible());
+            await p.keyboard.type('Su Su Hl'); await settle(p, 900);
+            const result = p.getByRole('dialog').getByRole('button', { name: /Su Su Hlaing/ }).first();
+            await result.focus(); await p.keyboard.press('Enter'); await settle(p, 800);
+            check('file for: choosing names the dialog', (await title()) === 'File leave for Su Su Hlaing', await title());
+            check('file for: choosing focuses the title', (await active(p)).startsWith('h2[title]:File leave for Su Su Hlaing'), await active(p));
+            check('file for: the line still shows', await line.isVisible());
+            await p.getByRole('dialog').getByRole('button', { name: 'Change' }).click(); await settle(p, 700);
+            check('file for: Change brings back the generic title', (await title()) === 'File leave for an employee', await title());
             await c.close();
         }
 

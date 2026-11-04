@@ -172,13 +172,15 @@
                                 @else
                                     <td class="{{ $cell }}">{{ $days($figures['used']) }}</td>
                                 @endif
+                                {{-- On paper a link is noise: the chevron goes; its empty column keeps the
+                                right edge the row's divider is inset from. --}}
                                 <td class="px-1 py-2 text-right">
                                     @unless ($row['total'])
                                         <a
                                             href="{{ route('employees.show', $employee) }}#leave"
                                             wire:navigate
                                             aria-label="View leave for {{ $employee->full_name }}"
-                                            class="-my-1 ml-auto inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-primary-600/35 dark:hover:text-primary-300"
+                                            class="-my-1 ml-auto inline-flex h-10 w-10 print:!hidden items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-primary-600/35 dark:hover:text-primary-300"
                                         >
                                             <x-icon name="chevron-right" class="h-5 w-5" />
                                         </a>

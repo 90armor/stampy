@@ -261,8 +261,24 @@ input:-webkit-autofill:focus {
         -webkit-mask-image: none !important;
         mask-image: none !important;
     }
+    /* Compact, so a page holds a useful number of rows: smaller type, tighter
+       rows, and an Employee column wide enough that a department doesn't
+       wrap onto three lines. */
     [data-report] table {
         min-width: 0 !important;
+        font-size: 8pt;
+    }
+    [data-report] table .text-xs {
+        font-size: 7pt;
+    }
+    [data-report] th,
+    [data-report] td {
+        padding-top: 0.3rem !important;
+        padding-bottom: 0.3rem !important;
+    }
+    [data-report] .table-pin-lead {
+        width: 15rem !important;
+        min-width: 15rem !important;
     }
     [data-report] thead {
         display: table-header-group;
