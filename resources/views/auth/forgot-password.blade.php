@@ -1,7 +1,7 @@
 <x-guest-layout>
     <x-slot:pageTitle>Reset your password</x-slot:pageTitle>
 
-    <a href="{{ route('login') }}" wire:navigate class="mb-6 inline-flex items-center gap-x-1 text-sm font-semibold text-primary-700 hover:text-primary-800 dark:text-accent-300 dark:hover:text-accent-200">
+    <a href="{{ route('login') }}" wire:navigate class="-my-3 mb-3 inline-flex min-h-11 items-center gap-x-1 rounded-lg text-sm font-semibold text-primary-700 hover:text-primary-800 dark:text-accent-300 dark:hover:text-accent-200">
         <x-icon name="chevron-right" class="w-5 h-5 rotate-180" />
         Back to sign in
     </a>
@@ -24,11 +24,11 @@
             <!-- Username or email -->
             <div>
                 <x-input-label for="email" :value="__('Username or email')" />
-                <x-text-input id="email" class="block mt-1 w-full" type="text" name="email" :value="old('email')" required autofocus autocomplete="username" placeholder="Your username or email" />
+                <x-text-input id="email" class="block mt-1 min-h-11 w-full" type="text" name="email" :value="old('email')" required autofocus autocomplete="username" placeholder="Your username or email" />
                 <x-input-error :messages="$errors->get('email')" class="mt-2" />
             </div>
 
-            <x-button type="submit" variant="primary" class="w-full">
+            <x-button type="submit" variant="primary" class="min-h-11 w-full">
                 {{ __('Send reset link') }}
                 <x-icon name="chevron-right" class="w-5 h-5" />
             </x-button>

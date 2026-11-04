@@ -213,7 +213,7 @@
                                 @click="all = ! all; $nextTick(() => $el.scrollIntoView({ block: 'nearest' }))"
                                 :aria-expanded="all.toString()"
                                 aria-controls="needs-attention-list"
-                                class="mt-3 -ml-2 inline-flex min-h-7 items-center gap-1 rounded-lg px-2 text-sm font-medium text-primary-700 transition hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:hover:bg-primary-600/35"
+                                class="mt-3 -ml-2 inline-flex min-h-7 max-sm:min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-medium text-primary-700 transition hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:hover:bg-primary-600/35"
                             >
                                 <span x-text="all ? 'Show less' : @js('Show all '.$attendance['needsAttentionTotal'])">Show all {{ $attendance['needsAttentionTotal'] }}</span>
                                 <x-icon name="chevron-down" class="h-5 w-5 transition" x-bind:class="all && 'rotate-180'" />
@@ -378,7 +378,7 @@
                     @else
                         <p class="mt-4 text-sm text-slate-500 dark:text-slate-400">No leave balances yet.</p>
                     @endif
-                    <div class="mt-4"><a href="{{ route('time-off.index') }}" wire:navigate class="{{ $link }}">Request leave on Time off</a></div>
+                    <div class="mt-4"><a href="{{ route('time-off.index') }}" wire:navigate class="{{ $link }} max-sm:-my-3 max-sm:inline-flex max-sm:min-h-11 max-sm:items-center">Request leave on Time off</a></div>
                 </x-card>
             </div>
 
@@ -424,7 +424,7 @@
                             @endif
                         </ul>
                         <div class="mt-4 flex flex-wrap gap-x-4 gap-y-2">
-                            <a href="{{ route('time-off.index') }}" wire:navigate class="{{ $link }}">See all requests on Time off</a>
+                            <a href="{{ route('time-off.index') }}" wire:navigate class="{{ $link }} max-sm:-my-3 max-sm:inline-flex max-sm:min-h-11 max-sm:items-center">See all requests on Time off</a>
                             @if (count($mine['overtime']))
                                 <a href="{{ route('overtime.index') }}" wire:navigate class="{{ $link }}">See overtime</a>
                             @endif

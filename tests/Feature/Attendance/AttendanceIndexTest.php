@@ -461,14 +461,18 @@ class AttendanceIndexTest extends TestCase
             ->set('toDate', '2026-03-02')
             ->html();
 
+        // One link per rendering of the row: the table's (from sm) and the
+        // phone card's (below sm, Phase 6f) — only one of them is ever shown.
         $href = route('attendance.show', $employee).'?month=2026-03';
-        $this->assertSame(1, substr_count($html, 'href="'.$href.'"'));
-        $this->assertStringContainsString('aria-label="View attendance for Chevron Chan, Mon 2 Mar"', $html);
-        // The name is plain text, not a link.
+        $this->assertSame(2, substr_count($html, 'href="'.$href.'"'));
+        $this->assertSame(2, substr_count($html, 'aria-label="View attendance for Chevron Chan, Mon 2 Mar"'));
+        // The name is plain text, not a link, in both.
         $this->assertMatchesRegularExpression('/<div class="whitespace-nowrap text-sm font-medium text-slate-900 dark:text-slate-100">Chevron Chan<\/div>/', $html);
+        $this->assertMatchesRegularExpression('/<p class="break-words text-sm font-medium text-slate-900 dark:text-slate-100">Chevron Chan<\/p>/', $html);
         $this->assertStringNotContainsString('text-primary-700 underline', $html);
-        // 40px target.
+        // A 40px target in the table, 44px on the card.
         $this->assertStringContainsString('inline-flex h-10 w-10', $html);
+        $this->assertStringContainsString('inline-flex h-11 w-11', $html);
         // The shared tooltip, shown on hover and on keyboard focus; never a
         // native title, and the aria-label stays the accessible name.
         $this->assertMatchesRegularExpression('/<span role="tooltip" class="[^"]*group-hover\/action:opacity-100 group-focus-within\/action:opacity-100[^"]*">View attendance details<\/span>/', $html);

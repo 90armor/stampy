@@ -13,7 +13,7 @@
         <div>
             <x-input-label for="password" :value="__('Password')" />
 
-            <x-text-input id="password" class="block mt-1 w-full"
+            <x-text-input id="password" class="block mt-1 min-h-11 w-full"
                             type="password"
                             name="password"
                             required autocomplete="current-password" />
@@ -21,7 +21,7 @@
             <x-input-error :messages="$errors->get('password')" class="mt-2" />
         </div>
 
-        <x-button type="submit" variant="primary" class="w-full">
+        <x-button type="submit" variant="primary" class="min-h-11 w-full">
             {{ __('Confirm') }}
         </x-button>
     </form>

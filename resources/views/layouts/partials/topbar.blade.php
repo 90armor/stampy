@@ -3,7 +3,7 @@
     {{-- Below lg the sidebar is a drawer, so its Approvals badge is hidden until
     opened: a dot on the menu button says something is waiting (Phase 3e). --}}
     {{-- The Approvals page refreshes the count after every decision (approval-badge). --}}
-    <button type="button" class="relative rounded-lg p-2 text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:hidden dark:text-slate-400" @click="openSidebar()"
+    <button type="button" class="relative rounded-lg p-2 max-sm:p-2.5 text-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:hidden dark:text-slate-400" @click="openSidebar()"
         x-data="{ waiting: {{ $waiting }} }" x-on:approval-badge.window="waiting = $event.detail.count">
         <span class="sr-only" x-text="'Open sidebar' + (waiting > 0 ? ' — ' + waiting + (waiting === 1 ? ' approval' : ' approvals') + ' waiting' : '')">Open sidebar{{ $waiting > 0 ? ' — '.$waiting.' '.Str::plural('approval', $waiting).' waiting' : '' }}</span>
         <x-icon name="bars-3" class="w-6 h-6" />
@@ -42,7 +42,7 @@
                 x-data="{ isDark: document.documentElement.classList.contains('dark') }"
                 x-on:livewire:navigated.window="isDark = document.documentElement.classList.contains('dark')"
                 @click="document.documentElement.classList.toggle('dark'); isDark = document.documentElement.classList.contains('dark'); localStorage.setItem('theme', isDark ? 'dark' : 'light')"
-                class="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-600/30 dark:hover:text-slate-200"
+                class="rounded-lg p-2 max-sm:p-3 text-slate-500 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-slate-600/30 dark:hover:text-slate-200"
                 :aria-label="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
             >
                 <x-icon name="sun" class="w-5 h-5 hidden dark:block" />

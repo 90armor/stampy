@@ -148,13 +148,20 @@
                                     <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-750 dark:text-slate-300">
                                         {{ strtoupper(substr($employee->full_name, 0, 1)) }}
                                     </span>
-                                    <div class="min-w-0">
-                                        <a href="{{ route('employees.show', $employee) }}" wire:navigate class="rounded font-medium whitespace-nowrap text-primary-700 underline decoration-1 decoration-primary-300 underline-offset-2 transition hover:decoration-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:decoration-primary-700 dark:hover:decoration-primary-400">{{ $employee->full_name }}</a>
+                                    {{-- As wide as the name, so the table can't squeeze it onto two lines;
+                                    a long name wraps at 14rem instead of widening the column
+                                    under the pinned Status (F32). --}}
+                                    <div class="w-max max-w-[14rem]">
+                                        <a href="{{ route('employees.show', $employee) }}" wire:navigate class="rounded font-medium text-primary-700 underline decoration-1 decoration-primary-300 underline-offset-2 transition hover:decoration-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:decoration-primary-700 dark:hover:decoration-primary-400">{{ $employee->full_name }}</a>
                                         <div class="text-sm text-slate-500 dark:text-slate-400">{{ $employee->employee_code }}</div>
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{{ $employee->department->name }}</td>
+                            {{-- One line (F32): a long department wrapped to four lines at
+                            1024 and made rows jump. Truncated by CSS only, so the full name
+                            is still the cell's text for a screen reader, and it's on the
+                            profile. --}}
+                            <td class="max-w-[12rem] truncate px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{{ $employee->department->name }}</td>
                             <td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">{{ $employee->position->name }}</td>
                             <td class="whitespace-nowrap px-6 py-4 text-sm tabular-nums text-slate-500 dark:text-slate-400">{{ \App\Support\DisplayDate::compact($employee->join_date) }}</td>
                             <td class="table-pin table-pin-start px-6 py-4">

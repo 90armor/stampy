@@ -3,6 +3,7 @@
 namespace Tests\Feature\Overtime;
 
 use App\Enums\OvertimeCompensation;
+use App\Enums\OvertimeStatus;
 use App\Livewire\Leave\Approvals;
 use App\Models\Employee;
 use App\Models\Leave;
@@ -163,12 +164,19 @@ class OvertimeApprovalsTest extends TestCase
         $this->assertFalse($can($this->employee->user, 'approve', $request));
         $this->assertFalse($can($otherManager->user, 'approve', $request));
 
-        // cancel: the requester before it starts, an admin any time; not the manager.
+        // cancel: the requester while it's pending, even once it has started
+        // (Phase 6f, F14), and an approved one before it starts; an admin any
+        // time; never the manager or a colleague.
         $this->assertTrue($can($this->employee->user, 'cancel', $request));
         $this->assertTrue($can($this->admin, 'cancel', $request));
         $this->assertFalse($can($this->manager->user, 'cancel', $request));
+        $this->assertFalse($can($colleague->user, 'cancel', $request));
 
         $this->travelTo(Carbon::parse('2026-06-16 17:00:00'));
+        $this->assertTrue($can($this->employee->user, 'cancel', $request->fresh()));
+        $this->assertTrue($can($this->admin, 'cancel', $request->fresh()));
+
+        $request->forceFill(['status' => OvertimeStatus::Approved, 'current_step' => null])->save();
         $this->assertFalse($can($this->employee->user, 'cancel', $request->fresh()));
         $this->assertTrue($can($this->admin, 'cancel', $request->fresh()));
     }

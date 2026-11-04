@@ -53,8 +53,13 @@ class OvertimePolicy
     }
 
     /**
-     * A pending or approved request: by the requester (the employee it's for)
-     * before its window starts, by an admin at any time.
+     * A pending or approved request. An admin at any time. The requester (the
+     * employee it's for): a pending one at any time, at either step, until the
+     * final decision — a claim's window has always started, so the start-time
+     * rule left no way to withdraw one filed by mistake (F14, owner, Phase 6f);
+     * an approved one only before its window starts. A request an admin filed
+     * on their behalf is approved on submit, so it follows the approved rule,
+     * as leave filed on someone's behalf does.
      */
     public function cancel(User $user, OvertimeRequest $request): bool
     {
@@ -66,6 +71,10 @@ class OvertimePolicy
             return true;
         }
 
-        return $user->employee?->is($request->employee) === true && now()->lt($request->starts_at);
+        if ($user->employee?->is($request->employee) !== true) {
+            return false;
+        }
+
+        return $request->status === OvertimeStatus::Pending || now()->lt($request->starts_at);
     }
 }

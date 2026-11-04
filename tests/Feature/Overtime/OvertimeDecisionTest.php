@@ -295,24 +295,56 @@ class OvertimeDecisionTest extends TestCase
 
     // ── Cancelling ──────────────────────────────────────────────────────
 
-    public function test_the_requester_cancels_before_the_window_starts_and_an_admin_any_time(): void
+    /**
+     * Phase 6f, F14: the requester cancels a pending request at any time, at
+     * either step, until the final decision; an approved one only before its
+     * window starts; an admin any time. The service enforces it, not only the UI.
+     */
+    public function test_the_requester_cancels_a_pending_request_any_time_and_an_approved_one_before_it_starts(): void
     {
         $tonight = $this->file('2026-06-15', '17:00', '19:00');
         $this->service->cancel($tonight, $this->employee->user);
         $this->assertSame(OvertimeStatus::Cancelled, $tonight->fresh()->status);
         $this->assertSame($this->employee->user_id, $tonight->fresh()->cancelled_by);
 
+        // A claim: its window has started, it's still pending — at step 1, then at step 2.
+        $claim = $this->file('2026-06-12', '17:00', '19:00');
+        $this->service->cancel($claim, $this->employee->user);
+        $this->assertSame(OvertimeStatus::Cancelled, $claim->fresh()->status);
+
+        $atStepTwo = $this->file('2026-06-11', '17:00', '19:00');
+        $this->service->approve($atStepTwo, $this->manager->user);
+        $this->assertSame(2, $atStepTwo->fresh()->current_step);
+        $this->service->cancel($atStepTwo->fresh(), $this->employee->user);
+        $this->assertSame(OvertimeStatus::Cancelled, $atStepTwo->fresh()->status);
+
+        // Approved, then the window starts: only an admin can cancel it now.
         $started = $this->file('2026-06-16', '17:00', '19:00');
+        $this->service->approve($started, $this->manager->user);
+        $this->service->approve($started->fresh(), $this->admin);
+        $this->assertSame(OvertimeStatus::Approved, $started->fresh()->status);
         $this->travelTo(Carbon::parse('2026-06-16 17:00:00'));
 
         try {
-            $this->service->cancel($started, $this->employee->user);
-            $this->fail('The requester cancelled after the window started.');
+            $this->service->cancel($started->fresh(), $this->employee->user);
+            $this->fail('The requester cancelled an approved request after its window started.');
         } catch (AuthorizationException) {
         }
 
-        $this->service->cancel($started, $this->admin);
+        $this->service->cancel($started->fresh(), $this->admin);
         $this->assertSame(OvertimeStatus::Cancelled, $started->fresh()->status);
+    }
+
+    /** Filed by an admin on their behalf: approved on submit, so the approved rule — as leave filed on someone's behalf. */
+    public function test_a_request_an_admin_filed_for_them_follows_the_approved_rule(): void
+    {
+        $tomorrow = $this->file('2026-06-16', '17:00', '19:00', actor: $this->admin);
+        $this->assertSame(OvertimeStatus::Approved, $tomorrow->status);
+        $this->assertTrue($this->employee->user->can('cancel', $tomorrow));
+
+        $claim = $this->file('2026-06-12', '17:00', '19:00', actor: $this->admin);
+        $this->assertFalse($this->employee->user->can('cancel', $claim));
+        $this->assertTrue($this->admin->can('cancel', $claim));
     }
 
     /**
