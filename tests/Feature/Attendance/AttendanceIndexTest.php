@@ -284,6 +284,40 @@ class AttendanceIndexTest extends TestCase
             ->assertSeeHtml('<strong>Tue 10 Mar</strong>');
     }
 
+    public function test_the_notice_names_only_missing_days_of_people_the_filters_show(): void
+    {
+        // Mon 9 and Tue 10 Mar are past workdays. Shown Person has both rows;
+        // Hidden Person, in another department, has none.
+        $this->travelTo(Carbon::parse('2026-03-11 12:00:00'));
+        $shownDepartment = Department::factory()->create(['name' => 'Shown Dept']);
+        $hiddenDepartment = Department::factory()->create(['name' => 'Hidden Dept']);
+        $shown = Employee::factory()->create(['full_name' => 'Shown Person', 'employee_code' => 'AUD-001', 'department_id' => $shownDepartment->id]);
+        Employee::factory()->create(['full_name' => 'Hidden Person', 'employee_code' => 'STR-001', 'department_id' => $hiddenDepartment->id]);
+        $this->attendanceRowForEmployee($shown, '2026-03-09', AttendanceStatus::Present);
+        $this->attendanceRowForEmployee($shown, '2026-03-10', AttendanceStatus::Present);
+
+        $page = Livewire::actingAs($this->admin())
+            ->test(Index::class)
+            ->set('fromDate', '2026-03-09')
+            ->set('toDate', '2026-03-10');
+
+        // Unfiltered, Hidden Person's days are missing.
+        $page->assertSeeHtml('<strong>Mon 9 Mar and Tue 10 Mar</strong>');
+
+        // A search or a department that leaves them out: no notice.
+        $page->set('employeeFilter', 'AUD')->assertDontSee('been calculated for');
+        $page->set('employeeFilter', '')->set('departmentFilter', (string) $shownDepartment->id)->assertDontSee('been calculated for');
+
+        // One that includes them still warns.
+        $page->set('departmentFilter', (string) $hiddenDepartment->id)->assertSeeHtml('<strong>Mon 9 Mar and Tue 10 Mar</strong>');
+
+        // A status chip doesn't hide it — a missing workday could become Absent…
+        $page->call('toggleStatus', 'absent')->assertSeeHtml('<strong>Mon 9 Mar and Tue 10 Mar</strong>');
+
+        // …but never Holiday, so a Holiday-only selection gets no notice.
+        $page->call('toggleStatus', 'absent')->call('toggleStatus', 'holiday')->assertDontSee('been calculated for');
+    }
+
     public function test_admin_sees_every_employees_attendance(): void
     {
         $admin = $this->admin();
