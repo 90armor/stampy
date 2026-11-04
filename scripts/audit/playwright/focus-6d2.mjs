@@ -1,7 +1,9 @@
 // AUDIT-ONLY (Phase 6d2): the modal focus rules in a real browser — the repo has
 // no browser runner in its suite, and focus can't be checked from PHP. One check
 // per close rule (notice, trigger, heading, <main>), never another row's Approve,
-// the trap, step changes, names. It submits and decides real requests on the dev
+// the trap, step changes, names; since Phase 6f also Daily attendance's Filters
+// disclosure and the overtime cancel confirmation. It submits, decides and
+// cancels real requests on the dev
 // database: reseed afterwards. Needs the demo seed + seed-personas.php +
 // stress-employees.php. Exits 1 on any failure.
 import { BASE, login, themedContext, withBrowser } from './lib.mjs';
@@ -270,6 +272,68 @@ await withBrowser(async (b) => {
             await p.evaluate(() => { const e = document.activeElement; e.blur(); const s = document.createElement('span'); document.querySelector('[role=dialog] [data-modal-title]').after(s); });
             await p.waitForTimeout(100);
             check('trap: a re-render with focus on <body> comes back', await inDialog(), await active(p));
+            await c.close();
+        }
+
+        // Phase 6f: Daily attendance's Filters disclosure — a phone only.
+        {
+            const { c, p } = await page(b, manager, 'light', width);
+            await p.goto(`${BASE}/attendance`, { waitUntil: 'networkidle' });
+            const button = p.getByRole('button', { name: /^Filters/ });
+            const search = p.locator('#attendance-search');
+            if (width < 640) {
+                check('filters: closed on load, search hidden', (await button.getAttribute('aria-expanded')) === 'false' && ! await search.isVisible());
+                await button.focus(); await p.keyboard.press('Enter'); await settle(p, 300);
+                check('filters: Enter opens it, focus stays on the button', (await button.getAttribute('aria-expanded')) === 'true' && await search.isVisible() && (await active(p)).startsWith('button:Filters'), await active(p));
+                await p.getByRole('button', { name: 'Late arrival' }).click(); await settle(p, 700);
+                check('filters: still open after a chip re-renders the page, and counts it', (await button.getAttribute('aria-expanded')) === 'true' && await search.isVisible() && (await button.innerText()).trim() === 'Filters (1)', (await button.innerText()).trim());
+                check('filters: Reset filters shows while one is set', await p.getByRole('button', { name: 'Reset filters' }).isVisible());
+                await button.focus(); await p.keyboard.press('Enter'); await settle(p, 300);
+                check('filters: Enter closes it, focus stays on the button', (await button.getAttribute('aria-expanded')) === 'false' && ! await search.isVisible() && (await active(p)).startsWith('button:Filters'), await active(p));
+                check('filters: the cards replace the table', await p.locator('ul[aria-label="Attendance records"]').isVisible() && ! await p.getByRole('region', { name: 'Daily attendance' }).isVisible());
+            } else {
+                check('filters: no disclosure from 640px, every filter shows', ! await button.isVisible() && await search.isVisible() && await p.getByRole('button', { name: 'Late arrival' }).isVisible());
+                check('filters: the table, not the cards', await p.getByRole('region', { name: 'Daily attendance' }).isVisible() && ! await p.locator('ul[aria-label="Attendance records"]').isVisible());
+            }
+            await c.close();
+        }
+
+        // Phase 6f, F14: a pending claim can be cancelled, behind "Keep request / Cancel request".
+        {
+            const { c, p } = await page(b, employee, 'light', width);
+            const fill = (id, value) => p.evaluate(([i, v]) => { const el = document.getElementById(`${i}-native`); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }, [id, value]);
+            let filed = null;
+            for (let back = width === 1440 ? 1 : 2, tries = 0; tries < 6 && ! filed; back += 2, tries++) {
+                const day = new Date(Date.now() - 86400000 * back);
+                if ([0, 6].includes(day.getDay())) continue;
+                const iso = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`;
+                await p.goto(`${BASE}/overtime`, { waitUntil: 'networkidle' });
+                await p.getByRole('button', { name: /request overtime/i }).first().click(); await settle(p);
+                await fill('overtime_date', iso); await fill('overtime_start', '18:00'); await fill('overtime_end', '18:30'); await settle(p, 300);
+                await p.getByRole('dialog').getByRole('button', { name: 'Review' }).click(); await settle(p, 700);
+                if (await p.getByRole('button', { name: /submit request/i }).count()) {
+                    await p.getByRole('button', { name: /submit request/i }).click(); await settle(p, 1000);
+                    filed = iso;
+                }
+            }
+            check('cancel: a claim filed to cancel', !! filed, filed ?? 'every candidate day was refused');
+            if (filed) {
+                await p.goto(`${BASE}/overtime`, { waitUntil: 'networkidle' });
+                // The page has each request twice — the phone list and the table — one of them hidden.
+                const cancel = p.locator('button[aria-label^="Cancel overtime request"]:visible').first();
+                check('cancel: a pending claim offers Cancel', await cancel.isVisible());
+                const label = await cancel.getAttribute('aria-label');
+                await cancel.focus(); await p.keyboard.press('Enter'); await settle(p, 400);
+                const dialog = p.getByRole('alertdialog').or(p.getByRole('dialog'));
+                const text = (await dialog.first().innerText()).replace(/\s+/g, ' ');
+                check('cancel: the confirmation reads as leave\'s does', text.includes('Cancel this overtime request?') && text.includes('Keep request') && text.includes('Cancel request'), text.slice(0, 160));
+                await p.getByRole('button', { name: 'Keep request' }).click(); await settle(p, 400);
+                check('cancel: Keep request keeps it, focus back on its Cancel', await p.locator(`button[aria-label="${label}"]:visible`).count() === 1 && (await active(p)) === `button:${label}`, await active(p));
+                await p.locator(`button[aria-label="${label}"]:visible`).click(); await settle(p, 400);
+                await p.getByRole('button', { name: 'Cancel request' }).click(); await settle(p, 900);
+                const after = await active(p);
+                check('cancel: Cancel request cancels it, focus on the notice', after.startsWith('div[notice]:Cancelled your overtime request') && await p.locator(`button[aria-label="${label}"]:visible`).count() === 0, after);
+            }
             await c.close();
         }
 

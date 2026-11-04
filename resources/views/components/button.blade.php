@@ -1,7 +1,9 @@
 @props(['variant' => 'primary', 'type' => 'button', 'href' => null])
 
 @php
-$base = 'inline-flex h-control items-center justify-center gap-x-1.5 whitespace-nowrap rounded-lg px-3.5 text-sm font-medium shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-800 disabled:cursor-not-allowed disabled:opacity-50';
+// h-control (38px) from sm; below 640px at least 44px, a touch target
+// (max-sm:min-h-11, Phase 6f, docs/DESIGN_SYSTEM.md, Control height).
+$base = 'inline-flex h-control max-sm:min-h-11 items-center justify-center gap-x-1.5 whitespace-nowrap rounded-lg px-3.5 text-sm font-medium shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-800 disabled:cursor-not-allowed disabled:opacity-50';
 
 $variants = [
     'primary' => 'bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800',

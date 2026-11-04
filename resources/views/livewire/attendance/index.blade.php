@@ -39,6 +39,19 @@
         || $timingFilters !== []
         || $workedOnLeave
         || $overtime;
+    // Below 640px search, department and the chips fold behind "Filters (n)"
+    // (F06): n counts what's set in there, the date range staying outside it.
+    // Each selected timing chip counts on its own; the status chips count once
+    // while they narrow the set, and Show off days once.
+    $offValue = \App\Enums\AttendanceStatus::Off->value;
+    $workingSelected = collect($selectedStatuses)->reject(fn ($status) => $status === $offValue)->values()->all();
+    $hiddenFilterCount = ($employeeFilter !== '' ? 1 : 0)
+        + ($departmentFilter !== '' ? 1 : 0)
+        + ($workingSelected !== collect($defaultStatuses)->reject(fn ($status) => $status === $offValue)->values()->all() ? 1 : 0)
+        + (in_array($offValue, $selectedStatuses, true) ? 1 : 0)
+        + count($timingFilters)
+        + ($workedOnLeave ? 1 : 0)
+        + ($overtime ? 1 : 0);
 @endphp
 
 <div class="space-y-6">
@@ -98,7 +111,8 @@
         </dl>
     </x-card>
 
-    <x-card :padding="false">
+    {{-- filtersOpen: the phone disclosure (below 640px); from sm every filter shows. --}}
+    <x-card :padding="false" x-data="{ filtersOpen: false }">
         <div class="flex flex-wrap items-center justify-between gap-3 p-5 pb-0 sm:p-6 sm:pb-0">
             <h2 class="flex items-baseline gap-x-2 text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-100">
                 Attendance records
@@ -120,7 +134,9 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 sm:p-6 lg:grid-cols-[auto_minmax(16rem,1fr)_14rem]">
+        {{-- Below 640px the date range and the Filters button share the first
+        row; the rest is behind the button. --}}
+        <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-3 p-5 sm:grid-cols-2 sm:p-6 lg:grid-cols-[auto_minmax(16rem,1fr)_14rem]">
             {{-- Date range: presets plus the date picker in range mode (datePicker
             in resources/js/app.js, calendar in <x-date-picker.calendar>; rules
             in docs/ATTENDANCE_UI.md). It sets the
@@ -143,7 +159,7 @@
                     aria-controls="attendance-date-panel"
                     class="inline-flex h-control w-full items-center justify-between gap-2 rounded-lg border border-slate-border bg-white px-3 text-sm text-slate-700 shadow-sm transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:bg-slate-750 dark:text-slate-200 dark:hover:bg-slate-600 lg:w-auto"
                 >
-                    <span class="inline-flex items-center gap-2"><x-icon name="calendar-days" class="h-5 w-5 text-slate-400 dark:text-slate-500" />{{ $rangeLabel }}</span>
+                    <span class="inline-flex min-w-0 items-center gap-2"><x-icon name="calendar-days" class="h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" /><span class="truncate whitespace-nowrap">{{ $rangeLabel }}</span></span>
                     <x-icon name="chevron-down" class="h-5 w-5 text-slate-400 dark:text-slate-500" />
                 </button>
                 {{-- Outside the panel, so a completed range is still announced
@@ -219,7 +235,20 @@
                 </div>
             </div>
 
-            <div class="relative min-w-0 sm:col-span-2 lg:col-span-1">
+            <button
+                type="button"
+                @click="filtersOpen = ! filtersOpen"
+                :aria-expanded="String(filtersOpen)"
+                aria-controls="attendance-search-field attendance-department-field attendance-filter-chips"
+                class="inline-flex h-control items-center gap-1.5 rounded-lg bg-white px-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-inset ring-slate-border transition hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:bg-slate-750 dark:text-slate-200 dark:hover:bg-slate-600 sm:hidden"
+            >
+                <x-icon name="funnel" class="h-5 w-5 text-slate-400 dark:text-slate-500" />
+                {{-- No chevron: the date range beside it needs the room, and
+                aria-expanded says whether it's open. --}}
+                <span class="whitespace-nowrap">Filters{{ $hiddenFilterCount > 0 ? ' ('.$hiddenFilterCount.')' : '' }}</span>
+            </button>
+
+            <div id="attendance-search-field" class="relative col-span-2 min-w-0 max-sm:hidden lg:col-span-1" :class="{ 'max-sm:hidden': ! filtersOpen }">
                 <label for="attendance-search" class="sr-only">Search by employee name or code</label>
                 <x-icon name="search" class="pointer-events-none absolute left-3 top-2.5 w-5 h-5 text-slate-400 dark:text-slate-500" />
                 <input
@@ -231,7 +260,7 @@
                 >
             </div>
 
-            <div class="min-w-0">
+            <div id="attendance-department-field" class="col-span-2 min-w-0 max-sm:hidden sm:col-span-1" :class="{ 'max-sm:hidden': ! filtersOpen }">
                 <label for="attendance-department" class="sr-only">Department</label>
                 <x-select id="attendance-department" wire:model.live="departmentFilter" class="w-full">
                     <option value="">All departments</option>
@@ -271,7 +300,7 @@
             $allWorkingSelected = $workingStatuses->every(fn ($status) => in_array($status->value, $statuses, true));
             $showsOffDays = in_array(\App\Enums\AttendanceStatus::Off->value, $statuses, true);
         @endphp
-        <div class="grid gap-4 border-t border-slate-divider px-5 py-4 sm:px-6 xl:grid-cols-[minmax(0,1fr)_auto]">
+        <div id="attendance-filter-chips" class="grid gap-4 border-t border-slate-divider px-5 py-4 max-sm:hidden sm:px-6 xl:grid-cols-[minmax(0,1fr)_auto]" :class="{ 'max-sm:hidden': ! filtersOpen }">
         <fieldset>
         <legend class="text-xs font-medium text-slate-700 dark:text-slate-300">Status</legend>
         <div class="mt-2 flex flex-wrap gap-2">
@@ -376,7 +405,94 @@
                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Try widening the date range or adjusting the filters above.</p>
             </div>
         @else
-            <div class="border-t border-slate-divider">
+            @php
+                // A single-day range already says the date in the range
+                // control, so the table's Date column recedes to muted and
+                // the cards leave it out.
+                $singleDay = $fromDate === $toDate;
+                $dateCellClass = $singleDay ? 'text-slate-500 dark:text-slate-400' : 'text-slate-700 dark:text-slate-300';
+                $emDash = '<span class="text-slate-300 dark:text-slate-600">—</span>';
+            @endphp
+
+            {{-- Below 640px each row is a card (F06, owner decision): the one
+            exception to "never convert rows into cards" (docs/ATTENDANCE_UI.md,
+            Responsive behavior). As a scrolling table a phone showed only Date
+            and Employee, with the status a scroll away on every row, on the
+            page a manager opens to see who's in. Every field the table shows is
+            here, in the same order of rows; the chevron is still the only link. --}}
+            <ul class="border-t border-slate-divider transition-opacity sm:hidden" wire:loading.class="opacity-60" aria-label="Attendance records">
+                @foreach ($attendances as $attendance)
+                    @php
+                        $workDateLabel = \App\Support\DisplayDate::compact($attendance->work_date);
+                    @endphp
+                    <li wire:key="daily-attendance-card-{{ $attendance->id }}" class="flex items-center gap-1 border-t border-slate-divider py-3 pl-5 pr-2 first:border-t-0">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="break-words text-sm font-medium text-slate-900 dark:text-slate-100">{{ $attendance->employee->full_name }}</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ $attendance->employee->employee_code }} · {{ $attendance->employee->department->name }}</p>
+                                </div>
+                                <x-badge :color="$variantStyles[$attendance->displayVariant()]['badge']" class="shrink-0">{{ $attendance->status->label() }}</x-badge>
+                            </div>
+                            <dl class="mt-2 grid grid-cols-3 gap-x-3 gap-y-1.5 text-sm tabular-nums text-slate-700 dark:text-slate-300">
+                                @unless ($singleDay)
+                                    <div class="col-span-3">
+                                        <dt class="sr-only">Date</dt>
+                                        <dd>{{ $workDateLabel }}</dd>
+                                    </div>
+                                @endunless
+                                <div>
+                                    <dt class="text-xs text-slate-500 dark:text-slate-400">In</dt>
+                                    <dd class="whitespace-nowrap">
+                                        @if ($attendance->first_in)
+                                            <x-time :time="$attendance->first_in" />
+                                        @else
+                                            {!! $emDash !!}
+                                        @endif
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt class="text-xs text-slate-500 dark:text-slate-400">Out</dt>
+                                    <dd>
+                                        @if ($attendance->last_out)
+                                            <span class="whitespace-nowrap"><x-time :time="$attendance->last_out" /></span>
+                                            @if ($attendance->isOvernightOut())
+                                                <span class="whitespace-nowrap text-slate-500 dark:text-slate-400">(+1)</span>
+                                            @endif
+                                        @else
+                                            {!! $emDash !!}
+                                        @endif
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt class="text-xs text-slate-500 dark:text-slate-400">Worked</dt>
+                                    <dd class="whitespace-nowrap">{!! e($attendance->formattedWorkedMinutes()) ?: $emDash !!}</dd>
+                                </div>
+                                <div>
+                                    <dt class="text-xs text-slate-500 dark:text-slate-400">Late</dt>
+                                    <dd @class(['whitespace-nowrap', 'font-medium text-amber-700 dark:text-amber-300' => $attendance->isLate()])>{!! e($attendance->formattedLateMinutes()) ?: $emDash !!}</dd>
+                                </div>
+                                <div>
+                                    <dt class="text-xs text-slate-500 dark:text-slate-400">Early leave</dt>
+                                    <dd @class(['whitespace-nowrap', 'font-medium text-amber-700 dark:text-amber-300' => $attendance->leftEarly()])>{!! e($attendance->formattedEarlyLeaveMinutes()) ?: $emDash !!}</dd>
+                                </div>
+                            </dl>
+                            <x-attendance.annotations :record="$attendance" :holiday="$holidays[$attendance->work_date->format('Y-m-d')] ?? null" />
+                        </div>
+                        {{-- The card's only link, at its right edge: 44px on a phone. --}}
+                        <a
+                            href="{{ route('attendance.show', $attendance->employee) }}?month={{ $attendance->work_date->format('Y-m') }}"
+                            wire:navigate
+                            aria-label="View attendance for {{ $attendance->employee->full_name }}, {{ $workDateLabel }}"
+                            class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-primary-600/35 dark:hover:text-primary-300"
+                        >
+                            <x-icon name="chevron-right" class="h-5 w-5" />
+                        </a>
+                    </li>
+                @endforeach
+            </ul>
+
+            <div class="hidden border-t border-slate-divider sm:block">
                 {{-- The table's natural width is ~1119px; it first fits the card
                 at a 1440px viewport (1134px card), so the cue shows below that —
                 including 1024–1439, where it used to be hidden while the table
@@ -418,12 +534,6 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @php
-                            // A single-day range already says the date in the range
-                            // control, so the repeated Date column recedes to muted.
-                            $dateCellClass = $fromDate === $toDate ? 'text-slate-500 dark:text-slate-400' : 'text-slate-700 dark:text-slate-300';
-                            $emDash = '<span class="text-slate-300 dark:text-slate-600">—</span>';
-                        @endphp
                         @foreach ($attendances as $attendance)
                             @php
                                 $style = $variantStyles[$attendance->displayVariant()];

@@ -31,26 +31,33 @@ $current = 'z-10 cursor-default font-semibold border-primary-600 bg-primary-50 t
 <div>
     @if ($paginator->hasPages())
         <nav role="navigation" aria-label="Pagination Navigation" class="flex items-center justify-between">
-            <div class="flex justify-between flex-1 sm:hidden">
+            {{-- Below 640px: Previous, "Page 1 of 5", Next (F32, Phase 6f), each
+            button a 44px touch target. --}}
+            <div class="flex flex-1 items-center justify-between gap-3 sm:hidden">
                 <span>
                     @if ($paginator->onFirstPage())
-                        <span class="{{ $item }} {{ $disabled }} rounded-lg px-4">
+                        <span class="{{ $item }} {{ $disabled }} h-11 rounded-lg px-4">
                             {!! __('pagination.previous') !!}
                         </span>
                     @else
-                        <button type="button" wire:click="previousPage('{{ $paginator->getPageName() }}')" x-on:click="{{ $scrollIntoViewJsSnippet }}" wire:loading.attr="disabled" dusk="previousPage{{ $paginator->getPageName() == 'page' ? '' : '.' . $paginator->getPageName() }}.before" class="{{ $item }} {{ $enabled }} rounded-lg px-4">
+                        <button type="button" wire:click="previousPage('{{ $paginator->getPageName() }}')" x-on:click="{{ $scrollIntoViewJsSnippet }}" wire:loading.attr="disabled" dusk="previousPage{{ $paginator->getPageName() == 'page' ? '' : '.' . $paginator->getPageName() }}.before" class="{{ $item }} {{ $enabled }} h-11 rounded-lg px-4">
                             {!! __('pagination.previous') !!}
                         </button>
                     @endif
                 </span>
 
+                <p class="text-sm tabular-nums text-slate-600 dark:text-slate-400">
+                    Page <span class="font-medium text-slate-900 dark:text-slate-100">{{ $paginator->currentPage() }}</span>
+                    of <span class="font-medium text-slate-900 dark:text-slate-100">{{ $paginator->lastPage() }}</span>
+                </p>
+
                 <span>
                     @if ($paginator->hasMorePages())
-                        <button type="button" wire:click="nextPage('{{ $paginator->getPageName() }}')" x-on:click="{{ $scrollIntoViewJsSnippet }}" wire:loading.attr="disabled" dusk="nextPage{{ $paginator->getPageName() == 'page' ? '' : '.' . $paginator->getPageName() }}.before" class="{{ $item }} {{ $enabled }} ml-3 rounded-lg px-4">
+                        <button type="button" wire:click="nextPage('{{ $paginator->getPageName() }}')" x-on:click="{{ $scrollIntoViewJsSnippet }}" wire:loading.attr="disabled" dusk="nextPage{{ $paginator->getPageName() == 'page' ? '' : '.' . $paginator->getPageName() }}.before" class="{{ $item }} {{ $enabled }} h-11 rounded-lg px-4">
                             {!! __('pagination.next') !!}
                         </button>
                     @else
-                        <span class="{{ $item }} {{ $disabled }} ml-3 rounded-lg px-4">
+                        <span class="{{ $item }} {{ $disabled }} h-11 rounded-lg px-4">
                             {!! __('pagination.next') !!}
                         </span>
                     @endif

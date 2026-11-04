@@ -286,6 +286,39 @@ class Index extends Component
     }
 
     /**
+     * Whose missing days the "hasn't been calculated" notice names: the
+     * people the current filters could show — scope, search and department —
+     * so a search for a few people never warns about someone it hides. The
+     * row chips don't narrow it: a missing workday has no status or timing
+     * yet and could become any of them, except Off and Holiday, which a
+     * workday never is — so a selection of only those gets no notice.
+     *
+     * @return int[]|null null = everyone
+     */
+    private function gapEmployeeIds(): ?array
+    {
+        $statuses = $this->statuses !== [] ? $this->statuses : $this->defaultStatuses();
+
+        if (array_diff($statuses, [AttendanceStatus::Off->value, AttendanceStatus::Holiday->value]) === []) {
+            return [];
+        }
+
+        if ($this->employeeFilter === '' && $this->departmentFilter === '') {
+            return $this->scopedEmployeeIds();
+        }
+
+        return Employee::query()
+            ->when($this->scopedEmployeeIds() !== null, fn (Builder $query) => $query->whereIn('id', $this->scopedEmployeeIds() ?? []))
+            ->when($this->employeeFilter, fn (Builder $query) => $query->where(function (Builder $query) {
+                $query->where('full_name', 'like', "%{$this->employeeFilter}%")
+                    ->orWhere('employee_code', 'like', "%{$this->employeeFilter}%");
+            }))
+            ->when($this->departmentFilter, fn (Builder $query) => $query->where('department_id', $this->departmentFilter))
+            ->pluck('id')
+            ->all();
+    }
+
+    /**
      * Powers the paginated table only. Joins (not whereHas) because the
      * default sort crosses the employee relation — whereHas can filter that
      * but can't drive an ORDER BY.
@@ -469,7 +502,7 @@ class Index extends Component
                 : null,
             // F07's rule (Phase 6e follow-up): only past workdays in the range,
             // for the people in scope, that have no row — never the future.
-            'missingDates' => AttendanceGaps::missingDates($this->scopedEmployeeIds(), Carbon::parse($this->fromDate), Carbon::parse($this->toDate)),
+            'missingDates' => AttendanceGaps::missingDates($this->gapEmployeeIds(), Carbon::parse($this->fromDate), Carbon::parse($this->toDate)),
             'allStatuses' => AttendanceStatus::cases(),
             // Holiday names for the annotation, from the builder's own lookup.
             'holidays' => WorkdayCalendar::holidayNamesBetween(Carbon::parse($this->fromDate), Carbon::parse($this->toDate)),

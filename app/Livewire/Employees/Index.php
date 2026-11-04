@@ -12,6 +12,9 @@ use Livewire\WithPagination;
 
 class Index extends Component
 {
+    /** 25 a page (F32, Phase 6f): 10 made a 112-employee directory twelve pages long. */
+    public const PER_PAGE = 25;
+
     use WithPagination;
 
     #[Url(as: 'q', history: true)]
@@ -78,7 +81,7 @@ class Index extends Component
             ->when($this->departmentFilter, fn ($query) => $query->where('department_id', $this->departmentFilter))
             ->when($this->statusFilter, fn ($query) => $query->where('status', $this->statusFilter))
             ->orderBy('full_name')
-            ->paginate(10);
+            ->paginate(self::PER_PAGE);
 
         $user = auth()->user();
 

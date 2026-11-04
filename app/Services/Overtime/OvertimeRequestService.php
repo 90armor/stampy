@@ -326,9 +326,9 @@ class OvertimeRequestService
     }
 
     /**
-     * Who reviews a new request of $employee's, in words — and, for a planned
-     * one, that it can be cancelled until it starts (a claim has started, so
-     * only an admin can cancel it).
+     * Who reviews a new request of $employee's, in words, and until when they
+     * can cancel it (OvertimePolicy::cancel): while it waits for a decision,
+     * and a planned one also once approved, until it starts.
      */
     private function reviewers(Employee $employee, bool $planned): string
     {
@@ -342,7 +342,9 @@ class OvertimeRequestService
 
         $names = $this->flow->stepOneApprovers($probe)->map(fn (User $user) => $user->employee?->full_name ?? $user->name)->implode(' or ');
 
-        return "{$names} reviews it first, then an admin.".($planned ? ' You can cancel it until it starts.' : '');
+        return "{$names} reviews it first, then an admin.".($planned
+            ? ' You can cancel it while it waits for a decision, and once approved until it starts.'
+            : ' You can cancel it while it waits for a decision.');
     }
 
     /**
@@ -444,7 +446,9 @@ class OvertimeRequestService
 
     /**
      * Cancels a pending or approved request (OvertimePolicy::cancel: the
-     * requester before it starts, an admin any time). Its steps stay as they
+     * requester a pending one at any time and an approved one before it
+     * starts, an admin any time). A pending one leaves its approver's queue at
+     * once; an approver who has it open gets the stale notice (Approvals). Its steps stay as they
      * are. A cancelled approved request rebuilds its date if it's past or
      * today, which takes its time off in lieu back.
      *

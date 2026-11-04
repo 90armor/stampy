@@ -119,6 +119,36 @@ class StaleDecisionTest extends TestCase
         $this->assertSame('cancelled', $request->fresh()->status->value);
     }
 
+    /**
+     * Phase 6f, F14: the employee withdraws a claim the manager already
+     * approved at step 1. It leaves the admin's queue at once, and an admin
+     * who had it open gets the stale notice, not an error.
+     */
+    public function test_a_claim_the_employee_cancels_at_step_two_leaves_the_admin_queue(): void
+    {
+        $service = app(OvertimeRequestService::class);
+        $claim = $service->submit($this->employee, Carbon::parse('2026-06-12'), Carbon::parse('2026-06-12 17:00'), Carbon::parse('2026-06-12 19:00'), OvertimeCompensation::Pay, null, $this->employee->user)['request'];
+        $service->approve($claim, $this->manager->user);
+        $this->assertSame(2, $claim->fresh()->current_step);
+        $this->assertSame(1, app(ApprovalInbox::class)->count($this->admin));
+
+        $page = Livewire::actingAs($this->admin)->test(Approvals::class)
+            ->assertSee('Fri 12 Jun, 5:00 PM – 7:00 PM')
+            ->call('openDecision', $claim->id, 'approve', 'overtime', 2)
+            ->assertSet('showDecision', true);
+
+        $service->cancel($claim->fresh(), $this->employee->user);
+
+        $this->assertSame(0, app(ApprovalInbox::class)->count($this->admin));
+        Livewire::actingAs($this->admin)->test(Approvals::class)->assertDontSee('Fri 12 Jun, 5:00 PM – 7:00 PM');
+
+        $page->call('decide')
+            ->assertSet('showDecision', false)
+            ->assertSee('Kyaw Kyaw cancelled their overtime request (Fri 12 Jun, 5:00 PM – 7:00 PM).')
+            ->assertDontSee('You don');
+        $this->assertSame(OvertimeStatus::Cancelled, $claim->fresh()->status);
+    }
+
     #[DataProvider('types')]
     public function test_cancelled_before_the_dialog_opened(string $type): void
     {

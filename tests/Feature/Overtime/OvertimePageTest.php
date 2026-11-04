@@ -203,6 +203,25 @@ class OvertimePageTest extends TestCase
         $this->assertSame(OvertimeStatus::Cancelled, $request->fresh()->status);
     }
 
+    /** Phase 6f, F14: a claim has always started, but while it's pending its requester can still withdraw it. */
+    public function test_a_pending_claim_offers_cancel_and_an_approved_one_does_not(): void
+    {
+        $service = app(OvertimeRequestService::class);
+        $claim = $service->submit($this->employee, Carbon::parse('2026-06-12'), Carbon::parse('2026-06-12 17:00'), Carbon::parse('2026-06-12 19:00'), OvertimeCompensation::Pay, null, $this->employee->user)['request'];
+
+        Livewire::actingAs($this->employee->user)->test(Index::class)
+            ->assertSeeHtml('aria-label="Cancel overtime request, '.$claim->displayDateAndWindow().'"')
+            ->call('cancel', $claim->id)
+            ->assertSee('Cancelled your overtime request for Fri 12 Jun.');
+        $this->assertSame(OvertimeStatus::Cancelled, $claim->fresh()->status);
+
+        $approved = $service->submit($this->employee, Carbon::parse('2026-06-11'), Carbon::parse('2026-06-11 17:00'), Carbon::parse('2026-06-11 19:00'), OvertimeCompensation::Pay, null, $this->admin)['request'];
+        $this->assertSame(OvertimeStatus::Approved, $approved->status);
+
+        Livewire::actingAs($this->employee->user)->test(Index::class)
+            ->assertDontSeeHtml('aria-label="Cancel overtime request, '.$approved->displayDateAndWindow().'"');
+    }
+
     // ── The request modal ──────────────────────────────────────────────
 
     public function test_the_review_explains_what_counts_and_what_it_earns(): void
@@ -216,7 +235,7 @@ class OvertimePageTest extends TestCase
             ->assertSee('Only 5:00 PM – 7:00 PM counts. 4:00 PM – 5:00 PM is normal working hours.')
             ->assertDontSee('Workday (150%)')
             ->assertSee('Adds 2h 00m toward time off in lieu.')
-            ->assertSee('Aye Aye Mon reviews it first, then an admin.')
+            ->assertSee('Aye Aye Mon reviews it first, then an admin. You can cancel it while it waits for a decision, and once approved until it starts.')
             ->call('submit')
             ->assertDispatched('overtime-saved');
 
@@ -242,9 +261,9 @@ class OvertimePageTest extends TestCase
             ->assertSee('This is a claim: the time has already started.')
             ->assertSee('With your punches (out 7:05 PM), all 2h 00m would be credited.')
             ->assertDontSee('Requested:')
-            // A claim has already started: only an admin can cancel it now.
-            ->assertSee('Aye Aye Mon reviews it first, then an admin.')
-            ->assertDontSee('You can cancel it until it starts.');
+            // A claim has already started: its requester can cancel it only while it's pending.
+            ->assertSee('Aye Aye Mon reviews it first, then an admin. You can cancel it while it waits for a decision.')
+            ->assertDontSee('once approved until it starts');
     }
 
     public function test_a_claim_says_what_the_real_punches_would_credit(): void
