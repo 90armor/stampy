@@ -629,6 +629,8 @@ class CalendarReadabilityTest extends TestCase
 
     public function test_voiding_from_the_modal_asks_for_a_reason_first_not_a_direct_click(): void
     {
+        // Inside 2026, so the form's date omits the year.
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $employee = Employee::factory()->create();
         $punch = AttendanceLog::factory()->create([
             'employee_id' => $employee->id,
