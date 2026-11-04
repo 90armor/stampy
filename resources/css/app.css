@@ -249,3 +249,31 @@ input:-webkit-autofill:focus {
     -webkit-mask-image: none;
     mask-image: none;
 }
+
+/* Printing a report (Phase 6g, F04; docs/DESIGN_SYSTEM.md, Printing). The page
+   is A4 landscape (reports.blade.php's @page) on light paper whatever the
+   theme (resources/js/app.js takes the dark class off for the print). The
+   table flows across pages: no scroller, no pinned column or edge fade, its
+   header repeated on every page and no row split between two. */
+@media print {
+    [data-report] [role='region'] {
+        overflow: visible !important;
+        -webkit-mask-image: none !important;
+        mask-image: none !important;
+    }
+    [data-report] table {
+        min-width: 0 !important;
+    }
+    [data-report] thead {
+        display: table-header-group;
+    }
+    [data-report] tr {
+        break-inside: avoid;
+    }
+    [data-report] .table-pin-lead {
+        position: static;
+    }
+    [data-report] .table-pin-lead::after {
+        display: none;
+    }
+}

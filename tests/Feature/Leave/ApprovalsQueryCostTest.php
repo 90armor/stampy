@@ -174,6 +174,28 @@ class ApprovalsQueryCostTest extends TestCase
         $this->actingAs($this->present->user)->get(route('profile.edit'))->assertSeeHtml('aria-label="10 waiting"');
     }
 
+    public function test_a_managers_dashboard_with_their_own_cards_costs_the_same_for_3_or_30_requests(): void
+    {
+        // F11 (Phase 6g): their own leave cards beside the team's, whose team
+        // (every requester reports to them) grows with the requests.
+        $this->present->user->forceFill(['time_off_seen_at' => now()->subWeek()])->save();
+        Leave::factory()->approved()->between('2026-11-23', '2026-11-24')->create(['employee_id' => $this->present->id, 'leave_type_id' => $this->annual->id]);
+
+        $this->costAt3And6And30($this->present->user, route('dashboard'));
+
+        $this->actingAs($this->present->user)->get(route('dashboard'))->assertSee('Leave balance')->assertSee('Upcoming');
+    }
+
+    public function test_a_linked_admins_dashboard_with_their_own_cards_costs_the_same_for_3_or_30_requests(): void
+    {
+        $this->admin->forceFill(['time_off_seen_at' => now()->subWeek()])->save();
+        Employee::factory()->create(['full_name' => 'Admin', 'user_id' => $this->admin->id, 'department_id' => $this->sales->id]);
+
+        $this->costAt3And6And30($this->admin, route('dashboard'));
+
+        $this->actingAs($this->admin)->get(route('dashboard'))->assertSee('Leave balance');
+    }
+
     public function test_the_badge_is_computed_once_per_request(): void
     {
         $this->pending(6);

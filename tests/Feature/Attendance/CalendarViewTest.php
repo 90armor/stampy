@@ -380,6 +380,7 @@ class CalendarViewTest extends TestCase
             ->set('newPunchDate', '2026-03-02')
             ->set('newPunchTime', '07:55')
             ->set('newPunchType', 'in')
+            ->set('newPunchReason', 'Forgot to punch')
             ->call('addPunch')
             ->assertHasNoErrors();
 
@@ -394,7 +395,7 @@ class CalendarViewTest extends TestCase
 
         $punch = AttendanceLog::where('employee_id', $employee->id)->firstOrFail();
 
-        $component->call('voidPunch', $punch->id);
+        $component->set('voidReason', 'Not their punch')->call('voidPunch', $punch->id);
 
         $dataAfterVoid = $component->instance()->render()->getData();
         $recordAfterVoid = $dataAfterVoid['recordsByDate']->get('2026-03-02');
@@ -434,6 +435,7 @@ class CalendarViewTest extends TestCase
             ->set('newPunchDate', '2026-03-02')
             ->set('newPunchTime', '20:00')
             ->set('newPunchType', 'in')
+            ->set('newPunchReason', 'Forgot to punch')
             ->call('addPunch')
             ->assertHasNoErrors();
 
@@ -476,6 +478,7 @@ class CalendarViewTest extends TestCase
             ->test(Show::class, ['employee' => $subordinate])
             ->set('month', self::SUNDAY_START_MONTH)
             ->call('openDay', '2026-03-02')
+            ->set('voidReason', 'Not their punch')
             ->call('voidPunch', $punch->id)
             ->assertForbidden();
     }

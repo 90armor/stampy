@@ -20,9 +20,11 @@ class AttendanceLog extends Model
         'source',
         'device_id',
         'created_by',
+        'reason',
         'raw',
         'voided_at',
         'voided_by',
+        'void_reason',
     ];
 
     protected function casts(): array

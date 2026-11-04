@@ -14,9 +14,10 @@
     $divider = '<span class="pointer-events-none absolute inset-x-4 bottom-0 z-[2] h-px bg-slate-divider sm:inset-x-6"></span>';
 @endphp
 
-<div class="space-y-6">
-    {{-- Three controls: beside the title only from xl, where they fit on one line. --}}
-    <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+<div class="space-y-6" data-report>
+    {{-- Four controls: beside the title only from xl, where they fit on one line.
+    On paper the print header stands in for them (Phase 6g, F04). --}}
+    <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between print:!hidden">
         <div>
             <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Attendance report</h2>
             <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">Each employee's month in counts, from the calculated attendance.</p>
@@ -43,11 +44,14 @@
                 <x-icon name="document-text" class="h-5 w-5" />
                 Download CSV
             </x-button>
+            <x-report.print-button />
         </div>
     </div>
 
+    <x-report.print-header title="Attendance report" :period="$monthLabel" :filters="$report['department'] !== null ? $report['departments'][$report['department']] : 'All departments'" :open="$report['open'] ? 'This month is still open: figures can change until it ends.' : null" />
+
     @if ($report['open'])
-        <div class="flex items-start gap-2.5 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-200 dark:ring-amber-500/30" role="status">
+        <div class="flex items-start gap-2.5 rounded-lg bg-amber-50 print:!hidden p-3 text-sm text-amber-900 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-200 dark:ring-amber-500/30" role="status">
             <x-icon name="info" class="mt-0.5 h-5 w-5 shrink-0" />
             <span>This month is still open: figures can change until it ends.</span>
         </div>

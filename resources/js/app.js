@@ -968,3 +968,26 @@ document.addEventListener('alpine:init', () => {
         },
     }));
 });
+
+// Printing (Phase 6g, F04; docs/DESIGN_SYSTEM.md, Printing). Always on light
+// paper, whatever the theme: the dark class comes off for the print and goes
+// back after. And a report's "Printed …" line says when it was printed, not
+// when the page was rendered, in the app's timezone (its data-printed-at) and
+// DisplayDate's compact form: "Wed 4 Nov, 2:15 PM".
+let darkBeforePrint = false;
+window.addEventListener('beforeprint', () => {
+    const root = document.documentElement;
+    darkBeforePrint = root.classList.contains('dark');
+    root.classList.remove('dark');
+    const now = new Date();
+    document.querySelectorAll('[data-printed-at]').forEach((element) => {
+        const timeZone = element.dataset.printedAt;
+        const day = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone }).format(now);
+        const time = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone }).format(now).replace(/ /g, ' ');
+        element.textContent = `${day}, ${time}`;
+    });
+});
+window.addEventListener('afterprint', () => {
+    if (darkBeforePrint) document.documentElement.classList.add('dark');
+    darkBeforePrint = false;
+});

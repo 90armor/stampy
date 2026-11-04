@@ -177,21 +177,26 @@ class AttendanceReportPageTest extends TestCase
         $this->assertSame(1, substr_count($content, "\xEF\xBB\xBF"));
         $lines = $this->lines($content);
 
-        $this->assertSame('Attendance report, May 2026 — All departments — All employees — generated 2026-06-15 09:10 (Asia/Phnom_Penh)', $lines[0][0]);
-        $this->assertStringStartsWith('The same counts as each employee\'s attendance summary.', $lines[1][0]);
-        $this->assertSame(['Code', 'Name', 'Department', 'Joined', 'Left', 'Calculated workdays', 'Present', 'Absent', 'Incomplete', 'On leave', 'Leave taken (days)', 'Worked on leave (days)', 'Days off worked', 'Late (days)', 'Late (minutes)', 'Early leave (days)', 'Early leave (minutes)', 'Worked (minutes)', 'Not calculated'], $lines[2]);
-        $this->assertSame(['EMP-0002', 'Kyaw Kyaw', 'Engineering', '', '', '21', '1', '20', '0', '0', '0.0', '0', '0', '1', '20', '0', '0', '460', '0'], $lines[3]);
-        $this->assertSame(['EMP-0005', 'Su Su', 'Engineering', '2026-05-11', '', '15', '1', '14', '0', '0', '0.0', '0', '0', '0', '0', '0', '0', '480', '0'], $lines[4]);
-        $this->assertSame(['Total', '', '', '', '', '36', '2', '34', '0', '0', '0.0', '0', '0', '1', '20', '0', '0', '940', '0'], $lines[5]);
-        $this->assertCount(6, $lines);
+        // The header row first (Phase 6g, F35), the rows, then one blank row and the notes.
+        $this->assertSame(['Code', 'Name', 'Department', 'Joined', 'Left', 'Calculated workdays', 'Present', 'Absent', 'Incomplete', 'On leave', 'Leave taken (days)', 'Worked on leave (days)', 'Days off worked', 'Late (days)', 'Late (minutes)', 'Early leave (days)', 'Early leave (minutes)', 'Worked (minutes)', 'Not calculated'], $lines[0]);
+        $this->assertSame(['EMP-0002', 'Kyaw Kyaw', 'Engineering', '', '', '21', '1', '20', '0', '0', '0.0', '0', '0', '1', '20', '0', '0', '460', '0'], $lines[1]);
+        $this->assertSame(['EMP-0005', 'Su Su', 'Engineering', '2026-05-11', '', '15', '1', '14', '0', '0', '0.0', '0', '0', '0', '0', '0', '0', '480', '0'], $lines[2]);
+        $this->assertSame(['Total', '', '', '', '', '36', '2', '34', '0', '0', '0.0', '0', '0', '1', '20', '0', '0', '940', '0'], $lines[3]);
+        $this->assertSame([null], $lines[4]);
+        $this->assertSame('Attendance report, May 2026 — All departments — All employees — generated 2026-06-15 09:10 (Asia/Phnom_Penh)', $lines[5][0]);
+        $this->assertStringStartsWith('The same counts as each employee\'s attendance summary.', $lines[6][0]);
+        $this->assertCount(7, $lines);
 
         // The totals are the page's.
         $totals = Livewire::actingAs($this->admin)->test(Attendance::class)->set('month', '2026-05')->viewData('report')['totals'];
-        $this->assertSame([(string) $totals['workdays'], (string) $totals['present'], (string) $totals['absent'], (string) $totals['total_worked_minutes']], [$lines[5][5], $lines[5][6], $lines[5][7], $lines[5][17]]);
+        $this->assertSame([(string) $totals['workdays'], (string) $totals['present'], (string) $totals['absent'], (string) $totals['total_worked_minutes']], [$lines[3][5], $lines[3][6], $lines[3][7], $lines[3][17]]);
 
-        // The open month says so in the file too.
-        $open = $this->lines($this->downloadedContent(Livewire::actingAs($this->admin)->test(Attendance::class)->call('download')));
-        $this->assertSame('This month is still open: figures can change until it ends.', $open[1][0]);
+        // The open month says so in the file, between the title and the explanation, and in its name.
+        $download = Livewire::actingAs($this->admin)->test(Attendance::class)->call('download');
+        $download->assertFileDownloaded('attendance-2026-06-exported-2026-06-15-0910-OPEN.csv');
+        $open = $this->lines($this->downloadedContent($download));
+        $this->assertSame('Code', $open[0][0]);
+        $this->assertSame('This month is still open: figures can change until it ends.', $open[count($open) - 2][0]);
     }
 
     public function test_a_managers_csv_holds_their_team_only_and_names_the_department(): void
@@ -208,8 +213,8 @@ class AttendanceReportPageTest extends TestCase
         $response->assertFileDownloaded('attendance-2026-05-engineering-exported-2026-06-15-0910.csv');
 
         $lines = $this->lines($this->downloadedContent($response));
-        $this->assertSame('Attendance report, May 2026 — Engineering — Team of Aye Aye Mon — generated 2026-06-15 09:10 (Asia/Phnom_Penh)', $lines[0][0]);
-        $this->assertSame(['EMP-0001', 'EMP-0002', 'Total'], array_column(array_slice($lines, 3), 0));
+        $this->assertSame(['EMP-0001', 'EMP-0002', 'Total'], array_column(array_slice($lines, 1, 3), 0));
+        $this->assertSame('Attendance report, May 2026 — Engineering — Team of Aye Aye Mon — generated 2026-06-15 09:10 (Asia/Phnom_Penh)', $lines[5][0]);
     }
 
     public function test_the_csv_is_refused_without_the_ability(): void

@@ -6,9 +6,15 @@
                 @if ($step === 'review')
                     Review {{ $forOthers ? 'overtime' : 'your request' }}
                 @else
-                    {{ $forOthers ? 'File overtime for an employee' : 'Request overtime' }}
+                    {{-- The chosen employee's name once there is one (Phase 6g, F28). --}}
+                    {{ $forOthers ? 'File overtime for '.($employee?->full_name ?? 'an employee') : 'Request overtime' }}
                 @endif
             </x-modal.title>
+            {{-- What filing for someone means, before Review says it again: unless
+            the admin chose their own record, which goes through approval. --}}
+            @if ($step === 'form' && $forOthers && $employee?->user_id !== auth()->id())
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Filed by you — approved straight away, no approval steps.</p>
+            @endif
         </div>
 
         @if ($step === 'form')

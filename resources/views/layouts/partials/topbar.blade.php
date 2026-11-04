@@ -1,4 +1,4 @@
-<header class="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-x-4 border-b border-slate-border bg-white/70 backdrop-blur-xl px-4 sm:px-6 dark:bg-slate-800/60">
+<header class="sticky top-0 z-30 flex h-16 shrink-0 print:!hidden items-center gap-x-4 border-b border-slate-border bg-white/70 backdrop-blur-xl px-4 sm:px-6 dark:bg-slate-800/60">
     @php $waiting = \App\Support\ApprovalBadge::count(auth()->user()); @endphp
     {{-- Below lg the sidebar is a drawer, so its Approvals badge is hidden until
     opened: a dot on the menu button says something is waiting (Phase 3e). --}}

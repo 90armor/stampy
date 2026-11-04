@@ -280,7 +280,7 @@ class LeaveReportTest extends TestCase
         // The CSV's "Available at last day" column, filled for a leaver only.
         $download = \Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Reports\Leave::class)->call('download');
         $lines = array_map('str_getcsv', explode("\n", trim(substr(base64_decode(data_get($download->effects, 'download.content')), 3))));
-        $header = $lines[3];
+        $header = $lines[0];
         $row = collect($lines)->first(fn ($line) => $line[0] === 'EMP-0009' && $line[5] === 'Annual');
         $this->assertSame(LeaveDays::toDecimal($balance->availableAtLastDay()), $row[array_search('Available at last day', $header, true)]);
         $this->assertSame(LeaveDays::toDecimal($balance->available()), $row[array_search('Available', $header, true)]);

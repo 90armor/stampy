@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Support\LoginIdentifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
@@ -16,7 +16,7 @@ class PasswordResetLinkController extends Controller
     /** The one answer to every request (Phase 6b): it never says whether an account exists. */
     public const SENT = 'If this account has an email on file, a reset link is on its way. No email? Ask an admin to reset your password.';
 
-    /** Requests per username or email, per address, per minute. */
+    /** Requests per identifier typed, per address, per minute. */
     private const ATTEMPTS = 3;
 
     /**
@@ -30,16 +30,15 @@ class PasswordResetLinkController extends Controller
     /**
      * Handle an incoming password reset link request.
      *
-     * The field accepts a username too (like the login form) — an employee
-     * with no email has nothing valid to type in an email-only field, and
-     * they're likely to try their username here since that's what they log
-     * in with.
+     * The field takes whatever the login form does — a username, an employee
+     * code or an email, resolved the same way (LoginIdentifier, Phase 6g) —
+     * since an employee with no email will type what they sign in with.
      *
      * Every outcome — no such account, an account with no email, a link sent,
      * the broker's own per-account throttle — gets the same message (SENT), so
      * the form can't be used to find out which usernames exist (audit F09).
      * Behind it nothing changed: a link is only mailed to an email on file.
-     * The throttle the user can see is this form's own, per username or email
+     * The throttle the user can see is this form's own, per identifier typed
      * and address, so it trips the same way whether the account exists or not,
      * and says how long to wait.
      */
@@ -47,8 +46,8 @@ class PasswordResetLinkController extends Controller
     {
         $request->validate(
             ['email' => ['required', 'string']],
-            ['email.required' => 'Enter your username or email.'],
-            ['email' => 'username or email'],
+            ['email.required' => 'Enter your username or employee code.'],
+            ['email' => 'username or employee code'],
         );
 
         $identifier = trim($request->string('email')->toString());
@@ -64,10 +63,7 @@ class PasswordResetLinkController extends Controller
 
         RateLimiter::hit($key, 60);
 
-        $user = User::query()
-            ->where('email', $identifier)
-            ->orWhere('username', $identifier)
-            ->first();
+        $user = LoginIdentifier::resolve($identifier, 'Password reset request');
 
         if ($user?->email !== null) {
             Password::sendResetLink(['email' => $user->email]);

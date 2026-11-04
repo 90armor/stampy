@@ -6,6 +6,7 @@ use App\Models\LeaveType;
 use App\Support\EmployeeScope;
 use App\Support\LeaveDays;
 use App\Support\LeaveReport;
+use App\Support\ReportCsv;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
@@ -63,12 +64,8 @@ class Leave extends Component
 
         return response()->streamDownload(function () use ($reports, $year, $department, $exportedAt, $view, $decimal) {
             $out = fopen('php://output', 'w');
-            // A UTF-8 byte-order mark: HR opens this in Excel, which otherwise
-            // reads the file as ANSI and breaks "—" and Khmer or Myanmar names.
+            // The byte-order mark, the header row first, the notes last (ReportCsv).
             fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, ['Leave report, '.$year.' — '.($department ?? 'All departments').' — '.$view.' — generated '.$exportedAt->format('Y-m-d H:i').' ('.config('app.timezone').')']);
-            fputcsv($out, ['Pending is as of the export time.']);
-            fputcsv($out, ['Each row is the employee\'s balance as Time off shows it, in days. A type with no balance has only its used and pending days. Time off in lieu lists only employees who have earned some. Joined and Left only when inside the year. Available is the full year; for someone who left in the year, Available at last day is what they had at their last day (their grant pro-rated to it).']);
             fputcsv($out, ['Code', 'Name', 'Department', 'Joined', 'Left', 'Type', 'Balance', 'Entitled', 'Carried in', 'Adjustments', 'Used', 'Pending', 'Available', 'Available at last day', 'Usable from']);
 
             foreach ($reports as [$type, $report]) {
@@ -114,8 +111,14 @@ class Leave extends Component
                 ]);
             }
 
+            ReportCsv::notes($out, [
+                'Leave report, '.$year.' — '.($department ?? 'All departments').' — '.$view.' — generated '.$exportedAt->format('Y-m-d H:i').' ('.config('app.timezone').')',
+                'Pending is as of the export time.',
+                'Each row is the employee\'s balance as Time off shows it, in days. A type with no balance has only its used and pending days. Time off in lieu lists only employees who have earned some. Joined and Left only when inside the year. Available is the full year; for someone who left in the year, Available at last day is what they had at their last day (their grant pro-rated to it).',
+            ]);
             fclose($out);
-        }, 'leave-'.$year.($department !== null ? '-'.Str::slug($department) : '').'-exported-'.$exportedAt->format('Y-m-d-Hi').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+            // A year isn't closed until it has ended (this year, or next year once granted).
+        }, ReportCsv::filename('leave-'.$year.($department !== null ? '-'.Str::slug($department) : ''), $exportedAt, $year >= $exportedAt->year), ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     /** The year asked for, if offered; else this year. */

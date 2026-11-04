@@ -33,7 +33,7 @@ There is no sign-up. Create the first admin with:
 php artisan user:create-admin
 ```
 
-It asks for a name, a username (what they sign in with), an email (optional — press Enter to skip) and a password, typed twice and checked by the same rules as the password-change form. It needs the `admin` role from step 2, and refuses — creating nothing — if the username or email is already taken. The password is the one you typed, so nothing asks for a new one at first login.
+It asks for a name, a username (what they sign in with — or their employee code or email, once linked; a username can't be another employee's code), an email (optional — press Enter to skip) and a password, typed twice and checked by the same rules as the password-change form. It needs the `admin` role from step 2, and refuses — creating nothing — if the username or email is already taken. The password is the one you typed, so nothing asks for a new one at first login.
 
 If this admin will also take leave, link them to an employee record (step 6). An admin with no employee record is only for a system account. Once the employee exists, `php artisan user:create-admin --employee=EMP-0001` creates an admin already linked to it; the account's name then follows the employee record. The command never changes an existing account: to make someone who already has a login an admin, change their role in the employee form.
 

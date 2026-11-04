@@ -8,6 +8,7 @@ use App\Models\Position;
 use App\Models\User;
 use App\Support\DisplayDate;
 use App\Support\TemporaryPassword;
+use App\Support\UsernameCodeCollision;
 use Carbon\Carbon;
 use Closure;
 use Illuminate\Support\Collection;
@@ -68,7 +69,8 @@ class FormModal extends Component
 
         return [
             'full_name' => ['required', 'string', 'max:255'],
-            'employee_code' => ['required', 'string', 'max:50', 'unique:employees,employee_code,'.$employeeId],
+            // Neither may be someone else's other: both sign in (UsernameCodeCollision).
+            'employee_code' => ['required', 'string', 'max:50', 'unique:employees,employee_code,'.$employeeId, UsernameCodeCollision::forEmployeeCode($this->editing?->user_id)],
             'department_id' => ['required', 'exists:departments,id'],
             'position_id' => ['required', 'exists:positions,id'],
             'manager_id' => ['nullable', 'exists:employees,id', $this->managerIsNotACycle()],
@@ -77,7 +79,7 @@ class FormModal extends Component
             'join_date' => ['required', 'date', $this->joinDateIsNotAfterLeftOn()],
             'device_user_id' => ['nullable', 'string', 'max:50', 'unique:employees,device_user_id,'.$employeeId],
             'create_user' => ['boolean'],
-            'username' => ['required_if:create_user,true', 'nullable', 'string', 'max:255', 'unique:users,username'],
+            'username' => ['required_if:create_user,true', 'nullable', 'string', 'max:255', 'unique:users,username', UsernameCodeCollision::forUsername($employeeId)],
             'email' => ['required_if:create_user,true', 'nullable', 'email', 'max:255', 'unique:users,email'],
             'role' => ['required_if:create_user,true', 'nullable', 'in:admin,manager,employee'],
         ];

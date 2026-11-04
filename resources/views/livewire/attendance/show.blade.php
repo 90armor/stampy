@@ -634,6 +634,7 @@
                                             :new-punch-date="$newPunchDate"
                                             :new-punch-time="$newPunchTime"
                                             :new-punch-type="$newPunchType"
+                                            :voiding-punch-id="$voidingPunchId"
                                         />
                                     </td>
                                 </tr>
@@ -859,6 +860,7 @@
                             :new-punch-date="$newPunchDate"
                             :new-punch-time="$newPunchTime"
                             :new-punch-type="$newPunchType"
+                            :voiding-punch-id="$voidingPunchId"
                             initial-focus
                         />
                     </div>
@@ -871,7 +873,5 @@
                 </div>
             @endif
         </x-modal>
-
-        <x-confirm-dialog event="confirm-dialog-attendance-show" />
     @endif
 </div>

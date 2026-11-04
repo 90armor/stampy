@@ -74,11 +74,12 @@ class ForgotPasswordPrivacyTest extends TestCase
             ->assertSessionHasErrors(['email' => 'Too many attempts. Try again in 60 seconds.']);
     }
 
-    public function test_the_field_says_username_or_email(): void
+    public function test_the_field_says_username_or_employee_code(): void
     {
-        $this->get('/forgot-password')->assertSee('Username or email');
+        // Email still works, but isn't advertised (Phase 6g, F15).
+        $this->get('/forgot-password')->assertSee('Username or employee code');
 
         $this->post('/forgot-password', ['email' => ''])
-            ->assertSessionHasErrors(['email' => 'Enter your username or email.']);
+            ->assertSessionHasErrors(['email' => 'Enter your username or employee code.']);
     }
 }
