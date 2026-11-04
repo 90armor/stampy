@@ -24,10 +24,12 @@ use Tests\TestCase;
  * Khmer New Year, 14–16 April, which the seeder doesn't know as a holiday)
  * and 29 Feb 2028. About 20 minutes, so not in the suite.
  *
- * Pins its own clock, so PIN_NOW changes nothing here; scripts/pinned-instants.sh
- * leaves the group out.
+ * In the seed-sample group: the pre-commit hook leaves it out (about two
+ * minutes of a commit's run), every verification run includes it. It pins its
+ * own clock, so PIN_NOW changes nothing here: scripts/pinned-instants.sh runs
+ * the group once, after the instants, rather than 25 times over.
  */
-#[Group('seed-sweep')]
+#[Group('seed-sample')]
 class SeedAtAnyDateTest extends TestCase
 {
     use RefreshDatabase;

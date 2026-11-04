@@ -45,8 +45,8 @@ for t in \
 do
     log="$RUN/$(echo "$t" | tr ' :' '_-').log"
     # SeedAtAnyDateTest pins its own clock, so PIN_NOW changes nothing there:
-    # its group is left out rather than run 25 times over.
-    if docker compose exec -T -e PIN_NOW="$t" app php vendor/bin/phpunit --colors=never --exclude-group seed-sweep "$@" > "$log" 2>&1; then
+    # its group runs once, after the instants, rather than 25 times over.
+    if docker compose exec -T -e PIN_NOW="$t" app php vendor/bin/phpunit --colors=never --exclude-group seed-sample "$@" > "$log" 2>&1; then
         status="ok"
     else
         status="FAILED"
@@ -54,5 +54,18 @@ do
     fi
     printf '%s  %-6s  %s\n' "$t" "$status" "$(tail -1 "$log")"
 done
+
+# The seed sample, once and unpinned (it pins its own clock), so the run
+# covers the whole suite. Arguments that narrow the run (--filter) skip it.
+if [ "$#" -eq 0 ]; then
+    log="$RUN/seed-sample.log"
+    if docker compose exec -T app php vendor/bin/phpunit --colors=never --group seed-sample > "$log" 2>&1; then
+        status="ok"
+    else
+        status="FAILED"
+        failed=1
+    fi
+    printf '%-19s  %-6s  %s\n' "seed-sample (once)" "$status" "$(tail -1 "$log")"
+fi
 
 exit $failed
