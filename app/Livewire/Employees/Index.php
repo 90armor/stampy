@@ -6,6 +6,7 @@ use App\Livewire\Attributes\QueryParam;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Support\EmployeeScope;
+use App\Support\ListUrl;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -74,6 +75,14 @@ class Index extends Component
 
     public function render()
     {
+        // The list as the user has it now, for a profile's way back (ListUrl, Phase 6i).
+        ListUrl::remember('employees.index', [
+            'q' => $this->search,
+            'department' => $this->departmentFilter,
+            'status' => $this->statusFilter,
+            'page' => $this->getPage() > 1 ? (string) $this->getPage() : '',
+        ]);
+
         $scope = EmployeeScope::for(auth()->user(), 'Employee directory');
 
         // Everything on this page — rows, stats, the department filter — is

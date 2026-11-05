@@ -98,15 +98,6 @@
             />
         </x-card>
     @else
-        @unless ($viaSelfView)
-            <div>
-                <a href="{{ route('attendance.index') }}" wire:navigate class="inline-flex items-center gap-x-1 rounded-lg max-sm:-my-3 max-sm:min-h-11 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100">
-                    <x-icon name="chevron-left" class="h-5 w-5" />
-                    Back to attendance
-                </a>
-            </div>
-        @endunless
-
         <div class="flex flex-wrap items-center justify-between gap-4">
             <div class="flex items-center gap-x-4">
                 <x-avatar :name="$employee->full_name" class="h-14 w-14 text-lg font-semibold" />

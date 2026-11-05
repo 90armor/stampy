@@ -18,12 +18,14 @@ use App\Support\AttendanceGaps;
 use App\Support\AttendanceSummary;
 use App\Support\AttendanceTime;
 use App\Support\DisplayDate;
+use App\Support\ListUrl;
 use App\Support\OvertimeResult;
 use App\Support\StrictDate;
 use App\Support\WorkdayCalendar;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Show extends Component
@@ -86,6 +88,17 @@ class Show extends Component
     public ?string $viewingDay = null;
 
     /**
+     * Reached as /my-attendance (Phase 6i). Set once in mount(), from the
+     * route actually opened, and locked: render() runs on every Livewire
+     * update too, where the route is livewire.update, so asking
+     * request()->routeIs('attendance.mine') there answered "no" after the
+     * first round trip — the employee's own page grew a "Back to attendance"
+     * link as soon as they opened a day.
+     */
+    #[Locked]
+    public bool $selfView = false;
+
+    /**
      * Route-model-bound when reached via /attendance/{employee} (admin or a
      * manager viewing someone else); left null when reached via
      * /my-attendance, which has no {employee} segment at all — that case
@@ -101,6 +114,8 @@ class Show extends Component
         if (! in_array($this->view, ['calendar', 'table'], true)) {
             $this->view = 'calendar';
         }
+
+        $this->selfView = $employee === null;
 
         if ($employee === null) {
             $employee = auth()->user()->employee;
@@ -667,11 +682,7 @@ class Show extends Component
             $this->authorize('view', $this->employee);
         }
 
-        // request()->routeIs(), not stored mount()-time state: mount() only
-        // runs on the initial load, but render() runs on every subsequent
-        // request too (e.g. clicking prev/next month), and the route name
-        // is stable and available either way.
-        $viaSelfView = request()->routeIs('attendance.mine');
+        $viaSelfView = $this->selfView;
 
         if ($this->employee === null) {
             return view('livewire.attendance.show')
@@ -692,7 +703,7 @@ class Show extends Component
         $layoutData = $viaSelfView
             ? ['header' => 'My attendance']
             : ['breadcrumbs' => [
-                ['label' => 'Attendance', 'route' => route('attendance.index')],
+                ['label' => 'Attendance', 'route' => auth()->user()->can('viewAny', Employee::class) ? ListUrl::for('attendance.index') : null],
                 ['label' => $this->employee->full_name],
             ]];
 
@@ -713,13 +724,6 @@ class Show extends Component
             'dayOvertime' => $this->viewingDay !== null ? $this->dayOvertime($existing->get($this->viewingDay)) : null,
             'quietDays' => $gaps['quiet'],
             'missingWorkdays' => $gaps['missing'],
-            // Same reasoning as $layoutData just above: nobody reaches
-            // /my-attendance via the list (it's a sidebar destination, and a
-            // plain employee can't open /attendance at all), so a "Back to
-            // attendance" link there is a dead end for everyone, not just
-            // employees — it used to render unconditionally regardless of
-            // route.
-            'viaSelfView' => $viaSelfView,
         ])->layout('layouts.app', $layoutData);
     }
 }

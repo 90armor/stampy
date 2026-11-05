@@ -1,11 +1,4 @@
 <div class="space-y-6">
-    <div>
-        <a href="{{ route('employees.index') }}" wire:navigate class="inline-flex items-center gap-x-1 rounded text-sm font-medium text-slate-600 transition hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:text-primary-300">
-            <x-icon name="chevron-right" class="h-5 w-5 rotate-180" />
-            Back to employees
-        </a>
-    </div>
-
     @php $ownRecord = $employee->status === 'active' && $employee->user_id !== null && $employee->user_id === auth()->id() && auth()->user()->can('deactivate', $employee); @endphp
     <header @class([
         'flex flex-col gap-4',

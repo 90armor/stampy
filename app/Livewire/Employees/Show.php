@@ -3,6 +3,7 @@
 namespace App\Livewire\Employees;
 
 use App\Models\Employee;
+use App\Support\ListUrl;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -36,7 +37,7 @@ class Show extends Component
         return view('livewire.employees.show')
             ->layout('layouts.app', [
                 'breadcrumbs' => [
-                    ['label' => 'Employees', 'route' => route('employees.index')],
+                    ['label' => 'Employees', 'route' => auth()->user()->can('viewAny', Employee::class) ? ListUrl::for('employees.index') : null],
                     ['label' => $this->employee->full_name],
                 ],
             ]);

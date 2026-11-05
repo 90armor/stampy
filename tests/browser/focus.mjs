@@ -3,8 +3,9 @@
 // can't be checked from PHP. One check per close rule (notice, trigger,
 // heading, <main>), never another row's Approve, the trap, step changes,
 // names; Daily attendance's Filters disclosure and the overtime cancel
-// confirmation (6f); the file-for title naming the chosen employee (F28) and
-// a punch correction's missing reason (F34, 6g). It submits, decides and
+// confirmation (6f); the file-for title naming the chosen employee (F28),
+// a punch correction's missing reason (F34, 6g), and the profile's modals and the
+// breadcrumb's way back (6i). It submits, decides and
 // cancels real requests on the dev database: reseed afterwards. Needs the demo
 // seed + scripts/audit/seed-personas.php + scripts/audit/stress-employees.php.
 // Exits 1 on any failure. How to run it: tests/browser/README.md.
@@ -454,6 +455,106 @@ await withBrowser(async (b) => {
             await p.getByRole('button', { name: /file for an employee/i }).first().click(); await settle(p);
             const name = await p.evaluate(() => { const d = [...document.querySelectorAll('[role=dialog][aria-labelledby]')].find((e) => e.getClientRects().length); return document.getElementById(d?.getAttribute('aria-labelledby'))?.textContent.trim(); });
             check('name: the dialog is named by its visible title', name === 'File leave for an employee', name);
+            await c.close();
+        }
+    }
+
+    // Phase 6i: the breadcrumb returns to the list as it was left — filters,
+    // range and the page reached through a Livewire update — at 1440 through
+    // the crumb, at 390 through the topbar's "‹ Attendance" (44px).
+    for (const width of [1440, 390]) {
+        const { c, p } = await page(b, admin, 'light', width);
+        const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const from = iso(new Date(Date.now() - 86400000 * 30)), to = iso(new Date(Date.now() - 86400000));
+        await p.goto(`${BASE}/attendance?from=${from}&to=${to}`, { waitUntil: 'networkidle' });
+        await p.getByRole('button', { name: /next/i }).last().click(); await settle(p, 800);
+        await p.getByRole('link', { name: /^View attendance for/ }).first().click(); await settle(p, 800);
+        const back = width === 1440
+            ? p.locator('header').getByRole('link', { name: 'Attendance', exact: true }).last()
+            : p.locator('header [data-back-link]');
+        check(`breadcrumb (${width}): the way back is visible`, await back.isVisible());
+        if (width === 390) {
+            const box = await back.boundingBox();
+            check('breadcrumb (390): "‹ Attendance" is a 44px target', box && box.height >= 44, box && `${box.height}px`);
+            check('breadcrumb (390): the record\'s name is not in the title', ! (await p.locator('header span.font-semibold').first().isVisible()));
+        }
+        await back.click(); await settle(p, 800);
+        const url = new URL(p.url());
+        check(`breadcrumb (${width}): back on the list with its range and page`, url.pathname === '/attendance' && url.searchParams.get('from') === from && url.searchParams.get('to') === to && url.searchParams.get('page') === '2', p.url());
+        await c.close();
+    }
+
+    // Phase 6i: the profile's Change password modal, on a persona nothing
+    // else here signs in as — a change signs out its other sessions.
+    for (const width of [1440, 390]) {
+        const first = (await login(b, 'audit.khmer')).state;
+        const second = (await login(b, 'audit.khmer')).state;
+        const { c, p } = await page(b, first, 'light', width);
+        await p.goto(`${BASE}/profile`, { waitUntil: 'networkidle' });
+        const trigger = p.getByRole('button', { name: 'Change password' });
+        await trigger.focus(); await p.keyboard.press('Enter'); await settle(p);
+        check(`password (${width}): opening focuses Current password`, (await active(p)).startsWith('input:current_password'), await active(p));
+        const toggle = p.getByRole('dialog').getByRole('button', { name: 'Show password' }).first();
+        await toggle.click();
+        check(`password (${width}): show/hide reveals the field and says it's pressed`, (await p.locator('#current_password').getAttribute('type')) === 'text' && (await toggle.getAttribute('aria-pressed')) === 'true');
+        await p.keyboard.press('Escape'); await settle(p);
+        check(`password (${width}): Escape returns to Change`, (await active(p)).startsWith('button:Change password'), await active(p));
+
+        await trigger.click(); await settle(p);
+        await p.fill('#current_password', 'wrong');
+        await p.fill('#new_password', 'Another-pass-1');
+        await p.fill('#new_password_confirmation', 'Another-pass-1');
+        await p.getByRole('dialog').getByRole('button', { name: 'Change password' }).click(); await settle(p, 800);
+        check(`password (${width}): a wrong current password focuses that field`, (await active(p)).startsWith('input:current_password'), await active(p));
+        await p.fill('#current_password', 'password');
+        await p.getByRole('dialog').getByRole('button', { name: 'Change password' }).click(); await settle(p, 900);
+        const done = await active(p);
+        check(`password (${width}): success closes and focuses the notice`, done.startsWith('div[notice]:Password changed. You\'ve been signed out on other devices.') && (await p.getByRole('dialog').count()) === 0, done);
+
+        const other = await b.newContext({ storageState: second });
+        const op = await other.newPage();
+        await op.goto(`${BASE}/dashboard`, { waitUntil: 'networkidle' });
+        check(`password (${width}): the other session is signed out`, new URL(op.url()).pathname === '/login', op.url());
+        await other.close();
+
+        await p.reload({ waitUntil: 'networkidle' });
+        check(`password (${width}): this session stays signed in`, new URL(p.url()).pathname === '/profile', p.url());
+        // Back to the seed's password, so the next run (and width) can sign in.
+        await trigger.click(); await settle(p);
+        await p.fill('#current_password', 'Another-pass-1');
+        await p.fill('#new_password', 'password');
+        await p.fill('#new_password_confirmation', 'password');
+        await p.getByRole('dialog').getByRole('button', { name: 'Change password' }).click(); await settle(p, 900);
+        await c.close();
+    }
+
+    // Phase 6i: the admin's Edit account modal — unlinked (name and email)
+    // and linked (email, the name on the employee record).
+    for (const width of [1440, 390]) {
+        {
+            const { c, p } = await page(b, admin, 'light', width);
+            await p.goto(`${BASE}/profile`, { waitUntil: 'networkidle' });
+            const edit = p.getByRole('button', { name: 'Edit account' });
+            await edit.focus(); await p.keyboard.press('Enter'); await settle(p);
+            check(`edit (${width}, unlinked): opening focuses Name`, (await active(p)).startsWith('input:account_name'), await active(p));
+            check(`edit (${width}): the dialog is named by its title`, await p.getByRole('dialog', { name: 'Edit account' }).isVisible());
+            await p.fill('#account_name', '');
+            await p.getByRole('dialog').getByRole('button', { name: 'Save' }).click(); await settle(p, 800);
+            check(`edit (${width}): a blank name focuses Name`, (await active(p)).startsWith('input:account_name'), await active(p));
+            await p.fill('#account_name', 'Administrator');
+            await p.getByRole('dialog').getByRole('button', { name: 'Save' }).click(); await settle(p, 900);
+            check(`edit (${width}): Save closes and focuses the notice`, (await active(p)).startsWith('div[notice]:Account saved.'), await active(p));
+            await c.close();
+        }
+        {
+            const linked = (await login(b, 'audit.admin')).state;
+            const { c, p } = await page(b, linked, 'light', width);
+            await p.goto(`${BASE}/profile`, { waitUntil: 'networkidle' });
+            await p.getByRole('button', { name: 'Edit account' }).click(); await settle(p);
+            check(`edit (${width}, linked): opening focuses Email`, (await active(p)).startsWith('input:account_email'), await active(p));
+            check(`edit (${width}, linked): no name field, a link to the record`, (await p.locator('#account_name').count()) === 0 && await p.getByRole('dialog').getByRole('link', { name: 'Edit on your employee record' }).isVisible());
+            await p.keyboard.press('Escape'); await settle(p);
+            check(`edit (${width}, linked): Escape returns to Edit`, (await active(p)).startsWith('button:Edit account'), await active(p));
             await c.close();
         }
     }
