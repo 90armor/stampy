@@ -109,9 +109,7 @@
 
         <div class="flex flex-wrap items-center justify-between gap-4">
             <div class="flex items-center gap-x-4">
-                <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-lg font-semibold bg-slate-100 text-slate-600 dark:bg-slate-750 dark:text-slate-300">
-                    {{ strtoupper(substr($employee->full_name, 0, 1)) }}
-                </span>
+                <x-avatar :name="$employee->full_name" class="h-14 w-14 text-lg font-semibold" />
                 <div>
                     <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{{ $employee->full_name }}</h1>
                     <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">{{ $employee->employee_code }} &middot; {{ $employee->department->name }} &middot; {{ $employee->position->name }}</p>
@@ -250,12 +248,14 @@
                 </div>
 
                 {{-- One control: the container is h-control and rounded-lg; its two segments
-                are rounded-lg too, on the radius scale (docs/DESIGN_SYSTEM.md, Control height). --}}
-                <div class="inline-flex h-control max-sm:h-11 items-stretch rounded-lg border border-slate-border bg-white p-0.5 dark:bg-slate-750" role="group" aria-label="View">
+                are rounded-lg too, on the radius scale (docs/DESIGN_SYSTEM.md, Control height).
+                Below 640px the segments themselves are the 44px targets, so the container
+                grows around them (Phase 6h, N2: at h-11 they were 38px inside it). --}}
+                <div class="inline-flex h-control max-sm:h-auto items-stretch rounded-lg border border-slate-border bg-white p-0.5 dark:bg-slate-750" role="group" aria-label="View">
                     <button
                         type="button"
                         wire:click="$set('view', 'calendar')"
-                        class="inline-flex items-center rounded-lg px-3 text-sm ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 {{ $view === 'calendar' ? 'font-semibold bg-primary-50 text-primary-700 ring-primary-600 dark:bg-primary-600/35 dark:text-primary-200 dark:ring-primary-500' : 'font-medium ring-transparent text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}"
+                        class="inline-flex max-sm:min-h-11 items-center rounded-lg px-3 text-sm ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 {{ $view === 'calendar' ? 'font-semibold bg-primary-50 text-primary-700 ring-primary-600 dark:bg-primary-600/35 dark:text-primary-200 dark:ring-primary-500' : 'font-medium ring-transparent text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}"
                         aria-pressed="{{ $view === 'calendar' ? 'true' : 'false' }}"
                     >
                         Calendar
@@ -263,7 +263,7 @@
                     <button
                         type="button"
                         wire:click="$set('view', 'table')"
-                        class="inline-flex items-center rounded-lg px-3 text-sm ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 {{ $view === 'table' ? 'font-semibold bg-primary-50 text-primary-700 ring-primary-600 dark:bg-primary-600/35 dark:text-primary-200 dark:ring-primary-500' : 'font-medium ring-transparent text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}"
+                        class="inline-flex max-sm:min-h-11 items-center rounded-lg px-3 text-sm ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 {{ $view === 'table' ? 'font-semibold bg-primary-50 text-primary-700 ring-primary-600 dark:bg-primary-600/35 dark:text-primary-200 dark:ring-primary-500' : 'font-medium ring-transparent text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}"
                         aria-pressed="{{ $view === 'table' ? 'true' : 'false' }}"
                     >
                         Table
@@ -275,7 +275,7 @@
             <div class="px-6 pb-6">
                 <div class="grid grid-cols-7 gap-1.5 sm:gap-2">
                     @foreach ($weekdayLabels as $label)
-                        <div class="pb-1 text-center text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        <div wire:key="weekday-{{ $label }}" class="pb-1 text-center text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                             {{ $label }}
                         </div>
                     @endforeach
@@ -331,7 +331,7 @@
                         @endphp
 
                         @if ($cell['inMonth'])
-                            <button
+                            <button wire:key="day-{{ $cellDateKey }}"
                                 type="button"
                                 wire:click="openDay('{{ $cellDateKey }}')"
                                 aria-label="{{ $cellAriaLabel }}"
@@ -447,7 +447,7 @@
                             {{-- Leading/trailing days from adjacent months — muted,
                             not clickable, excluded from the month summary. They
                             exist only to keep the grid rectangular. --}}
-                            <div
+                            <div wire:key="day-{{ $cellDateKey }}"
                                 class="flex min-h-16 flex-col items-start gap-1 rounded-lg p-1.5 text-slate-300 dark:text-slate-700 sm:min-h-24 sm:p-2"
                                 aria-hidden="true"
                             >
@@ -464,7 +464,7 @@
                 <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-divider pt-3 text-xs text-slate-500 dark:text-slate-400">
                     {{-- "Not calculated" only when a cell shows it: a quiet day isn't one (F07). --}}
                     @foreach ($days->contains(fn ($day) => ! $day['record'] && ! isset($quietDays[$day['date']->format('Y-m-d')])) ? $legendItems : array_slice($legendItems, 0, -1) as $item)
-                        <span class="inline-flex items-center gap-1.5">
+                        <span wire:key="legend-{{ $item['label'] }}" class="inline-flex items-center gap-1.5">
                             <x-icon :name="$item['icon']" class="h-5 w-5 shrink-0 {{ $item['text'] }}" />
                             {{ $item['label'] }}
                         </span>
@@ -794,7 +794,7 @@
                                             ? 'Charged '.\App\Support\LeaveDays::label($item['charged'])
                                             : 'Not charged — '.($modalHoliday ? 'holiday' : 'day off');
                                     @endphp
-                                    <li class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                                    <li wire:key="day-leave-{{ $item['leave']->id }}" class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                                         <div>
                                             <p class="text-sm font-medium text-slate-900 dark:text-slate-100">{{ $dayLeave->leaveType->name.($dayLeave->half ? ' · '.$dayLeave->half->label() : '') }}</p>
                                             {{-- The half is in the title already; this line is the leave's dates. --}}

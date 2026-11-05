@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Reports;
 
+use App\Livewire\Attributes\QueryParam;
 use App\Models\OvertimeSettings;
 use App\Support\DisplayDate;
 use App\Support\OvertimeReport;
@@ -9,7 +10,6 @@ use App\Support\OvertimeSummary;
 use App\Support\ReportCsv;
 use Carbon\Carbon;
 use Livewire\Attributes\On;
-use Livewire\Attributes\Url;
 use Livewire\Component;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -33,7 +33,7 @@ class Overtime extends Component
     public bool $opened = true;
 
     /** 'Y-m'. */
-    #[Url(as: 'month', history: true)]
+    #[QueryParam(as: 'month', history: true)]
     public string $month = '';
 
     public function mount(): void

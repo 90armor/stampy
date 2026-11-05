@@ -73,7 +73,7 @@
                             <h2 tabindex="-1" data-section-heading class="text-lg font-semibold text-slate-900 dark:text-slate-100 focus:outline-none">You can override</h2>
                             <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Waiting for a manager. Deciding one completes both steps.</p>
                         </div>
-                        <button type="button" wire:click="$toggle('showOverrides')" class="shrink-0 rounded-lg px-2 py-1 text-sm font-medium text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400" aria-expanded="{{ $showOverrides ? 'true' : 'false' }}">
+                        <button type="button" wire:click="$toggle('showOverrides')" class="shrink-0 rounded-lg px-2 py-1 max-sm:min-h-11 text-sm font-medium text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400" aria-expanded="{{ $showOverrides ? 'true' : 'false' }}">
                             {{ $showOverrides ? 'Hide' : 'Show '.count($overrides) }}
                         </button>
                     </div>
@@ -122,7 +122,7 @@
                                 <p class="font-medium">Over the daily limit</p>
                                 <ul class="mt-1 space-y-0.5">
                                     @foreach ($limitProblems as $problem)
-                                        <li>{{ $problem }}</li>
+                                        <li wire:key="limit-problem-{{ $loop->index }}">{{ $problem }}</li>
                                     @endforeach
                                 </ul>
                                 @unless ($needsOverride)

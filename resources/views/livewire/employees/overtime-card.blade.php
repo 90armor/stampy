@@ -36,7 +36,7 @@
     <div class="mt-3 grid grid-cols-1 sm:grid-cols-2">
         @foreach ($months as $month)
             @php $summary = $month['summary']; @endphp
-            <section class="border-t border-slate-divider px-4 py-4 sm:px-6 sm:[&:nth-child(2)]:border-l">
+            <section wire:key="overtime-month-{{ $month['label'] }}" class="border-t border-slate-divider px-4 py-4 sm:px-6 sm:[&:nth-child(2)]:border-l">
                 <div class="flex items-baseline justify-between gap-4">
                     <h3 class="{{ $sectionTitle }}">{{ $month['label'] }}</h3>
                     <p class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ $summary['total'] > 0 ? Duration::format($summary['total']) : 'None' }}</p>
@@ -76,7 +76,7 @@
                         @if ($request->approvalSteps->isNotEmpty() || $request->cancelled_at)
                             <ul class="mt-1 space-y-0.5 {{ $muted }}">
                                 @foreach ($request->approvalSteps as $step)
-                                    <li>{{ $stepLine($step) }}</li>
+                                    <li wire:key="overtime-step-{{ $step->id }}">{{ $stepLine($step) }}</li>
                                 @endforeach
                                 @if ($request->cancelled_at)
                                     <li>{{ 'Cancelled'.($request->cancelledBy ? ' by '.$request->cancelledBy->name : '').' · '.DisplayDate::compact($request->cancelled_at) }}</li>

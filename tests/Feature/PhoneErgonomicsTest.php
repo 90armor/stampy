@@ -24,7 +24,7 @@ use Tests\TestCase;
  * the auth pages at every width (F23, D3), and the Employees directory's page
  * size and phone pagination (F32). What only a browser can show — that the
  * cards replace the table below sm, that the disclosure opens and survives a
- * re-render — is scripts/audit/playwright/focus-6d2.mjs.
+ * re-render — is tests/browser/focus.mjs.
  */
 class PhoneErgonomicsTest extends TestCase
 {
@@ -178,6 +178,13 @@ class PhoneErgonomicsTest extends TestCase
         foreach (['leave', 'overtime'] as $page) {
             $this->assertStringContainsString('max-sm:min-h-11', File::get(resource_path("views/livewire/{$page}/partials/cancel-button.blade.php")));
         }
+    }
+
+    /** Phase 6h, N3 and N4: Approvals' "Show n" and the admin dashboard's quick actions. */
+    public function test_show_n_and_the_quick_actions_are_44px_below_sm(): void
+    {
+        $this->assertMatchesRegularExpression("/<button[^>]*max-sm:min-h-11[^>]*>\\s*\\{\\{ \\\$showOverrides \\? 'Hide' : 'Show '/", File::get(resource_path('views/livewire/leave/approvals.blade.php')));
+        $this->assertMatchesRegularExpression('/@foreach \(\$quickActions as \$action\)\s*<a [^>]*class="[^"]*max-sm:min-h-11[^"]*"/', File::get(resource_path('views/dashboard.blade.php')));
     }
 
     /** D3: the auth pages keep 44px at every width — every field, button and link. */

@@ -44,7 +44,7 @@ class DashboardAttendance
      * @return array{
      *     total: int,
      *     builtToday: bool,
-     *     segments: list<array{key: string, label: string, count: int, percent: float, dot: string}>,
+     *     segments: list<array{key: string, label: string, count: int, percent: float}>,
      *     present: array{count: int, percent: float},
      *     late: array{count: int, percent: float},
      *     earlyLeave: array{count: int, percent: float},
@@ -84,13 +84,13 @@ class DashboardAttendance
         // even though nothing assigns it yet (Phase 3) — it'll simply
         // render as a zero-width segment until it does.
         $definitions = [
-            ['key' => 'present', 'label' => 'Present', 'dot' => 'bg-green-500'],
-            ['key' => 'absent', 'label' => 'Absent', 'dot' => 'bg-red-400'],
-            ['key' => 'incomplete', 'label' => 'Incomplete', 'dot' => 'bg-violet-400'],
-            ['key' => 'in_progress', 'label' => 'In progress', 'dot' => 'bg-blue-400'],
-            ['key' => 'holiday', 'label' => 'Holiday', 'dot' => 'bg-fuchsia-400'],
-            ['key' => 'off', 'label' => 'Off', 'dot' => 'bg-slate-300 dark:bg-slate-600'],
-            ['key' => 'leave', 'label' => 'Leave', 'dot' => 'bg-accent-400'],
+            ['key' => 'present', 'label' => 'Present'],
+            ['key' => 'absent', 'label' => 'Absent'],
+            ['key' => 'incomplete', 'label' => 'Incomplete'],
+            ['key' => 'in_progress', 'label' => 'In progress'],
+            ['key' => 'holiday', 'label' => 'Holiday'],
+            ['key' => 'off', 'label' => 'Off'],
+            ['key' => 'leave', 'label' => 'Leave'],
         ];
 
         $segments = [];
@@ -111,7 +111,6 @@ class DashboardAttendance
             $segments[] = [
                 'key' => 'not_calculated',
                 'label' => 'Not calculated yet',
-                'dot' => 'bg-slate-100 dark:bg-slate-800',
                 'count' => $notCalculated,
                 'percent' => $percent($notCalculated),
             ];

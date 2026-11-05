@@ -293,49 +293,60 @@ class ManualPunchTest extends TestCase
     }
 
     /**
-     * The (employee_id, punched_at, source) unique index has no voided_at
-     * in it (see the migration's comment for why that would be unsafe), so
-     * a voided row permanently occupies its exact key — re-adding at the
-     * same time must revive that row, not attempt (and fail) an insert.
+     * Re-adding a punch at the exact time of a voided manual one is a new row
+     * (Phase 6h): the voided row keeps who added it, who voided it and both
+     * reasons. The unique index leaves voided manual punches out
+     * (add_live_key_to_attendance_logs_table), so the insert doesn't collide —
+     * and doing it twice over still leaves one live punch.
      */
-    public function test_adding_a_punch_at_the_same_time_as_a_voided_one_revives_it_instead_of_failing(): void
+    public function test_adding_a_punch_at_the_same_time_as_a_voided_one_is_a_new_row_beside_it(): void
     {
         $employee = Employee::factory()->create();
 
         $component = Livewire::actingAs($this->admin())
             ->test(Show::class, ['employee' => $employee])
-            ->set('month', '2026-02')
+            ->set('month', '2026-02');
+        $add = fn (string $reason) => $component
             ->call('startAddingPunch', self::DAY)
             ->set('newPunchDate', self::DAY)
             ->set('newPunchTime', '07:55')
             ->set('newPunchType', 'in')
-            ->set('newPunchReason', 'Forgot to punch')
+            ->set('newPunchReason', $reason)
             ->call('addPunch')
             ->assertHasNoErrors();
 
-        $punch = AttendanceLog::where('employee_id', $employee->id)->firstOrFail();
-        $component->set('voidReason', 'Not their punch')->call('voidPunch', $punch->id);
-        $this->assertNotNull($punch->fresh()->voided_at);
+        $add('Forgot to punch');
+        $first = AttendanceLog::where('employee_id', $employee->id)->sole();
+        $component->call('startVoiding', $first->id)->set('voidReason', 'Not their punch')->call('voidPunch', $first->id);
 
-        // Re-add at the exact same date/time/type.
+        // Re-added, voided again, re-added again: three rows, one live.
+        $add('It was theirs after all');
+        $second = AttendanceLog::where('employee_id', $employee->id)->whereNull('voided_at')->sole();
+        $component->call('startVoiding', $second->id)->set('voidReason', 'Wrong time')->call('voidPunch', $second->id);
+        $add('Right time after all');
+
+        $this->assertSame(3, AttendanceLog::where('employee_id', $employee->id)->count());
+        $this->assertSame(1, AttendanceLog::where('employee_id', $employee->id)->whereNull('voided_at')->count());
+
+        // The first correction is exactly as it was voided.
+        $first->refresh();
+        $this->assertNotNull($first->voided_at);
+        $this->assertSame('Forgot to punch', $first->reason);
+        $this->assertSame('Not their punch', $first->void_reason);
+        $this->assertNotSame($first->id, $second->id);
+
+        // A second live punch at the same time is still refused.
         $component
             ->call('startAddingPunch', self::DAY)
             ->set('newPunchDate', self::DAY)
             ->set('newPunchTime', '07:55')
             ->set('newPunchType', 'in')
-            ->set('newPunchReason', 'Forgot to punch')
+            ->set('newPunchReason', 'Again')
             ->call('addPunch')
-            ->assertHasNoErrors();
+            ->assertHasErrors(['newPunchTime']);
+        $this->assertSame(3, AttendanceLog::where('employee_id', $employee->id)->count());
 
-        // Still one row (revived), not two, and no longer voided.
-        $this->assertSame(1, AttendanceLog::where('employee_id', $employee->id)->count());
-        $revived = $punch->fresh();
-        $this->assertSame($punch->id, $revived->id);
-        $this->assertNull($revived->voided_at);
-        $this->assertNull($revived->voided_by);
-
-        // The day's summary reflects the re-added punch, not a stale "still
-        // voided" state.
+        // The day's summary follows the live punch.
         $row = DailyAttendance::where('employee_id', $employee->id)
             ->whereDate('work_date', self::DAY)
             ->first();
@@ -344,15 +355,41 @@ class ManualPunchTest extends TestCase
     }
 
     /**
-     * The revive-on-exact-match lookup in addPunch() is scoped to
-     * source=manual, matching the unique index's full (employee_id,
-     * punched_at, source) key — a voided DEVICE punch at the same timestamp
-     * has a different source, so it's neither found nor collided with. A
-     * manual add there must produce a second, independent row rather than
-     * resurrecting the device row under a manual identity (which would
-     * falsely claim the device reported something it never did).
+     * The index still counts a voided DEVICE punch: re-importing the file it
+     * came from can't bring it back as a live duplicate.
      */
-    public function test_a_voided_device_punch_is_not_revived_by_a_manual_add_at_the_same_time(): void
+    public function test_a_voided_device_punch_still_blocks_the_same_punch_from_being_imported_again(): void
+    {
+        $employee = Employee::factory()->create();
+        AttendanceLog::factory()->voided()->create([
+            'employee_id' => $employee->id,
+            'punched_at' => self::DAY.' 07:55:00',
+            'punch_type' => 'in',
+            'source' => 'device',
+        ]);
+
+        $inserted = AttendanceLog::query()->insertOrIgnore([[
+            'employee_id' => $employee->id,
+            'punched_at' => self::DAY.' 07:55:00',
+            'punch_type' => 'in',
+            'source' => 'device',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]]);
+
+        $this->assertSame(0, $inserted);
+        $this->assertSame(0, AttendanceLog::where('employee_id', $employee->id)->whereNull('voided_at')->count());
+    }
+
+    /**
+     * addPunch()'s duplicate check is scoped to source=manual, matching the
+     * unique index's key — a voided DEVICE punch at the same timestamp has a
+     * different source, so it's neither found nor collided with. A manual add
+     * there must produce a second, independent row rather than resurrecting
+     * the device row under a manual identity (which would falsely claim the
+     * device reported something it never did).
+     */
+    public function test_a_manual_add_at_the_time_of_a_voided_device_punch_is_its_own_row(): void
     {
         $employee = Employee::factory()->create();
         $devicePunch = AttendanceLog::factory()->voided()->create([

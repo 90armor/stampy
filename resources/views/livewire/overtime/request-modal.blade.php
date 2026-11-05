@@ -107,7 +107,7 @@
                         <p class="font-medium">Over the daily limit</p>
                         <ul class="mt-1 space-y-0.5">
                             @foreach ($summary['limitProblems'] as $problem)
-                                <li>{{ $problem }}</li>
+                                <li wire:key="limit-problem-{{ $loop->index }}">{{ $problem }}</li>
                             @endforeach
                         </ul>
                     </div>

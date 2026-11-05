@@ -145,9 +145,7 @@
                                     <span class="pointer-events-none absolute inset-x-6 bottom-0 z-[2] h-px bg-slate-divider"></span>
                                 @endunless
                                 <div class="flex items-center gap-x-3">
-                                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold bg-slate-100 text-slate-600 dark:bg-slate-750 dark:text-slate-300">
-                                        {{ strtoupper(substr($employee->full_name, 0, 1)) }}
-                                    </span>
+                                    <x-avatar :name="$employee->full_name" class="h-8 w-8 text-xs font-semibold" />
                                     {{-- As wide as the name, so the table can't squeeze it onto two lines;
                                     a long name wraps at 14rem instead of widening the column
                                     under the pinned Status (F32). --}}

@@ -70,7 +70,7 @@ class LoginRequest extends FormRequest
 
         $user = Auth::user();
 
-        // Credentials matched, but a temporary password past its 48h window
+        // Credentials matched, but a temporary password past its window (TemporaryPassword::LIFETIME_HOURS)
         // must not grant a session at all — not just get caught later by
         // the must-change-password redirect. Undo the attempt and give the
         // specific reason rather than the generic message above, which

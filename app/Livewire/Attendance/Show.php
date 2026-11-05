@@ -5,6 +5,7 @@ namespace App\Livewire\Attendance;
 use App\Enums\LeaveStatus;
 use App\Enums\OvertimeStatus;
 use App\Enums\PunchSource;
+use App\Livewire\Attributes\QueryParam;
 use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
 use App\Models\Employee;
@@ -18,11 +19,11 @@ use App\Support\AttendanceSummary;
 use App\Support\AttendanceTime;
 use App\Support\DisplayDate;
 use App\Support\OvertimeResult;
+use App\Support\StrictDate;
 use App\Support\WorkdayCalendar;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
-use Livewire\Attributes\Url;
 use Livewire\Component;
 
 class Show extends Component
@@ -31,7 +32,7 @@ class Show extends Component
 
     public bool $noEmployeeRecord = false;
 
-    #[Url(as: 'month', history: true)]
+    #[QueryParam(as: 'month', history: true)]
     public string $month = '';
 
     /**
@@ -39,7 +40,7 @@ class Show extends Component
      * (it shows worked/late/early minutes per row, which the calendar
      * can't fit) but is now the secondary view.
      */
-    #[Url(as: 'view', history: true)]
+    #[QueryParam(as: 'view', history: true)]
     public string $view = 'calendar';
 
     /**
@@ -92,6 +93,15 @@ class Show extends Component
      */
     public function mount(?Employee $employee = null): void
     {
+        // A month or view the URL got wrong is ignored (Phase 6h).
+        if (! StrictDate::isMonth($this->month)) {
+            $this->month = '';
+        }
+
+        if (! in_array($this->view, ['calendar', 'table'], true)) {
+            $this->view = 'calendar';
+        }
+
         if ($employee === null) {
             $employee = auth()->user()->employee;
 
@@ -225,64 +235,43 @@ class Show extends Component
             return;
         }
 
-        // The unique index is (employee_id, punched_at, source) — no
-        // voided_at involved (adding it would let MySQL treat every voided
-        // row's NULL as distinct from every other NULL and stop enforcing
-        // uniqueness among LIVE rows at all, breaking Phase 2.2's
-        // idempotency guarantee — confirmed empirically, not assumed). So a
-        // voided row permanently occupies its exact key, and a plain
-        // create() would collide with it forever, not just once. Checking
-        // for it first and reviving it — rather than inserting — is
-        // correct here anyway: an admin re-adding a punch at the exact time
-        // they just voided is correcting their own correction, not
-        // creating new data.
-        $existing = AttendanceLog::query()
+        // Only a live manual punch at this exact time is a duplicate. A voided
+        // one stays as it was — who added it, who voided it and why — and the
+        // punch added now is a new row beside it (Phase 6h): the unique index
+        // leaves voided manual punches out (add_live_key_to_attendance_logs_table).
+        $duplicate = AttendanceLog::query()
             ->where('employee_id', $this->employee->id)
             ->where('punched_at', $punchedAt)
             ->where('source', PunchSource::Manual->value)
-            ->first();
+            ->whereNull('voided_at')
+            ->exists();
 
-        if ($existing !== null) {
-            if ($existing->voided_at === null) {
+        if ($duplicate) {
+            $this->addError('newPunchTime', 'A punch already exists at this exact date and time.');
+
+            return;
+        }
+
+        try {
+            AttendanceLog::create([
+                'employee_id' => $this->employee->id,
+                'punched_at' => $punchedAt,
+                'punch_type' => $this->newPunchType,
+                'source' => PunchSource::Manual,
+                'created_by' => auth()->id(),
+                'reason' => $this->newPunchReason,
+            ]);
+        } catch (QueryException $e) {
+            // Belt-and-suspenders for a race between the check above and this
+            // insert (e.g. two admins correcting the same day at once) — the
+            // pre-check makes this the rare path, not the normal one.
+            if (str_contains($e->getMessage(), 'attendance_logs_live_punch_unique')) {
                 $this->addError('newPunchTime', 'A punch already exists at this exact date and time.');
 
                 return;
             }
 
-            // Added again, by whoever did it now, why and when: the punch list
-            // reads who and when from created_by and created_at.
-            $existing->forceFill([
-                'punch_type' => $this->newPunchType,
-                'voided_at' => null,
-                'voided_by' => null,
-                'void_reason' => null,
-                'created_by' => auth()->id(),
-                'created_at' => now(),
-                'reason' => $this->newPunchReason,
-            ])->save();
-        } else {
-            try {
-                AttendanceLog::create([
-                    'employee_id' => $this->employee->id,
-                    'punched_at' => $punchedAt,
-                    'punch_type' => $this->newPunchType,
-                    'source' => PunchSource::Manual,
-                    'created_by' => auth()->id(),
-                    'reason' => $this->newPunchReason,
-                ]);
-            } catch (QueryException $e) {
-                // Belt-and-suspenders for a race between the check above and
-                // this insert (e.g. two admins correcting the same day at
-                // once) — the pre-check makes this the rare path, not the
-                // normal one.
-                if (str_contains($e->getMessage(), 'attendance_logs_employee_id_punched_at_source_unique')) {
-                    $this->addError('newPunchTime', 'A punch already exists at this exact date and time.');
-
-                    return;
-                }
-
-                throw $e;
-            }
+            throw $e;
         }
 
         $this->rebuildAround($punchedAt);
@@ -445,17 +434,6 @@ class Show extends Component
     }
 
     /**
-     * Raw punches for the month, including voided ones, grouped by calendar
-     * date of punched_at — fetched once for the whole month (not per day
-     * expanded) so opening every day's panel costs nothing extra. This is
-     * deliberately the admin-troubleshooting view of "what punches exist on
-     * this date", not DailySummaryBuilder's paired interpretation of them —
-     * an overnight out-punch shows under the date it was actually punched,
-     * even though the builder pairs it into the previous day's row.
-     *
-     * @return Collection<string, Collection<int, AttendanceLog>>
-     */
-    /**
      * Overnight shifts, so a day's punch list can say which shift a punch
      * belongs to. A (+1) out-punch is grouped under the date it was punched,
      * not the shift it closed: without this, the next day's list opens with
@@ -508,6 +486,18 @@ class Show extends Component
         return ['outs' => $outs, 'shifts' => $shifts];
     }
 
+    /**
+     * Raw punches for the month, including voided ones, grouped by calendar
+     * date of punched_at — fetched once for the whole month (not per day
+     * expanded) so opening every day's panel costs nothing extra. This is
+     * the full history of "what punches exist on this date" — voided ones
+     * too, with who and why, for the employee as for an admin — not
+     * DailySummaryBuilder's paired interpretation of them: an overnight
+     * out-punch shows under the date it was actually punched, even though
+     * the builder pairs it into the previous day's row.
+     *
+     * @return Collection<string, Collection<int, AttendanceLog>>
+     */
     private function punchesByDate(): Collection
     {
         $start = $this->monthStart();

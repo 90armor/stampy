@@ -7,6 +7,7 @@ use App\Enums\ApprovalOutcome;
 use App\Models\ApprovalStep;
 use App\Models\Employee;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 /**
@@ -69,7 +70,21 @@ class ApprovalFlow
      */
     public function stepOneCandidates(): Collection
     {
-        return User::role(['manager', 'admin'])->with('employee')->get();
+        return self::withRoles(['manager', 'admin'])->with('employee')->get();
+    }
+
+    /**
+     * Users holding any of these roles, with their roles loaded (Phase 6h):
+     * one query by role name, where spatie's User::role() first looked each
+     * role up by name (a query apiece), and every hasRole() on the users it
+     * returned then loaded that user's roles again.
+     *
+     * @param  list<string>  $names
+     * @return Builder<User>
+     */
+    private static function withRoles(array $names): Builder
+    {
+        return User::query()->whereHas('roles', fn (Builder $query) => $query->whereIn('name', $names))->with('roles');
     }
 
     /**
@@ -108,7 +123,7 @@ class ApprovalFlow
     {
         $requesterId = $this->requester($approvable)?->id;
 
-        return User::role('admin')->get()->reject(fn (User $user) => $user->id === $requesterId)->values();
+        return self::withRoles(['admin'])->get()->reject(fn (User $user) => $user->id === $requesterId)->values();
     }
 
     /** The requester is the only admin, so their step 2 is self_approved. */

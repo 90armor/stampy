@@ -47,6 +47,7 @@ class PasswordResetForNoEmailAccountsTest extends TestCase
             ->test(FormModal::class)
             ->call('edit', $employee->id)
             ->call('resetPassword')
+            ->assertSee('It expires in 7 days and must be changed on first login.')
             ->assertSet('resetPasswordValue', fn ($value) => is_string($value) && Hash::check($value, $user->fresh()->password));
 
         $user->refresh();
@@ -55,7 +56,7 @@ class PasswordResetForNoEmailAccountsTest extends TestCase
         $this->assertSame($admin->id, $user->password_reset_by);
         $this->assertNotNull($user->password_reset_at);
         $this->assertNotNull($user->temporary_password_expires_at);
-        $this->assertTrue($user->temporary_password_expires_at->betweenIncluded(now()->addHours(47), now()->addHours(49)));
+        $this->assertTrue($user->temporary_password_expires_at->betweenIncluded(now()->addDays(7)->subHour(), now()->addDays(7)->addHour()));
     }
 
     public function test_resetting_the_password_of_an_employee_with_no_login_fails_cleanly(): void
@@ -145,7 +146,7 @@ class PasswordResetForNoEmailAccountsTest extends TestCase
         $user = User::factory()->create([
             'must_change_password' => true,
             'password_changed_at' => null,
-            'temporary_password_expires_at' => now()->addHours(48),
+            'temporary_password_expires_at' => now()->addDays(7),
         ])->assignRole('employee');
 
         $this->actingAs($user)
@@ -167,7 +168,7 @@ class PasswordResetForNoEmailAccountsTest extends TestCase
         $user = User::factory()->create([
             'password' => Hash::make('Kyaw-4871'),
             'must_change_password' => true,
-            'temporary_password_expires_at' => now()->addHours(48),
+            'temporary_password_expires_at' => now()->addDays(7),
         ])->assignRole('employee');
 
         $this->actingAs($user)
@@ -180,12 +181,12 @@ class PasswordResetForNoEmailAccountsTest extends TestCase
         $this->assertTrue($user->fresh()->must_change_password);
     }
 
-    public function test_a_temporary_password_older_than_48h_is_rejected_at_login_with_the_specific_message(): void
+    public function test_an_expired_temporary_password_is_rejected_at_login_with_the_specific_message(): void
     {
         $user = User::factory()->create([
             'password' => Hash::make('Kyaw-4871'),
             'must_change_password' => true,
-            'temporary_password_expires_at' => now()->subHours(49),
+            'temporary_password_expires_at' => now()->subHour(),
         ]);
 
         $response = $this->post('/login', [
@@ -249,7 +250,7 @@ class PasswordResetForNoEmailAccountsTest extends TestCase
 
         $user = User::factory()->create([
             'must_change_password' => true,
-            'temporary_password_expires_at' => now()->addHours(48),
+            'temporary_password_expires_at' => now()->addDays(7),
         ]);
 
         $this->post('/forgot-password', ['email' => $user->email]);

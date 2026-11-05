@@ -3,17 +3,18 @@
 namespace App\Livewire\Attendance;
 
 use App\Enums\AttendanceStatus;
+use App\Livewire\Attributes\QueryParam;
 use App\Models\DailyAttendance;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Support\AttendanceGaps;
 use App\Support\DashboardAttendance;
 use App\Support\EmployeeScope;
+use App\Support\StrictDate;
 use App\Support\WorkdayCalendar;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -33,20 +34,20 @@ class Index extends Component
      */
     private ?EmployeeScope $scope = null;
 
-    #[Url(as: 'from', history: true)]
+    #[QueryParam(as: 'from', history: true)]
     public string $fromDate = '';
 
-    #[Url(as: 'to', history: true)]
+    #[QueryParam(as: 'to', history: true)]
     public string $toDate = '';
 
-    #[Url(as: 'q', history: true)]
+    #[QueryParam(as: 'q', history: true)]
     public string $employeeFilter = '';
 
-    #[Url(as: 'department', history: true)]
+    #[QueryParam(as: 'department', history: true)]
     public string $departmentFilter = '';
 
     /** @var string[] */
-    #[Url(as: 'status', history: true)]
+    #[QueryParam(as: 'status', history: true)]
     public array $statuses = [];
 
     /**
@@ -59,7 +60,7 @@ class Index extends Component
      *
      * @var string[]
      */
-    #[Url(as: 'timing', history: true)]
+    #[QueryParam(as: 'timing', history: true)]
     public array $timingFilters = [];
 
     /**
@@ -68,14 +69,14 @@ class Index extends Component
      * lists only today's (Phase 3e). Neither a status nor timing: its own
      * filter.
      */
-    #[Url(as: 'worked-on-leave', history: true)]
+    #[QueryParam(as: 'worked-on-leave', history: true)]
     public bool $workedOnLeave = false;
 
     /**
      * Only days with credited overtime (Phase 4d) — an annotation, so its own
      * filter, like Worked on leave.
      */
-    #[Url(as: 'overtime', history: true)]
+    #[QueryParam(as: 'overtime', history: true)]
     public bool $overtime = false;
 
     public function mount(): void
@@ -89,13 +90,36 @@ class Index extends Component
         // mirroring EmployeePolicy::view's row-level rule.
         $this->authorize('viewAny', Employee::class);
 
-        if ($this->fromDate === '') {
+        $this->normalizeFilters();
+    }
+
+    /**
+     * Whatever the URL or a request carried, keep only what the filters know
+     * (Phase 6h; #[QueryParam] already fitted each value to its type): a real
+     * date, else today; known statuses and timings; a department id. A filter
+     * left with nothing goes back to its default.
+     */
+    public function updated(): void
+    {
+        $this->normalizeFilters();
+    }
+
+    private function normalizeFilters(): void
+    {
+        if (! StrictDate::isDay($this->fromDate)) {
             $this->fromDate = today()->format('Y-m-d');
         }
 
-        if ($this->toDate === '') {
+        if (! StrictDate::isDay($this->toDate)) {
             $this->toDate = today()->format('Y-m-d');
         }
+
+        if (! ctype_digit($this->departmentFilter)) {
+            $this->departmentFilter = '';
+        }
+
+        $this->statuses = array_values(array_intersect($this->statuses, array_column(AttendanceStatus::cases(), 'value')));
+        $this->timingFilters = array_values(array_intersect($this->timingFilters, ['late', 'early']));
 
         if ($this->statuses === []) {
             $this->statuses = $this->defaultStatuses();

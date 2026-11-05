@@ -18,9 +18,6 @@ class UnderlineTest extends TestCase
 
         foreach (File::allFiles(resource_path('views')) as $file) {
             $relative = str_replace(base_path().'/', '', $file->getPathname());
-            if ($relative === 'resources/views/welcome.blade.php') {
-                continue;
-            }
             preg_match_all('/<([\w.:-]+)\b([^>]*?)>/s', $file->getContents(), $tags, PREG_SET_ORDER);
             foreach ($tags as [$tag, $name, $attributes]) {
                 if ($name !== 'a' && preg_match('/(?<![\w:-])underline(?![\w-])/', $attributes)) {

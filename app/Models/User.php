@@ -39,7 +39,7 @@ class User extends Authenticatable
 
     /**
      * True once a temporary password (set by resetPassword()) has passed
-     * its 48h window — checked against the stored timestamp itself, not
+     * its LIFETIME_HOURS window (seven days) — checked against the stored timestamp itself, not
      * inferred from updated_at, which any unrelated row change would reset.
      */
     public function hasExpiredTemporaryPassword(): bool

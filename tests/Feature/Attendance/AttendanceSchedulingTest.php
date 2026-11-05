@@ -4,6 +4,7 @@ namespace Tests\Feature\Attendance;
 
 use App\Console\AttendanceSchedule;
 use App\Enums\AttendanceStatus;
+use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
 use App\Models\Employee;
 use App\Models\WorkSchedule;
@@ -136,7 +137,7 @@ class AttendanceSchedulingTest extends TestCase
     {
         $employee = Employee::factory()->create();
         // Monday 09:30 in-punch, no out: the pairing window closes Tuesday 03:30.
-        \App\Models\AttendanceLog::factory()->create(['employee_id' => $employee->id, 'punched_at' => '2026-02-09 09:30:00', 'punch_type' => 'in']);
+        AttendanceLog::factory()->create(['employee_id' => $employee->id, 'punched_at' => '2026-02-09 09:30:00', 'punch_type' => 'in']);
 
         // Monday evening, past end time: still in progress (overtime is still "at work").
         $this->runScheduled($this->tasksAt('2026-02-09 18:00:00')['today']);

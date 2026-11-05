@@ -3,6 +3,7 @@
 namespace Tests\Feature\Attendance;
 
 use App\Livewire\Attendance\Show;
+use App\Models\DailyAttendance;
 use App\Models\Employee;
 use App\Models\Holiday;
 use App\Models\User;
@@ -97,7 +98,7 @@ class UpcomingDaysTest extends TestCase
 
     public function test_the_table_view_still_marks_a_missing_past_workday(): void
     {
-        \App\Models\DailyAttendance::query()->whereDate('work_date', '2026-04-14')->delete();
+        DailyAttendance::query()->whereDate('work_date', '2026-04-14')->delete();
 
         $this->page('table')
             ->assertSee('Not calculated')

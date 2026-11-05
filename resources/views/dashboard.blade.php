@@ -83,7 +83,6 @@
             $cardHeader = 'flex items-baseline justify-between gap-4';
             $cardTitle = 'text-lg font-semibold text-slate-900 dark:text-slate-100';
             $cardMeta = 'shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400';
-            $avatar = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600 dark:bg-slate-750 dark:text-slate-300';
             // The own cards' styles (dashboard/own-*), as the employee dashboard has them.
             $row = 'flex items-baseline justify-between gap-4 border-t border-slate-divider py-2.5 first:border-t-0 first:pt-0 last:pb-0';
             $link = 'rounded text-sm font-medium text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-2 hover:decoration-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:decoration-primary-700 dark:hover:decoration-primary-400';
@@ -187,7 +186,7 @@
                         <ul id="needs-attention-list" class="mt-4 divide-y divide-slate-divider">
                             @foreach ($attendance['needsAttention'] as $person)
                                 <li {!! $loop->index >= $shown ? 'x-show="all" x-cloak' : '' !!} class="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-                                    <span class="{{ $avatar }}" aria-hidden="true">{{ strtoupper(substr($person['name'], 0, 1)) }}</span>
+                                    <x-avatar :name="$person['name']" class="h-9 w-9 text-xs font-semibold" />
                                     <div class="min-w-0 flex-1">
                                         <p class="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{{ $person['name'] }}</p>
                                         @if (in_array($person['kind'], ['not_in_yet', 'worked_on_leave'], true))
@@ -236,7 +235,7 @@
                         <div class="mt-4 divide-y divide-slate-divider">
                             @foreach ($attendance['recent'] as $activity)
                                 <div class="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-                                    <span class="{{ $avatar }}" aria-hidden="true">{{ strtoupper(substr($activity['name'], 0, 1)) }}</span>
+                                    <x-avatar :name="$activity['name']" class="h-9 w-9 text-xs font-semibold" />
                                     <div class="min-w-0 flex-1">
                                         <p class="truncate text-sm font-medium text-slate-700 dark:text-slate-200">{{ $activity['name'] }}</p>
                                         {{-- A log, so neutral: the late fact is shown once, in Needs attention. --}}
@@ -269,7 +268,7 @@
                         <h2 class="{{ $cardTitle }}">Quick actions</h2>
                         <div class="mt-3 space-y-1">
                             @foreach ($quickActions as $action)
-                                <a href="{{ route($action['route']) }}" wire:navigate class="group -mx-3 flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:bg-slate-600/30 dark:hover:text-white">
+                                <a href="{{ route($action['route']) }}" wire:navigate class="group -mx-3 flex max-sm:min-h-11 items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:bg-slate-600/30 dark:hover:text-white">
                                     <x-icon :name="$action['icon']" class="h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" />
                                     {{ $action['label'] }}
                                 </a>

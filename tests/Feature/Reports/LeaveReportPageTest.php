@@ -6,9 +6,11 @@ use App\Livewire\Reports\Leave as LeaveReportTab;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Leave;
+use App\Models\LeaveEntitlement;
 use App\Models\LeaveType;
 use App\Models\User;
 use App\Models\WorkSchedule;
+use App\Support\LeaveDays;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -120,7 +122,7 @@ class LeaveReportPageTest extends TestCase
             ->assertSet('year', '2026');
 
         // 2025 has a grant: it is offered, and not "as of now".
-        \App\Models\LeaveEntitlement::factory()->create(['employee_id' => $this->kyaw->id, 'leave_type_id' => $this->annual->id, 'year' => 2025, 'days' => '18.0']);
+        LeaveEntitlement::factory()->create(['employee_id' => $this->kyaw->id, 'leave_type_id' => $this->annual->id, 'year' => 2025, 'days' => '18.0']);
         Livewire::actingAs($this->admin)->test(LeaveReportTab::class)
             ->set('year', '2025')
             ->assertSet('year', '2025')
@@ -163,7 +165,7 @@ class LeaveReportPageTest extends TestCase
         foreach ([$this->annual, $this->unpaid] as $type) {
             $totals = Livewire::actingAs($this->admin)->test(LeaveReportTab::class)->set('type', (string) $type->id)->viewData('report')['totals'];
             $csvTotal = collect($lines)->first(fn ($line) => $line[0] === 'Total' && $line[5] === $type->name);
-            $this->assertSame(\App\Support\LeaveDays::toDecimal($totals['used']), $csvTotal[10]);
+            $this->assertSame(LeaveDays::toDecimal($totals['used']), $csvTotal[10]);
         }
     }
 

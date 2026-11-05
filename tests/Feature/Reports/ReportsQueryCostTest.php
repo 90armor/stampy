@@ -87,7 +87,6 @@ class ReportsQueryCostTest extends TestCase
         for ($i = 0; $i < $count; $i++, $this->made++) {
             $employee = Employee::factory()->create([
                 'full_name' => "Employee {$this->made}",
-                'employee_code' => sprintf('RPT-%04d', $this->made + 1),
                 'manager_id' => $this->manager->id,
                 'department_id' => $this->sales->id,
             ]);

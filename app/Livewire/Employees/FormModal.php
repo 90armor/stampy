@@ -13,7 +13,6 @@ use Carbon\Carbon;
 use Closure;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -62,6 +61,13 @@ class FormModal extends Component
      * never persisted anywhere but the hash, never shown again.
      */
     public ?string $resetPasswordValue = null;
+
+    /**
+     * True when the modal was opened only to reset a password — from the
+     * profile's Login card, once a temporary password has expired — so Done
+     * closes it rather than going on to the edit form.
+     */
+    public bool $resetOnly = false;
 
     protected function rules(): array
     {
@@ -184,8 +190,12 @@ class FormModal extends Component
             'device_user_id' => $this->device_user_id ?: null,
         ];
 
+        // A generated password is a temporary one (Phase 6h, N1), like a
+        // reset's: it travels by hand, so the employee chooses their own at
+        // first sign-in, and it stops working after LIFETIME_HOURS. Not a
+        // reset, so password_reset_by/at stay empty.
         if ($this->create_user && ! ($this->editing?->user_id)) {
-            $password = Str::password(12);
+            $password = TemporaryPassword::generate();
 
             $user = User::create([
                 'name' => $this->full_name,
@@ -193,6 +203,11 @@ class FormModal extends Component
                 'email' => $this->email,
                 'password' => Hash::make($password),
             ]);
+
+            $user->forceFill([
+                'must_change_password' => true,
+                'temporary_password_expires_at' => now()->addHours(TemporaryPassword::LIFETIME_HOURS),
+            ])->save();
 
             $user->assignRole($this->role);
             $data['user_id'] = $user->id;
@@ -252,10 +267,43 @@ class FormModal extends Component
             'password_changed_at' => null,
             'password_reset_by' => auth()->id(),
             'password_reset_at' => now(),
-            'temporary_password_expires_at' => now()->addHours(48),
+            'temporary_password_expires_at' => now()->addHours(TemporaryPassword::LIFETIME_HOURS),
         ])->save();
 
         $this->resetPasswordValue = $temporary;
+
+        // The profile's Login card shows the password's state.
+        $this->dispatch('employee-saved');
+    }
+
+    /**
+     * The Login card's "reset it" (Phase 6h, N1): the same reset, behind the
+     * same confirmation, opening this modal on the new password alone.
+     */
+    public function resetPasswordFor(int $id): void
+    {
+        $employee = Employee::findOrFail($id);
+
+        $this->authorize('update', $employee);
+
+        $this->resetForm();
+        $this->editing = $employee;
+        $this->resetOnly = true;
+        $this->showModal = true;
+
+        $this->resetPassword();
+    }
+
+    public function closeReset(): void
+    {
+        if (! $this->resetOnly) {
+            $this->resetPasswordValue = null;
+
+            return;
+        }
+
+        $this->showModal = false;
+        $this->resetForm();
     }
 
     protected function resetForm(): void
@@ -263,7 +311,7 @@ class FormModal extends Component
         $this->reset([
             'editing', 'full_name', 'employee_code', 'department_id', 'position_id', 'manager_id',
             'join_date', 'device_user_id', 'create_user', 'username', 'email', 'generatedPassword',
-            'resetPasswordValue',
+            'resetPasswordValue', 'resetOnly',
         ]);
         $this->role = 'employee';
         $this->resetErrorBag();

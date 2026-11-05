@@ -41,5 +41,13 @@ export default defineConfig({
             host: hmrHost,
             clientPort: hmrClientPort,
         },
+
+        // Nothing under storage/ is a source (Phase 6h): Blade compiles views
+        // into storage/framework/views, and while Vite watched them — through
+        // Tailwind's content list, which no longer reads them — each first
+        // compile rebuilt the CSS and reloaded every open page, mid-click.
+        watch: {
+            ignored: ['**/storage/**'],
+        },
     },
 });

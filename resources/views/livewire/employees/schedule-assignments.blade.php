@@ -97,7 +97,7 @@
             <p class="text-xs font-medium text-slate-500 dark:text-slate-400">Assignment history</p>
             <ul class="mt-3 space-y-2">
                 @foreach ($assignments->slice(0, -1)->reverse()->values() as $assignment)
-                    <li class="group flex items-center justify-between gap-3 rounded-xl border border-slate-divider px-4 py-3">
+                    <li wire:key="assignment-{{ $assignment->id }}" class="group flex items-center justify-between gap-3 rounded-xl border border-slate-divider px-4 py-3">
                         <div class="min-w-0">
                             <p class="break-words text-sm font-medium text-slate-900 dark:text-slate-100">
                                 {{ $assignment->workSchedule->name }}

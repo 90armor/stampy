@@ -13,20 +13,30 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 class EmployeeFactory extends Factory
 {
     /**
+     * Codes and device ids by sequence (Phase 6h): FAC-00001, F00001, …, a
+     * prefix no test or seeder writes by hand. A random EMP-#### could take a
+     * code a test had chosen (EMP-0031) about one run in a few hundred, which
+     * is why 6c's query-cost test had to name its own (RPT-).
+     */
+    private static int $sequence = 0;
+
+    /**
      * Define the model's default state.
      *
      * @return array<string, mixed>
      */
     public function definition(): array
     {
+        $sequence = ++self::$sequence;
+
         return [
             'user_id' => null,
-            'employee_code' => 'EMP-'.$this->faker->unique()->numerify('####'),
+            'employee_code' => sprintf('FAC-%05d', $sequence),
             'full_name' => $this->faker->name(),
             'department_id' => Department::factory(),
             'position_id' => Position::factory(),
             'join_date' => '2020-01-01',
-            'device_user_id' => $this->faker->unique()->numerify('####'),
+            'device_user_id' => sprintf('F%05d', $sequence),
             'status' => 'active',
             // An inactive employee needs a last day (Employee::booted()). A
             // plain ['status' => 'inactive'] left on their join date, so they

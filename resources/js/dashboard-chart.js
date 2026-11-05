@@ -57,15 +57,16 @@ const markerLabels = {
             // A marker wider than its slot ("Not calculated" at phone width)
             // wraps onto two lines, bottom-aligned, rather than spilling into
             // its neighbours — at its " · " if it has one ("Off · 2 worked"
-            // becomes "Off" over "2 worked"), else after the first word.
+            // becomes "Off" over "2 worked"), else after the first word. If
+            // "2 worked" still doesn't fit (390, Phase 6h), it's "Off · 2" —
+            // on one line, or "Off" over "2". The full text stays in the
+            // chart's accessible label.
             const slot = chartArea.width / Math.max(1, markers.length) - 4;
-            const parts = marker.includes(' · ') ? marker.split(' · ') : [marker.split(' ')[0], marker.split(' ').slice(1).join(' ')];
-            if (ctx.measureText(marker).width > slot && parts[1]) {
-                ctx.fillText(parts.slice(1).join(' · '), x, y);
-                ctx.fillText(parts[0], x, y - 14);
-            } else {
-                ctx.fillText(marker, x, y);
-            }
+            const fits = (lines) => lines.every((line) => ctx.measureText(line).width <= slot);
+            const split = (text) => (text.includes(' · ') ? [text.split(' · ')[0], text.split(' · ').slice(1).join(' · ')] : [text.split(' ')[0], text.split(' ').slice(1).join(' ')]);
+            const short = marker.replace(/ · (\d+) worked$/, ' · $1');
+            const lines = [[marker], split(marker), [short], split(short)].find((candidate) => candidate[candidate.length - 1] && fits(candidate)) ?? split(short);
+            lines.filter(Boolean).reverse().forEach((line, i) => ctx.fillText(line, x, y - i * 14));
         });
 
         ctx.restore();

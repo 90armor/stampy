@@ -1,13 +1,13 @@
-// AUDIT-ONLY (Phase 6d2): the modal focus rules in a real browser — the repo has
-// no browser runner in its suite, and focus can't be checked from PHP. One check
-// per close rule (notice, trigger, heading, <main>), never another row's Approve,
-// the trap, step changes, names; since Phase 6f also Daily attendance's Filters
-// disclosure and the overtime cancel confirmation; since Phase 6g the file-for
-// title naming the chosen employee (F28) and a punch correction's missing
-// reason (F34). It submits, decides and
-// cancels real requests on the dev
-// database: reseed afterwards. Needs the demo seed + seed-personas.php +
-// stress-employees.php. Exits 1 on any failure.
+// The modal focus rules in a real browser (Phase 6d2; permanent since Phase 6h,
+// moved from scripts/audit/) — the suite has no browser runner, and focus
+// can't be checked from PHP. One check per close rule (notice, trigger,
+// heading, <main>), never another row's Approve, the trap, step changes,
+// names; Daily attendance's Filters disclosure and the overtime cancel
+// confirmation (6f); the file-for title naming the chosen employee (F28) and
+// a punch correction's missing reason (F34, 6g). It submits, decides and
+// cancels real requests on the dev database: reseed afterwards. Needs the demo
+// seed + scripts/audit/seed-personas.php + scripts/audit/stress-employees.php.
+// Exits 1 on any failure. How to run it: tests/browser/README.md.
 import { BASE, REPO, login, themedContext, withBrowser } from './lib.mjs';
 import { execSync } from 'node:child_process';
 

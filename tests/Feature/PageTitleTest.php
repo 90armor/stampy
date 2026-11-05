@@ -137,7 +137,7 @@ class PageTitleTest extends TestCase
     {
         $offenders = [];
         foreach (File::allFiles(resource_path('views')) as $file) {
-            if (str_contains($file->getContents(), '<title') && ! in_array($file->getFilename(), ['app.blade.php', 'guest.blade.php', 'welcome.blade.php'], true)) {
+            if (str_contains($file->getContents(), '<title') && ! in_array($file->getFilename(), ['app.blade.php', 'guest.blade.php'], true)) {
                 $offenders[] = $file->getRelativePathname();
             }
         }

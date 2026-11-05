@@ -53,7 +53,7 @@
                                         ? 'cancelled'
                                         : 'shortened to end '.\App\Support\DisplayDate::compact(\Carbon\Carbon::parse($affected['end']));
                                 @endphp
-                                <li>{{ $affected['type'] }} · {{ $affected['dates'] }} ({{ $affected['status'] }}) — {{ $change }}</li>
+                                <li wire:key="affected-{{ $affected['kind'] }}-{{ $affected['id'] }}">{{ $affected['type'] }} · {{ $affected['dates'] }} ({{ $affected['status'] }}) — {{ $change }}</li>
                             @endforeach
                         </ul>
                     </div>

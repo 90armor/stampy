@@ -38,7 +38,7 @@ approval-item. $item comes from Leave\Approvals::describeOvertime(). --}}
             @if ($steps->isNotEmpty())
                 <ul class="space-y-0.5 text-xs text-slate-500 dark:text-slate-400">
                     @foreach ($steps as $step)
-                        <li>{{ 'Step '.$step->step.': '.strtolower($step->outcome->label()).($step->decidedBy ? ' by '.$step->decidedBy->name : '').' · '.\App\Support\DisplayDate::compact($step->decided_at).($step->note ? ' — “'.$step->note.'”' : '') }}</li>
+                        <li wire:key="step-{{ $step->id }}">{{ 'Step '.$step->step.': '.strtolower($step->outcome->label()).($step->decidedBy ? ' by '.$step->decidedBy->name : '').' · '.\App\Support\DisplayDate::compact($step->decided_at).($step->note ? ' — “'.$step->note.'”' : '') }}</li>
                     @endforeach
                 </ul>
             @endif

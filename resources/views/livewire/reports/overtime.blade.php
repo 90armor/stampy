@@ -60,7 +60,7 @@
                         <tr class="relative text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
                             <th scope="col" class="table-pin-lead px-4 py-3 font-medium sm:px-6">Employee</th>
                             @foreach ($categories as $key => [$label, $rateColumn])
-                                <th scope="col" class="{{ $th }}">Pay · {{ $label }}<span class="block font-normal normal-case tracking-normal">{{ $rates->{$rateColumn} }}%</span></th>
+                                <th wire:key="category-{{ $key }}" scope="col" class="{{ $th }}">Pay · {{ $label }}<span class="block font-normal normal-case tracking-normal">{{ $rates->{$rateColumn} }}%</span></th>
                             @endforeach
                             <th scope="col" class="{{ $th }}">Time off</th>
                             <th scope="col" class="px-6 py-3 text-right font-medium">Pay-equiv. hours<span class="pointer-events-none absolute inset-x-4 bottom-0 z-[2] h-px bg-slate-divider sm:inset-x-6"></span></th>
@@ -68,7 +68,7 @@
                     </thead>
                     <tbody>
                         @foreach ($report['rows'] as $row)
-                            <tr class="relative">
+                            <tr wire:key="report-row-{{ $row['code'] }}" class="relative">
                                 <td class="table-pin-lead px-4 py-4 sm:px-6">
                                     {{-- Narrower on a phone, so the pinned column leaves room
                                     for the figures: the name and code wrap instead. --}}

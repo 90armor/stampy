@@ -98,7 +98,7 @@ export const sets = {
     ]],
 };
 
-// Imported by axe-6d.mjs for the page list; run directly, it shoots.
+// Imported by axe.mjs for the page list; run directly, it shoots.
 if (process.argv[1]?.endsWith('pages.mjs')) {
 const wanted = process.argv.slice(2);
 await withBrowser(async (browser) => {
