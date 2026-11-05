@@ -2,7 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
+use App\Models\WorkSchedule;
 use App\Support\Avatar;
+use Database\Seeders\RoleSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\File;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -16,6 +20,8 @@ use Tests\TestCase;
  */
 class AvatarTest extends TestCase
 {
+    use RefreshDatabase;
+
     public static function names(): array
     {
         return [
@@ -56,5 +62,16 @@ class AvatarTest extends TestCase
         foreach (File::allFiles(resource_path('views')) as $file) {
             $this->assertDoesNotMatchRegularExpression('/strtoupper\(\s*substr\(/', $file->getContents(), $file->getRelativePathname().' builds an initial with substr(): use <x-avatar :name>.');
         }
+    }
+
+    public function test_the_topbar_menu_is_named_on_a_phone_where_only_the_avatar_shows(): void
+    {
+        $this->seed(RoleSeeder::class);
+        WorkSchedule::factory()->create(['is_default' => true]);
+        $user = User::factory()->create(['name' => 'សុខ សុភាព'])->assignRole('admin');
+
+        // The avatar is aria-hidden, and the visible name is hidden below sm.
+        $this->actingAs($user)->get('/time-off')
+            ->assertSee('<span class="sr-only sm:hidden">សុខ សុភាព</span>', false);
     }
 }

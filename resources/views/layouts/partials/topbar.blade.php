@@ -58,6 +58,9 @@
                         :aria-expanded="open.toString()"
                     >
                         <x-avatar :name="auth()->user()->name" class="h-8 w-8 font-medium" />
+                        {{-- The avatar is decorative, so below sm, where the name is hidden,
+                        this names the button (Phase 6h). --}}
+                        <span class="sr-only sm:hidden">{{ auth()->user()->name }}</span>
                         <span class="hidden sm:flex sm:flex-col sm:items-start sm:leading-tight">
                             <span class="font-medium text-slate-900 dark:text-slate-100">{{ auth()->user()->name }}</span>
                             <span class="text-xs text-slate-500 dark:text-slate-400">

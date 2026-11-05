@@ -21,6 +21,10 @@ const settle = async (page, ms = 400) => { await page.waitForLoadState('networki
 const text = async (loc) => (await loc.allInnerTexts().catch(() => [])).join(' | ').replace(/\s+/g, ' ').slice(0, 400);
 const errorsOn = async (page) => text(page.locator('[role=alert], .text-red-600, .text-red-700, p.text-sm.text-red-600'));
 
+const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const nextWorkday = () => { const d = new Date(); do d.setDate(d.getDate() + 1); while ([0, 6].includes(d.getDay())); return iso(d); };
+const workdayBack = (n) => { const d = new Date(); d.setDate(d.getDate() - n); while ([0, 6].includes(d.getDay())) d.setDate(d.getDate() - 1); return iso(d); };
+
 async function employeeJourney(browser) {
     const J = 'employee-phone';
     // 1. Login with the employee code (the persona brief asks for it).
@@ -45,7 +49,7 @@ async function employeeJourney(browser) {
     await page.goto(`${BASE}/my-attendance`); await settle(page); clicks++;
     await page.locator('[aria-current=date]').first().click().catch(() => {}); await settle(page, 600); clicks++;
     await shot(page, 'journey-day-modal-today-e2-390-light');
-    note(J, 'open today in calendar', { modal: await text(page.locator('[role=dialog]').first()) });
+    note(J, 'open today in calendar', { modal: await text(page.getByRole('dialog').last()) });
     await page.keyboard.press('Escape'); await settle(page);
     await page.getByRole('button', { name: /table/i }).first().click().catch(() => {}); await settle(page); clicks++;
     await shot(page, 'journey-my-attendance-table-e2-390-light');
@@ -55,7 +59,7 @@ async function employeeJourney(browser) {
     await page.getByRole('button', { name: /request leave/i }).first().click(); await settle(page, 600); clicks++;
     await shot(page, 'journey-leave-form-e2-390-light');
     await page.selectOption('#leave_type', { label: 'Annual' });
-    await page.fill('#leave_start-native', '2026-11-03');
+    await page.fill('#leave_start-native', nextWorkday());
     await settle(page, 300);
     const halfVisible = await page.locator('#leave_half, [name=half], input[value=am]').first().isVisible().catch(() => false);
     note(J, 'half-day choice visible after picking one date', { halfVisible });
@@ -72,7 +76,8 @@ async function employeeJourney(browser) {
     // 4. Overtime claim from 6 days ago, time off in lieu
     await page.goto(`${BASE}/overtime`); await settle(page);
     await page.getByRole('button', { name: /request overtime/i }).first().click(); await settle(page, 600);
-    await page.fill('#overtime_date-native', '2026-10-22');
+    // Three workdays back: E2's audit data already has approved overtime further back.
+    await page.fill('#overtime_date-native', workdayBack(3));
     await page.fill('#overtime_start-native', '17:00');
     await page.fill('#overtime_end-native', '19:00');
     const comp = await page.locator('#overtime_compensation option').allInnerTexts();
@@ -117,7 +122,7 @@ async function passwordReset(browser) {
         await page.goto(`${BASE}/forgot-password`);
         await page.fill('input[name=email]', value);
         await page.click('button[type=submit]'); await settle(page, 600);
-        note(J, label, { message: await text(page.locator('form').first()) });
+        note(J, label, { message: await text(page.locator('[role=status], [role=alert]')) });
         await shot(page, `journey-forgot-${label.replace(/\W+/g, '-')}-390-light`);
     }
     await ctx.close();
@@ -168,14 +173,12 @@ async function staleAndExpiry(browser) {
     const e1 = await ctxFor(browser, 'audit.new.joiner', 1440);
     await e1.page.goto(`${BASE}/time-off`); await settle(e1.page);
     await e1.page.getByRole('button', { name: /request leave/i }).first().click(); await settle(e1.page, 600);
-    // Annual first: is the reason clear?
-    await e1.page.selectOption('#leave_type', { label: 'Annual' });
-    await e1.page.locator('#leave_start').click(); await settle(e1.page, 300);
-    await e1.page.keyboard.press('Enter'); await settle(e1.page, 300);
-    await e1.page.getByRole('button', { name: /review/i }).click(); await settle(e1.page, 700);
+    // Annual can't be chosen before eligibility (Phase 6e): its option is disabled, with why.
     await shot(e1.page, 'journey-e1-annual-refused-1440-light');
-    note(J, 'E1 Annual before eligibility', { errors: await errorsOn(e1.page), options: await e1.page.locator('#leave_type option').allInnerTexts() });
+    note(J, 'E1 Annual before eligibility', { disabled: await e1.page.locator('#leave_type option:disabled').allInnerTexts() });
     await e1.page.selectOption('#leave_type', { label: 'Medical' });
+    // The native input is hidden at 1440: set it as a phone would.
+    await e1.page.evaluate((v) => { const el = document.getElementById('leave_start-native'); el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }, nextWorkday()); await settle(e1.page, 300);
     await e1.page.getByRole('button', { name: /review/i }).click(); await settle(e1.page, 700);
     await e1.page.getByRole('button', { name: /^submit/i }).click(); await settle(e1.page, 800);
     const m1 = await ctxFor(browser, 'aye.aye.mon', 1440);
@@ -185,19 +188,26 @@ async function staleAndExpiry(browser) {
     await e1.page.getByRole('button', { name: /^cancel/i }).first().click(); await settle(e1.page, 400);
     await e1.page.locator('[role=alertdialog]').getByRole('button').last().click(); await settle(e1.page, 700);
     // M1 approves the stale item
-    const item = m1.page.locator('li', { hasText: 'Sreyneang Kim' }).first();
+    // The item itself (wire:key="approval-…"), not an outer list item that holds it.
+    // By its name line: another card's "Also off" can name Sreyneang Kim too.
+    const item = m1.page.locator('li[wire\\:key^="approval-"]').filter({ has: m1.page.locator('p.font-semibold', { hasText: 'Sreyneang Kim' }) }).first();
+    note(J, 'E1 request in M1 queue', { found: await item.count() });
     await item.getByRole('button', { name: 'Approve' }).click(); await settle(m1.page, 600);
-    await m1.page.locator('[role=dialog] button[type=submit]').click(); await settle(m1.page, 800);
+    // Since Phase 6b a request that moved on doesn't open the dialog at all: the notice says why.
+    const dialogOpened = await m1.page.locator('[role=dialog] button[type=submit]').isVisible().catch(() => false);
+    if (dialogOpened) { await m1.page.locator('[role=dialog] button[type=submit]').click(); await settle(m1.page, 800); }
+    note(J, 'decision dialog opened for the cancelled request', { dialogOpened });
     await shot(m1.page, 'journey-stale-approve-m1-1440-light');
-    note(J, 'approve a cancelled request', { message: await text(m1.page.locator('[role=dialog]').last()), errors: await errorsOn(m1.page), page: (await text(m1.page.locator('main'))).slice(0, 300) });
+    note(J, 'approve a cancelled request', { notice: await text(m1.page.locator('[data-focus-notice], [role=status]')), page: (await text(m1.page.locator('main'))).slice(0, 300) });
     // Session expiry during a Livewire action: drop the session cookie, then act.
     await m1.ctx.clearCookies();
     await m1.page.goto(`${BASE}/approvals`).catch(() => {});
-    const m1b = await ctxFor(browser, 'aye.aye.mon', 390);
+    // 1440: below 640px the chips are behind Filters (Phase 6f).
+    const m1b = await ctxFor(browser, 'aye.aye.mon', 1440);
     await m1b.page.goto(`${BASE}/attendance`); await settle(m1b.page);
     await m1b.ctx.clearCookies();
     await m1b.page.getByRole('button', { name: /late/i }).first().click().catch(() => {}); await settle(m1b.page, 1200);
-    await shot(m1b.page, 'journey-livewire-419-m1-390-light');
+    await shot(m1b.page, 'journey-livewire-419-m1-1440-light');
     note(J, 'livewire action after session loss', { dialogs: [...m1b.dialogs], url: m1b.page.url() });
     // A plain form POST with an expired token
     const g = await browser.newContext({ viewport: { width: 390, height: 844 } });
