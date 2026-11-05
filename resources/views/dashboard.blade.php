@@ -268,7 +268,7 @@
                         <h2 class="{{ $cardTitle }}">Quick actions</h2>
                         <div class="mt-3 space-y-1">
                             @foreach ($quickActions as $action)
-                                <a href="{{ route($action['route']) }}" wire:navigate class="group -mx-3 flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:bg-slate-600/30 dark:hover:text-white">
+                                <a href="{{ route($action['route']) }}" wire:navigate class="group -mx-3 flex max-sm:min-h-11 items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:bg-slate-600/30 dark:hover:text-white">
                                     <x-icon :name="$action['icon']" class="h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" />
                                     {{ $action['label'] }}
                                 </a>

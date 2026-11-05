@@ -248,12 +248,14 @@
                 </div>
 
                 {{-- One control: the container is h-control and rounded-lg; its two segments
-                are rounded-lg too, on the radius scale (docs/DESIGN_SYSTEM.md, Control height). --}}
-                <div class="inline-flex h-control max-sm:h-11 items-stretch rounded-lg border border-slate-border bg-white p-0.5 dark:bg-slate-750" role="group" aria-label="View">
+                are rounded-lg too, on the radius scale (docs/DESIGN_SYSTEM.md, Control height).
+                Below 640px the segments themselves are the 44px targets, so the container
+                grows around them (Phase 6h, N2: at h-11 they were 38px inside it). --}}
+                <div class="inline-flex h-control max-sm:h-auto items-stretch rounded-lg border border-slate-border bg-white p-0.5 dark:bg-slate-750" role="group" aria-label="View">
                     <button
                         type="button"
                         wire:click="$set('view', 'calendar')"
-                        class="inline-flex items-center rounded-lg px-3 text-sm ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 {{ $view === 'calendar' ? 'font-semibold bg-primary-50 text-primary-700 ring-primary-600 dark:bg-primary-600/35 dark:text-primary-200 dark:ring-primary-500' : 'font-medium ring-transparent text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}"
+                        class="inline-flex max-sm:min-h-11 items-center rounded-lg px-3 text-sm ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 {{ $view === 'calendar' ? 'font-semibold bg-primary-50 text-primary-700 ring-primary-600 dark:bg-primary-600/35 dark:text-primary-200 dark:ring-primary-500' : 'font-medium ring-transparent text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}"
                         aria-pressed="{{ $view === 'calendar' ? 'true' : 'false' }}"
                     >
                         Calendar
@@ -261,7 +263,7 @@
                     <button
                         type="button"
                         wire:click="$set('view', 'table')"
-                        class="inline-flex items-center rounded-lg px-3 text-sm ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 {{ $view === 'table' ? 'font-semibold bg-primary-50 text-primary-700 ring-primary-600 dark:bg-primary-600/35 dark:text-primary-200 dark:ring-primary-500' : 'font-medium ring-transparent text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}"
+                        class="inline-flex max-sm:min-h-11 items-center rounded-lg px-3 text-sm ring-1 ring-inset transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 {{ $view === 'table' ? 'font-semibold bg-primary-50 text-primary-700 ring-primary-600 dark:bg-primary-600/35 dark:text-primary-200 dark:ring-primary-500' : 'font-medium ring-transparent text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' }}"
                         aria-pressed="{{ $view === 'table' ? 'true' : 'false' }}"
                     >
                         Table

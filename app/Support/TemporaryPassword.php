@@ -5,6 +5,13 @@ namespace App\Support;
 class TemporaryPassword
 {
     /**
+     * How long a temporary password signs in for — one set by a reset, or
+     * generated with a new login (Phase 6h, N1). Past it, login refuses it
+     * (User::hasExpiredTemporaryPassword()) and an admin resets it again.
+     */
+    public const LIFETIME_HOURS = 48;
+
+    /**
      * Short, name-like words rather than a random string — this travels by
      * paper, Telegram, or word of mouth, and needs to be read aloud or
      * copied by hand without inviting transcription errors. The random

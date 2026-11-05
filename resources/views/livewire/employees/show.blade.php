@@ -96,7 +96,31 @@
                     <div class="sm:grid sm:grid-cols-[max-content_minmax(0,1fr)] sm:items-baseline sm:gap-x-4">
                         <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Password</dt>
                         <dd class="mt-1 text-sm text-slate-900 dark:text-slate-100">
-                            @if ($employee->user->must_change_password)
+                            @if ($employee->user->hasExpiredTemporaryPassword())
+                                {{-- Phase 6h, N1: login refuses it, so say so and offer the
+                                reset here. A native button: the confirmation's message needs
+                                @js(), which doesn't compile inside a component tag. Below
+                                640px a 44px target, as a text link is (Phase 6f). --}}
+                                @can('update', $employee)
+                                    <p class="text-slate-900 dark:text-slate-100">
+                                        Temporary password expired —
+                                        <button
+                                            type="button"
+                                            x-data="{}"
+                                            @click="$dispatch('confirm-dialog-form-modal', {
+                                                title: 'Reset password',
+                                                message: @js('Reset the password for '.$employee->full_name.'? You get a new temporary password to share with them.'),
+                                                confirmText: 'Reset password',
+                                                method: 'resetPasswordFor',
+                                                args: [{{ $employee->id }}],
+                                            })"
+                                            class="rounded font-medium text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-2 transition hover:decoration-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 max-sm:-my-3 max-sm:inline-flex max-sm:min-h-11 max-sm:items-center dark:text-primary-400 dark:decoration-primary-700 dark:hover:decoration-primary-400"
+                                        >reset it</button>
+                                    </p>
+                                @else
+                                    <p class="text-slate-900 dark:text-slate-100">Temporary password expired — an admin can reset it</p>
+                                @endif
+                            @elseif ($employee->user->must_change_password)
                                 <x-badge color="amber">Change pending</x-badge>
                             @else
                                 <span class="text-slate-500 dark:text-slate-400">Up to date</span>

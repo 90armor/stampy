@@ -12,7 +12,7 @@ Closed out on 5 Nov 2026 (Phase 6h, branch `ui-polish/6h-hygiene`) by re-running
 | Admin journey | Result |
 |---|---|
 | Add an employee without a login | saved; no user |
-| Add an employee with a login | saved; user `journey.login` (see N1) |
+| Add an employee with a login | saved; user `journey.login` (see N1, fixed since) |
 | A new schedule, then an effective-dated change to it | assignment from Mon 16 Nov |
 | A new holiday | saved |
 | An opening-balance adjustment | +1.5 days, with its note |
@@ -66,15 +66,15 @@ Closed out on 5 Nov 2026 (Phase 6h, branch `ui-polish/6h-hygiene`) by re-running
 | audit.admin | `/dashboard` | 288 | 111 | 135 | 90 |
 | audit.admin | `/time-off` | 258 | 68 | 97 | 58 |
 
-**Still open.** The payroll items wait on HR (Phase 5c, `docs/HR_DECISIONS.md` 24–28). New from the re-run, none fixed here (none is a P1):
+**Still open.** The payroll items wait on HR (Phase 5c, `docs/HR_DECISIONS.md` 24–28). New from the re-run (none a P1), all fixed in the 6h follow-up:
 
-| ID | Severity | Where | What | Decision |
-|---|---|---|---|---|
-| N1 | P2 | Employee form, "Create a login account" | The generated password the admin is shown never has to be changed and never expires, unlike Reset password (must change, 48 hours). `docs/GO_LIVE.md` calls these temporary passwords. | Owner: make a new account's password temporary like a reset's? |
-| N2 | P3 | My attendance and an employee's calendar, 390 | The Calendar / Table toggle is 38px tall, under 6f's 44px rule for employee pages. | Agent |
-| N3 | P3 | Approvals, 390 | The "Show 6" button for the other approvers' requests is 28px tall. | Agent |
-| N4 | P3 | Admin dashboard, 390 | Quick actions are 36px tall; 6f's rule covers employee and approver pages, so this is outside it. | Owner: extend the rule to admin pages? |
-| N5 | P3 | `DashboardAttendance` | Each status definition carries a `dot` class that no view renders (and Tailwind doesn't scan `app/`, so it would have no CSS). Dead code. | Agent |
+| ID | Severity | Where | What | Decision | Status (Phase 6) |
+|---|---|---|---|---|---|
+| N1 | P2 | Employee form, "Create a login account" | The generated password the admin is shown never has to be changed and never expires, unlike Reset password (must change, 48 hours). `docs/GO_LIVE.md` calls these temporary passwords. | Owner: make it temporary, like a reset's. | Fixed, 6h follow-up: a temporary password (same words-and-digits form, 48 hours, changed at first sign-in), for a new employee's login and one added later; the Login card says "Temporary password expired — reset it" once it has, with the reset (`GeneratedPasswordTest`) |
+| N2 | P3 | My attendance and an employee's calendar, 390 | The Calendar / Table toggle is 38px tall, under 6f's 44px rule for employee pages. | Agent | Fixed, 6h follow-up: 6f made the toggle's frame 44px, but its border and padding left the two buttons 38px; below 640px the buttons are 44px and the frame 50px |
+| N3 | P3 | Approvals, 390 | The "Show 6" button for the other approvers' requests is 28px tall. | Agent | Fixed, 6h follow-up: 44px below 640px |
+| N4 | P3 | Admin dashboard, 390 | Quick actions are 36px tall; 6f's rule covers employee and approver pages, so this is outside it. | Owner: 44px below 640px, desktop unchanged. | Fixed, 6h follow-up |
+| N5 | P3 | `DashboardAttendance` | Each status definition carries a `dot` class that no view renders (and Tailwind doesn't scan `app/`, so it would have no CSS). Dead code. | Agent | Fixed, 6h follow-up: removed |
 
 The calendar's day cells are 39px wide at 390 — seven across a phone — and 64px tall; that is the grid, above WCAG's 24px minimum, not a finding.
 

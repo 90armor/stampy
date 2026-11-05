@@ -3,7 +3,8 @@
 
     <h1 class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Choose a permanent password</h1>
     <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">
-        An admin reset your password. Pick a new one to continue — you won't be able to use the rest of the app until you do.
+        {{-- A reset leaves password_reset_at; a new login's generated password doesn't (Phase 6h). --}}
+        {{ auth()->user()->password_reset_at ? 'An admin reset your password.' : 'You signed in with a temporary password.' }} Pick a new one to continue — you won't be able to use the rest of the app until you do.
     </p>
 
     <form method="POST" action="{{ route('password.change.update') }}" class="mt-8 space-y-5">

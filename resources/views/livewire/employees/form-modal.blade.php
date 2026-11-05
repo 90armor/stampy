@@ -19,14 +19,14 @@
                     <div class="flex gap-2"><dt class="font-medium text-slate-500 dark:text-slate-400 w-36">Temporary password</dt><dd class="font-mono text-slate-900 dark:text-slate-100">{{ $resetPasswordValue }}</dd></div>
                 </dl>
                 <div class="mt-4">
-                    <x-button type="button" variant="primary" wire:click="$set('resetPasswordValue', null)">Done</x-button>
+                    <x-button type="button" variant="primary" wire:click="closeReset">Done</x-button>
                 </div>
             </div>
         @elseif ($generatedPassword)
             <div class="p-6">
                 <x-modal.title look="text-base font-semibold text-green-700 dark:text-green-400">Employee saved — account created</x-modal.title>
                 <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    Share these credentials with {{ $full_name }}. This password is shown once and cannot be retrieved later.
+                    Share these credentials with {{ $full_name }}. This temporary password is shown once and cannot be retrieved later. It expires in 48 hours and must be changed at first sign-in.
                 </p>
                 <dl class="mt-3 space-y-1 text-sm">
                     <div class="flex gap-2"><dt class="font-medium text-slate-500 dark:text-slate-400 w-20">Username</dt><dd class="text-slate-900 dark:text-slate-100">{{ $username }}</dd></div>

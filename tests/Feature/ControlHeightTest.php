@@ -79,9 +79,11 @@ class ControlHeightTest extends TestCase
         $this->assertSame(2, preg_match_all('/aria-label="(?:Previous|Next) month"/', $view));
         // 44px below sm, a touch target (Phase 6f).
         $this->assertSame(2, substr_count($view, 'inline-flex h-control w-control max-sm:h-11 max-sm:w-11 items-center justify-center rounded-lg border'));
-        // Calendar/Table: one h-control container (44px below sm), rounded-lg segments, no rounded-md.
-        $this->assertStringContainsString('inline-flex h-control max-sm:h-11 items-stretch rounded-lg border border-slate-border bg-white p-0.5', $view);
-        $this->assertSame(2, substr_count($view, 'class="inline-flex items-center rounded-lg px-3 text-sm ring-1 ring-inset'));
+        // Calendar/Table: one h-control container, rounded-lg segments, no rounded-md;
+        // below sm the segments themselves are 44px and the container grows around them
+        // (Phase 6h, N2 — at a 44px container they were 38px).
+        $this->assertStringContainsString('inline-flex h-control max-sm:h-auto items-stretch rounded-lg border border-slate-border bg-white p-0.5', $view);
+        $this->assertSame(2, substr_count($view, 'class="inline-flex max-sm:min-h-11 items-center rounded-lg px-3 text-sm ring-1 ring-inset'));
         $this->assertStringNotContainsString('rounded-md px-3 py-1.5', $view);
     }
 }

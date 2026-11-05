@@ -84,7 +84,8 @@ await withBrowser(async (b) => {
         await dialog(p).getByRole('button', { name: 'Save employee' }).click(); await settle(p, 900);
         await shot('employee-with-login-saved');
         const row = sql("select concat(u.username, ' | ', u.name, ' | must change: ', u.must_change_password) from users u join employees e on e.user_id = u.id where e.employee_code = 'JRN-002'");
-        expect(row.startsWith('journey.login | Journey With Login'), `users row: "${row}"`);
+        // A generated password is temporary (Phase 6h follow-up, N1).
+        expect(row === 'journey.login | Journey With Login | must change: 1', `users row: "${row}"`);
         await p.keyboard.press('Escape'); await settle(p);
         return row;
     });
