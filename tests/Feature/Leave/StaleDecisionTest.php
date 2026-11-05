@@ -330,7 +330,7 @@ class StaleDecisionTest extends TestCase
         $queue = count($page->viewData('stepOne')) + count($page->viewData('stepTwo'));
 
         $this->assertSame($expected, $queue);
-        $this->assertSame([], $page->viewData('overrides'));
+        $this->assertSame([], [...$page->viewData('stuckOverrides'), ...$page->viewData('otherOverrides')]);
         $page->assertDispatched('approval-badge', count: $expected);
         // What the badge shows on the next page load.
         $this->assertSame($expected, ApprovalInbox::count($user));

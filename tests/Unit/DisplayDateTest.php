@@ -35,6 +35,17 @@ class DisplayDateTest extends TestCase
         $this->assertSame('28 Dec 2025 – 3 Jan 2026', DisplayDate::range(Carbon::parse('2025-12-28'), Carbon::parse('2026-01-03')));
     }
 
+    /** Phase 6j: the Approvals rows' range, each end with its weekday. */
+    public function test_weekday_range(): void
+    {
+        $this->assertSame('Tue 29 Sep', DisplayDate::weekdayRange(Carbon::parse('2026-09-29'), Carbon::parse('2026-09-29')));
+        $this->assertSame('Mon 16 – Thu 19 Nov', DisplayDate::weekdayRange(Carbon::parse('2026-11-16'), Carbon::parse('2026-11-19')));
+        $this->assertSame('Mon 30 Nov – Wed 2 Dec', DisplayDate::weekdayRange(Carbon::parse('2026-11-30'), Carbon::parse('2026-12-02')));
+        $this->assertSame('Mon 28 Dec 2026 – Tue 5 Jan 2027', DisplayDate::weekdayRange(Carbon::parse('2026-12-28'), Carbon::parse('2027-01-05')));
+        $this->assertSame('Mon 15 – Wed 17 Mar 2027', DisplayDate::weekdayRange(Carbon::parse('2027-03-15'), Carbon::parse('2027-03-17')));
+        $this->assertSame('Fri 26 Feb – Tue 2 Mar 2027', DisplayDate::weekdayRange(Carbon::parse('2027-02-26'), Carbon::parse('2027-03-02')));
+    }
+
     public function test_long_always_includes_the_year(): void
     {
         $this->assertSame('Tuesday, 29 September 2026', DisplayDate::long(Carbon::parse('2026-09-29')));

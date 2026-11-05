@@ -37,7 +37,7 @@ class QueryParameterJunkTest extends TestCase
         '/reports/overtime' => ['month'],
         '/policies' => ['tab'],
         '/organization' => ['tab'],
-        '/approvals' => ['tab', 'page'],
+        '/approvals' => ['type', 'tab', 'page'],
         '/time-off' => ['page'],
         '/overtime' => ['page'],
         '/dashboard' => ['page'],

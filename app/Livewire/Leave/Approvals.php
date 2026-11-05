@@ -6,9 +6,11 @@ use App\Contracts\Approvable;
 use App\Enums\ApprovalOutcome;
 use App\Enums\LeaveStatus;
 use App\Enums\OvertimeCompensation;
+use App\Enums\OvertimeKind;
 use App\Enums\OvertimeStatus;
 use App\Exceptions\OvertimeValidationException;
 use App\Exceptions\StaleDecisionException;
+use App\Livewire\Attributes\QueryParam;
 use App\Models\ApprovalStep;
 use App\Models\Leave;
 use App\Models\OvertimeRequest;
@@ -55,6 +57,15 @@ use Livewire\Component;
  */
 class Approvals extends Component
 {
+    /** The type filter chips: all, leave or overtime (Phase 6j). */
+    #[QueryParam(as: 'type', history: true)]
+    public string $typeFilter = 'all';
+
+    /**
+     * Whether "You can override" lists the requests that aren't stuck: the
+     * stuck ones are always listed, the rest behind "{n} more waiting for
+     * managers" (Phase 6j).
+     */
     public bool $showOverrides = false;
 
     public bool $showDecision = false;
@@ -91,6 +102,17 @@ class Approvals extends Component
     public function mount(): void
     {
         $this->authorize('decideAny', Leave::class);
+
+        if (! in_array($this->typeFilter, self::TYPE_FILTERS, true)) {
+            $this->typeFilter = 'all';
+        }
+    }
+
+    public const TYPE_FILTERS = ['all', 'leave', 'overtime'];
+
+    public function filterBy(string $type): void
+    {
+        $this->typeFilter = in_array($type, self::TYPE_FILTERS, true) ? $type : 'all';
     }
 
     /**
@@ -289,26 +311,46 @@ class Approvals extends Component
         $this->authorize('decideAny', Leave::class);
 
         $user = auth()->user();
+        $isAdmin = $user->hasRole('admin');
         [$inbox, $status] = ApprovalInbox::withStatus($user);
         $waiting = ApprovalInbox::countOf($inbox, $status);
         // The sidebar badge and the menu-button dot are rendered with the page,
         // outside this component: every render — a decision, a stale removal —
         // sends them the count of the list it shows (Phase 6b), and on a full
-        // page load they show it without counting again (Phase 6c).
+        // page load they show it without counting again (Phase 6c). Always the
+        // whole queue, whatever the type filter.
         ApprovalBadge::remember($user, $waiting);
         $this->dispatch('approval-badge', count: $waiting);
+
+        $all = $inbox['stepOne']->concat($inbox['stepTwo'])->concat($inbox['overrides']);
+        $typeCounts = [
+            'all' => $all->count(),
+            'leave' => $all->filter(fn (Approvable $item) => $item instanceof Leave)->count(),
+            'overtime' => $all->filter(fn (Approvable $item) => $item instanceof OvertimeRequest)->count(),
+        ];
+        $shown = fn (Collection $items) => $items->filter(fn (Approvable $item) => match ($this->typeFilter) {
+            'leave' => $item instanceof Leave,
+            'overtime' => $item instanceof OvertimeRequest,
+            default => true,
+        })->values();
+        $groups = array_map($shown, $inbox);
+
         $visible = EmployeeScope::for($user, 'Approvals')->ids;
-        $facts = $this->facts($inbox['stepOne']->concat($inbox['stepTwo'])->concat($inbox['overrides']), $balances, $counter, $overtime, $visible);
-        $describeOne = fn (Approvable $item) => $item instanceof OvertimeRequest
-            ? $this->describeOvertime($item, $facts)
-            : $this->describe($item, $facts);
-        $describe = fn (Collection $items) => $items->map($describeOne)->all();
-        // Only the override group says "Stuck": it's why an admin steps in there.
-        $describeOverrides = fn (Collection $items) => $items->map(fn (Approvable $item) => [
-            ...$describeOne($item),
-            'stuck' => $status[ApprovalInbox::key($item)]['stuck'],
-            'awayReason' => $status[ApprovalInbox::key($item)]['awayReason'],
-        ])->all();
+        $facts = $this->facts($groups['stepOne']->concat($groups['stepTwo'])->concat($groups['overrides']), $balances, $counter, $overtime, $visible);
+        // The override rows' step column names the requester's manager: one query, only when there are any.
+        EloquentCollection::make($groups['overrides']->pluck('employee')->unique('id')->values()->all())->loadMissing('manager');
+        // $section decides the step column: empty in "Waiting for you", who
+        // approved step 1 in "Waiting for admin", whose step it is in "You can override".
+        $describe = fn (Collection $items, string $section) => $items->map(function (Approvable $item) use ($facts, $status, $isAdmin, $section) {
+            $itemStatus = $status[ApprovalInbox::key($item)] ?? ['stuck' => false, 'awayReason' => null, 'awayUntil' => null];
+            $described = $item instanceof OvertimeRequest
+                ? $this->describeOvertime($item, $facts, $itemStatus, $isAdmin)
+                : $this->describe($item, $facts, $itemStatus);
+
+            return [...$described, 'step' => $this->stepLabel($item, $section, $itemStatus)];
+        })->all();
+
+        $overrides = $describe($groups['overrides'], 'overrides');
 
         $deciding = $this->decidingId === null ? null : ($this->decidingType === 'overtime'
             ? OvertimeRequest::with('employee')->find($this->decidingId)
@@ -317,25 +359,29 @@ class Approvals extends Component
         $limitProblems = $deciding instanceof OvertimeRequest && $this->decision === 'approve' ? $overtime->currentLimitProblems($deciding) : [];
 
         return view('livewire.leave.approvals', [
-            'isAdmin' => $user->hasRole('admin'),
-            'stepOne' => $describe($inbox['stepOne']),
-            'stepTwo' => $describe($inbox['stepTwo']),
-            'overrides' => $describeOverrides($inbox['overrides']),
+            'isAdmin' => $isAdmin,
+            'typeCounts' => $typeCounts,
+            'stepOne' => $describe($groups['stepOne'], 'stepOne'),
+            'stepTwo' => $describe($groups['stepTwo'], 'stepTwo'),
+            // Stuck first (ApprovalInbox's order): listed; the rest behind a toggle.
+            'stuckOverrides' => array_values(array_filter($overrides, fn (array $item) => $item['stuck'])),
+            'otherOverrides' => array_values(array_filter($overrides, fn (array $item) => ! $item['stuck'])),
             'deciding' => $deciding,
             'decidesBoth' => $decidesBoth,
             'limitProblems' => $limitProblems,
             // Completing it over a limit needs an admin's reason; a manager's step 1 doesn't.
-            'needsOverride' => $limitProblems !== [] && $user->hasRole('admin') && ($decidesBoth || $deciding?->current_step === ApprovalFlow::ADMIN_STEP),
+            'needsOverride' => $limitProblems !== [] && $isAdmin && ($decidesBoth || $deciding?->current_step === ApprovalFlow::ADMIN_STEP),
             'timeOffOffered' => OvertimeSettings::current()->toil_leave_type_id !== null,
         ])->layout('layouts.app', ['header' => 'Approvals']);
     }
 
     /**
-     * Everything the cards read, loaded once for every request on the page
-     * rather than per card (Phase 6c): relations, each leave's cost, the
+     * Everything the rows read, loaded once for every request on the page
+     * rather than per row (Phase 6c): relations, each leave's cost, the
      * balances after it (LeaveBalance::forMany(), per balance type and year),
-     * "Also off" (one query, each card's share filtered here exactly as its
-     * own query did) and what each past overtime request's punches would
+     * "Also off" (one query, each row's share filtered here exactly as its
+     * own query did) and, for every overtime request, what its window counts
+     * and its limit problems — and for a past one what its punches would
      * credit (OvertimeRequestService::creditsFor()).
      *
      * @param  Collection<int, Approvable>  $items
@@ -380,34 +426,43 @@ class Approvals extends Component
             ->orderBy('id')
             ->get();
 
-        $past = $overtimeRequests->filter(fn (OvertimeRequest $request) => ! $request->date->isFuture())->values();
-
-        return ['costs' => $costs, 'balances' => $found, 'alsoOff' => $alsoOff, 'credits' => $overtime->creditsFor($past)];
+        return ['costs' => $costs, 'balances' => $found, 'alsoOff' => $alsoOff, 'credits' => $overtime->creditsFor($overtimeRequests)];
     }
 
     /**
-     * What one overtime request card shows: the request, and for a claim or a
-     * planned date that has passed, what the day's punches would credit if it
-     * were approved (OvertimeRequestService::wouldCredit() — the builder's own
-     * calculation — through creditsFor(), in facts()).
+     * One overtime row: who, when, how long, its signals and step, and the
+     * details behind "Show details" — for a claim or a planned date that has
+     * passed, what the day's punches would credit if it were approved
+     * (OvertimeRequestService::wouldCredit() — the builder's own calculation
+     * — through creditsFor(), in facts()).
      *
      * @param  array<string, mixed>  $facts  facts()
+     * @param  array{stuck: bool, awayReason: ?string, awayUntil: mixed}  $status
      * @return array<string, mixed>
      */
-    private function describeOvertime(OvertimeRequest $request, array $facts): array
+    private function describeOvertime(OvertimeRequest $request, array $facts, array $status, bool $isAdmin): array
     {
+        $settings = OvertimeSettings::current();
+        ['would' => $would, 'requested' => $requested, 'split' => $split, 'limitProblems' => $limitProblems] = $facts['credits'][$request->id];
+        $splitMinutes = array_filter([
+            'workday' => $split->workday, 'night' => $split->night, 'rest_day' => $split->restDay, 'holiday' => $split->holiday,
+        ]);
+        $pay = $request->compensation === OvertimeCompensation::Pay;
+        // Rates belong to pay only (Phase 4d): time off is earned 1:1 whatever the category.
+        $categories = collect($splitMinutes)->map(fn (int $minutes, string $key) => OvertimeSummary::CATEGORIES[$key][0]
+            .' '.$settings->{OvertimeSummary::CATEGORIES[$key][1]}.'%'
+            .(count($splitMinutes) > 1 ? ' '.Duration::format($minutes) : ''));
+
+        $past = ! $request->date->isFuture();
         $worked = null;
         $workedHint = null;
+        $punchSignal = null;
 
-        if (! $request->date->isFuture()) {
-            ['would' => $would, 'requested' => $requested] = $facts['credits'][$request->id];
+        if ($past) {
             $credit = $would['credit'] ?? null;
-            $categories = $credit === null ? [] : array_filter([
-                'workday' => $credit->workday, 'night' => $credit->night, 'rest_day' => $credit->restDay, 'holiday' => $credit->holiday,
-            ]);
-            // Which categories, for pay only: time off is earned 1:1 whatever the category.
-            $which = $request->compensation === OvertimeCompensation::Pay && $categories !== []
-                ? ' ('.collect($categories)->keys()->map(fn ($key) => strtolower(OvertimeSummary::CATEGORIES[$key][0]))->implode(', ').')'
+            $which = $pay && $credit !== null && $credit->total() > 0
+                ? ' ('.collect(['workday' => $credit->workday, 'night' => $credit->night, 'rest_day' => $credit->restDay, 'holiday' => $credit->holiday])
+                    ->filter()->keys()->map(fn ($key) => strtolower(OvertimeSummary::CATEGORIES[$key][0]))->implode(', ').')'
                 : '';
             // Less than requested is written against the request, so it can't be read past.
             $short = $credit !== null && $credit->total() < $requested;
@@ -422,40 +477,94 @@ class Approvals extends Component
                         default => 'none of '.Duration::format($requested).' requested would be credited',
                     },
             };
+            $punchSignal = match (true) {
+                $would === null || ($would['in'] === null && $would['out'] === null) => 'No punches yet',
+                $would['out'] === null => 'No out-punch yet',
+                $short => 'Punches: '.Duration::format($credit->total()).' of '.Duration::format($requested),
+                default => null,
+            };
             if ($short && $would['in'] !== null && $would['out'] !== null) {
                 $workedHint = 'Check the punches before approving — an out-punch may be missing.';
             }
         }
 
+        $signals = [];
+        $days = (int) today()->diffInDays($request->date->copy()->startOfDay(), false);
+
+        if ($request->kind === OvertimeKind::Planned && $days === 0) {
+            $signals[] = self::attention('calendar-days', 'Starts today');
+        } elseif ($request->kind === OvertimeKind::Planned && $days === 1) {
+            $signals[] = self::attention('calendar-days', 'Starts tomorrow');
+        }
+        if ($limitProblems !== []) {
+            // A manager can't override a limit: the admin will have to.
+            $signals[] = self::attention('clock', $isAdmin ? 'Over limit' : 'Override needed');
+        }
+        if ($status['stuck']) {
+            $signals[] = self::attention('flag', 'Stuck');
+        }
+        if ($punchSignal !== null) {
+            $signals[] = self::muted($punchSignal);
+        }
+        // Planned is the default and says nothing: only a claim, or a planned date that has passed.
+        if ($request->kind === OvertimeKind::Claim) {
+            $signals[] = self::muted('Claim');
+        } elseif ($days < 0) {
+            $signals[] = self::muted('Already worked');
+        }
+
+        $details = array_values(array_filter([
+            $request->reason ? ['label' => 'Reason', 'lines' => ['“'.$request->reason.'”']] : null,
+            ['label' => 'Requested', 'lines' => [
+                $request->displayDateAndWindow().' · '.$request->kind->label().' · '.$request->compensation->label(),
+                'Submitted '.DisplayDate::compact($request->created_at).($request->startsLabel() ? ' · '.$request->startsLabel() : ''),
+            ]],
+            $pay && count($splitMinutes) > 1 ? ['label' => 'Counts as', 'lines' => [$categories->implode(' · ')]] : null,
+            $worked ? ['label' => 'Punches', 'lines' => array_values(array_filter([$worked, $workedHint]))] : null,
+            $limitProblems !== [] ? ['label' => 'Daily limit', 'lines' => $limitProblems] : null,
+            $request->limit_override_reason ? ['label' => 'Over the daily limit', 'lines' => ['“'.$request->limit_override_reason.'”']] : null,
+            $status['awayReason'] ? ['label' => 'Approvers away', 'lines' => [$status['awayReason'].'.']] : null,
+            $this->historyDetail($request),
+        ]));
+
         return [
             'type' => 'overtime',
             'request' => $request,
-            'submitted' => 'Submitted '.DisplayDate::compact($request->created_at),
-            'when' => $request->startsLabel(),
-            'stuck' => false,
-            'awayReason' => null,
+            'stuck' => $status['stuck'],
+            'name' => $request->employee->full_name,
             'department' => $request->employee->department?->name,
-            'worked' => $worked,
-            'workedHint' => $workedHint,
+            'when' => DisplayDate::compact($request->date),
+            'whenTime' => AttendanceTime::range($request->starts_at, $request->ends_at),
+            'whenSub' => implode(' · ', array_filter([
+                Duration::format($requested),
+                $pay ? (count($splitMinutes) > 1 ? collect($splitMinutes)->keys()->map(fn ($key) => OvertimeSummary::CATEGORIES[$key][0].' '.$settings->{OvertimeSummary::CATEGORIES[$key][1]}.'%')->implode(' + ') : $categories->first()) : null,
+                $request->compensation->label(),
+            ])),
+            'signals' => $signals,
+            'reason' => $request->reason,
+            'details' => $details,
         ];
     }
 
     /**
-     * What one request card shows.
+     * One leave row.
      *
      * @param  array<string, mixed>  $facts  facts()
+     * @param  array{stuck: bool, awayReason: ?string, awayUntil: mixed}  $status
      * @return array<string, mixed>
      */
-    private function describe(Leave $leave, array $facts): array
+    private function describe(Leave $leave, array $facts, array $status): array
     {
         $employee = $leave->employee;
         $cost = $facts['costs'][$leave->id];
         $balanceType = $leave->leaveType->deductsFrom ?? $leave->leaveType;
+        $deducted = $balanceType->isNot($leave->leaveType);
 
         // Pending leave is already reserved, so available() is the balance after this request.
         $after = ! $balanceType->hasBalance() ? [] : collect(array_keys($cost))
-            ->map(fn (int $year) => ['year' => $year, 'available' => LeaveDays::format($facts['balances'][$balanceType->id.'|'.$year.'|'.$employee->id]->available())])
+            ->map(fn (int $year) => ['year' => $year, 'tenths' => $facts['balances'][$balanceType->id.'|'.$year.'|'.$employee->id]->available()])
             ->all();
+        $afterText = collect($after)->map(fn ($line) => (count($after) > 1 ? $line['year'].': ' : '').LeaveDays::format($line['tenths']))->implode(' · ');
 
         // Others in the same department off in these dates, from facts()'s one query.
         $start = $leave->start_date->format('Y-m-d');
@@ -474,21 +583,122 @@ class Approvals extends Component
                 .')')
             ->values();
 
+        $signals = [];
+        $days = (int) today()->diffInDays($leave->start_date->copy()->startOfDay(), false);
+
+        if ($alsoOff->isNotEmpty()) {
+            $signals[] = self::attention('users', $alsoOff->count().' '.($alsoOff->count() === 1 ? 'other' : 'others').' off');
+        }
+        $starts = match (true) {
+            $leave->end_date->lt(today()) => null,
+            $days < 0 => 'Started '.DisplayDate::compact($leave->start_date),
+            $days === 0 => 'Starts today',
+            $days === 1 => 'Starts tomorrow',
+            default => null,
+        };
+        if ($starts !== null) {
+            $signals[] = self::attention('calendar-days', $starts);
+        }
+        if (collect($after)->contains(fn ($line) => $line['tenths'] < 0)) {
+            $signals[] = self::attention('scale', 'Balance below 0');
+        }
+        if ($status['stuck']) {
+            $signals[] = self::attention('flag', 'Stuck');
+        }
+        if ($leave->end_date->lt(today())) {
+            $signals[] = self::muted('Already taken');
+        }
+        if ($after !== []) {
+            // "16 days left", "2026: 15 · 2027: 23 left"; a deducting type names what it draws on.
+            $signals[] = self::muted(($deducted ? $balanceType->name.': ' : '')
+                .(count($after) === 1 ? LeaveDays::label($after[0]['tenths']) : $afterText).' left');
+        }
+
+        $details = array_values(array_filter([
+            $leave->reason ? ['label' => 'Reason', 'lines' => ['“'.$leave->reason.'”']] : null,
+            ['label' => 'Requested', 'lines' => [
+                $leave->leaveType->name.' · '.$leave->displayDates().' · '.LeaveDays::label(array_sum($cost)),
+                'Submitted '.DisplayDate::compact($leave->created_at).($leave->startsLabel() ? ' · '.$leave->startsLabel() : ''),
+            ]],
+            ['label' => 'Balance', 'lines' => [$after === []
+                ? $leave->leaveType->name.' has no balance to draw from.'
+                : $balanceType->name.($deducted ? ' (deducted from)' : '').' available after this request: '
+                    .collect($after)->map(fn ($line) => (count($after) > 1 ? $line['year'].': ' : '').LeaveDays::label($line['tenths']))->implode(' · ')]],
+            $alsoOff->isNotEmpty() ? ['label' => 'Also off', 'lines' => [
+                $alsoOff->count().' '.($alsoOff->count() === 1 ? 'other' : 'others').' in '.$employee->department?->name.' during these dates:',
+                ...$alsoOff->all(),
+            ]] : null,
+            $status['awayReason'] ? ['label' => 'Approvers away', 'lines' => [$status['awayReason'].'.']] : null,
+            $this->historyDetail($leave),
+        ]));
+
         return [
             'type' => 'leave',
             'request' => $leave,
-            'leave' => $leave,
-            'submitted' => 'Submitted '.DisplayDate::compact($leave->created_at),
-            'when' => $leave->startsLabel(),
-            'stuck' => false,
-            'awayReason' => null,
-            'dates' => $leave->displayDates(),
-            'days' => LeaveDays::label(array_sum($cost)),
-            'balanceType' => $balanceType->name,
-            'deducted' => $balanceType->isNot($leave->leaveType),
-            'after' => $after,
+            'stuck' => $status['stuck'],
+            'name' => $employee->full_name,
             'department' => $employee->department?->name,
-            'alsoOff' => $alsoOff->all(),
+            'when' => DisplayDate::weekdayRange($leave->start_date, $leave->end_date),
+            'whenTime' => null,
+            'whenSub' => ($leave->half !== null ? 'Half day '.$leave->half->label() : LeaveDays::label(array_sum($cost))).' · '.$leave->leaveType->name,
+            'signals' => $signals,
+            'reason' => $leave->reason,
+            'details' => $details,
         ];
+    }
+
+    /** @return array{tone: string, icon: ?string, text: string} */
+    private static function attention(string $icon, string $text): array
+    {
+        return ['tone' => 'attention', 'icon' => $icon, 'text' => $text];
+    }
+
+    /** @return array{tone: string, icon: ?string, text: string} */
+    private static function muted(string $text): array
+    {
+        return ['tone' => 'muted', 'icon' => null, 'text' => $text];
+    }
+
+    /**
+     * The step column (Phase 6j): nothing in "Waiting for you" (the section
+     * says it); in "Waiting for admin" who approved step 1 ("Manager ✓ Aye Aye
+     * Mon") or that it was skipped; in "You can override" whose step it is —
+     * the requester's manager — and why it may be stalled ("Manager: Aye Aye
+     * Mon · away until Fri 6 Nov"). A request with a skipped step 1 is never
+     * an override: the skip moves it to the admin step.
+     *
+     * @param  array{stuck: bool, awayReason: ?string, awayUntil: mixed}  $status
+     * @return array{done: bool, text: ?string, by: ?string}
+     */
+    private function stepLabel(Approvable $request, string $section, array $status): array
+    {
+        if ($section === 'stepOne') {
+            return ['done' => false, 'text' => null, 'by' => null];
+        }
+
+        if ($section === 'overrides') {
+            $manager = $request->employee->manager;
+
+            return ['done' => false, 'by' => null, 'text' => ($manager !== null ? 'Manager: '.$manager->full_name : 'No manager')
+                .($status['awayUntil'] !== null ? ' · away until '.DisplayDate::compact($status['awayUntil']) : '')];
+        }
+
+        $first = $request->approvalSteps->firstWhere('step', ApprovalFlow::MANAGER_STEP);
+
+        return $first === null || $first->outcome === ApprovalOutcome::Skipped
+            ? ['done' => false, 'text' => 'Manager step skipped', 'by' => null]
+            : ['done' => true, 'text' => 'Manager', 'by' => $first->decidedBy?->name];
+    }
+
+    /** @return array{label: string, lines: list<string>}|null */
+    private function historyDetail(Approvable $request): ?array
+    {
+        if ($request->approvalSteps->isEmpty()) {
+            return null;
+        }
+
+        return ['label' => 'History', 'lines' => $request->approvalSteps->map(fn (ApprovalStep $step) => 'Step '.$step->step.': '.strtolower($step->outcome->label())
+            .($step->decidedBy ? ' by '.$step->decidedBy->name : '').' · '.DisplayDate::compact($step->decided_at)
+            .($step->note ? ' — “'.$step->note.'”' : ''))->values()->all()];
     }
 }

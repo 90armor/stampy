@@ -158,9 +158,9 @@ class ModalFocusRulesTest extends TestCase
 
     public function test_approval_rows_are_keyed_so_a_re_render_cannot_hand_one_rows_button_to_the_next(): void
     {
-        foreach (['approval-item' => 'approval-{{ $leave->id }}', 'approval-overtime-item' => 'approval-overtime-{{ $request->id }}'] as $partial => $key) {
-            $this->assertStringContainsString('<li wire:key="'.$key.'"', File::get(resource_path("views/livewire/leave/partials/{$partial}.blade.php")));
-        }
+        // One partial for both types since Phase 6j, keyed by type and id.
+        $this->assertStringContainsString("\$key = \$item['type'].'-'.\$request->id;", File::get(resource_path('views/livewire/leave/partials/approval-row.blade.php')));
+        $this->assertStringContainsString('<li wire:key="approval-{{ $key }}"', File::get(resource_path('views/livewire/leave/partials/approval-row.blade.php')));
     }
 
     public function test_after_an_approval_the_notice_is_rendered_ready_for_focus(): void

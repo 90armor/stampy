@@ -41,6 +41,8 @@ class IconTest extends TestCase
         $allowed = [
             'resources/views/livewire/attendance/index.blade.php' => ['name="check" class="h-3.5 w-3.5"'],
             'resources/views/livewire/attendance/show.blade.php' => [':name="$modalStyle[\'icon\']" class="h-3.5 w-3.5"'],
+            // Phase 6j: an Approvals signal chip is a pill.
+            'resources/views/livewire/leave/partials/approval-row.blade.php' => [':name="$signal[\'icon\']" class="h-3.5 w-3.5 shrink-0"'],
         ];
         $offenders = [];
 

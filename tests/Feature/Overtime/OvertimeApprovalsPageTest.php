@@ -90,7 +90,7 @@ class OvertimeApprovalsPageTest extends TestCase
         $page = Livewire::actingAs($user)->test(Approvals::class);
 
         return count($page->viewData('stepOne')) + count($page->viewData('stepTwo'))
-            + collect($page->viewData('overrides'))->where('stuck', true)->count();
+            + count($page->viewData('stuckOverrides'));
     }
 
     public function test_both_types_are_listed_together_with_their_type_and_details(): void
@@ -100,8 +100,9 @@ class OvertimeApprovalsPageTest extends TestCase
 
         Livewire::actingAs($this->manager->user)->test(Approvals::class)
             ->assertSee('Leave and overtime requests waiting for a decision.')
-            ->assertSeeInOrder(['Overtime · Tue 16 Jun, 5:00 PM – 7:00 PM', 'Leave · Annual · Wed 24 Jun'])
-            ->assertSee('Planned · Time off')
+            // Each row: its type, who, the date and window, how long and what kind (Phase 6j).
+            ->assertSeeInOrder(['Overtime', 'Kyaw Kyaw', 'Tue 16 Jun', '5:00 – 7:00 PM', '2h 00m · Time off', 'Leave', 'Kyaw Kyaw', 'Wed 24 Jun', '1 day · Annual'])
+            ->assertSee('Tue 16 Jun, 5:00 PM – 7:00 PM · Planned · Time off')
             ->assertSee('“Release night”')
             ->assertSee('Submitted Mon 15 Jun');
     }

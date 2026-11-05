@@ -11,6 +11,9 @@
 import { BASE, REPO, login, themedContext, withBrowser } from './lib.mjs';
 import { execSync } from 'node:child_process';
 
+// How to run a command in the app (STAMPY_EXEC for a checkout served elsewhere, e.g. `docker exec <container>`).
+const EXEC = process.env.STAMPY_EXEC ?? 'docker compose exec -T app';
+
 const settle = async (p, ms = 500) => { await p.waitForLoadState('networkidle').catch(() => {}); await p.waitForTimeout(ms); };
 const active = (p) => p.evaluate(() => {
     const e = document.activeElement;
@@ -36,6 +39,54 @@ await withBrowser(async (b) => {
 
     for (const width of [1440, 390]) {
         console.log(`\n# ${width}`);
+
+        // Phase 6j: Approvals' Show details opens in place, says so, and keeps focus.
+        {
+            const { c, p } = await page(b, manager, 'light', width);
+            await p.goto(`${BASE}/approvals`, { waitUntil: 'networkidle' });
+            const toggle = p.locator('[data-details-toggle]').first();
+            const panel = p.locator(`#${await toggle.getAttribute('aria-controls')}`);
+            check('6j: details closed at first', (await toggle.getAttribute('aria-expanded')) === 'false' && ! (await panel.isVisible()));
+            await toggle.focus(); await p.keyboard.press('Enter'); await settle(p, 300);
+            check('6j: Show details opens the details in place', (await toggle.getAttribute('aria-expanded')) === 'true' && await panel.isVisible() && /Hide details/.test(await toggle.innerText()));
+            check('6j: focus stays on the toggle', (await active(p)).startsWith('button:Hide details'), await active(p));
+            await p.keyboard.press('Enter'); await settle(p, 300);
+            check('6j: and closes them again', (await toggle.getAttribute('aria-expanded')) === 'false' && ! (await panel.isVisible()));
+            await c.close();
+        }
+
+        // Phase 6j: the type filter chips — pressed state, the URL, only that type, focus kept.
+        {
+            const { c, p } = await page(b, admin, 'light', width);
+            await p.goto(`${BASE}/approvals`, { waitUntil: 'networkidle' });
+            const chips = p.getByRole('group', { name: 'Request type' });
+            const overtime = chips.getByRole('button', { name: /^Overtime \d+$/ });
+            check('6j: All is pressed at first', (await chips.getByRole('button', { name: /^All \d+$/ }).getAttribute('aria-pressed')) === 'true');
+            await overtime.focus(); await p.keyboard.press('Enter'); await settle(p, 700);
+            check('6j: the chip is pressed and in the URL', (await overtime.getAttribute('aria-pressed')) === 'true' && /[?&]type=overtime/.test(p.url()), p.url());
+            check('6j: focus stays on the chip', (await active(p)).startsWith('button:Overtime'), await active(p));
+            const types = await p.locator('li[wire\\:key^="approval-"]').evaluateAll((rows) => rows.map((r) => r.getAttribute('wire:key').split('-')[1]));
+            check('6j: only overtime rows are listed', types.length > 0 && types.every((t) => t === 'overtime'), types.join(','));
+            await p.reload({ waitUntil: 'networkidle' });
+            check('6j: a reload keeps the filter', (await chips.getByRole('button', { name: /^Overtime \d+$/ }).getAttribute('aria-pressed')) === 'true');
+            await c.close();
+        }
+
+        // Phase 6j: "You can override"'s toggle says whether it's open and keeps focus.
+        {
+            const { c, p } = await page(b, admin, 'light', width);
+            await p.goto(`${BASE}/approvals`, { waitUntil: 'networkidle' });
+            const more = p.getByRole('button', { name: /waiting for managers/ });
+            if (await more.count()) {
+                const rows = await p.locator('li[wire\\:key^="approval-"]').count();
+                await more.focus(); await p.keyboard.press('Enter'); await settle(p, 700);
+                check('6j: the override toggle opens the rest', (await more.getAttribute('aria-expanded')) === 'true' && (await p.locator('li[wire\\:key^="approval-"]').count()) > rows);
+                check('6j: focus stays on the override toggle', /waiting for managers/.test(await active(p)), await active(p));
+            } else {
+                check('6j: the override toggle is there to check', false, 'no "waiting for managers" button — the data has no non-stuck override');
+            }
+            await c.close();
+        }
 
         // Rule 1, a notice from the same component: Approve.
         {
@@ -344,7 +395,7 @@ await withBrowser(async (b) => {
         // takes focus, marked invalid and described by its message. Nothing is
         // written: every submit here fails validation.
         {
-            const kyaw = execSync(`docker compose exec -T app php artisan tinker --execute="echo App\\Models\\Employee::where('employee_code', 'EMP-0002')->value('id');"`, { cwd: REPO }).toString().trim().split('\n').pop();
+            const kyaw = execSync(`${EXEC} php artisan tinker --execute="echo App\\Models\\Employee::where('employee_code', 'EMP-0002')->value('id');"`, { cwd: REPO }).toString().trim().split('\n').pop();
             const { c, p } = await page(b, admin, 'light', width);
             await p.goto(`${BASE}/attendance/${kyaw}`, { waitUntil: 'networkidle' });
             // The month's first Present day: a past day with punches to void.

@@ -243,10 +243,15 @@ class OvertimeRequestService
      * wouldCredit() and approvedMinutes() for many requests at once (the
      * Approvals page), keyed by request id: the same calculation, with each
      * day's row, the holidays and the employees' approved leave loaded once
-     * for all of them rather than per request.
+     * for all of them rather than per request. Also, for each, what the
+     * window would credit by category if all of it were worked (`split`, its
+     * total being `requested`) and its daily-limit problems now
+     * (`limitProblems`, currentLimitProblems()'s) — the Approvals rows'
+     * duration, categories and "Over limit" (Phase 6j). `would` is null for a
+     * day with no attendance row yet, a future one included.
      *
      * @param  Collection<int, OvertimeRequest>  $requests
-     * @return array<int, array{would: array{in: ?Carbon, out: ?Carbon, credit: OvertimeCredit}|null, requested: int}>
+     * @return array<int, array{would: array{in: ?Carbon, out: ?Carbon, credit: OvertimeCredit}|null, requested: int, split: OvertimeCredit, limitProblems: list<string>}>
      */
     public function creditsFor(Collection $requests): array
     {
@@ -280,13 +285,17 @@ class OvertimeRequestService
             $day = $this->day($request->employee, $request->date->copy(), ['holidays' => $holidays, 'leaves' => $leaves->get($request->employee_id, collect())]);
             $row = $rows->get($request->employee_id.'|'.$request->date->format('Y-m-d'));
 
+            $split = $this->requestedCredit($day, $request->starts_at, $request->ends_at);
+
             $credits[$request->id] = [
                 'would' => $row === null ? null : [
                     'in' => $row->first_in,
                     'out' => $row->last_out,
                     'credit' => $this->creditFromPunches($request, $row->first_in, $row->last_out, $day) ?? new OvertimeCredit($request->id),
                 ],
-                'requested' => $this->creditableMinutes($day, $request->starts_at, $request->ends_at),
+                'requested' => $split->total(),
+                'split' => $split,
+                'limitProblems' => $this->limitProblems($day, $split->total()),
             ];
         }
 
@@ -797,12 +806,22 @@ class OvertimeRequestService
      */
     private function creditableMinutes(array $day, Carbon $startsAt, Carbon $endsAt): int
     {
+        return $this->requestedCredit($day, $startsAt, $endsAt)->total();
+    }
+
+    /**
+     * creditableMinutes() by category.
+     *
+     * @param  array<string, mixed>  $day  day()
+     */
+    private function requestedCredit(array $day, CarbonInterface $startsAt, CarbonInterface $endsAt): OvertimeCredit
+    {
         $window = new OvertimeRequest(['date' => $day['date'], 'starts_at' => $startsAt, 'ends_at' => $endsAt]);
 
         return $this->calculator->calculate(
             $window, $startsAt, $endsAt, $day['schedule'], $day['date'],
             $day['isScheduledWorkday'], $day['isHoliday'], LeaveDay::none(), OvertimeSettings::current(),
-        )->total();
+        );
     }
 
     /** An approved or pending leave making $date a full day off (an AM and a PM one together count), if any. */
