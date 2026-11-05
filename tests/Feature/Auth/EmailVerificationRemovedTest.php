@@ -2,9 +2,12 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Livewire\Profile\Show as ProfileShow;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Route;
+use Livewire\Livewire;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -43,8 +46,15 @@ class EmailVerificationRemovedTest extends TestCase
 
         $this->actingAs($user)->get('/dashboard')->assertOk();
 
-        $this->actingAs($user)->patch('/profile', ['name' => 'Renamed', 'email' => 'new@example.com'])
-            ->assertSessionHasNoErrors();
+        // Only an admin changes their own email (Phase 6i, the profile's Edit).
+        Role::firstOrCreate(['name' => 'admin']);
+        $user->assignRole('admin');
+
+        Livewire::actingAs($user)->test(ProfileShow::class)
+            ->call('openAccount')
+            ->set('email', 'new@example.com')
+            ->call('saveAccount')
+            ->assertHasNoErrors();
 
         $this->assertSame('new@example.com', $user->fresh()->email);
     }

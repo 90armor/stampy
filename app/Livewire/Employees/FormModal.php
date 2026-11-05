@@ -220,9 +220,9 @@ class FormModal extends Component
             $this->editing = Employee::create($data);
         }
 
-        // Keep the linked account's name in sync — Profile shows it read-only
-        // for a linked user (name is HR data, admin-owned; see
-        // ProfileController::update()), so this is the only path left that
+        // Keep the linked account's name in sync — the profile shows it
+        // read-only for a linked user and has no field for it (name is HR
+        // data, admin-owned; see Profile\Show::saveAccount()), so this is the only path left that
         // writes users.name once an employee already has an account. A no-op
         // when the name didn't change, and harmless to also run right after
         // create_user above sets it to the same value.

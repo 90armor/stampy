@@ -302,7 +302,7 @@ class AccessibilityFoundationsTest extends TestCase
 
     public function test_read_only_values_and_the_auth_subtitle_use_the_muted_text_rule(): void
     {
-        $this->assertStringContainsString('dark:!text-slate-400', File::get(resource_path('views/profile/partials/update-profile-information-form.blade.php')));
+        $this->assertStringContainsString('text-slate-500 dark:text-slate-400 sm:ml-2 sm:inline">Ask HR to change', File::get(resource_path('views/livewire/profile/show.blade.php')));
         $this->assertStringContainsString('attendance, stamped in seconds', $guest = File::get(resource_path('views/layouts/guest.blade.php')));
         $this->assertMatchesRegularExpression('/class="[^"]*dark:text-slate-400[^"]*">attendance, stamped in seconds/', $guest);
     }

@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
 use App\Livewire\Attendance\Index as AttendanceIndex;
 use App\Livewire\Attendance\Show as AttendanceShow;
 use App\Livewire\Employees\Index as EmployeesIndex;
@@ -8,6 +7,7 @@ use App\Livewire\Employees\Show as ShowEmployee;
 use App\Livewire\Leave\Approvals;
 use App\Livewire\Leave\TimeOff;
 use App\Livewire\Overtime\Index as OvertimeIndex;
+use App\Livewire\Profile\Show as ProfileShow;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Position;
@@ -95,8 +95,9 @@ Route::get('/dashboard', function () {
 })->middleware('auth')->name('dashboard');
 
 Route::middleware('auth')->group(function () {
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    // The user's own profile (Phase 6i): read-only, each change in a modal of
+    // the component, so there is no PATCH /profile or PUT /password any more.
+    Route::get('/profile', ProfileShow::class)->name('profile.edit');
 
     // No role restriction: resolves the viewer's own linked employee record
     // (EmployeePolicy::view already allows anyone to view their own record

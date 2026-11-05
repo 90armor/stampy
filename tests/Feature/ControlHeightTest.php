@@ -13,9 +13,10 @@ use Tests\TestCase;
  */
 class ControlHeightTest extends TestCase
 {
-    // The two components the first test renders: their `->merge` cuts the
+    // The components the first test renders: their `->merge`/`->class` cuts the
     // tag scan short.
     private const IGNORED = [
+        'resources/views/components/password-input.blade.php',
         'resources/views/components/select.blade.php',
         'resources/views/components/text-input.blade.php',
     ];
@@ -24,6 +25,7 @@ class ControlHeightTest extends TestCase
     {
         $rendered = [
             'text-input' => Blade::render('<x-text-input id="a" />'),
+            'password-input' => Blade::render('<x-password-input id="a" />'),
             'select' => Blade::render('<x-select id="a"><option>1</option></x-select>'),
             'button' => Blade::render('<x-button>Save</x-button>'),
             'button link' => Blade::render('<x-button href="/">Go</x-button>'),
