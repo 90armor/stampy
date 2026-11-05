@@ -141,7 +141,7 @@ class PunchReasonTest extends TestCase
         $this->assertSame(1, substr_count($html, 'Void reason: —'));
     }
 
-    public function test_re_adding_a_voided_manual_punch_takes_the_new_reason_and_drops_the_void(): void
+    public function test_re_adding_a_voided_manual_punch_keeps_the_voided_one_with_its_reasons(): void
     {
         $this->addForm('Forgot to punch')->call('addPunch');
         $punch = AttendanceLog::query()->sole();
@@ -150,10 +150,58 @@ class PunchReasonTest extends TestCase
         $this->travelTo(Carbon::parse('2026-04-16 09:30:00'));
         $this->addForm('It was the right day after all')->call('addPunch')->assertHasNoErrors();
 
+        // The voided correction is untouched (Phase 6h); the new one is its own row.
         $punch->refresh();
-        $this->assertNull($punch->voided_at);
-        $this->assertNull($punch->void_reason);
-        $this->assertSame('It was the right day after all', $punch->reason);
-        $this->assertSame('2026-04-16 09:30:00', $punch->created_at->format('Y-m-d H:i:s'));
+        $this->assertNotNull($punch->voided_at);
+        $this->assertSame('Forgot to punch', $punch->reason);
+        $this->assertSame('Wrong day', $punch->void_reason);
+        $this->assertSame('2026-04-15 12:00:00', $punch->created_at->format('Y-m-d H:i:s'));
+
+        $added = AttendanceLog::query()->whereNull('voided_at')->sole();
+        $this->assertSame('It was the right day after all', $added->reason);
+        $this->assertSame('2026-04-16 09:30:00', $added->created_at->format('Y-m-d H:i:s'));
+
+        // Both are in the day's list: the voided one muted and struck through.
+        $html = $this->page()->html();
+        $this->assertSame(2, substr_count($html, 'Reason: '));
+        $this->assertStringContainsString('Reason: Forgot to punch', $html);
+        $this->assertStringContainsString('Void reason: Wrong day', $html);
+        $this->assertStringContainsString('Reason: It was the right day after all', $html);
+        $this->assertStringContainsString('line-through', $html);
+    }
+
+    public function test_the_employee_sees_the_reasons_on_their_own_day(): void
+    {
+        $this->addForm('Forgot to punch in at the gate')->call('addPunch');
+        $punch = AttendanceLog::query()->sole();
+        $this->page()->call('startVoiding', $punch->id)->set('voidReason', 'Someone else\'s finger')->call('voidPunch', $punch->id);
+        $this->addForm('Punched in at the side door')->call('addPunch');
+
+        $user = User::factory()->create()->assignRole('employee');
+        $this->employee->update(['user_id' => $user->id]);
+
+        Livewire::actingAs($user)
+            ->test(Show::class)
+            ->set('month', '2026-02')
+            ->call('openDay', self::DAY)
+            ->assertSee('Reason: Forgot to punch in at the gate')
+            ->assertSee('Void reason: Someone else&#039;s finger', false)
+            ->assertSee('Reason: Punched in at the side door')
+            // No correction controls, so no hint either.
+            ->assertDontSee('Add punch')
+            ->assertDontSee('The employee can see this.');
+    }
+
+    public function test_the_reason_fields_say_the_employee_can_see_them(): void
+    {
+        $punch = AttendanceLog::factory()->for($this->employee)->create(['punched_at' => self::DAY.' 08:52:00']);
+
+        $add = $this->page()->call('startAddingPunch', self::DAY)->html();
+        $this->assertStringContainsString('aria-describedby="new_punch_reason_'.self::DAY.'_hint"', $add);
+        $this->assertStringContainsString('id="new_punch_reason_'.self::DAY.'_hint" class="mt-1 text-xs text-slate-600 dark:text-slate-400">The employee can see this.</p>', $add);
+
+        $void = $this->page()->call('startVoiding', $punch->id)->html();
+        $this->assertStringContainsString('aria-describedby="void_reason_'.$punch->id.'_hint"', $void);
+        $this->assertStringContainsString('id="void_reason_'.$punch->id.'_hint" class="mt-1 text-xs text-slate-600 dark:text-slate-400">The employee can see this.</p>', $void);
     }
 }

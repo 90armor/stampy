@@ -115,7 +115,8 @@ divergence here would be a real correctness bug, not just a style one. --}}
                             <p class="text-sm text-slate-700 dark:text-slate-300">Void the {{ $punch->punch_type->label() }} punch at {{ \App\Support\AttendanceTime::format($punch->punched_at) }} on {{ \App\Support\DisplayDate::compact($punch->punched_at) }}? This can't be undone.</p>
                             <div class="mt-3 sm:max-w-xl">
                                 <x-input-label for="void_reason_{{ $punch->id }}" value="Reason" class="!mb-1 !text-xs" />
-                                <x-text-input id="void_reason_{{ $punch->id }}" wire:model="voidReason" maxlength="200" placeholder="Why this punch is wrong" x-init="$nextTick(() => $el.focus())" />
+                                <x-text-input id="void_reason_{{ $punch->id }}" wire:model="voidReason" maxlength="200" placeholder="Why this punch is wrong" aria-describedby="void_reason_{{ $punch->id }}_hint" x-init="$nextTick(() => $el.focus())" />
+                                <p id="void_reason_{{ $punch->id }}_hint" class="mt-1 text-xs text-slate-600 dark:text-slate-400">The employee can see this.</p>
                             </div>
                             <div class="mt-4 flex justify-end gap-3 sm:max-w-xl">
                                 <x-button type="button" variant="secondary" wire:click="cancelVoiding">Cancel</x-button>
@@ -152,10 +153,12 @@ divergence here would be a real correctness bug, not just a style one. --}}
                     </x-select>
                 </div>
                 </div>
-                {{-- Why (F34): kept on the punch and shown in the list. --}}
+                {{-- Why (F34): kept on the punch and shown in the list — to the employee too,
+                which the hint says (Phase 6h). --}}
                 <div class="mt-3 sm:max-w-xl">
                     <x-input-label for="new_punch_reason_{{ $dayKey }}" value="Reason" class="!mb-1 !text-xs" />
-                    <x-text-input id="new_punch_reason_{{ $dayKey }}" wire:model="newPunchReason" maxlength="200" placeholder="Why this punch is being added" />
+                    <x-text-input id="new_punch_reason_{{ $dayKey }}" wire:model="newPunchReason" maxlength="200" placeholder="Why this punch is being added" aria-describedby="new_punch_reason_{{ $dayKey }}_hint" />
+                    <p id="new_punch_reason_{{ $dayKey }}_hint" class="mt-1 text-xs text-slate-600 dark:text-slate-400">The employee can see this.</p>
                 </div>
                 <div class="mt-4 flex justify-end gap-3 sm:max-w-xl">
                     <x-button type="button" variant="secondary" wire:click="cancelAddingPunch">Cancel</x-button>
