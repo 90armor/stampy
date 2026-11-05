@@ -1,27 +1,33 @@
-# Phase 6a audit tooling — AUDIT-ONLY
+# Audit tooling
 
-Throwaway tooling behind `docs/audit/UI_AUDIT.md`. None of it is app code, a seeder, a test or a dependency; delete the folder once the audit's fix slices are done — **except `playwright/focus-6d2.mjs` and the `lib.mjs` it imports, which stay** (Phase 6e): the only browser check of the modal focus rules and of validation-error focus, run before every merge (CLAUDE.md, Local environment).
+What's left of the Phase 6 audit tooling (`docs/audit/UI_AUDIT.md`), kept so the audit can be run again. None of it is app code, a seeder, a test or a dependency. The modal focus check that runs before every merge is not here: it is `tests/browser/focus.mjs`. The per-slice screenshot and setup scripts of Phases 6b–6h were deleted at the close-out; they are in git history.
 
-All PHP scripts run inside the `app` container and write to the **dev** `stampy` database.
+The PHP scripts run inside the `app` container and write to the **dev** `stampy` database.
 
 | File | What it does |
 |---|---|
-| `pinned-seed.php` | `migrate:fresh --seed` with the clock pinned to Fri 2 Oct 2026 12:00. Stop the scheduler first. |
-| `hash.php` | SHA-256 of every table's data (timestamps, password hashes, remember tokens excluded). |
-| `seed-personas.php` | Adds the audit personas and stress data on top of a normal seed. Every account's password is `password`. |
-| `stale-setup.php` | A pending Medical leave for persona E1 (`DAY=YYYY-MM-DD`), or cancels one (`CANCEL=id`). |
+| `seed-personas.php` | Adds the audit personas and stress data on top of a normal seed: admins with and without an employee record, managers with transitive reports, none or only a leaver, a new joiner, a leaver with a login, Khmer and very long names. Every account's password is `password`. |
 | `stress-employees.php` | 70 extra employees, for the 100+ row directory. |
-| `f01-4-check.php` | Phase 6b: what happens to a leaver's pending requests, and filing for a leaver (report only; reseed afterwards). |
-| `stale-6b.php`, `reset-token.php` | Phase 6b screenshots: a pending request moved on behind the approver's back; a reset token for the reset-password page. |
-| `own-employee-id.php` | Phase 6b follow-up screenshots: the id of persona A1's own employee record (AUD-001). |
-| `csv-6c.php`, `badge-6c.php`, `page-6c.php` | Phase 6c: every report CSV through the components' own `download()` with the clock pinned (`php scripts/audit/csv-6c.php <label>` → `storage/app/csv-6c/<label>/`); every user's badge and inbox — groups, stuck flags, away lines — at four pinned instants; and one page's visible text with the clock pinned (`php scripts/audit/page-6c.php <username> <path>`). Run on two checkouts and `diff`. `playwright/shots-6c.mjs` takes the Reports screenshots into `docs/audit/shots/6c/`. |
-| `playwright/axe-6d.mjs`, `axe-6d-report.mjs`, `pixeldiff-6d.mjs`, `check-6d.mjs`, `keyboard-6d.mjs` | Phase 6d: axe at all three widths for every 6a page and persona, plus four modal states, with a screenshot of each (`OUT_6D=<dir> node axe-6d.mjs before`, again as `after`); the before/after table by rule id; a pixel diff of the two runs; what only a real browser can show (focus, titles after a tab switch, the picker's announcements), with the slice's screenshots in `docs/audit/shots/6d/`; and the employee and manager journeys by keyboard alone, which submit and decide real requests, so reseed afterwards. Need `pixelmatch` and `pngjs` too for the diff. `STAMPY_REPO=<checkout>/` replaces editing `REPO` in `lib.mjs`. |
-| `playwright/focus-6d2.mjs`, `keyboard-6d2.mjs`, `shots-6d2.mjs` | Phase 6d2: the modal focus rules in a real browser (one check per close rule, never another row's Approve, the trap, steps, names, tapped labels), exiting 1 on any failure; the journeys by keyboard alone as a table of moment → where focus lands; and the slice's screenshots in `docs/audit/shots/6d2/` with an accessibility-tree check. The first two submit and decide real requests: reseed afterwards, and run `keyboard-6d2.mjs` one width at a time (`WIDTH=1440`, `WIDTH=390`) on a fresh seed each. Don't `view:clear` first: Vite watches the compiled views, so each first compile reloads every open page and aborts whatever the harness is doing. |
-| `setup-6f.php`, `playwright/shots-6f.mjs` | Phase 6f: pending overtime claims to cancel (one at step 2 in the admin's queue), and the slice's screenshots at 390, 1024 and 1440, light and dark, into `docs/audit/shots/6f/`, with axe on the states 6a never reached (the cards, Filters open, the cancel confirmation). `shots-6f.mjs` runs `setup-6f.php` itself; it cancels and approves real requests, so reseed afterwards. `focus-6d2.mjs` gained the Filters disclosure and the overtime cancel confirmation at both widths. |
-| `playwright/shots-6g.mjs` | Phase 6g: the slice's screenshots at 390 and 1440, light and dark, into `docs/audit/shots/6g/` — sign-in, the dashboards' own cards, the unlinked admin's navigation and Time off, File leave before and after choosing, a punch's missing reason and the punch list with reasons — with axe on those states, and a PDF of each report tab as the browser prints it, an open and a closed month, from a light and a dark page (`ONLY=pdf` for the PDFs alone). It adds and voids a punch with reasons: reseed afterwards. `focus-6d2.mjs` gained the file-for title (F28) and a punch correction's missing reason (F34) at both widths. |
 | `querycount.php` | `php scripts/audit/querycount.php <username> <path>`: status, queries, query ms, server ms and the most repeated query for one page, in a fresh app. |
-| `playwright/` | The screenshot/measurement harness (`pages.mjs`), the journeys, `shots-6b.mjs` (Phase 6b's screenshots, into `docs/audit/shots/6b/`) and `shots-6b-fix.mjs` (the 6b follow-up's four spots, into `docs/audit/shots/6b-fix/`; `ONLY=icons` retakes the directory icon alone). Needs `playwright` and `axe-core` installed next to it (e.g. `npm i --no-save playwright@1.62.1 axe-core@4.10.3` in a scratch folder, then copy these `.mjs` files next to that `node_modules` and run them there — ES modules ignore `NODE_PATH` — after pointing `REPO` in `lib.mjs` at this checkout), with the app on http://localhost:8000. Run from the repo root. |
+| `pinned-seed.php` | `migrate:fresh --seed` with the clock pinned to Fri 2 Oct 2026 12:00, so a seed hash doesn't depend on the day. Stop the scheduler first. |
+| `hash.php` | SHA-256 of every table's data (timestamps, password hashes and remember tokens left out). |
+| `playwright/pages.mjs` | Every persona's pages (the list the other scripts share). Run directly, it shoots each at 390/1024/1440, light and dark, and records overflow, targets under 44px and 24px, console errors, the `<h1>`, the title, time to first byte and axe at 390 and 1440, into `docs/audit/shots/` and `storage/app/audit-data/<persona>.json`. |
+| `playwright/axe.mjs` | axe at all three widths and both themes for every page in `pages.mjs`, the guest pages, and modal and error states, with a screenshot of each: `AXE_OUT=<dir> node axe.mjs <label>` writes `<dir>/<label>/axe.json`. |
+| `playwright/journeys.mjs` | The 6a journeys: an employee on a phone (sign in with the employee code, a half day, an overtime claim and cancelling it), forgot password, a manager approving and rejecting, a request cancelled while the approver has it open, a lost session, the filters and the Tab order. `node journeys.mjs [journey …]`; notes into `storage/app/audit-data/`. Submits and decides real requests. |
+| `playwright/admin-journeys.mjs` | The admin journeys, each saved through the UI and checked in the database: employees with and without a login, a schedule and an effective-dated change, a holiday, an opening-balance adjustment, deactivate and reactivate, leave and overtime filed for an employee with no login (with a limit override), a punch and a void with reasons, each report's CSV and print. Exits 1 if any fails. |
+| `playwright/lib.mjs` | Shared by the scripts above: sign-in, themed pages, measurements, axe, full-page screenshots. |
 
-Run a tinker script: `docker compose exec app php artisan tinker --execute="require 'scripts/audit/seed-personas.php';"`
+## Running an audit again
 
-**Restoring the dev database afterwards** (as the audit did): `docker compose stop scheduler`, `pinned-seed.php`, `hash.php` (compare with the baseline in the report), then `docker compose exec app php artisan migrate:fresh --seed` and `docker compose start scheduler`.
+1. **Data:** a fresh demo seed, then the personas and stress employees:
+   ```bash
+   docker compose exec app php artisan migrate:fresh --seed
+   docker compose exec app php artisan tinker --execute="require 'scripts/audit/seed-personas.php';"
+   docker compose exec app php artisan tinker --execute="require 'scripts/audit/stress-employees.php';"
+   ```
+   `pages.mjs` uses fixed employee ids and October dates from that seed; check them against the data before a run.
+2. **Playwright** outside the repo, as for `tests/browser/` (its README): `npm i --no-save playwright@1.62.1 axe-core@4.10.3` in a scratch folder, copy `playwright/*.mjs` next to its `node_modules` (ES modules ignore `NODE_PATH`), and run with `STAMPY_REPO=<this checkout>/`, the app on http://localhost:8000.
+3. **Order:** what reads before what writes — `axe.mjs` and `pages.mjs` first, then `querycount.php` for each page (`docker compose exec -T app php scripts/audit/querycount.php <user> <path> </dev/null` in a loop: without `</dev/null`, `exec` swallows the loop's input), then `journeys.mjs` and `admin-journeys.mjs`, which change the data.
+4. **Afterwards:** `docker compose exec app php artisan migrate:fresh --seed`, and `docker compose start scheduler` if you stopped it.
+
+**A seed hash** (to show a change leaves seeded data alone): stop the scheduler, `require 'scripts/audit/pinned-seed.php'` then `require 'scripts/audit/hash.php'` through tinker, on both checkouts, and compare. A table with a new column differs by that column alone; drop it from `hash.php`'s `$drop` list for the comparison.

@@ -24,7 +24,7 @@ use Tests\TestCase;
  * shows; on paper the shell, the page's title, tabs and controls are hidden,
  * A4 landscape. Light paper whatever the theme, the "Printed …" time and the
  * table's flow are the browser's (resources/js/app.js, resources/css/app.css,
- * scripts/audit/playwright/shots-6g.mjs). An open period's CSV name ends
+ * checked in a browser by the Phase 6 close-out). An open period's CSV name ends
  * -OPEN; a closed one's doesn't. The clock is Mon 15 Jun 2026 12:00.
  */
 class ReportPrintTest extends TestCase

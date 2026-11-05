@@ -1,16 +1,15 @@
-// AUDIT-ONLY (Phase 6d): axe at 390/1024/1440, light and dark, for every page
-// and persona from 6a (pages.mjs), the guest pages, and a few modal states 6a
-// didn't reach; a full-page screenshot of each capture for a before/after pixel
-// diff. Every axe node is kept, so the decorative calendar numbers can be told
-// apart from real hits. Usage: node axe-6d.mjs <label> [persona …]
-// Writes $OUT_6D/<label>/axe.json and $OUT_6D/<label>/shots/*.png.
+// axe at 390/1024/1440, light and dark, for every page and persona in
+// pages.mjs, the guest pages, and the modal and error states below, with a
+// full-page screenshot of each capture (6d; the Phase 6 close-out's run).
+// Usage: AXE_OUT=<dir> node axe.mjs <label> [persona …]
+// Writes $AXE_OUT/<label>/axe.json and $AXE_OUT/<label>/shots/*.png.
 import { BASE, AXE, login, fullShot, themedContext, withBrowser } from './lib.mjs';
 import { sets } from './pages.mjs';
 import fs from 'node:fs';
 
 const label = process.argv[2] ?? 'run';
 const wanted = process.argv.slice(3);
-const dir = `${process.env.OUT_6D ?? '.'}/${label}`;
+const dir = `${process.env.AXE_OUT ?? '.'}/${label}`;
 fs.mkdirSync(`${dir}/shots`, { recursive: true });
 
 const settle = async (p, ms = 350) => { await p.waitForLoadState('networkidle').catch(() => {}); await p.waitForTimeout(ms); };

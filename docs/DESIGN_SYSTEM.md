@@ -302,7 +302,7 @@ Dropdowns and popovers are opaque, elevated content surfaces. Modals use `<x-mod
 
 ### Modals and focus
 
-The rules live in the shared pieces, `<x-modal>`, `<x-modal.title>` and `stampyFocus` in `resources/js/app.js`, never in a modal of its own. `ModalFocusRulesTest` pins the markup and the order; the behaviour runs in a browser through `tests/browser/focus.mjs` and `keyboard-6d2.mjs`.
+The rules live in the shared pieces, `<x-modal>`, `<x-modal.title>` and `stampyFocus` in `resources/js/app.js`, never in a modal of its own. `ModalFocusRulesTest` pins the markup and the order; the behaviour runs in a browser through `tests/browser/focus.mjs`.
 
 - **Name.** Every modal is named by its visible title: `<x-modal.title>` is an `h2` with the id `<x-modal>`'s `aria-labelledby` points at, in the look the `h3` it replaced had (`look` for a different one). A modal with no visible title passes `label="…"` instead. Sections inside a modal are `h3`. The date picker's and time input's popovers carry their own `aria-label`.
 - **Trap.** While a modal is open, Tab and Shift+Tab stay in it, however its contents re-render. The handler is on `window`, so it still hears the key with focus on `<body>` or on the page behind. Focus that lands outside, or on `<body>` because a render removed the focused element, comes back: to the element that last had it if it's still there (a Save disabled for its round trip gets it back when a validation error enables it again), else the title. The root is `tabindex="-1"`, so a click on empty space inside stays inside. A confirmation opened from inside a modal sits on top and owns focus until it closes.
