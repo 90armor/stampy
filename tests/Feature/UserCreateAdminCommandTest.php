@@ -9,6 +9,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\PendingCommand;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 /**
@@ -104,7 +105,7 @@ class UserCreateAdminCommandTest extends TestCase
     public function test_it_refuses_without_an_admin_role_and_writes_nothing(): void
     {
         Role::query()->where('name', 'admin')->delete();
-        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
         $before = $this->snapshot();
 
         $this->artisan('user:create-admin')

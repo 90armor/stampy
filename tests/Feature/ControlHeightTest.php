@@ -85,4 +85,3 @@ class ControlHeightTest extends TestCase
         $this->assertStringNotContainsString('rounded-md px-3 py-1.5', $view);
     }
 }
-

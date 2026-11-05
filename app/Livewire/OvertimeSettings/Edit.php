@@ -154,7 +154,7 @@ class Edit extends Component
         }
 
         if ($value === '') {
-            $this->addError($property, "Enter ".lcfirst($label)." in hours, such as 2 or 1.5.");
+            $this->addError($property, 'Enter '.lcfirst($label).' in hours, such as 2 or 1.5.');
 
             return null;
         }
@@ -163,7 +163,7 @@ class Edit extends Component
         $minutes = $hours !== null ? $hours * 60 : null;
 
         if ($minutes === null || fmod($minutes, 15) !== 0.0) {
-            $this->addError($property, "Enter ".lcfirst($label)." in quarter hours, such as 2, 1.5 or 1.25.");
+            $this->addError($property, 'Enter '.lcfirst($label).' in quarter hours, such as 2, 1.5 or 1.25.');
         } elseif ($minutes < 15) {
             $this->addError($property, "{$label} must be at least a quarter of an hour (0.25 h).");
         } elseif ($hours > self::MAX_LIMIT_HOURS) {

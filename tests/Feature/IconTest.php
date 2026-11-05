@@ -62,4 +62,3 @@ class IconTest extends TestCase
         $this->assertSame([], $offenders, 'Icons are 20px (h-5 w-5); 14px only inside a status pill or filter chip.');
     }
 }
-

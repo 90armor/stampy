@@ -6,6 +6,7 @@ use App\Enums\AttendanceStatus;
 use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
 use App\Models\Employee;
+use App\Models\Holiday;
 use App\Models\WorkSchedule;
 use App\Services\Attendance\DailySummaryBuilder;
 use Carbon\Carbon;
@@ -822,7 +823,7 @@ class DailySummaryBuilderTest extends TestCase
 
     public function test_a_holiday_forces_timing_to_zero_for_in_progress_incomplete_and_present(): void
     {
-        \App\Models\Holiday::factory()->create(['date' => self::MONDAY]);
+        Holiday::factory()->create(['date' => self::MONDAY]);
         $builder = app(DailySummaryBuilder::class);
 
         $this->travelTo(Carbon::parse(self::MONDAY.' 10:00:00'));

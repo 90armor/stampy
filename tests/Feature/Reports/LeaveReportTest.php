@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Reports;
 
+use App\Livewire\Employees\LeaveCard;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\Leave;
@@ -18,6 +19,7 @@ use App\Support\LeaveDays;
 use App\Support\LeaveReport;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -109,7 +111,7 @@ class LeaveReportTest extends TestCase
         // Leave card (the balances partial Time off shares).
         $balance = $row['balance'];
         $this->assertSame($balance->carriedIn + $balance->earnedToLastDay + $balance->adjustments - $balance->used - $balance->pending, LeaveReport::available($balance));
-        \Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Employees\LeaveCard::class, ['employee' => $leaver->fresh()])
+        Livewire::actingAs($admin)->test(LeaveCard::class, ['employee' => $leaver->fresh()])
             ->assertSee('Full-year balance: '.LeaveDays::label($balance->available()))
             ->assertSee('at last day');
 
@@ -272,13 +274,13 @@ class LeaveReportTest extends TestCase
         $this->assertEveryRowEqualsTheBalance($report, $annual, 2026);
 
         // The row shows the figures, not "Usable from": they've left.
-        \Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Reports\Leave::class)
+        Livewire::actingAs($admin)->test(\App\Livewire\Reports\Leave::class)
             ->assertDontSee('Usable from')
             ->assertSee(LeaveDays::label($balance->availableAtLastDay()))
             ->assertSee('at last day');
 
         // The CSV's "Available at last day" column, filled for a leaver only.
-        $download = \Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Reports\Leave::class)->call('download');
+        $download = Livewire::actingAs($admin)->test(\App\Livewire\Reports\Leave::class)->call('download');
         $lines = array_map('str_getcsv', explode("\n", trim(substr(base64_decode(data_get($download->effects, 'download.content')), 3))));
         $header = $lines[0];
         $row = collect($lines)->first(fn ($line) => $line[0] === 'EMP-0009' && $line[5] === 'Annual');

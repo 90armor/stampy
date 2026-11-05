@@ -1,4 +1,5 @@
 <?php
+
 // AUDIT-ONLY (Phase 6c). Exports every report CSV through the components'
 // own download() with the clock pinned, so two checkouts can be compared
 // byte for byte:
@@ -11,11 +12,13 @@
 use App\Models\Department;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Contracts\Console\Kernel;
 
 [$script, $label] = $argv;
 require __DIR__.'/../../vendor/autoload.php';
 $app = require __DIR__.'/../../bootstrap/app.php';
-$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$app->make(Kernel::class)->bootstrap();
 
 Carbon::setTestNow('2026-10-30 10:00:00');
 $dir = storage_path('app/csv-6c/'.$label);
@@ -47,7 +50,7 @@ foreach (['admin', 'aye.aye.mon'] as $username) {
             ob_start();
             $response->sendContent();
             $body = $response->headers->get('Content-Disposition')."\n".ob_get_clean();
-        } catch (Illuminate\Auth\Access\AuthorizationException $e) {
+        } catch (AuthorizationException $e) {
             $body = 'forbidden';
         }
 

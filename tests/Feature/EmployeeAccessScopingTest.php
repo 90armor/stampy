@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Employee;
 use App\Models\User;
-use App\Support\EmployeeScope;
 use App\Models\WorkSchedule;
+use App\Support\EmployeeScope;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
 use Spatie\Permission\Models\Role;

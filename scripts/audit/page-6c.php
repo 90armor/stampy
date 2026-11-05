@@ -1,4 +1,9 @@
 <?php
+
+use App\Models\User;
+use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Http\Request;
+
 // AUDIT-ONLY (Phase 6c). Renders one page in-process as one user with the
 // clock pinned and prints its visible text (tags, scripts, Livewire
 // snapshots and tokens left out), so two checkouts can be diffed:
@@ -6,12 +11,12 @@
 [$script, $username, $path] = $argv;
 require __DIR__.'/../../vendor/autoload.php';
 $app = require __DIR__.'/../../bootstrap/app.php';
-$kernel = $app->make(Illuminate\Contracts\Http\Kernel::class);
-$request = Illuminate\Http\Request::create($path, 'GET');
+$kernel = $app->make(Kernel::class);
+$request = Request::create($path, 'GET');
 $app->instance('request', $request);
 $kernel->bootstrap();
 Carbon\Carbon::setTestNow('2026-10-30 10:00:00');
-$app['auth']->guard('web')->setUser(App\Models\User::where('username', $username)->firstOrFail());
+$app['auth']->guard('web')->setUser(User::where('username', $username)->firstOrFail());
 
 $html = $kernel->handle($request)->getContent();
 $html = preg_replace(['#<script\b.*?</script>#s', '#<style\b.*?</style>#s', '#<template\b[^>]*>#', '#</template>#'], ' ', $html);
