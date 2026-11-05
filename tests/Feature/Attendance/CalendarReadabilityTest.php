@@ -627,8 +627,10 @@ class CalendarReadabilityTest extends TestCase
         $component->assertDontSeeHtml('08:52:37');
     }
 
-    public function test_voiding_from_the_modal_goes_through_the_shared_confirm_dialog_not_a_direct_click(): void
+    public function test_voiding_from_the_modal_asks_for_a_reason_first_not_a_direct_click(): void
     {
+        // Inside 2026, so the form's date omits the year.
+        $this->travelTo(Carbon::parse('2026-04-15 12:00:00'));
         $employee = Employee::factory()->create();
         $punch = AttendanceLog::factory()->create([
             'employee_id' => $employee->id,
@@ -636,19 +638,22 @@ class CalendarReadabilityTest extends TestCase
             'punch_type' => 'in',
         ]);
 
-        $html = Livewire::actingAs($this->admin())
+        $page = Livewire::actingAs($this->admin())
             ->test(Show::class, ['employee' => $employee])
             ->set('month', self::MONTH)
-            ->call('openDay', '2026-03-02')
-            ->html();
+            ->call('openDay', '2026-03-02');
 
-        // The Void button dispatches to the confirm dialog rather than
-        // calling voidPunch() directly — a stray click can't immediately
-        // void a device record.
+        // The Void button opens a form under the punch rather than calling
+        // voidPunch() directly — a stray click can't immediately void a
+        // device record, and the form asks why (Phase 6g, F34).
+        $html = $page->html();
         $this->assertStringNotContainsString('wire:click="voidPunch('.$punch->id.')"', $html);
-        $this->assertStringContainsString('confirm-dialog-attendance-show', $html);
-        $this->assertStringContainsString("method: 'voidPunch'", $html);
-        $this->assertStringContainsString('args: ['.$punch->id.']', $html);
+        $this->assertStringContainsString('wire:click="startVoiding('.$punch->id.')"', $html);
+
+        $html = $page->call('startVoiding', $punch->id)->html();
+        $this->assertStringContainsString('wire:submit="voidPunch('.$punch->id.')"', $html);
+        $this->assertStringContainsString('Void the In punch at 8:52 AM on Mon 2 Mar? This can\'t be undone.', $html);
+        $this->assertStringContainsString('id="void_reason_'.$punch->id.'"', $html);
     }
 
     public function test_the_modal_shows_the_days_schedule(): void

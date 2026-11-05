@@ -135,16 +135,21 @@ class LeaveReportPageTest extends TestCase
         $this->travelTo(Carbon::parse('2026-06-15 09:10:00'));
 
         $response = Livewire::actingAs($this->admin)->test(LeaveReportTab::class)->call('download');
-        $response->assertFileDownloaded('leave-2026-exported-2026-06-15-0910.csv');
+        // 2026 isn't over: the name says so (Phase 6g, F35).
+        $response->assertFileDownloaded('leave-2026-exported-2026-06-15-0910-OPEN.csv');
 
         $content = $this->downloadedContent($response);
         $this->assertStringStartsWith("\xEF\xBB\xBF", $content);
         $this->assertSame(1, substr_count($content, "\xEF\xBB\xBF"));
         $lines = $this->lines($content);
 
-        $this->assertSame('Leave report, 2026 — All departments — All employees — generated 2026-06-15 09:10 (Asia/Phnom_Penh)', $lines[0][0]);
-        $this->assertSame('Pending is as of the export time.', $lines[1][0]);
-        $this->assertSame(['Code', 'Name', 'Department', 'Joined', 'Left', 'Type', 'Balance', 'Entitled', 'Carried in', 'Adjustments', 'Used', 'Pending', 'Available', 'Available at last day', 'Usable from'], $lines[3]);
+        // The header row first, the rows, then one blank row and the notes.
+        $this->assertSame(['Code', 'Name', 'Department', 'Joined', 'Left', 'Type', 'Balance', 'Entitled', 'Carried in', 'Adjustments', 'Used', 'Pending', 'Available', 'Available at last day', 'Usable from'], $lines[0]);
+        $this->assertSame([null], $lines[7]);
+        $this->assertSame('Leave report, 2026 — All departments — All employees — generated 2026-06-15 09:10 (Asia/Phnom_Penh)', $lines[8][0]);
+        $this->assertSame('Pending is as of the export time.', $lines[9][0]);
+        $this->assertStringStartsWith('Each row is the employee\'s balance', $lines[10][0]);
+        $this->assertCount(11, $lines);
         $this->assertSame([
             ['EMP-0002', 'Kyaw Kyaw', 'Engineering', '', '', 'Annual', 'Yes', '18.0', '0.0', '0.0', '20.0', '0.0', '-2.0', '', ''],
             ['EMP-0005', 'Su Su', 'Engineering', '2026-03-02', '', 'Annual', 'Yes', '0.0', '0.0', '0.0', '0.0', '0.0', '0.0', '', '2027-03-02'],
@@ -152,7 +157,7 @@ class LeaveReportPageTest extends TestCase
             ['EMP-0002', 'Kyaw Kyaw', 'Engineering', '', '', 'Unpaid', 'No', '', '', '', '2.0', '0.0', '', '', ''],
             ['EMP-0005', 'Su Su', 'Engineering', '2026-03-02', '', 'Unpaid', 'No', '', '', '', '0.0', '0.0', '', '', ''],
             ['Total', '', '', '', '', 'Unpaid', 'No', '', '', '', '2.0', '0.0', '', '', ''],
-        ], array_slice($lines, 4));
+        ], array_slice($lines, 1, 6));
 
         // Each type's Total is the page's.
         foreach ([$this->annual, $this->unpaid] as $type) {
@@ -172,11 +177,12 @@ class LeaveReportPageTest extends TestCase
         $response = Livewire::actingAs($managerUser)->test(LeaveReportTab::class)
             ->set('department', (string) $this->kyaw->department_id)
             ->call('download');
-        $response->assertFileDownloaded('leave-2026-engineering-exported-2026-06-15-0910.csv');
+        $response->assertFileDownloaded('leave-2026-engineering-exported-2026-06-15-0910-OPEN.csv');
 
         $lines = $this->lines($this->downloadedContent($response));
-        $this->assertSame('Leave report, 2026 — Engineering — Team of Aye Aye Mon — generated 2026-06-15 09:10 (Asia/Phnom_Penh)', $lines[0][0]);
-        $this->assertSame(['EMP-0001', 'EMP-0002'], collect(array_slice($lines, 4))->pluck(0)->reject(fn ($code) => $code === 'Total')->unique()->values()->all());
+        $notes = array_search([null], $lines, true);
+        $this->assertSame('Leave report, 2026 — Engineering — Team of Aye Aye Mon — generated 2026-06-15 09:10 (Asia/Phnom_Penh)', $lines[$notes + 1][0]);
+        $this->assertSame(['EMP-0001', 'EMP-0002'], collect(array_slice($lines, 1, $notes - 1))->pluck(0)->reject(fn ($code) => $code === 'Total')->unique()->values()->all());
     }
 
     /** @return list<list<?string>> */

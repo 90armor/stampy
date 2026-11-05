@@ -10,10 +10,11 @@
     $days = fn (int $tenths) => $tenths === 0 ? '—' : LeaveDays::label($tenths);
 @endphp
 
-<div class="space-y-6">
-    {{-- Four controls: beside the title only from 2xl; at 1440 they wrapped
-    beside it, the CSV button alone on a second line. --}}
-    <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between">
+<div class="space-y-6" data-report>
+    {{-- Five controls: beside the title only from 2xl; at 1440 they wrapped
+    beside it, the CSV button alone on a second line. On paper the print
+    header stands in for them (Phase 6g, F04). --}}
+    <div class="flex flex-col gap-4 2xl:flex-row 2xl:items-end 2xl:justify-between print:!hidden">
         <div>
             <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Leave report</h2>
             <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">Each employee's balance of one leave type for a year, as Time off shows it.</p>
@@ -50,8 +51,12 @@
                 <x-icon name="document-text" class="h-5 w-5" />
                 Download CSV
             </x-button>
+            <x-report.print-button />
         </div>
     </div>
+
+    {{-- A year isn't over until 31 Dec: this year, or next year once granted. --}}
+    <x-report.print-header title="Leave report" :period="(string) $selectedYear" :filters="($selectedType?->name ?? 'Leave').' · '.($report && $report['department'] !== null ? $report['departments'][$report['department']] : 'All departments')" :open="$selectedYear >= today()->year ? 'This year is still open: figures can change until it ends.' : null" />
 
     <x-card :padding="false">
         <div class="px-4 pt-5 sm:px-6">
@@ -167,13 +172,15 @@
                                 @else
                                     <td class="{{ $cell }}">{{ $days($figures['used']) }}</td>
                                 @endif
+                                {{-- On paper a link is noise: the chevron goes; its empty column keeps the
+                                right edge the row's divider is inset from. --}}
                                 <td class="px-1 py-2 text-right">
                                     @unless ($row['total'])
                                         <a
                                             href="{{ route('employees.show', $employee) }}#leave"
                                             wire:navigate
                                             aria-label="View leave for {{ $employee->full_name }}"
-                                            class="-my-1 ml-auto inline-flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-primary-600/35 dark:hover:text-primary-300"
+                                            class="-my-1 ml-auto inline-flex h-10 w-10 print:!hidden items-center justify-center rounded-lg text-slate-500 transition hover:bg-primary-50 hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:bg-primary-600/35 dark:hover:text-primary-300"
                                         >
                                             <x-icon name="chevron-right" class="h-5 w-5" />
                                         </a>

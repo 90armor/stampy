@@ -23,12 +23,16 @@
         })"
         class="space-y-6"
     >
-        <div>
+        {{-- Printing (Phase 6g, F04): A4 landscape; the page's title and tabs stay on
+        screen, and the open tab prints under its own print header. --}}
+        <style>@media print { @page { size: A4 landscape; margin: 10mm; } }</style>
+
+        <div class="print:!hidden">
             <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Reports</h1>
             <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">Figures per employee for a month or a year, on screen and as a CSV.</p>
         </div>
 
-        <x-tab-bar label="Report sections" :tabs="$tabs" />
+        <div class="print:!hidden"><x-tab-bar label="Report sections" :tabs="$tabs" /></div>
 
         @foreach ($tabs as $key => $label)
             <div x-show="tab === '{{ $key }}'" @if ($key !== $tab) x-cloak @endif>

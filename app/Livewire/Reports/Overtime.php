@@ -6,6 +6,7 @@ use App\Models\OvertimeSettings;
 use App\Support\DisplayDate;
 use App\Support\OvertimeReport;
 use App\Support\OvertimeSummary;
+use App\Support\ReportCsv;
 use Carbon\Carbon;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
@@ -73,14 +74,8 @@ class Overtime extends Component
 
         return response()->streamDownload(function () use ($report, $month, $exportedAt, $categories) {
             $out = fopen('php://output', 'w');
-            // A UTF-8 byte-order mark: HR opens this in Excel, which otherwise
-            // reads the file as ANSI and breaks "—" and Khmer or Myanmar names.
+            // The byte-order mark, the header row first, the notes last (ReportCsv).
             fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, ['Overtime report, '.DisplayDate::month($month).' — generated '.$exportedAt->format('Y-m-d H:i').' ('.config('app.timezone').')']);
-            if ($report['open']) {
-                fputcsv($out, ['This month is still open: figures can change until it ends.']);
-            }
-            fputcsv($out, ['Only approved, credited minutes count. Minutes; pay-equivalent hours = sum of (minutes x rate) / 60, pay only.']);
             fputcsv($out, ['Code', 'Name', 'Department', ...array_map(fn ($category) => "Pay: {$category[0]} minutes", array_values($categories)), 'Time off minutes', 'Pay-equivalent hours']);
 
             foreach ($report['rows'] as $row) {
@@ -88,8 +83,13 @@ class Overtime extends Component
             }
 
             fputcsv($out, ['Total', '', '', ...array_values($report['totals']['pay']), $report['totals']['time_off'], number_format($report['totals']['pay_equivalent_hours'], 2, '.', '')]);
+            ReportCsv::notes($out, array_values(array_filter([
+                'Overtime report, '.DisplayDate::month($month).' — generated '.$exportedAt->format('Y-m-d H:i').' ('.config('app.timezone').')',
+                $report['open'] ? 'This month is still open: figures can change until it ends.' : null,
+                'Only approved, credited minutes count. Minutes; pay-equivalent hours = sum of (minutes x rate) / 60, pay only.',
+            ])));
             fclose($out);
-        }, 'overtime-'.$month->format('Y-m').'-exported-'.$exportedAt->format('Y-m-d-Hi').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }, ReportCsv::filename('overtime-'.$month->format('Y-m'), $exportedAt, $report['open']), ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     private function selectedMonth(): Carbon

@@ -61,9 +61,10 @@ Today's list follows the builder's statuses (Phase 2.7), worst-first: **Absent**
 ## Other attendance details
 
 - Raw punch badges in the day modal and table view are neutral (`slate`) for both In and Out. Green means Present; a punch direction is not a status.
-- **Raw punches** (`<x-attendance.day-detail-panel>`, shared by the day modal and the table's expanded row): a `Raw punches N` heading with **Add punch** as a secondary button on the right (admins only); one row per punch — time, In/Out badge, source and any note — divided by the `divider` line, with a red **Void** ghost button (32px, visible at rest, `aria-label` naming the punch). The add form is a tinted well: date, time and type on one row, Cancel / Save punch right-aligned under them. The day modal shows a **Note** only when the day has one, and the employee's name under the date.
+- **Raw punches** (`<x-attendance.day-detail-panel>`, shared by the day modal and the table's expanded row): a `Raw punches N` heading with **Add punch** as a secondary button on the right (admins only); one row per punch — time, In/Out badge, source and any note — divided by the `divider` line, with a red **Void** ghost button (32px, visible at rest, `aria-label` naming the punch). The add form is a tinted well: date, time and type on one row, the **Reason** under them, Cancel / Save punch right-aligned under that.
+- **Every correction says why** (Phase 6g, F34): Add punch and Void each need a reason of 1–200 characters ("Write a reason for this change." when it's missing), stored on the punch (`attendance_logs.reason`, `void_reason`). The list shows it on its own muted line under who made the change and when — `Manual · by Administrator, Wed 4 Nov 9:12 AM`, then `Reason: Forgot to punch at the gate`; a voided punch adds `Void reason: …`. A correction from before reasons were asked for reads `Reason: —`; a device punch has no reason line. The day modal shows a **Note** only when the day has one, and the employee's name under the date.
 - **Overnight out-punches** are listed on both days, so neither day reads as missing or extra: on the shift's day, after its own punches, as `12:42 AM (+1)` · `recorded Thu 1 Oct`; on the day it was punched, in time order, as `ends Wed 30 Sep's shift`. Both rows are the same punch (`Attendance\Show::overnightPunches()`, which also covers the last day of the previous month) and either Void voids it.
-- **Void confirmation** opens above the day modal: `<x-confirm-dialog>` is teleported to `<body>` at `z-[60]`, one layer above modals, and Escape closes only the confirmation.
+- **Void asks for a reason in place** (Phase 6g): Void opens a well under the punch, like Add punch's — "Void the In punch at 8:52 AM on Mon 2 Mar? This can't be undone.", a Reason field (focused on opening) and Cancel / **Void punch** (danger). It replaced the confirm dialog, which holds no field and closes before the server answers, so it could show no reason error. One correction form is open at a time: opening Void closes Add punch, and the other way round.
 - Dashboard Recent activity is a neutral log ("Punched in" / "Punched out", no timing — event-log language, since "Checked in" is reserved for the any-punch aggregate) and shows the date (compact, `Tue 29 Sep`) above the time for any entry that isn't from today, so an older punch can't read as this morning's.
 
 ## Days with no row (Phase 6e)
@@ -241,7 +242,15 @@ Reports → Attendance (Phase 5b) is one row per employee for a month, read acro
 - **The Total row** sums every column, Late and Early included, in the semibold weight; it has no chevron and no divider under it.
 - **The trailing chevron is the row's only link**, as in the attendance tables: visible at rest, 40px, labelled `View attendance for {name}, {Month Year}`, opening that employee's calendar at the report's month. A manager's report holds only their team, so every chevron opens.
 - **Empty states say which:** "No employees in this month" / "No employees in this department" when nobody in the viewer's scope was employed then, "No attendance calculated for this month" when they were but nothing was built — never a table of zeros.
-- **Controls:** Month (the overtime report's 13 months, shared with the other report tabs), Department (the viewer's team's departments only), Download CSV. They sit beside the title from `xl`, under it below.
+- **Controls:** Month (the overtime report's 13 months, shared with the other report tabs), Department (the viewer's team's departments only), Download CSV, Print. They sit beside the title from `xl`, under it below.
+
+## Report CSVs and printing
+
+Every report tab (Attendance, Leave, Overtime) shares these (Phase 6g):
+
+- **The CSV's header row is its first line** (F35), so Excel's Filter and Sort and Power Query read it as a table; the rows and the Total follow; after one blank row come the notes — the title (report, period, filter, whose view, export time), the open-period notice, the explanation. A UTF-8 byte-order mark comes first of all, for Excel (`App\Support\ReportCsv`).
+- **An open period's file is named so:** while the month (attendance, overtime) or the year (leave — this year, or next once granted) isn't over, the name ends `-OPEN`: `attendance-2026-11-exported-2026-11-04-1030-OPEN.csv`. A closed period's name is unchanged: `attendance-2026-10-exported-2026-11-01-0910.csv`.
+- **Print** sits beside Download CSV and prints the open tab only (`window.print()`; the browser's own Print does the same). On paper: A4 landscape; no sidebar, topbar, page title, tabs, controls or on-screen notice; the table flows across pages — no scroller, pinned column, fading edge or chevron, in smaller type with tighter rows — its header row repeated on every page and no row split between two; light colours whatever the theme. A **print header** (`<x-report.print-header>`, paper only) stands in for what's hidden: `Attendance report · November 2026`, the filters (`Engineering`; for leave `Annual · All departments`; none for overtime), `Printed Wed 4 Nov, 2:15 PM by Administrator` — the time of printing, set on `beforeprint` — and the open-period notice while the period isn't over ("This month is still open: figures can change until it ends.", or "This year…").
 
 ## The leave report
 
@@ -255,7 +264,7 @@ Reports → Leave (Phase 5b) is one row per employee for one leave type and year
 - **Muted lines under the name:** Joined / Left inside the year, "Full-year balance" for a leaver, and for Time off in lieu the overtime saved toward the next half day.
 - **Time off in lieu lists only whoever it is shown for** elsewhere (`LeaveType::isShownFor()`); with nobody, the empty state says "Nobody has Time off in lieu in {year}". The other empty states: nobody employed that year, nobody in the department.
 - **The trailing chevron** (`View leave for {name}`) opens the employee's profile at its Leave card (`#leave`).
-- **Controls:** Year, Leave type, Department (the tab's own, `?leave-department=`), Download CSV. They sit beside the title from `2xl`, under it below. The Employee column is pinned with the fading end edge, as on the attendance report, and keeps its width from `sm`.
+- **Controls:** Year, Leave type, Department (the tab's own, `?leave-department=`), Download CSV, Print. They sit beside the title from `2xl`, under it below. The Employee column is pinned with the fading end edge, as on the attendance report, and keeps its width from `sm`.
 
 ## Dark mode and accessibility
 

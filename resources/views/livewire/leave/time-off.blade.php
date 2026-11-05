@@ -40,7 +40,10 @@
         <x-card>
             <div class="flex items-start gap-3">
                 <x-icon name="info" class="mt-0.5 h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" />
-                <p class="text-sm text-slate-600 dark:text-slate-300">Your account isn't linked to an employee record, so there's no leave balance of your own here. You can still file leave for an employee.</p>
+                <div class="text-sm text-slate-600 dark:text-slate-300">
+                    <p>Your account isn't linked to an employee record, so there's no leave balance of your own here. You can still file leave for an employee.</p>
+                    <p class="mt-1">Leave you file for someone appears on their profile.</p>
+                </div>
             </div>
         </x-card>
     @else

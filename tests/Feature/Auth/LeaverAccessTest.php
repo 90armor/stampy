@@ -70,7 +70,7 @@ class LeaverAccessTest extends TestCase
         $this->employee('2026-10-16');
 
         $this->post('/login', ['email' => 'visal', 'password' => 'wrong'])
-            ->assertSessionHasErrors(['auth' => 'Incorrect email/username or password. Please try again.']);
+            ->assertSessionHasErrors(['auth' => 'Incorrect username, employee code or password.']);
 
         $this->assertGuest();
     }

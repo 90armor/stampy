@@ -8,7 +8,7 @@
 
     <h1 class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Reset your password</h1>
     <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">
-        Enter your username or email. If your account has an email on file, we'll send a link to choose a new password.
+        Enter your username or employee code. If your account has an email on file, we'll send a link to choose a new password.
     </p>
 
     @if (session('status'))
@@ -21,10 +21,10 @@
         <form method="POST" action="{{ route('password.email') }}" class="mt-8 space-y-5">
             @csrf
 
-            <!-- Username or email -->
+            <!-- Username, employee code or email (LoginIdentifier) -->
             <div>
-                <x-input-label for="email" :value="__('Username or email')" />
-                <x-text-input id="email" class="block mt-1 min-h-11 w-full" type="text" name="email" :value="old('email')" required autofocus autocomplete="username" placeholder="Your username or email" />
+                <x-input-label for="email" :value="__('Username or employee code')" />
+                <x-text-input id="email" class="block mt-1 min-h-11 w-full" type="text" name="email" :value="old('email')" required autofocus autocomplete="username" placeholder="Username or employee code" />
                 <x-input-error :messages="$errors->get('email')" class="mt-2" />
             </div>
 

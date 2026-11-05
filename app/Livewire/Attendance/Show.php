@@ -55,6 +55,18 @@ class Show extends Component
 
     public string $newPunchType = 'in';
 
+    /** Why the punch is being added (Phase 6g, F34): required, kept on the row. */
+    public string $newPunchReason = '';
+
+    /**
+     * The punch whose void form is open, or null — like $addingPunchFor, one
+     * at a time. Voiding asks for a reason, so it's a small form under the
+     * punch rather than the confirm dialog, which can hold no field.
+     */
+    public ?int $voidingPunchId = null;
+
+    public string $voidReason = '';
+
     /**
      * Decoupled from $viewingDay on purpose (matching FormModal's
      * $showModal/$editing split): entangling the modal directly on a
@@ -124,12 +136,30 @@ class Show extends Component
         $this->newPunchDate = $date;
         $this->newPunchTime = '';
         $this->newPunchType = 'in';
+        $this->newPunchReason = '';
+        $this->voidingPunchId = null;
         $this->resetErrorBag();
     }
 
     public function cancelAddingPunch(): void
     {
         $this->addingPunchFor = null;
+        $this->resetErrorBag();
+    }
+
+    public function startVoiding(int $punchId): void
+    {
+        $this->authorize('update', $this->employee);
+
+        $this->voidingPunchId = $punchId;
+        $this->voidReason = '';
+        $this->addingPunchFor = null;
+        $this->resetErrorBag();
+    }
+
+    public function cancelVoiding(): void
+    {
+        $this->voidingPunchId = null;
         $this->resetErrorBag();
     }
 
@@ -153,6 +183,7 @@ class Show extends Component
     {
         $this->dayModalOpen = false;
         $this->addingPunchFor = null;
+        $this->voidingPunchId = null;
         $this->resetErrorBag();
     }
 
@@ -169,13 +200,17 @@ class Show extends Component
         $lastAllowed = $leftOn !== null && $leftOn->lt(today()) ? $leftOn : today();
         $outsideEmployment = "A punch must fall within this employee's employment (".$this->employmentPeriod().').';
 
+        $this->newPunchReason = trim($this->newPunchReason);
+
         $this->validate([
             'newPunchDate' => ['required', 'date', 'after_or_equal:'.$joinDate->format('Y-m-d'), 'before_or_equal:'.$lastAllowed->format('Y-m-d')],
             'newPunchTime' => ['required', 'date_format:H:i'],
             'newPunchType' => ['required', 'in:in,out'],
+            'newPunchReason' => self::REASON_RULES,
         ], [
             'newPunchDate.after_or_equal' => $outsideEmployment,
             'newPunchDate.before_or_equal' => $leftOn !== null ? $outsideEmployment : "A punch can't be dated in the future.",
+            ...self::reasonMessages('newPunchReason'),
         ], [
             'newPunchDate' => 'punch date',
             'newPunchTime' => 'punch time',
@@ -214,12 +249,17 @@ class Show extends Component
                 return;
             }
 
-            $existing->update([
+            // Added again, by whoever did it now, why and when: the punch list
+            // reads who and when from created_by and created_at.
+            $existing->forceFill([
                 'punch_type' => $this->newPunchType,
                 'voided_at' => null,
                 'voided_by' => null,
+                'void_reason' => null,
                 'created_by' => auth()->id(),
-            ]);
+                'created_at' => now(),
+                'reason' => $this->newPunchReason,
+            ])->save();
         } else {
             try {
                 AttendanceLog::create([
@@ -228,6 +268,7 @@ class Show extends Component
                     'punch_type' => $this->newPunchType,
                     'source' => PunchSource::Manual,
                     'created_by' => auth()->id(),
+                    'reason' => $this->newPunchReason,
                 ]);
             } catch (QueryException $e) {
                 // Belt-and-suspenders for a race between the check above and
@@ -246,6 +287,19 @@ class Show extends Component
 
         $this->rebuildAround($punchedAt);
         $this->addingPunchFor = null;
+        $this->newPunchReason = '';
+    }
+
+    /** A correction's reason (F34): what was done and why, in a line. */
+    private const REASON_RULES = ['required', 'string', 'max:200'];
+
+    /** @return array<string, string> */
+    private static function reasonMessages(string $field): array
+    {
+        return [
+            "{$field}.required" => 'Write a reason for this change.',
+            "{$field}.max" => 'Keep the reason to 200 characters or fewer.',
+        ];
     }
 
     /**
@@ -270,11 +324,17 @@ class Show extends Component
             ->notVoided()
             ->findOrFail($punchId);
 
+        $this->voidReason = trim($this->voidReason);
+        $this->validate(['voidReason' => self::REASON_RULES], self::reasonMessages('voidReason'));
+
         $log->update([
             'voided_at' => now(),
             'voided_by' => auth()->id(),
+            'void_reason' => $this->voidReason,
         ]);
 
+        $this->voidingPunchId = null;
+        $this->voidReason = '';
         $this->rebuildAround($log->punched_at);
     }
 

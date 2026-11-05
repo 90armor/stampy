@@ -31,9 +31,9 @@
             </div>
         @endif
 
-        <!-- Email or username -->
+        <!-- Username, employee code or email (LoginIdentifier, Phase 6g); email works but isn't advertised -->
         <div>
-            <x-input-label for="email" :value="__('Email or username')" />
+            <x-input-label for="email" :value="__('Username or employee code')" />
             <x-text-input
                 id="email"
                 class="mt-1 min-h-11 {{ $errors->has('email') ? '!border-red-500 focus:!border-red-500 focus:!ring-red-500' : '' }}"
@@ -43,7 +43,7 @@
                 required
                 autofocus
                 autocomplete="username"
-                placeholder="you@company.com or username"
+                placeholder="Username or employee code"
                 aria-invalid="{{ $errors->has('email') ? 'true' : 'false' }}"
                 :aria-describedby="$errors->has('email') ? 'email-error' : null"
             />

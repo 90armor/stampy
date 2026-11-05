@@ -187,17 +187,21 @@ class OvertimeReportTest extends TestCase
         $content = $this->downloadedContent($response);
         $this->assertStringStartsWith("\xEF\xBB\xBF", $content);
         $this->assertSame(1, substr_count($content, "\xEF\xBB\xBF"));
+        // The header row first (Phase 6g, F35), the rows, then one blank row and the notes.
         $lines = array_map('str_getcsv', explode("\n", trim(substr($content, 3))));
-        $this->assertSame('Overtime report, May 2026 — generated 2026-06-15 09:10 (Asia/Phnom_Penh)', $lines[0][0]);
-        $this->assertStringStartsWith('Only approved, credited minutes count.', $lines[1][0]);
-        $this->assertSame(['Code', 'Name', 'Department', 'Pay: Workday minutes', 'Pay: Night minutes', 'Pay: Rest day minutes', 'Pay: Holiday minutes', 'Time off minutes', 'Pay-equivalent hours'], $lines[2]);
-        $this->assertSame(['EMP-0002', 'Kyaw Kyaw', 'Engineering', '180', '60', '240', '0', '0', '14.50'], $lines[3]);
-        $this->assertSame(['EMP-0005', 'Su Su', 'Engineering', '0', '0', '0', '0', '90', '0.00'], $lines[4]);
-        $this->assertSame(['Total', '', '', '180', '60', '240', '0', '90', '14.50'], $lines[5]);
+        $this->assertSame(['Code', 'Name', 'Department', 'Pay: Workday minutes', 'Pay: Night minutes', 'Pay: Rest day minutes', 'Pay: Holiday minutes', 'Time off minutes', 'Pay-equivalent hours'], $lines[0]);
+        $this->assertSame(['EMP-0002', 'Kyaw Kyaw', 'Engineering', '180', '60', '240', '0', '0', '14.50'], $lines[1]);
+        $this->assertSame(['EMP-0005', 'Su Su', 'Engineering', '0', '0', '0', '0', '90', '0.00'], $lines[2]);
+        $this->assertSame(['Total', '', '', '180', '60', '240', '0', '90', '14.50'], $lines[3]);
+        $this->assertSame([null], $lines[4]);
+        $this->assertSame('Overtime report, May 2026 — generated 2026-06-15 09:10 (Asia/Phnom_Penh)', $lines[5][0]);
+        $this->assertStringStartsWith('Only approved, credited minutes count.', $lines[6][0]);
+        $this->assertCount(7, $lines);
 
-        // The open month says so in the file too.
+        // The open month says so in the file and in its name.
         $open = Livewire::actingAs($this->admin)->test(Overtime::class)->call('download');
-        $this->assertSame('This month is still open: figures can change until it ends.', str_getcsv(explode("\n", substr($this->downloadedContent($open), 3))[1])[0]);
+        $open->assertFileDownloaded('overtime-2026-06-exported-2026-06-15-0910-OPEN.csv');
+        $this->assertSame('This month is still open: figures can change until it ends.', str_getcsv(array_slice(explode("\n", trim($this->downloadedContent($open))), -2)[0])[0]);
     }
 
     private function downloadedContent($response): string

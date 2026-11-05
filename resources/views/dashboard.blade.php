@@ -84,6 +84,9 @@
             $cardTitle = 'text-lg font-semibold text-slate-900 dark:text-slate-100';
             $cardMeta = 'shrink-0 text-xs tabular-nums text-slate-500 dark:text-slate-400';
             $avatar = 'flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600 dark:bg-slate-750 dark:text-slate-300';
+            // The own cards' styles (dashboard/own-*), as the employee dashboard has them.
+            $row = 'flex items-baseline justify-between gap-4 border-t border-slate-divider py-2.5 first:border-t-0 first:pt-0 last:pb-0';
+            $link = 'rounded text-sm font-medium text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-2 hover:decoration-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:decoration-primary-700 dark:hover:decoration-primary-400';
         @endphp
         <div class="flex flex-col gap-6 xl:grid xl:grid-cols-[minmax(0,2fr)_minmax(21rem,1fr)] xl:items-start">
             <div class="contents xl:flex xl:min-w-0 xl:flex-col xl:gap-6">
@@ -251,8 +254,18 @@
                     @endif
                 </x-card>
 
+                {{-- Their own leave (Phase 6g, F11): a manager, or an admin linked to an
+                employee record, is an employee too. After the team's cards — in the side
+                column from xl, after every team card below it, so the team view stays
+                first. An admin with no record has none. --}}
+                @if ($mine)
+                    @include('dashboard.own-decided', ['class' => 'order-5'])
+                    @include('dashboard.own-balance', ['class' => 'order-6'])
+                    @include('dashboard.own-upcoming', ['class' => 'order-7'])
+                @endif
+
                 @if ($showQuickActions)
-                    <x-card class="order-5">
+                    <x-card class="order-8">
                         <h2 class="{{ $cardTitle }}">Quick actions</h2>
                         <div class="mt-3 space-y-1">
                             @foreach ($quickActions as $action)
@@ -266,7 +279,7 @@
                 @endif
 
                 @if ($showSetup)
-                    <x-card class="order-6">
+                    <x-card class="order-9">
                         <h2 class="{{ $cardTitle }}">Complete your organization</h2>
                         <ul class="mt-4 space-y-3">
                             @foreach ($setupSteps as $step)
@@ -308,131 +321,14 @@
         short card never leaves a hole. --}}
         <div class="grid gap-6 lg:grid-cols-2 lg:items-start">
             <div class="flex min-w-0 flex-col gap-6">
-                {{-- Decided since they last opened Time off (LeaveDecisions), newest
-                first, at most the last 30 days — the same "New" state Time off
-                shows, which the title already says, so no per-item badge. Without
-                email, this is where an employee finds out; a rejection's note is
-                the reason, so it shows. --}}
-                @if (count($mine['decided']))
-                    <x-card>
-                        <div class="{{ $cardHeader }}">
-                            <h2 class="{{ $cardTitle }}">Decided since your last visit</h2>
-                            <p class="{{ $cardMeta }}">{{ count($mine['decided']) }} new</p>
-                        </div>
-                        <ul class="mt-4">
-                            @foreach ($mine['decided'] as $decided)
-                                @php $decision = \App\Support\RequestDecisions::note($decided); @endphp
-                                <li class="border-t border-slate-divider py-2.5 first:border-t-0 first:pt-0 last:pb-0">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        @if ($decided instanceof \App\Models\OvertimeRequest)
-                                            <p class="text-sm font-medium text-slate-700 dark:text-slate-200">Overtime · <span class="tabular-nums">{{ $decided->displayDateAndWindow() }}</span></p>
-                                        @else
-                                            <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $decided->leaveType->name }} · <span class="tabular-nums">{{ $decided->displayDates() }}</span></p>
-                                        @endif
-                                        <x-badge :color="$decided->status->badgeColor()">{{ $decided->status->label() }}</x-badge>
-                                    </div>
-                                    @if ($decision)
-                                        <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">“{{ $decision->note }}” <span class="text-slate-500 dark:text-slate-400">— {{ $decision->decidedBy?->name ?? 'an approver' }}</span></p>
-                                    @endif
-                                </li>
-                            @endforeach
-                        </ul>
-                        @php $decidedOvertime = collect($mine['decided'])->contains(fn ($decided) => $decided instanceof \App\Models\OvertimeRequest); @endphp
-                        <div class="mt-4 flex flex-wrap gap-x-4 gap-y-2">
-                            @if (collect($mine['decided'])->contains(fn ($decided) => $decided instanceof \App\Models\Leave))
-                                <a href="{{ route('time-off.index') }}" wire:navigate class="{{ $link }}">See them on Time off</a>
-                            @endif
-                            @if ($decidedOvertime)
-                                <a href="{{ route('overtime.index') }}" wire:navigate class="{{ $link }}">See overtime</a>
-                            @endif
-                        </div>
-                    </x-card>
-                @endif
+                @include('dashboard.own-decided')
 
-                <x-card>
-                    <div class="{{ $cardHeader }}">
-                        <h2 class="{{ $cardTitle }}">Leave balance</h2>
-                        <p class="{{ $cardMeta }}">{{ today()->year }}</p>
-                    </div>
-                    @if (count($mine['balances']))
-                        <dl class="mt-4">
-                            @foreach ($mine['balances'] as $balance)
-                                <div class="{{ $row }}">
-                                    <dt class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $balance['name'] }}</dt>
-                                    @if ($balance['usableFrom'] === null)
-                                        <dd class="text-right text-sm tabular-nums text-slate-500 dark:text-slate-400">
-                                            <span class="text-base font-semibold text-slate-900 dark:text-slate-100">{{ \App\Support\LeaveDays::format($balance['available']) }}</span> available{{ $balance['fullYear'] !== null ? ' at last day' : '' }}
-                                            @if ($balance['fullYear'] !== null)
-                                                <span class="block text-xs">Full-year balance: {{ \App\Support\LeaveDays::label($balance['fullYear']) }}</span>
-                                            @endif
-                                            @if (($balance['toilRemainder'] ?? 0) > 0)
-                                                <span class="block text-xs">{{ \App\Support\Duration::format($balance['toilRemainder']) }} toward the next half day</span>
-                                            @endif
-                                        </dd>
-                                    @else
-                                        <dd class="text-right text-sm text-slate-500 dark:text-slate-400">{{ $balance['usableLine'] }}</dd>
-                                    @endif
-                                </div>
-                            @endforeach
-                        </dl>
-                    @else
-                        <p class="mt-4 text-sm text-slate-500 dark:text-slate-400">No leave balances yet.</p>
-                    @endif
-                    <div class="mt-4"><a href="{{ route('time-off.index') }}" wire:navigate class="{{ $link }} max-sm:-my-3 max-sm:inline-flex max-sm:min-h-11 max-sm:items-center">Request leave on Time off</a></div>
-                </x-card>
+
+                @include('dashboard.own-balance')
             </div>
 
             <div class="flex min-w-0 flex-col gap-6">
-                {{-- Upcoming: pending requests with whose decision they wait for,
-                then the next approved leave. --}}
-                <x-card>
-                    <div class="{{ $cardHeader }}">
-                        <h2 class="{{ $cardTitle }}">Upcoming</h2>
-                        @php $waiting = count($mine['pending']) + collect($mine['overtime'])->where('status', \App\Enums\OvertimeStatus::Pending)->count(); @endphp
-                        @if ($waiting)<p class="{{ $cardMeta }}">{{ $waiting }} waiting</p>@endif
-                    </div>
-                    @if (count($mine['pending']) || $mine['next'] || count($mine['overtime']))
-                        <ul class="mt-4">
-                            @foreach ($mine['pending'] as $item)
-                                <li class="border-t border-slate-divider py-2.5 first:border-t-0 first:pt-0 last:pb-0">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $item['leave']->leaveType->name }} · <span class="tabular-nums">{{ $item['leave']->displayDates() }}</span></p>
-                                        <x-badge :color="$item['leave']->status->badgeColor()">{{ $item['leave']->status->label() }}</x-badge>
-                                    </div>
-                                    <p class="mt-0.5 text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ \App\Support\LeaveDays::label($item['days']).' · '.$item['leave']->waitingLabel() }}</p>
-                                </li>
-                            @endforeach
-                            {{-- Overtime: waiting for a decision, then approved and still ahead. --}}
-                            @foreach ($mine['overtime'] as $request)
-                                <li class="border-t border-slate-divider py-2.5 first:border-t-0 first:pt-0 last:pb-0">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <p class="text-sm font-medium text-slate-700 dark:text-slate-200">Overtime · <span class="tabular-nums">{{ $request->displayDateAndWindow() }}</span></p>
-                                        <x-badge :color="$request->status->badgeColor()">{{ $request->status->label() }}</x-badge>
-                                    </div>
-                                    <p class="mt-0.5 text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ implode(' · ', array_filter([$request->compensation->label(), $request->waitingLabel() ?? $request->startsLabel()])) }}</p>
-                                </li>
-                            @endforeach
-                            @if ($mine['next'])
-                                @php $next = $mine['next']['leave']; @endphp
-                                <li class="border-t border-slate-divider py-2.5 first:border-t-0 first:pt-0 last:pb-0">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <p class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ $next->leaveType->name }} · <span class="tabular-nums">{{ $next->displayDates() }}</span></p>
-                                        <x-badge :color="$next->status->badgeColor()">{{ $next->status->label() }}</x-badge>
-                                    </div>
-                                    <p class="mt-0.5 text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ implode(' · ', array_filter([\App\Support\LeaveDays::label($mine['next']['days']), $next->startsLabel()])) }}</p>
-                                </li>
-                            @endif
-                        </ul>
-                        <div class="mt-4 flex flex-wrap gap-x-4 gap-y-2">
-                            <a href="{{ route('time-off.index') }}" wire:navigate class="{{ $link }} max-sm:-my-3 max-sm:inline-flex max-sm:min-h-11 max-sm:items-center">See all requests on Time off</a>
-                            @if (count($mine['overtime']))
-                                <a href="{{ route('overtime.index') }}" wire:navigate class="{{ $link }}">See overtime</a>
-                            @endif
-                        </div>
-                    @else
-                        <p class="mt-4 text-sm text-slate-500 dark:text-slate-400">No leave requested or coming up.</p>
-                    @endif
-                </x-card>
+                @include('dashboard.own-upcoming')
 
                 <x-card>
                     <div class="{{ $cardHeader }}">

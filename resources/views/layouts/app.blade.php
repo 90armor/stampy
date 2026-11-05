@@ -40,7 +40,7 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         @livewireStyles
     </head>
-    <body class="font-sans antialiased bg-slate-100 text-slate-900 dark:bg-slate-900 dark:text-slate-100 bg-shell">
+    <body class="font-sans antialiased bg-slate-100 text-slate-900 dark:bg-slate-900 dark:text-slate-100 bg-shell print:bg-white print:bg-none">
         <div
             x-data="{
                 sidebarOpen: false,
@@ -87,7 +87,7 @@
                     }
                 },
             }"
-            class="h-screen flex overflow-hidden"
+            class="h-screen flex overflow-hidden print:block print:h-auto print:overflow-visible"
         >
             {{-- The first focusable element on every app page, hidden until focused.
             With the phone drawer open it's part of the drawer's focus trap (sidebarFocusables),
@@ -102,7 +102,8 @@
             >Skip to content</a>
 
             <!-- Desktop sidebar -->
-            <div class="hidden lg:flex lg:shrink-0">
+            {{-- Printing (Phase 6g, F04): no shell, and the page flows instead of scrolling inside <main>. --}}
+            <div class="hidden lg:flex lg:shrink-0 print:!hidden">
                 @include('layouts.partials.sidebar')
             </div>
 
@@ -120,11 +121,11 @@
             </div>
 
             <!-- Main column -->
-            <div class="flex flex-1 flex-col overflow-hidden">
+            <div class="flex flex-1 flex-col overflow-hidden print:block print:overflow-visible">
                 @include('layouts.partials.topbar', ['header' => $header ?? null, 'breadcrumbs' => $breadcrumbs ?? null])
 
-                <main id="main-content" x-ref="main" tabindex="-1" class="flex-1 overflow-y-auto focus:outline-none">
-                    <div class="max-w-7xl 2xl:max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <main id="main-content" x-ref="main" tabindex="-1" class="flex-1 overflow-y-auto focus:outline-none print:overflow-visible">
+                    <div class="max-w-7xl 2xl:max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 print:!max-w-none print:!p-0">
                         {{ $slot }}
                     </div>
                 </main>

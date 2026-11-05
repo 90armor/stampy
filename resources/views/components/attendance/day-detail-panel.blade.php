@@ -6,6 +6,8 @@
     'newPunchDate',
     'newPunchTime',
     'newPunchType',
+    // The punch whose void form is open (Phase 6g, F34: voiding asks for a reason).
+    'voidingPunchId' => null,
     // Overnight shifts (Attendance\Show::overnightPunches()): the (+1)
     // out-punch that closed this day's shift, and which shift each punch
     // recorded on this day belongs to, when it isn't this day's.
@@ -73,7 +75,7 @@ divergence here would be a real correctness bug, not just a style one. --}}
                         <span class="text-xs text-slate-500 dark:text-slate-400">
                             {{ $punch->source->label() }}
                             @if ($punch->source->value === 'manual' && $punch->createdBy)
-                                · by {{ $punch->createdBy->name }}
+                                · by {{ $punch->createdBy->name }}, {{ \App\Support\DisplayDate::compact($punch->created_at) }} {{ \App\Support\AttendanceTime::format($punch->created_at) }}
                             @endif
                             @if ($isNextDay)
                                 · recorded {{ \App\Support\DisplayDate::compact($punch->punched_at) }}
@@ -84,17 +86,19 @@ divergence here would be a real correctness bug, not just a style one. --}}
                                 · voided by {{ $punch->voidedBy?->name ?? 'unknown' }}, {{ \App\Support\DisplayDate::compact($punch->voided_at) }} {{ \App\Support\AttendanceTime::format($punch->voided_at) }}
                             @endif
                         </span>
+                        {{-- Why it was corrected (F34), under who and when; a correction from
+                        before reasons were asked for has none: "—". --}}
+                        @if ($punch->source->value === 'manual')
+                            <span class="basis-full text-xs text-slate-500 dark:text-slate-400">Reason: {{ $punch->reason ?? '—' }}</span>
+                        @endif
+                        @if ($voided)
+                            <span class="basis-full text-xs text-slate-500 dark:text-slate-400">Void reason: {{ $punch->void_reason ?? '—' }}</span>
+                        @endif
                     </div>
-                    @if ($canEdit && ! $voided)
+                    @if ($canEdit && ! $voided && $voidingPunchId !== $punch->id)
                         <button
                             type="button"
-                            @click="$dispatch('confirm-dialog-attendance-show', {
-                                title: 'Void punch',
-                                message: @js('Void the '.$punch->punch_type->label().' punch at '.\App\Support\AttendanceTime::format($punch->punched_at).' on '.\App\Support\DisplayDate::compact($punch->punched_at).'? This cannot be undone.'),
-                                confirmText: 'Void',
-                                method: 'voidPunch',
-                                args: [{{ $punch->id }}],
-                            })"
+                            wire:click="startVoiding({{ $punch->id }})"
                             aria-label="Void the {{ $punch->punch_type->label() }} punch at {{ \App\Support\AttendanceTime::format($punch->punched_at) }}"
                             class="inline-flex h-8 shrink-0 items-center rounded-lg px-2.5 text-xs font-medium text-red-600 transition hover:bg-red-50 hover:text-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-red-400 dark:hover:bg-red-950/40 dark:hover:text-red-300"
                         >
@@ -102,6 +106,25 @@ divergence here would be a real correctness bug, not just a style one. --}}
                         </button>
                     @endif
                 </li>
+                @if ($canEdit && ! $voided && $voidingPunchId === $punch->id)
+                    {{-- Voiding needs a reason (F34), so it's asked here, in a well like
+                    Add punch's, rather than in the confirm dialog, which holds no field.
+                    Opening it puts focus in the reason. --}}
+                    <li class="pb-3">
+                        <form wire:submit="voidPunch({{ $punch->id }})" class="rounded-xl bg-slate-50 p-4 ring-1 ring-inset ring-slate-divider dark:bg-slate-800">
+                            <p class="text-sm text-slate-700 dark:text-slate-300">Void the {{ $punch->punch_type->label() }} punch at {{ \App\Support\AttendanceTime::format($punch->punched_at) }} on {{ \App\Support\DisplayDate::compact($punch->punched_at) }}? This can't be undone.</p>
+                            <div class="mt-3 sm:max-w-xl">
+                                <x-input-label for="void_reason_{{ $punch->id }}" value="Reason" class="!mb-1 !text-xs" />
+                                <x-text-input id="void_reason_{{ $punch->id }}" wire:model="voidReason" maxlength="200" placeholder="Why this punch is wrong" x-init="$nextTick(() => $el.focus())" />
+                            </div>
+                            <div class="mt-4 flex justify-end gap-3 sm:max-w-xl">
+                                <x-button type="button" variant="secondary" wire:click="cancelVoiding">Cancel</x-button>
+                                <x-button type="submit" variant="danger">Void punch</x-button>
+                            </div>
+                        </form>
+                        <x-input-error for="void_reason_{{ $punch->id }}" :messages="$errors->get('voidReason')" class="mt-1" />
+                    </li>
+                @endif
             @endforeach
         </ul>
     @endif
@@ -129,6 +152,11 @@ divergence here would be a real correctness bug, not just a style one. --}}
                     </x-select>
                 </div>
                 </div>
+                {{-- Why (F34): kept on the punch and shown in the list. --}}
+                <div class="mt-3 sm:max-w-xl">
+                    <x-input-label for="new_punch_reason_{{ $dayKey }}" value="Reason" class="!mb-1 !text-xs" />
+                    <x-text-input id="new_punch_reason_{{ $dayKey }}" wire:model="newPunchReason" maxlength="200" placeholder="Why this punch is being added" />
+                </div>
                 <div class="mt-4 flex justify-end gap-3 sm:max-w-xl">
                     <x-button type="button" variant="secondary" wire:click="cancelAddingPunch">Cancel</x-button>
                     <x-button type="submit" variant="primary">Save punch</x-button>
@@ -138,5 +166,6 @@ divergence here would be a real correctness bug, not just a style one. --}}
             <x-input-error for="new_punch_date_{{ $dayKey }}" :messages="$errors->get('newPunchDate')" class="mt-1" />
             <x-input-error for="new_punch_time_{{ $dayKey }}" :messages="$errors->get('newPunchTime')" class="mt-1" />
             <x-input-error for="new_punch_type_{{ $dayKey }}" :messages="$errors->get('newPunchType')" class="mt-1" />
+            <x-input-error for="new_punch_reason_{{ $dayKey }}" :messages="$errors->get('newPunchReason')" class="mt-1" />
     @endif
 </div>

@@ -6,6 +6,7 @@ use App\Support\AttendanceReport;
 use App\Support\DisplayDate;
 use App\Support\EmployeeScope;
 use App\Support\LeaveDays;
+use App\Support\ReportCsv;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
@@ -90,14 +91,8 @@ class Attendance extends Component
 
         return response()->streamDownload(function () use ($report, $month, $department, $exportedAt, $view, $line) {
             $out = fopen('php://output', 'w');
-            // A UTF-8 byte-order mark: HR opens this in Excel, which otherwise
-            // reads the file as ANSI and breaks "—" and Khmer or Myanmar names.
+            // The byte-order mark, the header row first, the notes last (ReportCsv).
             fwrite($out, "\xEF\xBB\xBF");
-            fputcsv($out, ['Attendance report, '.DisplayDate::month($month).' — '.($department ?? 'All departments').' — '.$view.' — generated '.$exportedAt->format('Y-m-d H:i').' ('.config('app.timezone').')']);
-            if ($report['open']) {
-                fputcsv($out, ['This month is still open: figures can change until it ends.']);
-            }
-            fputcsv($out, ['The same counts as each employee\'s attendance summary. Workdays are scheduled workdays only; a day worked on a day off or holiday counts under Days off worked; Worked on leave counts the days of leave taken that were worked anyway. Durations in whole minutes; leave taken in days. Joined and Left only when inside the month.']);
             fputcsv($out, ['Code', 'Name', 'Department', 'Joined', 'Left', 'Calculated workdays', 'Present', 'Absent', 'Incomplete', 'On leave', 'Leave taken (days)', 'Worked on leave (days)', 'Days off worked', 'Late (days)', 'Late (minutes)', 'Early leave (days)', 'Early leave (minutes)', 'Worked (minutes)', 'Not calculated']);
 
             foreach ($report['rows'] as $row) {
@@ -110,8 +105,13 @@ class Attendance extends Component
             }
 
             fputcsv($out, ['Total', '', '', '', '', ...$line($report['totals'])]);
+            ReportCsv::notes($out, array_values(array_filter([
+                'Attendance report, '.DisplayDate::month($month).' — '.($department ?? 'All departments').' — '.$view.' — generated '.$exportedAt->format('Y-m-d H:i').' ('.config('app.timezone').')',
+                $report['open'] ? 'This month is still open: figures can change until it ends.' : null,
+                'The same counts as each employee\'s attendance summary. Workdays are scheduled workdays only; a day worked on a day off or holiday counts under Days off worked; Worked on leave counts the days of leave taken that were worked anyway. Durations in whole minutes; leave taken in days. Joined and Left only when inside the month.',
+            ])));
             fclose($out);
-        }, 'attendance-'.$month->format('Y-m').($department !== null ? '-'.Str::slug($department) : '').'-exported-'.$exportedAt->format('Y-m-d-Hi').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
+        }, ReportCsv::filename('attendance-'.$month->format('Y-m').($department !== null ? '-'.Str::slug($department) : ''), $exportedAt, $report['open']), ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     private function selectedMonth(): Carbon

@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Auth;
 
 use App\Models\User;
+use App\Support\LoginIdentifier;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -13,6 +14,10 @@ use Illuminate\Validation\ValidationException;
 
 class LoginRequest extends FormRequest
 {
+    private ?User $resolved = null;
+
+    private bool $hasResolved = false;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -24,11 +29,10 @@ class LoginRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * The field is still named/keyed 'email' (matches the view's input name
-     * and the throttle key below) but no longer requires email FORMAT —
-     * many employees have no email address (users.email is nullable) and
-     * sign in with their username instead. See authenticate() for which
-     * column it's actually matched against.
+     * The field is still named/keyed 'email' (the view's input name) but
+     * takes any identifier LoginIdentifier resolves — a username, an
+     * employee code or an email (Phase 6g, F15): many employees have no email
+     * address (users.email is nullable).
      *
      * @return array<string, ValidationRule|array<mixed>|string>
      */
@@ -49,17 +53,18 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        $identifier = $this->string('email')->toString();
-        $field = filter_var($identifier, FILTER_VALIDATE_EMAIL) ? 'email' : 'username';
+        $user = $this->resolvedUser();
 
-        if (! Auth::attempt([$field => $identifier, 'password' => $this->string('password')], $this->boolean('remember'))) {
+        // By id once resolved, so the identifier the user typed doesn't
+        // matter past this point (its events and password rehash are Laravel's).
+        if ($user === null || ! Auth::attempt(['id' => $user->id, 'password' => $this->string('password')], $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
             // Kept out of the 'email'/'password' keys (reserved for real field
             // validation) so the login view can render this as a standalone
             // banner instead of a per-field message.
             throw ValidationException::withMessages([
-                'auth' => __('Incorrect email/username or password. Please try again.'),
+                'auth' => __('Incorrect username, employee code or password.'),
             ]);
         }
 
@@ -115,10 +120,27 @@ class LoginRequest extends FormRequest
     }
 
     /**
-     * Get the rate limiting throttle key for the request.
+     * Get the rate limiting throttle key for the request: the resolved user
+     * when there is one (Phase 6g, F15), so switching between their username,
+     * employee code and email shares one count; else what was typed.
      */
     public function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+        $user = $this->resolvedUser();
+
+        return $user !== null
+            ? 'user:'.$user->id.'|'.$this->ip()
+            : Str::transliterate(Str::lower(trim($this->string('email')))).'|'.$this->ip();
+    }
+
+    /** Looked up once per request: the throttle key and the attempt share it. */
+    private function resolvedUser(): ?User
+    {
+        if (! $this->hasResolved) {
+            $this->resolved = LoginIdentifier::resolve($this->string('email')->toString(), 'Sign-in');
+            $this->hasResolved = true;
+        }
+
+        return $this->resolved;
     }
 }

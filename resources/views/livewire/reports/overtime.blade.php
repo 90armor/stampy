@@ -6,8 +6,9 @@
     $minutes = fn (int $value) => $value > 0 ? Duration::format($value) : '—';
 @endphp
 
-<div class="space-y-6">
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+<div class="space-y-6" data-report>
+    {{-- On paper the print header stands in for the title and controls (Phase 6g, F04). --}}
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between print:!hidden">
         <div>
             <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Overtime report</h2>
             <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">Credited overtime per employee for a month, for payroll.</p>
@@ -25,11 +26,14 @@
                 <x-icon name="document-text" class="h-5 w-5" />
                 Download CSV
             </x-button>
+            <x-report.print-button />
         </div>
     </div>
 
+    <x-report.print-header title="Overtime report" :period="$monthLabel" :open="$report['open'] ? 'This month is still open: figures can change until it ends.' : null" />
+
     @if ($report['open'])
-        <div class="flex items-start gap-2.5 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-200 dark:ring-amber-500/30" role="status">
+        <div class="flex items-start gap-2.5 rounded-lg bg-amber-50 print:!hidden p-3 text-sm text-amber-900 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-900/20 dark:text-amber-200 dark:ring-amber-500/30" role="status">
             <x-icon name="info" class="mt-0.5 h-5 w-5 shrink-0" />
             <span>This month is still open: figures can change until it ends.</span>
         </div>

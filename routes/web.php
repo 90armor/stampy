@@ -84,9 +84,10 @@ Route::get('/dashboard', function () {
         ];
     }
 
-    // Without the team figures: their own leave and attendance (Phase 3e),
-    // for anyone with an employee record.
-    $mine = $stats === null && auth()->user()->employee !== null
+    // Their own leave and attendance (Phase 3e), for anyone with an employee
+    // record — beside the team figures too, for a manager or a linked admin
+    // (Phase 6g, F11). A fixed number of queries, whatever the team's size.
+    $mine = auth()->user()->employee !== null
         ? EmployeeDashboard::for(auth()->user()->employee, auth()->user())
         : null;
 

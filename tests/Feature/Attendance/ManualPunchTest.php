@@ -75,7 +75,8 @@ class ManualPunchTest extends TestCase
             ->call('startAddingPunch', $date)
             ->set('newPunchDate', $date)
             ->set('newPunchTime', $time)
-            ->set('newPunchType', 'in');
+            ->set('newPunchType', 'in')
+            ->set('newPunchReason', 'Forgot to punch');
 
         return [$component, $employee];
     }
@@ -143,7 +144,8 @@ class ManualPunchTest extends TestCase
             ->call('startAddingPunch', $date)
             ->set('newPunchDate', $date)
             ->set('newPunchTime', '08:00')
-            ->set('newPunchType', 'in');
+            ->set('newPunchType', 'in')
+            ->set('newPunchReason', 'Forgot to punch');
 
         $rejected = $form('2026-04-01')->call('addPunch')->assertHasErrors(['newPunchDate']);
 
@@ -223,6 +225,7 @@ class ManualPunchTest extends TestCase
             ->set('newPunchDate', self::DAY)
             ->set('newPunchTime', '07:55')
             ->set('newPunchType', 'in')
+            ->set('newPunchReason', 'Forgot to punch')
             ->call('addPunch')
             ->assertHasNoErrors();
 
@@ -250,6 +253,7 @@ class ManualPunchTest extends TestCase
             ->set('newPunchDate', self::DAY)
             ->set('newPunchTime', '17:00')
             ->set('newPunchType', 'out')
+            ->set('newPunchReason', 'Forgot to punch')
             ->call('addPunch')
             ->assertHasNoErrors();
 
@@ -278,6 +282,7 @@ class ManualPunchTest extends TestCase
         Livewire::actingAs($this->admin())
             ->test(Show::class, ['employee' => $employee])
             ->set('month', '2026-02')
+            ->set('voidReason', 'Not their punch')
             ->call('voidPunch', $outPunch->id);
 
         $after = DailyAttendance::where('id', $before->id)->first();
@@ -304,11 +309,12 @@ class ManualPunchTest extends TestCase
             ->set('newPunchDate', self::DAY)
             ->set('newPunchTime', '07:55')
             ->set('newPunchType', 'in')
+            ->set('newPunchReason', 'Forgot to punch')
             ->call('addPunch')
             ->assertHasNoErrors();
 
         $punch = AttendanceLog::where('employee_id', $employee->id)->firstOrFail();
-        $component->call('voidPunch', $punch->id);
+        $component->set('voidReason', 'Not their punch')->call('voidPunch', $punch->id);
         $this->assertNotNull($punch->fresh()->voided_at);
 
         // Re-add at the exact same date/time/type.
@@ -317,6 +323,7 @@ class ManualPunchTest extends TestCase
             ->set('newPunchDate', self::DAY)
             ->set('newPunchTime', '07:55')
             ->set('newPunchType', 'in')
+            ->set('newPunchReason', 'Forgot to punch')
             ->call('addPunch')
             ->assertHasNoErrors();
 
@@ -362,6 +369,7 @@ class ManualPunchTest extends TestCase
             ->set('newPunchDate', self::DAY)
             ->set('newPunchTime', '07:55')
             ->set('newPunchType', 'in')
+            ->set('newPunchReason', 'Forgot to punch')
             ->call('addPunch')
             ->assertHasNoErrors();
 
@@ -413,6 +421,7 @@ class ManualPunchTest extends TestCase
         Livewire::actingAs($this->admin())
             ->test(Show::class, ['employee' => $employee])
             ->set('month', '2026-02')
+            ->set('voidReason', 'Not their punch')
             ->call('voidPunch', $inPunch->id);
 
         // Voiding Monday's in-punch must rebuild Tuesday too (not just
@@ -444,6 +453,7 @@ class ManualPunchTest extends TestCase
             ->set('newPunchDate', self::NEXT_DAY)
             ->set('newPunchTime', '00:30')
             ->set('newPunchType', 'out')
+            ->set('newPunchReason', 'Forgot to punch')
             ->call('addPunch')
             ->assertHasNoErrors();
 
@@ -469,6 +479,7 @@ class ManualPunchTest extends TestCase
             ->set('newPunchDate', self::DAY)
             ->set('newPunchTime', '07:55')
             ->set('newPunchType', 'in')
+            ->set('newPunchReason', 'Forgot to punch')
             ->call('addPunch');
 
         $punch = AttendanceLog::where('employee_id', $employee->id)->firstOrFail();
@@ -477,6 +488,7 @@ class ManualPunchTest extends TestCase
         Livewire::actingAs($admin)
             ->test(Show::class, ['employee' => $employee])
             ->set('month', '2026-02')
+            ->set('voidReason', 'Not their punch')
             ->call('voidPunch', $punch->id);
 
         $this->assertSame($admin->id, $punch->fresh()->voided_by);
@@ -507,6 +519,7 @@ class ManualPunchTest extends TestCase
         Livewire::actingAs($managerUser)
             ->test(Show::class, ['employee' => $subordinate])
             ->set('month', '2026-02')
+            ->set('voidReason', 'Not their punch')
             ->call('voidPunch', $punch->id)
             ->assertForbidden();
 
