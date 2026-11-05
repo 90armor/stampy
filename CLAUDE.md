@@ -184,7 +184,7 @@ Don't swap this for Livewire's own `@teleport`/`@endteleport` either, expecting 
 | password_changed_at | timestamp, nullable | |
 | password_reset_by | bigint FK → users, nullable | `nullOnDelete`, self-referencing; an audit record of an admin-issued reset, kept even after the user changes it — distinct from `must_change_password` |
 | password_reset_at | timestamp, nullable | |
-| temporary_password_expires_at | timestamp, nullable | checked at login against this stored value, not inferred from `updated_at`. Set, with `must_change_password`, by an admin's reset and (Phase 6h) by the password generated with a new login, 48 hours (`TemporaryPassword::LIFETIME_HOURS`); the profile's Login card offers the reset once it has passed |
+| temporary_password_expires_at | timestamp, nullable | checked at login against this stored value, not inferred from `updated_at`. Set, with `must_change_password`, by an admin's reset and (Phase 6h) by the password generated with a new login, 7 days (`TemporaryPassword::LIFETIME_HOURS`, 168 — 48 hours until the 6h follow-up, which expired an account created on a Friday or before a long holiday before the first workday); the profile's Login card offers the reset once it has passed |
 | time_off_seen_at | timestamp, nullable | Phase 3e, alter-migration: when the user last opened Time off — requests decided after it are "New" (`LeaveDecisions`); set on each visit, null until the first |
 | overtime_seen_at | timestamp, nullable | Phase 4d, alter-migration: the same for the Overtime page (`RequestDecisions`) — its own, so opening Time off doesn't mark overtime seen |
 | remember_token, timestamps | | |

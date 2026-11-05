@@ -18,7 +18,7 @@ use Tests\TestCase;
 
 /**
  * A password generated with a new login is a temporary password (Phase 6h,
- * N1): the same 48-hour expiry and forced change as a reset, and an expired
+ * N1): the same seven-day expiry and forced change as a reset, and an expired
  * one is offered for reset on the profile's Login card.
  */
 class GeneratedPasswordTest extends TestCase
@@ -57,7 +57,7 @@ class GeneratedPasswordTest extends TestCase
             ->set('role', 'employee')
             ->call('save')
             ->assertHasNoErrors()
-            ->assertSee('It expires in 48 hours and must be changed at first sign-in.')
+            ->assertSee('It expires in 7 days and must be changed at first sign-in.')
             ->get('generatedPassword');
     }
 
@@ -66,7 +66,7 @@ class GeneratedPasswordTest extends TestCase
         $this->assertTrue(Hash::check($password, $user->password));
         $this->assertMatchesRegularExpression('/^[A-Za-z]+-\d{4}$/', $password);
         $this->assertTrue($user->must_change_password);
-        $this->assertTrue($user->temporary_password_expires_at->betweenIncluded(now()->addHours(TemporaryPassword::LIFETIME_HOURS - 1), now()->addHours(TemporaryPassword::LIFETIME_HOURS + 1)));
+        $this->assertTrue($user->temporary_password_expires_at->betweenIncluded(now()->addDays(7)->subHour(), now()->addDays(7)->addHour()));
         // Not a reset: nobody reset anything.
         $this->assertNull($user->password_reset_by);
         $this->assertNull($user->password_reset_at);
@@ -120,6 +120,20 @@ class GeneratedPasswordTest extends TestCase
         $this->assertFalse($user->must_change_password);
         $this->assertNull($user->temporary_password_expires_at);
         $this->get(route('dashboard'))->assertOk();
+    }
+
+    /** Seven days, so an account made on a Friday, or before a long holiday, lasts to the first workday. */
+    public function test_a_generated_password_made_on_a_friday_still_signs_in_after_a_long_weekend(): void
+    {
+        $this->travelTo('2026-04-10 16:30:00'); // a Friday, before Khmer New Year (14–16 Apr)
+        $password = $this->createWithLogin($this->admin());
+        auth()->logout();
+
+        $this->travelTo('2026-04-17 08:00:00'); // the next workday, 6 days 15½ hours later
+
+        $this->post('/login', ['email' => 'sophea.chan', 'password' => $password])
+            ->assertRedirect(route('dashboard'));
+        $this->assertAuthenticated();
     }
 
     public function test_an_expired_generated_password_is_refused_with_the_existing_message(): void
