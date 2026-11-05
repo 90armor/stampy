@@ -88,7 +88,7 @@
                 {{-- Exactly today: the live "who is here now" strip. Any other
                 range: end-of-day status counts ("did they attend"). --}}
                 @foreach (\App\Support\DashboardAttendance::liveTodayCells($live) as $cell)
-                    <x-stat-card :icon="$cell['icon']" :label="$cell['label']" :value="$cell['value']">
+                    <x-stat-card wire:key="live-cell-{{ $cell['label'] }}" :icon="$cell['icon']" :label="$cell['label']" :value="$cell['value']">
                         @if ($cell['subtext'] !== null)
                             <x-slot:subtext>{{ $cell['subtext'] }}</x-slot:subtext>
                         @endif
@@ -188,7 +188,7 @@
                     selected classes, so a re-render must not reset them. --}}
                     <div class="mt-2 grid grid-cols-2 gap-2" wire:ignore>
                         @foreach ($presetRanges as $preset => $range)
-                            <button
+                            <button wire:key="preset-{{ $preset }}"
                                 type="button"
                                 @click="applyPreset('{{ $preset }}')"
                                 :aria-pressed="String(presetActive('{{ $preset }}'))"
@@ -306,7 +306,7 @@
         <div class="mt-2 flex flex-wrap gap-2">
             @foreach ($workingStatuses as $status)
                 @php $selected = ! $allWorkingSelected && in_array($status->value, $statuses, true); @endphp
-                <button
+                <button wire:key="status-chip-{{ $status->value }}"
                     type="button"
                     wire:click="toggleStatus('{{ $status->value }}')"
                     aria-pressed="{{ $selected ? 'true' : 'false' }}"

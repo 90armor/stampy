@@ -114,7 +114,7 @@
                         <p class="text-slate-700 dark:text-slate-200">Crosses New Year — each year's {{ $summary['charges'] }} balance pays for its own days:</p>
                         <ul class="mt-2 space-y-1 tabular-nums">
                             @foreach ($summary['years'] as $line)
-                                <li class="text-slate-600 dark:text-slate-300">{{ $line['year'] }}: uses <span class="font-semibold text-slate-900 dark:text-slate-100">{{ $line['cost'] }}</span> · available {{ $line['before'] }} → <span class="font-semibold text-slate-900 dark:text-slate-100">{{ $line['after'] }}</span></li>
+                                <li wire:key="year-cost-{{ $loop->index }}" class="text-slate-600 dark:text-slate-300">{{ $line['year'] }}: uses <span class="font-semibold text-slate-900 dark:text-slate-100">{{ $line['cost'] }}</span> · available {{ $line['before'] }} → <span class="font-semibold text-slate-900 dark:text-slate-100">{{ $line['after'] }}</span></li>
                             @endforeach
                         </ul>
                     @endif

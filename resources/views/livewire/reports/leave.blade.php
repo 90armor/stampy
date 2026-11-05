@@ -131,7 +131,7 @@
                                 $atLastDay = ! $row['total'] && $hasBalance && $balance->availableAtLastDay() !== null;
                                 $notUsableYet = ! $row['total'] && $hasBalance && $balance->usableFrom !== null && ! $atLastDay;
                             @endphp
-                            <tr @class(['relative', 'font-semibold' => $row['total']])>
+                            <tr wire:key="report-row-{{ $row['total'] ? 'total' : $row['employee']->id }}" @class(['relative', 'font-semibold' => $row['total']])>
                                 <td class="table-pin-lead px-4 py-4 sm:pl-6 sm:pr-3">
                                     @if ($row['total'])
                                         <span class="text-slate-900 dark:text-slate-100">Total</span>

@@ -15,10 +15,6 @@ use Tests\TestCase;
  */
 class NeutralScaleTest extends TestCase
 {
-    // Laravel's unused starter page: no route renders it, and it carries its
-    // own inlined Tailwind v4 build, not this app's classes.
-    private const IGNORED = ['resources/views/welcome.blade.php'];
-
     public function test_no_view_script_or_style_uses_a_neutral_palette_other_than_slate(): void
     {
         $offenders = [];
@@ -26,9 +22,6 @@ class NeutralScaleTest extends TestCase
         foreach (['resources/views', 'resources/js', 'resources/css'] as $dir) {
             foreach (File::allFiles(base_path($dir)) as $file) {
                 $relative = str_replace(base_path().'/', '', $file->getPathname());
-                if (in_array($relative, self::IGNORED, true)) {
-                    continue;
-                }
 
                 if (preg_match_all('/\b(?:stone|zinc|neutral)-\d{2,3}\b/', $file->getContents(), $matches)) {
                     $offenders[$relative] = array_values(array_unique($matches[0]));
@@ -57,9 +50,6 @@ class NeutralScaleTest extends TestCase
         foreach (['resources/views', 'resources/css'] as $dir) {
             foreach (File::allFiles(base_path($dir)) as $file) {
                 $relative = str_replace(base_path().'/', '', $file->getPathname());
-                if (in_array($relative, self::IGNORED, true)) {
-                    continue;
-                }
 
                 preg_match_all('/\b(?:border|ring|divide)(?:-[trblxy])?-slate-\d{2,3}(?:\/\d+)?\b/', $file->getContents(), $lines);
                 preg_match_all('/\bh-px\b[^"\']*\bbg-slate-\d{2,3}(?:\/\d+)?/', $file->getContents(), $rules);
@@ -99,9 +89,6 @@ class NeutralScaleTest extends TestCase
 
         foreach (File::allFiles(resource_path('views')) as $file) {
             $relative = str_replace(base_path().'/', '', $file->getPathname());
-            if (in_array($relative, self::IGNORED, true)) {
-                continue;
-            }
             preg_match_all('/<([\w.:-]+)\b([^>]*?)>/s', $file->getContents(), $tags, PREG_SET_ORDER);
             foreach ($tags as [$tag, $name, $attributes]) {
                 if (in_array($name, ['x-icon', 'svg', 'path'], true) || ! preg_match('/(?<![:\w-])(?<!:!)text-slate-400\b/', $attributes)) {

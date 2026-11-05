@@ -125,3 +125,14 @@ If `leave:grant` doesn't run, nobody gets next year's leave and new joiners neve
 - File one test leave request, approve it at both steps, then cancel it. The balance should return.
 - File one test overtime claim for a past day with both punches, approve it at both steps, and check its credited time on the Overtime page and in Reports → Overtime. Then cancel it.
 - Delete nothing to clean up afterwards: cancelled leave is history, and history is kept.
+
+## Every deploy
+
+Each release, before the app takes traffic (Phase 6h):
+
+```bash
+php artisan migrate --force
+php artisan optimize        # config:cache, event:cache, route:cache and view:cache
+```
+
+`view:cache` compiles every Blade view before the first request does. Without it, each view is compiled the first time someone opens it after the release, and two people opening the same page at that moment can race on the compiled file: one of them gets a 500 (`Failed to open stream` on a file in `storage/framework/views`). Phase 6d2 saw exactly that right after switching code. The app is cache-safe: nothing outside `config/` reads `env()`, and route closures cache. Run `php artisan optimize:clear` only to undo the caches; any later `.env` change needs `php artisan optimize` again to take effect.

@@ -70,7 +70,7 @@
                         @if ($leave->approvalSteps->isNotEmpty() || $leave->cancelled_at)
                             <ul class="mt-1 space-y-0.5 {{ $muted }}">
                                 @foreach ($leave->approvalSteps as $step)
-                                    <li>{{ $stepLine($step) }}</li>
+                                    <li wire:key="leave-step-{{ $step->id }}">{{ $stepLine($step) }}</li>
                                 @endforeach
                                 @if ($leave->cancelled_at)
                                     <li>{{ 'Cancelled'.($leave->cancelledBy ? ' by '.$leave->cancelledBy->name : '').' · '.DisplayDate::compact($leave->cancelled_at) }}</li>

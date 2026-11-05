@@ -273,7 +273,7 @@
             <div class="px-6 pb-6">
                 <div class="grid grid-cols-7 gap-1.5 sm:gap-2">
                     @foreach ($weekdayLabels as $label)
-                        <div class="pb-1 text-center text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        <div wire:key="weekday-{{ $label }}" class="pb-1 text-center text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                             {{ $label }}
                         </div>
                     @endforeach
@@ -329,7 +329,7 @@
                         @endphp
 
                         @if ($cell['inMonth'])
-                            <button
+                            <button wire:key="day-{{ $cellDateKey }}"
                                 type="button"
                                 wire:click="openDay('{{ $cellDateKey }}')"
                                 aria-label="{{ $cellAriaLabel }}"
@@ -445,7 +445,7 @@
                             {{-- Leading/trailing days from adjacent months — muted,
                             not clickable, excluded from the month summary. They
                             exist only to keep the grid rectangular. --}}
-                            <div
+                            <div wire:key="day-{{ $cellDateKey }}"
                                 class="flex min-h-16 flex-col items-start gap-1 rounded-lg p-1.5 text-slate-300 dark:text-slate-700 sm:min-h-24 sm:p-2"
                                 aria-hidden="true"
                             >
@@ -462,7 +462,7 @@
                 <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-divider pt-3 text-xs text-slate-500 dark:text-slate-400">
                     {{-- "Not calculated" only when a cell shows it: a quiet day isn't one (F07). --}}
                     @foreach ($days->contains(fn ($day) => ! $day['record'] && ! isset($quietDays[$day['date']->format('Y-m-d')])) ? $legendItems : array_slice($legendItems, 0, -1) as $item)
-                        <span class="inline-flex items-center gap-1.5">
+                        <span wire:key="legend-{{ $item['label'] }}" class="inline-flex items-center gap-1.5">
                             <x-icon :name="$item['icon']" class="h-5 w-5 shrink-0 {{ $item['text'] }}" />
                             {{ $item['label'] }}
                         </span>
@@ -792,7 +792,7 @@
                                             ? 'Charged '.\App\Support\LeaveDays::label($item['charged'])
                                             : 'Not charged — '.($modalHoliday ? 'holiday' : 'day off');
                                     @endphp
-                                    <li class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                                    <li wire:key="day-leave-{{ $item['leave']->id }}" class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                                         <div>
                                             <p class="text-sm font-medium text-slate-900 dark:text-slate-100">{{ $dayLeave->leaveType->name.($dayLeave->half ? ' · '.$dayLeave->half->label() : '') }}</p>
                                             {{-- The half is in the title already; this line is the leave's dates. --}}

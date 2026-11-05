@@ -213,15 +213,25 @@ document.addEventListener('alpine:init', () => {
             this.observer.observe(this.$el);
             const table = this.$el.querySelector('table');
             if (table) this.observer.observe(table);
+            const end = this.$el.querySelector('thead th.table-pin-end');
+            if (end) this.observer.observe(end);
+            // Again once the web fonts are in (they change the end column's
+            // width after the first measure) and on every resize (Phase 6h).
+            document.fonts?.ready.then(() => this.measure());
+            this.onResize = () => this.measure();
+            window.addEventListener('resize', this.onResize);
         },
         destroy() {
             this.observer?.disconnect();
+            window.removeEventListener('resize', this.onResize);
         },
         measure() {
             const el = this.$el;
             // No end column (the Employees table without Actions): the start column pins at the edge.
             const end = el.querySelector('thead th.table-pin-end');
-            el.style.setProperty('--pin-end-width', `${end ? end.offsetWidth : 0}px`);
+            // The fractional width, not offsetWidth: rounded down, it left a 1px
+            // seam between the two pinned columns that the rows scrolled through.
+            el.style.setProperty('--pin-end-width', `${end ? end.getBoundingClientRect().width : 0}px`);
             el.classList.toggle('table-pin-overflowing', el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
         },
     }));

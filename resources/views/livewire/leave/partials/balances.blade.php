@@ -29,7 +29,7 @@ employee profile's Leave card (Phase 3e). $balanceRows: list of
     <ul class="mt-3 sm:hidden">
         @foreach ($balanceRows as $row)
             @php $balance = $row['balance']; @endphp
-            <li class="border-t border-slate-divider px-4 py-4 first:border-t-0">
+            <li wire:key="balance-{{ $row['type']->id }}" class="border-t border-slate-divider px-4 py-4 first:border-t-0">
                 <div class="flex items-baseline justify-between gap-3">
                     <p class="text-sm font-medium text-slate-900 dark:text-slate-100">{{ $row['type']->name }}</p>
                     @unless ($notUsableYet($balance))
@@ -47,7 +47,7 @@ employee profile's Leave card (Phase 3e). $balanceRows: list of
                 @else
                     <dl class="mt-2 grid grid-cols-4 gap-x-3 gap-y-2 text-xs">
                         @foreach (array_filter([($row['type']->balance_source->isEarned() ? 'Earned from overtime' : 'Entitled') => $balance->entitled, 'Carried' => $balance->carriedIn, 'Adjustments' => $showAdjustments ? $balance->adjustments : null, 'Used' => $balance->used, 'Pending' => $balance->pending], fn ($value) => $value !== null) as $label => $value)
-                            <div>
+                            <div wire:key="balance-{{ $row['type']->id }}-{{ $label }}">
                                 <dt class="text-slate-500 dark:text-slate-400">{{ $label }}</dt>
                                 <dd class="tabular-nums text-sm text-slate-900 dark:text-slate-100">{{ LeaveDays::format($value) }}</dd>
                             </div>
@@ -75,7 +75,7 @@ employee profile's Leave card (Phase 3e). $balanceRows: list of
             <tbody>
                 @foreach ($balanceRows as $row)
                     @php $balance = $row['balance']; @endphp
-                    <tr class="relative">
+                    <tr wire:key="balance-row-{{ $row['type']->id }}" class="relative">
                         <td class="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
                             {{ $row['type']->name }}
                             @if ($earnedLine($balance))

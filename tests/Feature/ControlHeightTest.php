@@ -13,10 +13,9 @@ use Tests\TestCase;
  */
 class ControlHeightTest extends TestCase
 {
-    // The starter page (unrouted, its own Tailwind build) and the two
-    // components the first test renders: their `->merge` cuts the tag scan short.
+    // The two components the first test renders: their `->merge` cuts the
+    // tag scan short.
     private const IGNORED = [
-        'resources/views/welcome.blade.php',
         'resources/views/components/select.blade.php',
         'resources/views/components/text-input.blade.php',
     ];
