@@ -36,4 +36,30 @@ class StrictDate
 
         return $date;
     }
+
+    /**
+     * A query-string date or month (Phase 6h): exactly zero-padded `Y-m-d` /
+     * `Y-m` and a real calendar date, so whatever is typed into the address
+     * bar either names a real day or is ignored.
+     */
+    public static function isDay(string $value): bool
+    {
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 && self::parses('Y-m-d', $value);
+    }
+
+    public static function isMonth(string $value): bool
+    {
+        return preg_match('/^\d{4}-\d{2}$/', $value) === 1 && self::parses('!Y-m', $value);
+    }
+
+    private static function parses(string $format, string $value): bool
+    {
+        try {
+            self::parse($format, $value);
+
+            return true;
+        } catch (InvalidArgumentException) {
+            return false;
+        }
+    }
 }

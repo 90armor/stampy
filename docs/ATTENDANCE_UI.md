@@ -90,7 +90,7 @@ In-progress or not-yet-calculated attendance is **pending**, and every trend day
 | A past day with no rows, or with In progress rows whose window has already closed (the builder didn't run) | no bar, a muted `Not calculated` marker |
 | Closed | the rate as a `primary-500` bar; a closed workday with 0 attended gets a `0%` marker |
 
-Markers too wide for their slot (`Not calculated` at phone width) wrap onto two lines — at the ` · ` when there is one, so `Off · 2 worked` reads `Off` over `2 worked`. The **Department card** shows counts, never a bare percentage: `Checked in N / M` with the provisional (hollow) fill while today is pending, `Attended N / M` once it has closed.
+Markers too wide for their slot (`Not calculated` at phone width) wrap onto two lines — at the ` · ` when there is one, so `Off · 2 worked` reads `Off` over `2 worked`. Where even `2 worked` is wider than its slot (390, Phase 6h), it is `Off · 2`, on one line or as `Off` over `2`, so neighbouring markers never overlap; the chart's accessible label keeps the full text. The **Department card** shows counts, never a bare percentage: `Checked in N / M` with the provisional (hollow) fill while today is pending, `Attended N / M` once it has closed.
 
 ## Status counts vs. the live strip
 

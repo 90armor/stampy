@@ -2,11 +2,11 @@
 
 namespace App\Livewire\Employees;
 
+use App\Livewire\Attributes\QueryParam;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Support\EmployeeScope;
 use Livewire\Attributes\On;
-use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -17,13 +17,13 @@ class Index extends Component
 
     use WithPagination;
 
-    #[Url(as: 'q', history: true)]
+    #[QueryParam(as: 'q', history: true)]
     public string $search = '';
 
-    #[Url(as: 'department', history: true)]
+    #[QueryParam(as: 'department', history: true)]
     public string $departmentFilter = '';
 
-    #[Url(as: 'status', history: true)]
+    #[QueryParam(as: 'status', history: true)]
     public string $statusFilter = '';
 
     public function updatingSearch(): void
@@ -50,6 +50,15 @@ class Index extends Component
     public function mount(): void
     {
         $this->authorize('viewAny', Employee::class);
+
+        // A department or status the URL got wrong is ignored (Phase 6h).
+        if (! ctype_digit($this->departmentFilter)) {
+            $this->departmentFilter = '';
+        }
+
+        if (! in_array($this->statusFilter, ['active', 'inactive'], true)) {
+            $this->statusFilter = '';
+        }
     }
 
     /**

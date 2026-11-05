@@ -200,7 +200,7 @@ A card that needs a header uses one pattern: the title (`text-lg font-semibold`)
 
 ### Avatars
 
-Initial avatars use one neutral tint everywhere — `bg-slate-100 text-slate-600`, dark `bg-slate-800 text-slate-300` — in tables, lists, headers and the topbar. Avatars never carry status or rotating decorative hues: amber, violet, red and similar colors are reserved for attendance meaning, and an avatar that borrows them competes with the status column.
+Initial avatars are one component, `<x-avatar :name>` (Phase 6h), with one neutral tint everywhere — `bg-slate-100 text-slate-600`, dark `bg-slate-750 text-slate-300` — in tables, lists, headers and the topbar; the caller gives only the size (`h-9 w-9 text-xs font-semibold`). The initial is the name's first grapheme (`App\Support\Avatar`), so a Khmer or Myanmar-script name shows its whole first letter, never a byte slice's "�". Avatars never carry status or rotating decorative hues: amber, violet, red and similar colors are reserved for attendance meaning, and an avatar that borrows them competes with the status column.
 
 ### Dashboard
 

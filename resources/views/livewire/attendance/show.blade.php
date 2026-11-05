@@ -109,9 +109,7 @@
 
         <div class="flex flex-wrap items-center justify-between gap-4">
             <div class="flex items-center gap-x-4">
-                <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-lg font-semibold bg-slate-100 text-slate-600 dark:bg-slate-750 dark:text-slate-300">
-                    {{ strtoupper(substr($employee->full_name, 0, 1)) }}
-                </span>
+                <x-avatar :name="$employee->full_name" class="h-14 w-14 text-lg font-semibold" />
                 <div>
                     <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{{ $employee->full_name }}</h1>
                     <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">{{ $employee->employee_code }} &middot; {{ $employee->department->name }} &middot; {{ $employee->position->name }}</p>

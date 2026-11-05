@@ -57,9 +57,7 @@
                         aria-haspopup="true"
                         :aria-expanded="open.toString()"
                     >
-                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-medium bg-slate-100 text-slate-600 dark:bg-slate-750 dark:text-slate-300">
-                            {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
-                        </span>
+                        <x-avatar :name="auth()->user()->name" class="h-8 w-8 font-medium" />
                         <span class="hidden sm:flex sm:flex-col sm:items-start sm:leading-tight">
                             <span class="font-medium text-slate-900 dark:text-slate-100">{{ auth()->user()->name }}</span>
                             <span class="text-xs text-slate-500 dark:text-slate-400">

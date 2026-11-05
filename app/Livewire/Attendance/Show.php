@@ -5,6 +5,7 @@ namespace App\Livewire\Attendance;
 use App\Enums\LeaveStatus;
 use App\Enums\OvertimeStatus;
 use App\Enums\PunchSource;
+use App\Livewire\Attributes\QueryParam;
 use App\Models\AttendanceLog;
 use App\Models\DailyAttendance;
 use App\Models\Employee;
@@ -18,11 +19,11 @@ use App\Support\AttendanceSummary;
 use App\Support\AttendanceTime;
 use App\Support\DisplayDate;
 use App\Support\OvertimeResult;
+use App\Support\StrictDate;
 use App\Support\WorkdayCalendar;
 use Carbon\Carbon;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
-use Livewire\Attributes\Url;
 use Livewire\Component;
 
 class Show extends Component
@@ -31,7 +32,7 @@ class Show extends Component
 
     public bool $noEmployeeRecord = false;
 
-    #[Url(as: 'month', history: true)]
+    #[QueryParam(as: 'month', history: true)]
     public string $month = '';
 
     /**
@@ -39,7 +40,7 @@ class Show extends Component
      * (it shows worked/late/early minutes per row, which the calendar
      * can't fit) but is now the secondary view.
      */
-    #[Url(as: 'view', history: true)]
+    #[QueryParam(as: 'view', history: true)]
     public string $view = 'calendar';
 
     /**
@@ -92,6 +93,15 @@ class Show extends Component
      */
     public function mount(?Employee $employee = null): void
     {
+        // A month or view the URL got wrong is ignored (Phase 6h).
+        if (! StrictDate::isMonth($this->month)) {
+            $this->month = '';
+        }
+
+        if (! in_array($this->view, ['calendar', 'table'], true)) {
+            $this->view = 'calendar';
+        }
+
         if ($employee === null) {
             $employee = auth()->user()->employee;
 

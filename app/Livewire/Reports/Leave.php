@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Reports;
 
+use App\Livewire\Attributes\QueryParam;
 use App\Models\LeaveType;
 use App\Support\EmployeeScope;
 use App\Support\LeaveDays;
@@ -10,7 +11,6 @@ use App\Support\ReportCsv;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
-use Livewire\Attributes\Url;
 use Livewire\Component;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -33,15 +33,15 @@ class Leave extends Component
      */
     public bool $opened = true;
 
-    #[Url(as: 'year', history: true)]
+    #[QueryParam(as: 'year', history: true)]
     public string $year = '';
 
     /** A leave type id; '' picks the default (the first type granted yearly — Annual). */
-    #[Url(as: 'type', history: true)]
+    #[QueryParam(as: 'type', history: true)]
     public string $type = '';
 
     /** A department id, or '' for all. One outside the viewer's options is ignored. */
-    #[Url(as: 'leave-department', history: true)]
+    #[QueryParam(as: 'leave-department', history: true)]
     public string $department = '';
 
     public function mount(): void

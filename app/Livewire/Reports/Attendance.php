@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Reports;
 
+use App\Livewire\Attributes\QueryParam;
 use App\Support\AttendanceReport;
 use App\Support\DisplayDate;
 use App\Support\EmployeeScope;
@@ -10,7 +11,6 @@ use App\Support\ReportCsv;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
-use Livewire\Attributes\Url;
 use Livewire\Component;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -34,11 +34,11 @@ class Attendance extends Component
     public bool $opened = true;
 
     /** 'Y-m'. */
-    #[Url(as: 'month', history: true)]
+    #[QueryParam(as: 'month', history: true)]
     public string $month = '';
 
     /** A department id, or '' for all. One outside the viewer's options is ignored. */
-    #[Url(as: 'department', history: true)]
+    #[QueryParam(as: 'department', history: true)]
     public string $department = '';
 
     public function mount(): void

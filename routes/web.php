@@ -120,7 +120,7 @@ Route::middleware('auth')->group(function () {
     // tab if the user may see it, else on the first one they may.
     Route::get('/policies', function (Request $request) {
         $tabs = app(PoliciesPolicy::class)->tabs($request->user());
-        $tab = array_key_exists((string) $request->query('tab'), $tabs) ? $request->query('tab') : array_key_first($tabs);
+        $tab = is_string($requested = $request->query('tab')) && array_key_exists($requested, $tabs) ? $requested : array_key_first($tabs);
 
         return view('policies', ['tabs' => $tabs, 'tab' => $tab]);
     })->middleware('can:policies.view')->name('policies.index');
@@ -133,7 +133,7 @@ Route::middleware('auth')->group(function () {
     // export.
     Route::get('/reports', function (Request $request) {
         $tabs = app(ReportPolicy::class)->tabs($request->user());
-        $tab = array_key_exists((string) $request->query('tab'), $tabs) ? $request->query('tab') : array_key_first($tabs);
+        $tab = is_string($requested = $request->query('tab')) && array_key_exists($requested, $tabs) ? $requested : array_key_first($tabs);
 
         return view('reports', ['tabs' => $tabs, 'tab' => $tab]);
     })->middleware('can:reports.view')->name('reports.index');

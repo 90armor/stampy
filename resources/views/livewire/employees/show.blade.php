@@ -13,9 +13,7 @@
         'sm:grid sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:gap-x-3 sm:gap-y-1' => $ownRecord,
     ])>
         <div class="flex min-w-0 items-center gap-x-4">
-            <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-base font-semibold bg-slate-100 text-slate-600 dark:bg-slate-750 dark:text-slate-300">
-                {{ strtoupper(substr($employee->full_name, 0, 1)) }}
-            </span>
+            <x-avatar :name="$employee->full_name" class="h-12 w-12 text-base font-semibold" />
             <div class="min-w-0">
                 <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">{{ $employee->full_name }}</h1>
                 <div class="mt-1 flex flex-wrap items-center gap-2">
