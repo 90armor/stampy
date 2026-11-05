@@ -22,7 +22,7 @@ use Tests\TestCase;
 /**
  * Phase 6d2: what the modal focus rules (docs/DESIGN_SYSTEM.md, Modals and focus)
  * stand on. Focus itself can't be checked from PHP: the rules run in a browser
- * through scripts/audit/playwright/focus-6d2.mjs, and this suite pins the markup
+ * through tests/browser/focus.mjs, and this suite pins the markup
  * they read and the order they follow, so neither can drift unnoticed.
  */
 class ModalFocusRulesTest extends TestCase

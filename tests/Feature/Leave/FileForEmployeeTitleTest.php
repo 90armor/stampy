@@ -20,7 +20,7 @@ use Tests\TestCase;
  * once chosen, and goes back to the generic one on Change; from the first
  * step it says what filing for someone means. Not when the admin chose their
  * own record: that request goes through approval. Choosing focuses the title
- * (6d2's rule — scripts/audit/playwright/focus-6d2.mjs checks it in a browser).
+ * (6d2's rule — tests/browser/focus.mjs checks it in a browser).
  */
 class FileForEmployeeTitleTest extends TestCase
 {

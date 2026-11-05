@@ -24,7 +24,7 @@ use Tests\TestCase;
  * the auth pages at every width (F23, D3), and the Employees directory's page
  * size and phone pagination (F32). What only a browser can show — that the
  * cards replace the table below sm, that the disclosure opens and survives a
- * re-render — is scripts/audit/playwright/focus-6d2.mjs.
+ * re-render — is tests/browser/focus.mjs.
  */
 class PhoneErgonomicsTest extends TestCase
 {
