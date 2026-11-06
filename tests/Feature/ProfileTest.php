@@ -67,9 +67,12 @@ class ProfileTest extends TestCase
             ->assertSeeText('Manager: Manager Person · Joined Thu 1 Aug 2024 (2 years 3 months)')
             ->assertSeeText('Mon–Fri · 8:00 AM – 5:00 PM · Break 12:00 PM')
             ->assertSeeText('kyaw')
-            ->assertSeeText('Ask HR to change')
             ->assertSeeText('None')
-            ->assertSeeText('Ask HR to add or change your email')
+            // Who changes these is one help popover by the title, not a hint per row.
+            ->assertSee('aria-label="About your account details"', false)
+            ->assertSeeText('Your username and email are managed by HR. Ask HR to add or change them.')
+            ->assertDontSeeText('Ask HR to change')
+            ->assertDontSeeText('Ask HR to add or change your email')
             ->assertSeeText('Device user ID 1234')
             ->assertSeeText("tell HR if your punches don't show up.")
             ->assertDontSee('effective-dated')
@@ -133,7 +136,8 @@ class ProfileTest extends TestCase
             ->assertSeeText('Account')
             ->assertDontSeeText('Work schedule')
             ->assertDontSeeText('Fingerprint')
-            ->assertSee('Edit account');
+            ->assertSee('Edit account')
+            ->assertDontSee('About your account details');
     }
 
     public function test_employees_and_managers_cannot_change_their_email_or_name(): void
@@ -176,6 +180,7 @@ class ProfileTest extends TestCase
         Livewire::actingAs($admin)->test(ProfileShow::class)
             ->call('openAccount')
             ->assertSet('showAccountModal', true)
+            ->assertDontSee('About your account details')
             ->assertSee('Edit on your employee record')
             ->assertSee(route('employees.show', $admin->employee))
             ->set('name', 'Tampered')
@@ -220,6 +225,69 @@ class ProfileTest extends TestCase
             ->assertSet('showAccountModal', true);
     }
 
+    public function test_an_unlinked_admin_changes_their_username(): void
+    {
+        $admin = User::factory()->create(['username' => 'root'])->assignRole('admin');
+
+        Livewire::actingAs($admin)->test(ProfileShow::class)
+            ->call('openAccount')
+            ->assertSet('username', 'root')
+            ->assertSee('account_username')
+            ->set('username', ' office.admin ')
+            ->call('saveAccount')
+            ->assertHasNoErrors();
+
+        $this->assertSame('office.admin', $admin->fresh()->username);
+
+        // Changing only its case is still their own username, not a collision.
+        Livewire::actingAs($admin->fresh())->test(ProfileShow::class)
+            ->call('openAccount')
+            ->set('username', 'Office.Admin')
+            ->call('saveAccount')
+            ->assertHasNoErrors();
+        $this->assertSame('Office.Admin', $admin->fresh()->username);
+    }
+
+    public function test_an_unlinked_admins_username_follows_the_employee_forms_rules(): void
+    {
+        User::factory()->create(['username' => 'taken.name']);
+        Employee::factory()->create(['employee_code' => 'EMP-0031', 'full_name' => 'Aung Kyaw Moe']);
+        $admin = User::factory()->create(['username' => 'root'])->assignRole('admin');
+
+        $cases = [
+            'TAKEN.NAME' => 'The username has already been taken.',
+            'emp-0031' => '"emp-0031" is Aung Kyaw Moe\'s employee code, and people sign in with either. Choose a different username.',
+            '' => 'The username field is required.',
+        ];
+
+        foreach ($cases as $username => $message) {
+            $page = Livewire::actingAs($admin)->test(ProfileShow::class)
+                ->call('openAccount')
+                ->set('username', $username)
+                ->call('saveAccount')
+                ->assertHasErrors('username')
+                ->assertSet('showAccountModal', true);
+
+            $this->assertSame($message, $page->errors()->first('username'), $username);
+        }
+
+        $this->assertSame('root', $admin->fresh()->username);
+    }
+
+    public function test_a_linked_admins_username_is_not_theirs_to_change(): void
+    {
+        $admin = $this->employeeUser('admin', [], ['username' => 'linked.admin']);
+
+        Livewire::actingAs($admin)->test(ProfileShow::class)
+            ->call('openAccount')
+            ->assertDontSee('account_username')
+            ->set('username', 'tampered')
+            ->call('saveAccount')
+            ->assertHasNoErrors();
+
+        $this->assertSame('linked.admin', $admin->fresh()->username);
+    }
+
     public function test_a_wrong_current_password_or_a_mismatch_is_refused(): void
     {
         $user = $this->employeeUser();
@@ -230,10 +298,26 @@ class ProfileTest extends TestCase
             ->set('password', 'new-Password-1')
             ->set('password_confirmation', 'something-else')
             ->call('changePassword')
-            ->assertHasErrors(['current_password', 'password'])
+            // The mismatch is under Confirm, where it's fixed, not under the
+            // new password that was typed correctly.
+            ->assertHasErrors(['current_password', 'password_confirmation'])
+            ->assertHasNoErrors('password')
+            ->assertSee("The passwords don't match.")
+            ->assertDontSee('confirmation does not match')
             ->assertSet('showPasswordModal', true);
 
         $this->assertTrue(Hash::check('password', $user->fresh()->password));
+    }
+
+    public function test_an_empty_confirmation_is_a_mismatch_too(): void
+    {
+        Livewire::actingAs($this->employeeUser())->test(ProfileShow::class)
+            ->call('openPassword')
+            ->set('current_password', 'password')
+            ->set('password', 'new-Password-1')
+            ->call('changePassword')
+            ->assertHasErrors(['password_confirmation'])
+            ->assertHasNoErrors(['current_password', 'password']);
     }
 
     public function test_a_password_change_signs_out_every_other_session_and_keeps_this_one(): void

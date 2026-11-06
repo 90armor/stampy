@@ -4,8 +4,10 @@ namespace App\Livewire\Profile;
 
 use App\Models\Employee;
 use App\Models\User;
+use App\Support\PasswordConfirmation;
 use App\Support\ScheduleSentence;
 use App\Support\Tenure;
+use App\Support\UsernameCodeCollision;
 use App\Support\UserSessions;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Auth;
@@ -18,8 +20,8 @@ use Livewire\Component;
 /**
  * The signed-in user's own profile (Phase 6i): read-only, with each change in
  * a modal. Everyone may change their password; only an admin may change their
- * own email, and their name only while no employee record is linked
- * (UserPolicy::updateAccount). Everyone else asks HR.
+ * own email, and their name and username only while no employee record is
+ * linked (UserPolicy::updateAccount). Everyone else asks HR.
  */
 class Show extends Component
 {
@@ -34,6 +36,8 @@ class Show extends Component
     public bool $showAccountModal = false;
 
     public string $name = '';
+
+    public string $username = '';
 
     public string $email = '';
 
@@ -56,8 +60,9 @@ class Show extends Component
     {
         $this->validate([
             'current_password' => ['required', 'current_password'],
-            'password' => ['required', Password::defaults(), 'confirmed'],
-        ]);
+            'password' => ['required', Password::defaults()],
+            ...PasswordConfirmation::rules(),
+        ], PasswordConfirmation::messages());
 
         /** @var User $user */
         $user = Auth::user();
@@ -86,6 +91,7 @@ class Show extends Component
         $this->authorize('updateAccount', $user);
 
         $this->name = $user->name;
+        $this->username = $user->username;
         $this->email = (string) $user->email;
         $this->notice = null;
         $this->resetErrorBag();
@@ -101,16 +107,23 @@ class Show extends Component
         $linked = $user->employee !== null;
 
         $this->email = strtolower(trim($this->email));
+        $this->username = trim($this->username);
 
         $data = $this->validate(array_filter([
             // A linked login's name is the employee record's, so it isn't a
             // field here and nothing submitted for it is read.
             'name' => $linked ? null : ['required', 'string', 'max:255'],
+            // An unlinked admin's username has no employee form to change it in,
+            // so it's here, under the employee form's rules (Phase 6g): unique,
+            // and never another employee's code, in any case. A linked login's
+            // username is HR's, like its name.
+            'username' => $linked ? null : ['required', 'string', 'max:255', Rule::unique(User::class)->ignore($user->id), UsernameCodeCollision::forUsername(null)],
             'email' => ['nullable', 'string', 'email', 'max:255', Rule::unique(User::class)->ignore($user->id)],
         ]));
 
         $user->forceFill(array_filter([
             'name' => $linked ? null : $data['name'],
+            'username' => $linked ? null : $data['username'],
         ]) + ['email' => $data['email'] !== '' ? $data['email'] : null])->save();
 
         $this->showAccountModal = false;

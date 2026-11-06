@@ -792,7 +792,7 @@
                                             <p class="text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ ($dayLeave->half ? \App\Support\DisplayDate::compact($dayLeave->start_date) : $dayLeave->displayDates()).' · '.$chargedText }}</p>
                                         </div>
                                         @if ($leaveLinkUrl)
-                                            <a href="{{ $leaveLinkUrl }}" wire:navigate class="rounded text-sm font-medium text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-2 hover:decoration-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:decoration-primary-700 dark:hover:decoration-primary-400">{{ $leaveLinkLabel }}</a>
+                                            <a href="{{ $leaveLinkUrl }}" wire:navigate class="rounded text-sm font-medium text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-2 hover:decoration-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-300 dark:decoration-primary-600 dark:hover:decoration-primary-300">{{ $leaveLinkLabel }}</a>
                                         @endif
                                     </li>
                                 @endforeach
@@ -834,7 +834,7 @@
                                     @if ($creditedLine)<p class="text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ $creditedLine }}</p>@endif
                                 </div>
                                 @if ($overtimeLinkUrl)
-                                    <a href="{{ $overtimeLinkUrl }}" wire:navigate class="rounded text-sm font-medium text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-2 hover:decoration-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:decoration-primary-700 dark:hover:decoration-primary-400">{{ $overtimeLinkLabel }}</a>
+                                    <a href="{{ $overtimeLinkUrl }}" wire:navigate class="rounded text-sm font-medium text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-2 hover:decoration-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-300 dark:decoration-primary-600 dark:hover:decoration-primary-300">{{ $overtimeLinkLabel }}</a>
                                 @endif
                             </div>
                         </div>

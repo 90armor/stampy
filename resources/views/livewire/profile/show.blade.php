@@ -36,10 +36,16 @@ read-only, every change in a modal. --}}
 
     <x-card>
         <div class="flex items-center justify-between gap-4">
-            <h2 tabindex="-1" data-section-heading class="text-base font-semibold text-slate-900 dark:text-slate-100 focus:outline-none">Account</h2>
+            <div class="flex items-center gap-x-1.5">
+                <h2 tabindex="-1" data-section-heading class="text-base font-semibold text-slate-900 dark:text-slate-100 focus:outline-none">Account</h2>
+                {{-- Who changes these, for everyone without Edit (Phase 6i). --}}
+                @unless ($canEditAccount)
+                    <x-help-popover label="About your account details">Your username and email are managed by HR. Ask HR to add or change them.</x-help-popover>
+                @endunless
+            </div>
             @if ($canEditAccount)
                 <x-button variant="secondary" wire:click="openAccount" wire:loading.attr="disabled" wire:target="openAccount" aria-label="Edit account">
-                    <x-icon name="pencil-square" class="h-5 w-5" />
+                    <x-icon name="pencil" class="h-5 w-5" />
                     Edit
                 </x-button>
             @endif
@@ -50,9 +56,6 @@ read-only, every change in a modal. --}}
                 <dt class="text-sm font-medium text-slate-500 dark:text-slate-400">Username</dt>
                 <dd class="min-w-0 text-sm">
                     <span class="break-all text-slate-900 dark:text-slate-100">{{ $user->username }}</span>
-                    @unless ($canEditAccount)
-                        <span class="block text-slate-500 dark:text-slate-400 sm:ml-2 sm:inline">Ask HR to change</span>
-                    @endunless
                 </dd>
             </div>
             <div class="grid grid-cols-1 gap-1 border-t border-slate-divider py-3 sm:grid-cols-[8rem_minmax(0,1fr)] sm:gap-4">
@@ -63,9 +66,6 @@ read-only, every change in a modal. --}}
                     @else
                         <span class="text-slate-900 dark:text-slate-100">None</span>
                     @endif
-                    @unless ($canEditAccount)
-                        <span class="block text-slate-500 dark:text-slate-400 sm:ml-2 sm:inline">Ask HR to add or change your email</span>
-                    @endunless
                 </dd>
             </div>
             <div class="grid grid-cols-1 gap-1 border-t border-slate-divider py-3 sm:grid-cols-[8rem_minmax(0,1fr)] sm:items-center sm:gap-4">
@@ -148,6 +148,12 @@ read-only, every change in a modal. --}}
                         <x-input-label for="account_name" value="Name" />
                         <x-text-input id="account_name" type="text" wire:model="name" autocomplete="name" autofocus />
                         <x-input-error :messages="$errors->get('name')" class="mt-1" />
+                    </div>
+                    <div>
+                        <x-input-label for="account_username" value="Username" />
+                        <x-text-input id="account_username" type="text" wire:model="username" autocomplete="username" autocapitalize="none" spellcheck="false" />
+                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">You sign in with it. It can't be someone's employee code.</p>
+                        <x-input-error :messages="$errors->get('username')" class="mt-1" />
                     </div>
                 @endif
                 <div>

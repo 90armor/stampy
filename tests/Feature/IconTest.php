@@ -63,4 +63,24 @@ class IconTest extends TestCase
 
         $this->assertSame([], $offenders, 'Icons are 20px (h-5 w-5); 14px only inside a status pill or filter chip.');
     }
+
+    public function test_every_icon_named_in_a_view_exists(): void
+    {
+        // An unknown name renders an empty <svg> that still takes its 20px: the
+        // profile's Edit button once showed a blank gap for 'pencil-square'
+        // (Phase 6i). Every literal name in a view must draw something.
+        $missing = [];
+
+        foreach (File::allFiles(resource_path('views')) as $file) {
+            preg_match_all('/<x-icon\b[^>]*?(?<!:)\bname="([a-z0-9-]+)"/s', $file->getContents(), $matches);
+
+            foreach (array_unique($matches[1]) as $name) {
+                if (! preg_match('/d="[Mm]/', Blade::render('<x-icon name="'.$name.'" />'))) {
+                    $missing[] = str_replace(base_path().'/', '', $file->getPathname()).': '.$name;
+                }
+            }
+        }
+
+        $this->assertSame([], $missing, 'Every <x-icon> name must be a match() case in components/icon.blade.php.');
+    }
 }
