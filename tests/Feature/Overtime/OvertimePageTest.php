@@ -198,7 +198,7 @@ class OvertimePageTest extends TestCase
             ->assertSeeHtml("cancelText: 'Keep request'")
             ->assertSeeHtml("confirmText: 'Cancel request'")
             ->call('cancel', $request->id)
-            ->assertSee('Cancelled your overtime request for Tue 16 Jun.');
+            ->assertSee('Cancelled your overtime request for Tue 16 Jun, 5:00 – 7:00 PM.');
 
         $this->assertSame(OvertimeStatus::Cancelled, $request->fresh()->status);
     }
@@ -212,7 +212,7 @@ class OvertimePageTest extends TestCase
         Livewire::actingAs($this->employee->user)->test(Index::class)
             ->assertSeeHtml('aria-label="Cancel overtime request, '.$claim->displayDateAndWindow().'"')
             ->call('cancel', $claim->id)
-            ->assertSee('Cancelled your overtime request for Fri 12 Jun.');
+            ->assertSee('Cancelled your overtime request for Fri 12 Jun, 5:00 – 7:00 PM.');
         $this->assertSame(OvertimeStatus::Cancelled, $claim->fresh()->status);
 
         $approved = $service->submit($this->employee, Carbon::parse('2026-06-11'), Carbon::parse('2026-06-11 17:00'), Carbon::parse('2026-06-11 19:00'), OvertimeCompensation::Pay, null, $this->admin)['request'];
@@ -232,7 +232,7 @@ class OvertimePageTest extends TestCase
             ->assertHasNoErrors()
             ->assertSet('step', 'review')
             ->assertSee('This is planned: it hasn\'t started yet.')
-            ->assertSee('Only 5:00 PM – 7:00 PM counts. 4:00 PM – 5:00 PM is normal working hours.')
+            ->assertSee('Only 5:00 – 7:00 PM counts. 4:00 – 5:00 PM is normal working hours.')
             ->assertDontSee('Workday (150%)')
             ->assertSee('Adds 2h 00m toward time off in lieu.')
             ->assertSee('Aye Aye Mon reviews it first, then an admin. You can cancel it while it waits for a decision, and once approved until it starts.')

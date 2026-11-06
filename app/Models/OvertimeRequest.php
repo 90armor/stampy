@@ -169,14 +169,16 @@ class OvertimeRequest extends Model implements Approvable
         return $this->kind === OvertimeKind::Planned ? $this->date : null;
     }
 
-    /** "5:00 PM – 7:00 PM", with "(+1)" when it ends after midnight (the attendance views' convention). */
+    /**
+     * "5:00 – 7:00 PM", "11:00 AM – 1:00 PM", "9:00 PM – 1:00 AM (+1)":
+     * AttendanceTime::range(), the one form an overtime window is shown in.
+     */
     public function displayWindow(): string
     {
-        return AttendanceTime::format($this->starts_at).' – '.AttendanceTime::format($this->ends_at)
-            .($this->ends_at->isSameDay($this->starts_at) ? '' : ' (+1)');
+        return AttendanceTime::range($this->starts_at, $this->ends_at);
     }
 
-    /** "Mon 5 Oct, 5:00 PM – 7:00 PM". */
+    /** "Mon 5 Oct, 5:00 – 7:00 PM". */
     public function displayDateAndWindow(): string
     {
         return DisplayDate::compact($this->date).', '.$this->displayWindow();

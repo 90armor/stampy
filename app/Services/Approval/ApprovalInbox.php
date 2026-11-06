@@ -56,7 +56,11 @@ class ApprovalInbox
      * all of them: what the Approvals page shows (the order, "Stuck" and the
      * away lines).
      *
-     * @return array{0: array{stepOne: Collection<int, Approvable>, stepTwo: Collection<int, Approvable>, overrides: Collection<int, Approvable>}, 1: array<string, array{stuck: bool, awayReason: ?string}>}
+     * awayUntil is the away line's date as a date — the first of the
+     * approvers' last days away — for the row's short "Manager away until"
+     * (Phase 6j).
+     *
+     * @return array{0: array{stepOne: Collection<int, Approvable>, stepTwo: Collection<int, Approvable>, overrides: Collection<int, Approvable>}, 1: array<string, array{stuck: bool, awayReason: ?string, awayUntil: ?CarbonInterface}>}
      */
     public static function withStatus(User $user): array
     {
@@ -232,7 +236,7 @@ class ApprovalInbox
             // no start (a claim), being away blocks it until they're back at all.
             $stuck = $stuck || ($away !== null && ($deadline === null || $away['backOn']->gte($deadline)));
 
-            $status[self::key($item)] = ['stuck' => $stuck, 'awayReason' => $away['reason'] ?? null];
+            $status[self::key($item)] = ['stuck' => $stuck, 'awayReason' => $away['reason'] ?? null, 'awayUntil' => $away['until'] ?? null];
         }
 
         return $status;
@@ -270,7 +274,7 @@ class ApprovalInbox
      *
      * @param  Collection<int, User>  $candidates  ApprovalFlow::stepOneCandidates()
      * @param  Collection<int, Collection<int, Leave>>  $leaves  the candidates' approved leaves ending today or later, by employee
-     * @return array{reason: string, backOn: CarbonInterface}|null
+     * @return array{reason: string, backOn: CarbonInterface, until: CarbonInterface}|null
      */
     private static function away(Approvable $item, CarbonInterface $today, HolidayRange $holidays, Collection $candidates, Collection $leaves): ?array
     {
@@ -282,6 +286,7 @@ class ApprovalInbox
 
         $away = [];
         $backOn = null;
+        $firstUntil = null;
 
         foreach ($approvers as $approver) {
             $own = $leaves->get($approver->employee->id, collect());
@@ -293,11 +298,12 @@ class ApprovalInbox
             $role = $approver->hasRole('admin') ? 'admin' : 'manager';
             [$until, $back] = self::absence($approver->employee, $own, $today, $holidays);
             $backOn = $backOn === null || $back->lt($backOn) ? $back : $backOn;
+            $firstUntil = $firstUntil === null || $until->lt($firstUntil) ? $until : $firstUntil;
             // "Wai Yan Aung (manager) is on leave until Wed 7 Oct; Aye Aye Mon (manager) until Tue 6 Oct"
             $away[] = "{$approver->employee->full_name} ({$role}) ".($away === [] ? 'is on leave until ' : 'until ').DisplayDate::compact($until);
         }
 
-        return ['reason' => implode('; ', $away), 'backOn' => $backOn];
+        return ['reason' => implode('; ', $away), 'backOn' => $backOn, 'until' => $firstUntil];
     }
 
     /**

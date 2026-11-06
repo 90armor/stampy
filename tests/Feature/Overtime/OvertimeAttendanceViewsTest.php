@@ -100,7 +100,7 @@ class OvertimeAttendanceViewsTest extends TestCase
         Livewire::actingAs($this->admin)->test(Show::class, ['employee' => $this->employee])
             ->set('month', '2026-06')
             ->call('openDay', '2026-06-10')
-            ->assertSee('9:00 PM – 11:00 PM')
+            ->assertSee('9:00 – 11:00 PM')
             ->assertSee('Claim · Pay')
             ->assertSee('Nothing credited — out at 7:00 PM, before the window')
             ->assertSee('View on profile');

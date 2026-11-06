@@ -248,7 +248,7 @@ class OvertimeSubmitTest extends TestCase
             $submitLeave('2026-06-16', '2026-06-18');
             $this->fail('A full-day leave over a date with overtime was accepted.');
         } catch (LeaveValidationException $e) {
-            $this->assertSame(['start_date' => ['Wed 17 Jun has your pending overtime request (5:00 PM – 7:00 PM). Cancel it first, or take a half day.']], $e->errors());
+            $this->assertSame(['start_date' => ['Wed 17 Jun has your pending overtime request (5:00 – 7:00 PM). Cancel it first, or take a half day.']], $e->errors());
         }
 
         // A half day leaves the other half worked; an AM and then a PM would make it a full day.
@@ -263,7 +263,7 @@ class OvertimeSubmitTest extends TestCase
     {
         $first = $this->submit('2026-06-16', '17:00', '19:00');
 
-        $this->assertStringContainsString('already a pending overtime request on Tue 16 Jun (5:00 PM – 7:00 PM)', $this->message($this->refused(fn () => $this->submit('2026-06-16', '19:00', '20:00'))));
+        $this->assertStringContainsString('already a pending overtime request on Tue 16 Jun (5:00 – 7:00 PM)', $this->message($this->refused(fn () => $this->submit('2026-06-16', '19:00', '20:00'))));
 
         $first->update(['status' => OvertimeStatus::Cancelled, 'current_step' => null]);
         $this->assertSame(OvertimeStatus::Pending, $this->submit('2026-06-16', '19:00', '20:00')->status);

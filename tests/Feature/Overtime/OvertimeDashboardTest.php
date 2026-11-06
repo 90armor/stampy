@@ -64,7 +64,7 @@ class OvertimeDashboardTest extends TestCase
         $this->overtime('2026-06-19', $this->admin);
 
         $this->actingAs($this->employee->user)->get(route('dashboard'))
-            ->assertSeeTextInOrder(['Upcoming', 'Overtime · Wed 17 Jun, 5:00 PM – 7:00 PM', 'Waiting for manager', 'Overtime · Fri 19 Jun, 5:00 PM – 7:00 PM', 'Starts in 4 days'])
+            ->assertSeeTextInOrder(['Upcoming', 'Overtime · Wed 17 Jun, 5:00 – 7:00 PM', 'Waiting for manager', 'Overtime · Fri 19 Jun, 5:00 – 7:00 PM', 'Starts in 4 days'])
             ->assertSee('1 waiting')
             ->assertSee(route('overtime.index'));
     }
@@ -78,7 +78,7 @@ class OvertimeDashboardTest extends TestCase
 
         $this->actingAs($this->employee->user->fresh())->get(route('dashboard'))
             ->assertSee('Decided since your last visit')
-            ->assertSeeText('Overtime · Wed 17 Jun, 5:00 PM – 7:00 PM')
+            ->assertSeeText('Overtime · Wed 17 Jun, 5:00 – 7:00 PM')
             ->assertSeeText('“Not this week”')
             ->assertSee('See overtime');
     }

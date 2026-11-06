@@ -96,7 +96,7 @@ class ApprovalsPageTest extends TestCase
         Livewire::actingAs($this->manager->user)->test(Approvals::class)
             ->assertSee('Waiting for you')
             ->assertDontSee('Waiting for admin')
-            ->assertSee('Annual · 22–24 Jun · 3 days')
+            ->assertSee('Annual · Mon 22 – Wed 24 Jun · 3 days')
             ->assertSee('“Family wedding”', false)
             // 18 granted, 3 reserved by this request.
             ->assertSee('Annual available after this request: 15');
@@ -130,7 +130,8 @@ class ApprovalsPageTest extends TestCase
         $this->request($this->employee, '2026-06-22', '2026-06-24');
 
         Livewire::actingAs($this->manager->user)->test(Approvals::class)
-            ->assertSee('1 other in Sales during these dates — Colleague (Annual, Tue 23 Jun, pending).')
+            ->assertSee('1 other off')
+            ->assertSeeInOrder(['1 other in Sales during these dates:', 'Colleague (Annual, Tue 23 Jun, pending)'])
             ->assertDontSee('Outsider');
     }
 
@@ -143,7 +144,8 @@ class ApprovalsPageTest extends TestCase
         $this->request($this->employee, '2026-06-22', '2026-06-24');
 
         Livewire::actingAs($this->manager->user)->test(Approvals::class)
-            ->assertSee('1 other in Sales during these dates — Colleague (Annual, Mon 22 Jun, pending; Annual, Wed 24 Jun, pending).')
+            ->assertSee('1 other off')
+            ->assertSeeInOrder(['1 other in Sales during these dates:', 'Colleague (Annual, Mon 22 Jun, pending; Annual, Wed 24 Jun, pending)'])
             ->assertDontSee('2 others in Sales');
     }
 

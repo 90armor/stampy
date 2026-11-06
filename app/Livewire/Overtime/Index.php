@@ -9,7 +9,6 @@ use App\Models\OvertimeRequest;
 use App\Models\OvertimeSettings;
 use App\Services\Leave\LeaveBalance;
 use App\Services\Overtime\OvertimeRequestService;
-use App\Support\DisplayDate;
 use App\Support\OvertimeResult;
 use App\Support\OvertimeSummary;
 use App\Support\RequestDecisions;
@@ -70,7 +69,7 @@ class Index extends Component
             return;
         }
 
-        $this->notice = 'Cancelled your overtime request for '.DisplayDate::compact($request->date).'.';
+        $this->notice = 'Cancelled your overtime request for '.$request->displayDateAndWindow().'.';
         $this->warning = $result['rebuildError'];
     }
 

@@ -22,7 +22,6 @@ use App\Services\Approval\ApprovalFlow;
 use App\Services\Attendance\DailySummaryBuilder;
 use App\Services\Attendance\EmployeeScheduleAssigner;
 use App\Services\Attendance\LeaveDay;
-use App\Support\AttendanceTime;
 use App\Support\DisplayDate;
 use App\Support\LeaveDays;
 use App\Support\WorkdayCalendar;
@@ -567,7 +566,7 @@ class LeaveRequestService
         foreach ($overtime as $request) {
             if (LeaveDay::on($existing->concat([$candidate]), $request->date)->fullDay) {
                 $add('start_date', DisplayDate::compact($request->date)." has {$whose} {$request->status->value} overtime request ("
-                    .AttendanceTime::format($request->starts_at).' – '.AttendanceTime::format($request->ends_at).'). Cancel it first, or take a half day.');
+                    .$request->displayWindow().'). Cancel it first, or take a half day.');
             }
         }
 
