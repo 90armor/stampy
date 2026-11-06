@@ -84,7 +84,7 @@ class StaleDecisionTest extends TestCase
     /** The request as its queue row names it: one person often has several waiting. */
     private function subject(string $type): string
     {
-        return $type === 'leave' ? 'leave request (Annual, Mon 22 Jun)' : 'overtime request (Wed 17 Jun, 5:00 PM – 7:00 PM)';
+        return $type === 'leave' ? 'leave request (Annual, Mon 22 Jun)' : 'overtime request (Wed 17 Jun, 5:00 – 7:00 PM)';
     }
 
     private function service(Approvable $request): LeaveRequestService|OvertimeRequestService
@@ -133,18 +133,18 @@ class StaleDecisionTest extends TestCase
         $this->assertSame(1, app(ApprovalInbox::class)->count($this->admin));
 
         $page = Livewire::actingAs($this->admin)->test(Approvals::class)
-            ->assertSee('Fri 12 Jun, 5:00 PM – 7:00 PM')
+            ->assertSee('Fri 12 Jun, 5:00 – 7:00 PM')
             ->call('openDecision', $claim->id, 'approve', 'overtime', 2)
             ->assertSet('showDecision', true);
 
         $service->cancel($claim->fresh(), $this->employee->user);
 
         $this->assertSame(0, app(ApprovalInbox::class)->count($this->admin));
-        Livewire::actingAs($this->admin)->test(Approvals::class)->assertDontSee('Fri 12 Jun, 5:00 PM – 7:00 PM');
+        Livewire::actingAs($this->admin)->test(Approvals::class)->assertDontSee('Fri 12 Jun, 5:00 – 7:00 PM');
 
         $page->call('decide')
             ->assertSet('showDecision', false)
-            ->assertSee('Kyaw Kyaw cancelled their overtime request (Fri 12 Jun, 5:00 PM – 7:00 PM).')
+            ->assertSee('Kyaw Kyaw cancelled their overtime request (Fri 12 Jun, 5:00 – 7:00 PM).')
             ->assertDontSee('You don');
         $this->assertSame(OvertimeStatus::Cancelled, $claim->fresh()->status);
     }
@@ -273,7 +273,7 @@ class StaleDecisionTest extends TestCase
             ->set('note', 'Not this week.')
             ->call('decide')
             ->assertSet('stale', null)
-            ->assertSee("Rejected Kyaw Kyaw's overtime on Wed 17 Jun.");
+            ->assertSee("Rejected Kyaw Kyaw's overtime on Wed 17 Jun, 5:00 – 7:00 PM.");
     }
 
     /**

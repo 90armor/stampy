@@ -102,7 +102,7 @@ class OvertimeApprovalsPageTest extends TestCase
             ->assertSee('Leave and overtime requests waiting for a decision.')
             // Each row: its type, who, the date and window, how long and what kind (Phase 6j).
             ->assertSeeInOrder(['Overtime', 'Kyaw Kyaw', 'Tue 16 Jun', '5:00 – 7:00 PM', '2h 00m · Time off', 'Leave', 'Kyaw Kyaw', 'Wed 24 Jun', '1 day · Annual'])
-            ->assertSee('Tue 16 Jun, 5:00 PM – 7:00 PM · Planned · Time off')
+            ->assertSee('Tue 16 Jun, 5:00 – 7:00 PM · Planned · Time off')
             ->assertSee('“Release night”')
             ->assertSee('Submitted Mon 15 Jun');
     }
@@ -163,7 +163,7 @@ class OvertimeApprovalsPageTest extends TestCase
             ->assertSee('Time off in lieu')
             ->set('compensation', 'time_off')
             ->call('decide')
-            ->assertSee('Approved Kyaw Kyaw\'s overtime on Tue 16 Jun — it now waits for an admin.');
+            ->assertSee('Approved Kyaw Kyaw\'s overtime on Tue 16 Jun, 5:00 – 7:00 PM — it now waits for an admin.');
 
         $this->assertSame(OvertimeCompensation::TimeOff, $request->fresh()->compensation);
         $this->assertSame('Compensation changed: pay → time off', $request->approvalSteps()->sole()->note);
@@ -204,7 +204,7 @@ class OvertimeApprovalsPageTest extends TestCase
             ->assertHasErrors('note')
             ->set('note', 'Not budgeted')
             ->call('decide')
-            ->assertSee('Rejected Kyaw Kyaw\'s overtime on Tue 16 Jun.');
+            ->assertSee('Rejected Kyaw Kyaw\'s overtime on Tue 16 Jun, 5:00 – 7:00 PM.');
 
         $this->assertSame(OvertimeStatus::Rejected, $request->fresh()->status);
     }

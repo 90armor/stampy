@@ -511,7 +511,7 @@ class OvertimeRequestService
                 'kind' => 'overtime',
                 'id' => $request->id,
                 'type' => 'Overtime',
-                'dates' => DisplayDate::compact($request->date).', '.AttendanceTime::format($request->starts_at).' – '.AttendanceTime::format($request->ends_at),
+                'dates' => $request->displayDateAndWindow(),
                 'status' => $request->status->value,
                 'action' => 'cancel',
                 'end' => null,
@@ -653,7 +653,7 @@ class OvertimeRequestService
 
         if ($creditable === 0) {
             $errors->add('starts_at', $day['hasHours']
-                ? 'This is within normal working hours ('.AttendanceTime::format($day['window']->start).' – '.AttendanceTime::format($day['window']->end).').'
+                ? 'This is within normal working hours ('.AttendanceTime::range($day['window']->start, $day['window']->end).').'
                 : 'None of this window counts as overtime — it\'s all break time.');
         }
 
@@ -678,7 +678,7 @@ class OvertimeRequestService
 
         if ($active !== null) {
             $errors->add('date', 'There is already '.($active->status === OvertimeStatus::Pending ? 'a pending' : 'an approved').' overtime request on '.DisplayDate::compact($date)
-                .' ('.AttendanceTime::format($active->starts_at).' – '.AttendanceTime::format($active->ends_at).'). Cancel it first to file a different one.');
+                .' ('.$active->displayWindow().'). Cancel it first to file a different one.');
         }
 
         $errors->throwIfAny();

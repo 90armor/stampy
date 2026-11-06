@@ -96,7 +96,7 @@ class ApprovalsPageTest extends TestCase
         Livewire::actingAs($this->manager->user)->test(Approvals::class)
             ->assertSee('Waiting for you')
             ->assertDontSee('Waiting for admin')
-            ->assertSee('Annual · 22–24 Jun · 3 days')
+            ->assertSee('Annual · Mon 22 – Wed 24 Jun · 3 days')
             ->assertSee('“Family wedding”', false)
             // 18 granted, 3 reserved by this request.
             ->assertSee('Annual available after this request: 15');

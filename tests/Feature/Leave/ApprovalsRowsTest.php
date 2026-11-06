@@ -153,8 +153,8 @@ class ApprovalsRowsTest extends TestCase
         $this->assertContains('2 others off', $this->signals($row, 'attention'));
         $alsoOff = collect($row['details'])->firstWhere('label', 'Also off')['lines'];
         $this->assertSame('2 others in Sales during these dates:', $alsoOff[0]);
-        $this->assertStringStartsWith('Ends on the first day (Annual, 12–16 Nov, approved)', $alsoOff[1]);
-        $this->assertStringStartsWith('Starts on the last day (Annual, 19–20 Nov, pending)', $alsoOff[2]);
+        $this->assertStringStartsWith('Ends on the first day (Annual, Thu 12 – Mon 16 Nov, approved)', $alsoOff[1]);
+        $this->assertStringStartsWith('Starts on the last day (Annual, Thu 19 – Fri 20 Nov, pending)', $alsoOff[2]);
         $this->assertCount(3, $alsoOff);
     }
 
@@ -332,6 +332,22 @@ class ApprovalsRowsTest extends TestCase
         $this->page($this->manager->user)->assertSeeHtml('<span class="whitespace-nowrap">9:00 PM – 1:00 AM (+1)</span>');
     }
 
+    /** The window and the dates keep the rows' forms off the rows too: details, the dialog's title, the notices. */
+    public function test_details_dialog_and_notices_use_the_rows_forms(): void
+    {
+        $half = Leave::factory()->between('2026-11-23', '2026-11-23')->halfDay('am')->pending()->create(['employee_id' => $this->employee->id, 'leave_type_id' => $this->annual->id]);
+        $overnight = $this->overtime('2026-11-12', '21:00', '01:00', 'planned', $this->person('Night', 'employee', $this->manager));
+
+        $this->assertSame('Annual · Mon 23 Nov · AM · 0.5 day', collect($this->row($this->manager->user, $half)['details'])->firstWhere('label', 'Requested')['lines'][0]);
+        $this->assertSame('Thu 12 Nov, 9:00 PM – 1:00 AM (+1) · Planned · Pay', collect($this->row($this->manager->user, $overnight)['details'])->firstWhere('label', 'Requested')['lines'][0]);
+
+        $this->page($this->manager->user)
+            ->call('openDecision', $overnight->id, 'approve', 'overtime', 1)
+            ->assertSee('overtime on Thu 12 Nov, 9:00 PM – 1:00 AM (+1)')
+            ->call('decide')
+            ->assertSee("Approved Night's overtime on Thu 12 Nov, 9:00 PM – 1:00 AM (+1) — it now waits for an admin.");
+    }
+
     public function test_time_off_has_no_rates(): void
     {
         $request = OvertimeRequest::factory()->planned()->timeOff()->window('2026-11-12', '21:00', '23:00')->pending()->create(['employee_id' => $this->employee->id]);
@@ -471,7 +487,7 @@ class ApprovalsRowsTest extends TestCase
 
         $this->assertSame('Family wedding', $row['reason']);
         $this->assertSame(['“Family wedding”'], $details['Reason']);
-        $this->assertSame(['Annual · 16–17 Nov · 2 days', 'Submitted Thu 5 Nov'], $details['Requested']);
+        $this->assertSame(['Annual · Mon 16 – Tue 17 Nov · 2 days', 'Submitted Thu 5 Nov'], $details['Requested']);
         $this->assertSame(['Step 1: approved by Manager · Thu 5 Nov — “Fine by me”'], $details['History']);
 
         $this->page($this->admin)

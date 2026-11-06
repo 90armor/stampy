@@ -76,7 +76,7 @@ class OvertimeProfileCardTest extends TestCase
             ->assertSee('6h 00m')
             ->assertSee('Workday (150%) 1h 00m · Night (200%) 1h 00m')
             ->assertSee('As time off 4h 00m')
-            ->assertSee('Mon 8 Jun, 9:00 PM – 11:00 PM')
+            ->assertSee('Mon 8 Jun, 9:00 – 11:00 PM')
             ->assertSee('2h 00m credited')
             ->assertSee('Step 1: approved by')
             ->assertSee('Time off in lieu posted')

@@ -205,7 +205,7 @@ class Approvals extends Component
         );
 
         $note = trim($this->note) !== '' ? trim($this->note) : null;
-        $whose = "{$request->employee->full_name}'s overtime on ".DisplayDate::compact($request->date);
+        $whose = "{$request->employee->full_name}'s overtime on ".$request->displayDateAndWindow();
 
         try {
             if ($this->decision === 'reject') {
@@ -280,7 +280,7 @@ class Approvals extends Component
         };
     }
 
-    /** "leave request (Annual, Mon 3 Nov)", "overtime request (Thu 29 Oct, 5:00 PM – 7:00 PM)" — the queue rows' formats. */
+    /** "leave request (Annual, Mon 3 – Wed 5 Nov)", "overtime request (Thu 29 Oct, 5:00 – 7:00 PM)" — the queue rows' formats. */
     private function staleSubject(Approvable $request): string
     {
         if ($request instanceof OvertimeRequest) {
@@ -289,7 +289,14 @@ class Approvals extends Component
 
         $request->loadMissing('leaveType');
 
-        return 'leave request ('.$request->leaveType->name.', '.str_replace(' · ', ', ', $request->displayDates()).')';
+        return 'leave request ('.$request->leaveType->name.', '.str_replace(' · ', ', ', $this->leaveDates($request)).')';
+    }
+
+    /** A leave's dates as the queue rows show them: "Mon 16 – Tue 17 Nov", with " · AM"/" · PM" on a half day. */
+    private function leaveDates(Leave $leave): string
+    {
+        return DisplayDate::weekdayRange($leave->start_date, $leave->end_date)
+            .($leave->half !== null ? ' · '.$leave->half->label() : '');
     }
 
     private function showStale(string $why): void
@@ -469,8 +476,7 @@ class Approvals extends Component
             $worked = match (true) {
                 $would === null || ($would['in'] === null && $would['out'] === null) => 'No punches on record for this day yet: nothing would be credited until they\'re added.',
                 $would['out'] === null => 'Punched in '.AttendanceTime::format($would['in']).'. No out-punch: nothing would be credited until it\'s added.',
-                default => 'Punched '.AttendanceTime::format($would['in']).' – '.AttendanceTime::format($would['out'])
-                    .($would['out']->isSameDay($request->date) ? '' : ' (+1)')
+                default => 'Punched '.AttendanceTime::range($would['in'], $would['out'])
                     .' → '.match (true) {
                         ! $short => Duration::format($credit->total()).' would be credited'.$which,
                         $credit->total() > 0 => Duration::format($credit->total()).' of '.Duration::format($requested).' requested would be credited'.$which,
@@ -579,7 +585,7 @@ class Approvals extends Component
             // in the order of their first leave in these dates.
             ->groupBy('employee_id')
             ->map(fn (Collection $leaves) => $leaves->first()->employee->full_name.' ('
-                .$leaves->map(fn (Leave $other) => "{$other->leaveType->name}, ".$other->displayDates().', '.$other->status->value)->implode('; ')
+                .$leaves->map(fn (Leave $other) => "{$other->leaveType->name}, ".$this->leaveDates($other).', '.$other->status->value)->implode('; ')
                 .')')
             ->values();
 
@@ -617,7 +623,7 @@ class Approvals extends Component
         $details = array_values(array_filter([
             $leave->reason ? ['label' => 'Reason', 'lines' => ['“'.$leave->reason.'”']] : null,
             ['label' => 'Requested', 'lines' => [
-                $leave->leaveType->name.' · '.$leave->displayDates().' · '.LeaveDays::label(array_sum($cost)),
+                $leave->leaveType->name.' · '.$this->leaveDates($leave).' · '.LeaveDays::label(array_sum($cost)),
                 'Submitted '.DisplayDate::compact($leave->created_at).($leave->startsLabel() ? ' · '.$leave->startsLabel() : ''),
             ]],
             ['label' => 'Balance', 'lines' => [$after === []

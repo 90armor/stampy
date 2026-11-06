@@ -252,7 +252,7 @@ class RequestModal extends Component
         $this->changed = null;
 
         $time = fn ($at) => AttendanceTime::format($at);
-        $span = fn (array $span) => $time($span[0]).' – '.$time($span[1]);
+        $span = fn (array $span) => AttendanceTime::range($span[0], $span[1]);
         $your = $this->forOthers ? 'their' : 'your';
         $settings = OvertimeSettings::current();
 
@@ -291,7 +291,7 @@ class RequestModal extends Component
 
         $this->summary = [
             'employee' => $preview->employee->full_name,
-            'when' => DisplayDate::compact($preview->date).', '.$span([$preview->startsAt, $preview->endsAt]).($preview->isOvernight() ? ' (+1)' : ''),
+            'when' => DisplayDate::compact($preview->date).', '.$span([$preview->startsAt, $preview->endsAt]),
             'kind' => $preview->kind === OvertimeKind::Claim
                 ? 'This is a claim: the time has already started.'
                 : 'This is planned: it hasn\'t started yet.',

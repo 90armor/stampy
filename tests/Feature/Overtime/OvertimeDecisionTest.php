@@ -398,7 +398,7 @@ class OvertimeDecisionTest extends TestCase
             ->set('left_on', '2026-06-15')
             ->call('confirm')
             ->assertSee('Overtime after their last day will change')
-            ->assertSee('Overtime · Tue 16 Jun, 5:00 PM – 7:00 PM (pending) — cancelled')
+            ->assertSee('Overtime · Tue 16 Jun, 5:00 – 7:00 PM (pending) — cancelled')
             ->assertSee('Deactivate and adjust 1 request')
             ->call('confirm')
             ->assertHasNoErrors();
