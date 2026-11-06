@@ -16,5 +16,5 @@
    cp <repo>/tests/browser/*.mjs .
    STAMPY_REPO=<repo>/ node focus.mjs
    ```
-   With the app on http://localhost:8000 (`STAMPY_BASE` to change it; for a checkout served by another container, `STAMPY_EXEC="docker exec <container>"` is how the script runs its one artisan lookup — `docker compose exec -T app` by default). Each check prints `PASS` or `FAIL`; the script exits 1 on any failure.
+   With the app on http://localhost:8000 (`STAMPY_BASE` to change it; for a checkout served by another container, `STAMPY_EXEC="docker exec <container>"` is how the script runs its one artisan lookup — `docker compose exec -T app` by default). Each check prints `PASS` or `FAIL`, or `SKIP` with the reason when the data of the moment can't exercise it (before about 8:11 nobody is late yet, so Needs attention has no Show all); the script exits 1 on any failure, never on a skip.
 3. **Afterwards,** reseed (`migrate:fresh --seed`): it submits, decides and cancels real requests.

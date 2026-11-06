@@ -116,7 +116,8 @@ class Show extends Component
             // An unlinked admin's username has no employee form to change it in,
             // so it's here, under the employee form's rules (Phase 6g): unique,
             // and never another employee's code, in any case. A linked login's
-            // username is HR's, like its name.
+            // username is an admin's to change on the employee page's Login card
+            // (Employees\Show::saveUsername()).
             'username' => $linked ? null : ['required', 'string', 'max:255', Rule::unique(User::class)->ignore($user->id), UsernameCodeCollision::forUsername(null)],
             'email' => ['nullable', 'string', 'email', 'max:255', Rule::unique(User::class)->ignore($user->id)],
         ]));

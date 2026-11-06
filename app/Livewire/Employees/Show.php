@@ -3,13 +3,22 @@
 namespace App\Livewire\Employees;
 
 use App\Models\Employee;
+use App\Models\User;
 use App\Support\ListUrl;
+use App\Support\UsernameCodeCollision;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
 class Show extends Component
 {
     public Employee $employee;
+
+    public bool $showUsernameModal = false;
+
+    public string $username = '';
+
+    public ?string $notice = null;
 
     public function mount(Employee $employee): void
     {
@@ -26,6 +35,56 @@ class Show extends Component
     public function refreshEmployee(): void
     {
         $this->employee->refresh()->load(['department', 'position', 'manager', 'user']);
+    }
+
+    /**
+     * The Login card's Change username (Phase 6i): an admin renames any linked
+     * login, an admin's own included, under the employee form's rules — unique
+     * and never another employee's code, in any case (Phase 6g); their own
+     * code is allowed. Sign-in finds the new name at once, and nothing else
+     * changes: sessions and "remember me" stay as they were.
+     */
+    public function openUsername(): void
+    {
+        $this->authorize('update', $this->employee);
+
+        $user = $this->employee->user()->first();
+        if ($user === null) {
+            return;
+        }
+
+        $this->username = $user->username;
+        $this->notice = null;
+        $this->resetErrorBag();
+        $this->showUsernameModal = true;
+    }
+
+    public function saveUsername(): void
+    {
+        $this->authorize('update', $this->employee);
+
+        /** @var User|null $user */
+        $user = $this->employee->user()->first();
+        if ($user === null) {
+            $this->showUsernameModal = false;
+
+            return;
+        }
+
+        $this->username = trim($this->username);
+
+        $this->validate([
+            'username' => ['required', 'string', 'max:255', Rule::unique(User::class, 'username')->ignore($user->id), UsernameCodeCollision::forUsername($this->employee->id)],
+        ]);
+
+        $changed = $user->username !== $this->username;
+        $user->forceFill(['username' => $this->username])->save();
+        $this->employee->setRelation('user', $user);
+
+        $this->showUsernameModal = false;
+        $this->notice = $changed
+            ? "Username changed. {$this->employee->full_name} signs in as “{$user->username}” from now on."
+            : null;
     }
 
     public function render()

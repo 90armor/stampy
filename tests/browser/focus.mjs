@@ -4,8 +4,9 @@
 // heading, <main>), never another row's Approve, the trap, step changes,
 // names; Daily attendance's Filters disclosure and the overtime cancel
 // confirmation (6f); the file-for title naming the chosen employee (F28),
-// a punch correction's missing reason (F34, 6g), and the profile's modals, its
-// help popover and the breadcrumb's way back (6i). It submits, decides and
+// a punch correction's missing reason (F34, 6g), Approvals' Show details (6j),
+// and the profile's modals, its help popover and the breadcrumb's way back
+// (6i). It submits, decides and
 // cancels real requests on the dev database: reseed afterwards. Needs the demo
 // seed + scripts/audit/seed-personas.php + scripts/audit/stress-employees.php.
 // Exits 1 on any failure. How to run it: tests/browser/README.md.
@@ -36,6 +37,9 @@ const focusLeavesDialog = (p, timeout = 20000) => p.waitForFunction(() => {
 }, null, { timeout }).catch(() => {});
 let failed = 0;
 const check = (name, pass, detail = '') => { if (! pass) failed++; console.log(`${pass ? 'PASS' : 'FAIL'}  ${name}${detail ? '  → ' + detail : ''}`); };
+// A check the data of the moment can't exercise (early in the morning nobody
+// is late yet): said, never counted as a pass or a failure.
+const skip = (name, reason) => console.log(`SKIP  ${name}  → ${reason}`);
 const page = async (b, state, theme = 'light', width = 1440) => {
     const c = await themedContext(b, state, theme);
     const p = await c.newPage();
@@ -283,7 +287,18 @@ await withBrowser(async (b) => {
                 const back = await p.evaluate(() => ({ label: document.activeElement.innerText.trim(), expanded: document.activeElement.getAttribute('aria-expanded') }));
                 check('Show less: back to the first few, focus still on the button', back.label === closed && back.expanded === 'false', JSON.stringify(back));
             } else {
-                check('Show all: the dashboard counts more people than it lists', false, 'no Show all button');
+                // No button is right when everyone fits in the list (the first 8):
+                // early in the day few people are late or due yet.
+                const counts = await p.evaluate(() => {
+                    const list = document.getElementById('needs-attention-list');
+                    const meta = [...document.querySelectorAll('h2')].find((h) => h.textContent.trim() === 'Needs attention')?.parentElement?.querySelector('p');
+                    return { listed: list ? list.children.length : 0, total: Number.parseInt(meta?.textContent ?? '0', 10) || 0 };
+                });
+                if (counts.total <= 8) { // DashboardAttendance::NEEDS_ATTENTION_SHOWN
+                    skip('Show all', `${counts.total} need${counts.total === 1 ? 's' : ''} attention today, all listed: no Show all to open`);
+                } else {
+                    check('Show all: the dashboard counts more people than it lists', false, `no Show all button for ${counts.total} people, ${counts.listed} listed`);
+                }
             }
             await c.close();
         }
@@ -601,6 +616,38 @@ await withBrowser(async (b) => {
             check(`edit (${width}, linked): no name field, a link to the record`, (await p.locator('#account_name').count()) === 0 && await p.getByRole('dialog').getByRole('link', { name: 'Edit on your employee record' }).isVisible());
             await p.keyboard.press('Escape'); await settle(p);
             check(`edit (${width}, linked): Escape returns to Edit`, (await active(p)).startsWith('button:Edit account'), await active(p));
+            await c.close();
+        }
+    }
+
+    // Phase 6i follow-up: an admin renames a linked login from the employee
+    // page's Login card. Kyaw is renamed and named back, so later sign-ins work.
+    {
+        const kyaw = execSync(`${EXEC} php artisan tinker --execute="echo App\\Models\\Employee::where('employee_code', 'EMP-0002')->value('id');"`, { cwd: REPO }).toString().trim().split('\n').pop();
+        for (const width of [1440, 390]) {
+            const { c, p } = await page(b, admin, 'light', width);
+            await p.goto(`${BASE}/employees/${kyaw}`, { waitUntil: 'networkidle' });
+            const rename = async (value) => {
+                await p.getByRole('button', { name: 'Change username' }).click();
+                await p.locator('#login_username').waitFor({ timeout: 20000 });
+                await settle(p, 200);
+                const opened = await active(p);
+                await p.fill('#login_username', value);
+                await p.getByRole('dialog').getByRole('button', { name: 'Save' }).click();
+                return opened;
+            };
+            const opened = await rename('emp-0003');
+            check(`username (${width}): Change opens on the field`, opened.startsWith('input:login_username'), opened);
+            await p.waitForFunction(() => document.activeElement?.id === 'login_username' && document.activeElement.getAttribute('aria-invalid') === 'true', null, { timeout: 20000 }).catch(() => {});
+            check(`username (${width}): someone's employee code focuses the field, with the 6g message`, (await active(p)).startsWith('input:login_username') && /employee code, and people sign in with either/.test(await p.getByRole('dialog').innerText()), await active(p));
+            await p.fill('#login_username', 'kyaw.6i');
+            await p.getByRole('dialog').getByRole('button', { name: 'Save' }).click();
+            await p.locator('[data-focus-notice]').waitFor({ timeout: 20000 }).catch(() => {});
+            await focusLeavesDialog(p);
+            check(`username (${width}): Save closes and focuses the notice`, (await active(p)).startsWith('div[notice]:Username changed.'), await active(p));
+            await rename('kyaw.kyaw.naing');
+            await p.getByRole('dialog').waitFor({ state: 'detached', timeout: 20000 }).catch(() => {});
+            check(`username (${width}): named back`, (await p.locator('dd').filter({ hasText: 'kyaw.kyaw.naing' }).count()) > 0);
             await c.close();
         }
     }
