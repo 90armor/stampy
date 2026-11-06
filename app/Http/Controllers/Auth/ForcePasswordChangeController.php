@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Support\PasswordConfirmation;
 use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,7 +35,6 @@ class ForcePasswordChangeController extends Controller
         $request->validate([
             'password' => [
                 'required',
-                'confirmed',
                 Password::defaults(),
                 function (string $attribute, $value, Closure $fail) use ($user) {
                     if (Hash::check($value, $user->password)) {
@@ -42,7 +42,8 @@ class ForcePasswordChangeController extends Controller
                     }
                 },
             ],
-        ]);
+            ...PasswordConfirmation::rules(),
+        ], PasswordConfirmation::messages());
 
         $user->forceFill([
             'password' => Hash::make($request->string('password')),

@@ -98,15 +98,6 @@
             />
         </x-card>
     @else
-        @unless ($viaSelfView)
-            <div>
-                <a href="{{ route('attendance.index') }}" wire:navigate class="inline-flex items-center gap-x-1 rounded-lg max-sm:-my-3 max-sm:min-h-11 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100">
-                    <x-icon name="chevron-left" class="h-5 w-5" />
-                    Back to attendance
-                </a>
-            </div>
-        @endunless
-
         <div class="flex flex-wrap items-center justify-between gap-4">
             <div class="flex items-center gap-x-4">
                 <x-avatar :name="$employee->full_name" class="h-14 w-14 text-lg font-semibold" />
@@ -801,7 +792,7 @@
                                             <p class="text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ ($dayLeave->half ? \App\Support\DisplayDate::compact($dayLeave->start_date) : $dayLeave->displayDates()).' · '.$chargedText }}</p>
                                         </div>
                                         @if ($leaveLinkUrl)
-                                            <a href="{{ $leaveLinkUrl }}" wire:navigate class="rounded text-sm font-medium text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-2 hover:decoration-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:decoration-primary-700 dark:hover:decoration-primary-400">{{ $leaveLinkLabel }}</a>
+                                            <a href="{{ $leaveLinkUrl }}" wire:navigate class="rounded text-sm font-medium text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-2 hover:decoration-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-300 dark:decoration-primary-600 dark:hover:decoration-primary-300">{{ $leaveLinkLabel }}</a>
                                         @endif
                                     </li>
                                 @endforeach
@@ -843,7 +834,7 @@
                                     @if ($creditedLine)<p class="text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ $creditedLine }}</p>@endif
                                 </div>
                                 @if ($overtimeLinkUrl)
-                                    <a href="{{ $overtimeLinkUrl }}" wire:navigate class="rounded text-sm font-medium text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-2 hover:decoration-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:decoration-primary-700 dark:hover:decoration-primary-400">{{ $overtimeLinkLabel }}</a>
+                                    <a href="{{ $overtimeLinkUrl }}" wire:navigate class="rounded text-sm font-medium text-primary-700 underline decoration-primary-300 decoration-1 underline-offset-2 hover:decoration-primary-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-300 dark:decoration-primary-600 dark:hover:decoration-primary-300">{{ $overtimeLinkLabel }}</a>
                                 @endif
                             </div>
                         </div>

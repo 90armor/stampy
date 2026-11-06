@@ -189,14 +189,17 @@ class AttendanceShowTest extends TestCase
             ->assertDontSee('Back to attendance');
     }
 
-    public function test_attendance_show_via_the_list_still_shows_a_back_to_attendance_link(): void
+    public function test_attendance_show_via_the_list_goes_back_through_its_breadcrumb(): void
     {
+        // Phase 6i: no in-page back link; the topbar's Attendance crumb is the
+        // way back (BackNavigationTest).
         $employee = Employee::factory()->create();
 
         $this->actingAs($this->admin())
             ->get(route('attendance.show', $employee))
             ->assertOk()
-            ->assertSee('Back to attendance');
+            ->assertDontSee('Back to attendance')
+            ->assertSee('data-back-link', false);
     }
 
     public function test_my_attendance_shows_a_clear_message_when_theres_no_linked_employee(): void

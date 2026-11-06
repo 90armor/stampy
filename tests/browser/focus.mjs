@@ -3,8 +3,10 @@
 // can't be checked from PHP. One check per close rule (notice, trigger,
 // heading, <main>), never another row's Approve, the trap, step changes,
 // names; Daily attendance's Filters disclosure and the overtime cancel
-// confirmation (6f); the file-for title naming the chosen employee (F28) and
-// a punch correction's missing reason (F34, 6g). It submits, decides and
+// confirmation (6f); the file-for title naming the chosen employee (F28),
+// a punch correction's missing reason (F34, 6g), Approvals' Show details (6j),
+// and the profile's modals, its help popover and the breadcrumb's way back
+// (6i). It submits, decides and
 // cancels real requests on the dev database: reseed afterwards. Needs the demo
 // seed + scripts/audit/seed-personas.php + scripts/audit/stress-employees.php.
 // Exits 1 on any failure. How to run it: tests/browser/README.md.
@@ -21,8 +23,23 @@ const active = (p) => p.evaluate(() => {
     const name = (e.getAttribute('aria-label') || e.innerText || e.id || '').trim().replace(/\s+/g, ' ').slice(0, 70);
     return `${e.tagName.toLowerCase()}${e.hasAttribute('data-focus-notice') ? '[notice]' : ''}${e.hasAttribute('data-section-heading') ? '[section]' : ''}${e.hasAttribute('data-modal-title') ? '[title]' : ''}:${name}`;
 });
+// Wait for a state, not a fixed delay: on a busy machine (the suite running
+// alongside) a round trip can take seconds, and a fixed wait read focus while
+// the modal was still closing (<body>). Resolves once focus has landed outside
+// every dialog; on a timeout the check that follows reports what it found.
+// Where the trigger's row goes away, wait for that first (gone()): focus
+// returns to the trigger while the round trip is still under way, and moves
+// on only once the row has gone.
+const gone = (p, label, timeout = 20000) => p.locator(`button[aria-label="${label}"]`).waitFor({ state: 'detached', timeout }).catch(() => {});
+const focusLeavesDialog = (p, timeout = 20000) => p.waitForFunction(() => {
+    const e = document.activeElement;
+    return e && e !== document.body && ! e.closest('[role=dialog], [role=alertdialog]');
+}, null, { timeout }).catch(() => {});
 let failed = 0;
 const check = (name, pass, detail = '') => { if (! pass) failed++; console.log(`${pass ? 'PASS' : 'FAIL'}  ${name}${detail ? '  → ' + detail : ''}`); };
+// A check the data of the moment can't exercise (early in the morning nobody
+// is late yet): said, never counted as a pass or a failure.
+const skip = (name, reason) => console.log(`SKIP  ${name}  → ${reason}`);
 const page = async (b, state, theme = 'light', width = 1440) => {
     const c = await themedContext(b, state, theme);
     const p = await c.newPage();
@@ -175,10 +192,16 @@ await withBrowser(async (b) => {
             const { c, p } = await page(b, admin, 'light', width);
             await p.goto(`${BASE}/policies?tab=holidays`, { waitUntil: 'networkidle' });
             const edit = p.getByRole('button', { name: /^Edit /i }).first();
-            await edit.focus(); await p.keyboard.press('Enter'); await settle(p);
+            const editLabel = await edit.getAttribute('aria-label');
+            await edit.focus(); await p.keyboard.press('Enter');
+            await p.locator('#holiday_date-native').waitFor({ state: 'attached', timeout: 20000 });
+            await settle(p, 0);
             await p.evaluate((w) => { const el = document.getElementById('holiday_date-native'); const v = new Date().getFullYear() + 1; el.value = `${v}-06-${w === 1440 ? 22 : 23}`; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }, width);
             await p.getByRole('dialog').getByRole('button', { name: /^(save|update)/i }).focus();
-            await p.keyboard.press('Enter'); await settle(p, 800);
+            await p.keyboard.press('Enter');
+            await p.getByRole('dialog').waitFor({ state: 'detached', timeout: 20000 }).catch(() => {});
+            if (editLabel) await gone(p, editLabel);
+            await focusLeavesDialog(p);
             check('rule 3: the section heading', (await active(p)).startsWith('h2[section]:Holidays'), await active(p));
             await c.close();
         }
@@ -264,7 +287,18 @@ await withBrowser(async (b) => {
                 const back = await p.evaluate(() => ({ label: document.activeElement.innerText.trim(), expanded: document.activeElement.getAttribute('aria-expanded') }));
                 check('Show less: back to the first few, focus still on the button', back.label === closed && back.expanded === 'false', JSON.stringify(back));
             } else {
-                check('Show all: the dashboard counts more people than it lists', false, 'no Show all button');
+                // No button is right when everyone fits in the list (the first 8):
+                // early in the day few people are late or due yet.
+                const counts = await p.evaluate(() => {
+                    const list = document.getElementById('needs-attention-list');
+                    const meta = [...document.querySelectorAll('h2')].find((h) => h.textContent.trim() === 'Needs attention')?.parentElement?.querySelector('p');
+                    return { listed: list ? list.children.length : 0, total: Number.parseInt(meta?.textContent ?? '0', 10) || 0 };
+                });
+                if (counts.total <= 8) { // DashboardAttendance::NEEDS_ATTENTION_SHOWN
+                    skip('Show all', `${counts.total} need${counts.total === 1 ? 's' : ''} attention today, all listed: no Show all to open`);
+                } else {
+                    check('Show all: the dashboard counts more people than it lists', false, `no Show all button for ${counts.total} people, ${counts.listed} listed`);
+                }
             }
             await c.close();
         }
@@ -273,10 +307,16 @@ await withBrowser(async (b) => {
         {
             const { c, p } = await page(b, admin, 'light', width);
             await p.goto(`${BASE}/policies?tab=holidays`, { waitUntil: 'networkidle' });
-            await p.locator('button[aria-label^="Delete "]:visible').first().focus();
-            await p.keyboard.press('Enter'); await settle(p, 400);
+            const remove = p.locator('button[aria-label^="Delete "]:visible').first();
+            const removeLabel = await remove.getAttribute('aria-label');
+            await remove.focus();
+            await p.keyboard.press('Enter');
+            await p.getByRole('alertdialog').getByRole('button', { name: /delete/i }).waitFor({ timeout: 20000 });
             await p.getByRole('alertdialog').getByRole('button', { name: /delete/i }).focus();
-            await p.keyboard.press('Enter'); await settle(p, 900);
+            await p.keyboard.press('Enter');
+            await p.getByRole('alertdialog').waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
+            await gone(p, removeLabel);
+            await focusLeavesDialog(p);
             check('rule 3, through a confirmation: the section heading', (await active(p)).startsWith('h2[section]:Holidays'), await active(p));
             await c.close();
         }
@@ -344,7 +384,10 @@ await withBrowser(async (b) => {
                 check('filters: Reset filters shows while one is set', await p.getByRole('button', { name: 'Reset filters' }).isVisible());
                 await button.focus(); await p.keyboard.press('Enter'); await settle(p, 300);
                 check('filters: Enter closes it, focus stays on the button', (await button.getAttribute('aria-expanded')) === 'false' && ! await search.isVisible() && (await active(p)).startsWith('button:Filters'), await active(p));
-                check('filters: the cards replace the table', await p.locator('ul[aria-label="Attendance records"]').isVisible() && ! await p.getByRole('region', { name: 'Daily attendance' }).isVisible());
+                // Late arrival lists nobody early in the morning (before 8:11 no one
+                // is late yet): then the empty state stands in for the cards.
+                const empty = await p.getByRole('heading', { name: 'No attendance records' }).isVisible();
+                check('filters: the cards replace the table', (empty || await p.locator('ul[aria-label="Attendance records"]').isVisible()) && ! await p.getByRole('region', { name: 'Daily attendance' }).isVisible(), empty ? 'no late arrivals yet: the empty state' : '');
             } else {
                 check('filters: no disclosure from 640px, every filter shows', ! await button.isVisible() && await search.isVisible() && await p.getByRole('button', { name: 'Late arrival' }).isVisible());
                 check('filters: the table, not the cards', await p.getByRole('region', { name: 'Daily attendance' }).isVisible() && ! await p.locator('ul[aria-label="Attendance records"]').isVisible());
@@ -456,6 +499,206 @@ await withBrowser(async (b) => {
             check('name: the dialog is named by its visible title', name === 'File leave for an employee', name);
             await c.close();
         }
+    }
+
+    // Phase 6i: the breadcrumb returns to the list as it was left — filters,
+    // range and the page reached through a Livewire update — at 1440 through
+    // the crumb, at 390 through the topbar's "‹ Attendance" (44px).
+    for (const width of [1440, 390]) {
+        const { c, p } = await page(b, admin, 'light', width);
+        const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const from = iso(new Date(Date.now() - 86400000 * 30)), to = iso(new Date(Date.now() - 86400000));
+        await p.goto(`${BASE}/attendance?from=${from}&to=${to}`, { waitUntil: 'networkidle' });
+        await p.getByRole('button', { name: /next/i }).last().click(); await settle(p, 800);
+        await p.getByRole('link', { name: /^View attendance for/ }).first().click(); await settle(p, 800);
+        const back = width === 1440
+            ? p.locator('header').getByRole('link', { name: 'Attendance', exact: true }).last()
+            : p.locator('header [data-back-link]');
+        check(`breadcrumb (${width}): the way back is visible`, await back.isVisible());
+        if (width === 390) {
+            const box = await back.boundingBox();
+            check('breadcrumb (390): "‹ Attendance" is a 44px target', box && box.height >= 44, box && `${box.height}px`);
+            check('breadcrumb (390): the record\'s name is not in the title', ! (await p.locator('header span.font-semibold').first().isVisible()));
+        }
+        await back.click(); await settle(p, 800);
+        const url = new URL(p.url());
+        check(`breadcrumb (${width}): back on the list with its range and page`, url.pathname === '/attendance' && url.searchParams.get('from') === from && url.searchParams.get('to') === to && url.searchParams.get('page') === '2', p.url());
+        await c.close();
+    }
+
+    const invalidConfirm = (p) => p.evaluate(() => {
+        const field = document.getElementById('new_password_confirmation');
+        const error = (field?.getAttribute('aria-describedby') ?? '').split(/\s+/).map((e) => document.getElementById(e)).find((e) => e?.hasAttribute('data-input-error'));
+        return { focused: document.activeElement === field, message: error?.textContent.trim() ?? null, newPasswordValid: document.getElementById('new_password')?.getAttribute('aria-invalid') !== 'true' };
+    });
+
+    // Phase 6i: the profile's Change password modal, on a persona nothing
+    // else here signs in as — a change signs out its other sessions.
+    for (const width of [1440, 390]) {
+        const first = (await login(b, 'audit.khmer')).state;
+        const second = (await login(b, 'audit.khmer')).state;
+        const { c, p } = await page(b, first, 'light', width);
+        await p.goto(`${BASE}/profile`, { waitUntil: 'networkidle' });
+        const trigger = p.getByRole('button', { name: 'Change password' });
+        await trigger.focus(); await p.keyboard.press('Enter'); await settle(p);
+        check(`password (${width}): opening focuses Current password`, (await active(p)).startsWith('input:current_password'), await active(p));
+        const toggle = p.getByRole('dialog').getByRole('button', { name: 'Show password' }).first();
+        await toggle.click();
+        check(`password (${width}): show/hide reveals the field and says it's pressed`, (await p.locator('#current_password').getAttribute('type')) === 'text' && (await toggle.getAttribute('aria-pressed')) === 'true');
+        await p.keyboard.press('Escape'); await settle(p);
+        check(`password (${width}): Escape returns to Change`, (await active(p)).startsWith('button:Change password'), await active(p));
+
+        await trigger.click(); await settle(p);
+        await p.fill('#current_password', 'wrong');
+        await p.fill('#new_password', 'Another-pass-1');
+        await p.fill('#new_password_confirmation', 'Another-pass-1');
+        await p.getByRole('dialog').getByRole('button', { name: 'Change password' }).click(); await settle(p, 800);
+        check(`password (${width}): a wrong current password focuses that field`, (await active(p)).startsWith('input:current_password'), await active(p));
+        await p.fill('#current_password', 'password');
+        await p.fill('#new_password_confirmation', 'Another-pass-2');
+        await p.getByRole('dialog').getByRole('button', { name: 'Change password' }).click(); await settle(p, 800);
+        const mismatch = await invalidConfirm(p);
+        check(`password (${width}): a mismatch is under Confirm, "The passwords don't match."`, mismatch.focused && mismatch.message === "The passwords don't match." && mismatch.newPasswordValid, JSON.stringify(mismatch));
+        await p.fill('#new_password_confirmation', 'Another-pass-1');
+        await p.getByRole('dialog').getByRole('button', { name: 'Change password' }).click(); await settle(p, 900);
+        const done = await active(p);
+        check(`password (${width}): success closes and focuses the notice`, done.startsWith('div[notice]:Password changed. You\'ve been signed out on other devices.') && (await p.getByRole('dialog').count()) === 0, done);
+
+        const other = await b.newContext({ storageState: second });
+        const op = await other.newPage();
+        await op.goto(`${BASE}/dashboard`, { waitUntil: 'networkidle' });
+        check(`password (${width}): the other session is signed out`, new URL(op.url()).pathname === '/login', op.url());
+        await other.close();
+
+        await p.reload({ waitUntil: 'networkidle' });
+        check(`password (${width}): this session stays signed in`, new URL(p.url()).pathname === '/profile', p.url());
+        // Back to the seed's password, so the next run (and width) can sign in.
+        await trigger.click(); await settle(p);
+        await p.fill('#current_password', 'Another-pass-1');
+        await p.fill('#new_password', 'password');
+        await p.fill('#new_password_confirmation', 'password');
+        await p.getByRole('dialog').getByRole('button', { name: 'Change password' }).click();
+        // Closing before the restore lands left the next width signing in with
+        // the old password: wait for its notice.
+        await p.locator('[data-focus-notice]').waitFor({ timeout: 20000 });
+        await c.close();
+    }
+
+    // Phase 6i: the admin's Edit account modal — unlinked (name and email)
+    // and linked (email, the name on the employee record).
+    for (const width of [1440, 390]) {
+        {
+            const { c, p } = await page(b, admin, 'light', width);
+            await p.goto(`${BASE}/profile`, { waitUntil: 'networkidle' });
+            const edit = p.getByRole('button', { name: 'Edit account' });
+            await edit.focus(); await p.keyboard.press('Enter'); await settle(p);
+            check(`edit (${width}, unlinked): opening focuses Name`, (await active(p)).startsWith('input:account_name'), await active(p));
+            check(`edit (${width}): the dialog is named by its title`, await p.getByRole('dialog', { name: 'Edit account' }).isVisible());
+            await p.fill('#account_name', '');
+            await p.getByRole('dialog').getByRole('button', { name: 'Save' }).click(); await settle(p, 800);
+            check(`edit (${width}): a blank name focuses Name`, (await active(p)).startsWith('input:account_name'), await active(p));
+            await p.fill('#account_name', 'Administrator');
+            // The username, under the employee form's rules: another employee's code, any case.
+            await p.fill('#account_username', 'emp-0002');
+            await p.getByRole('dialog').getByRole('button', { name: 'Save' }).click(); await settle(p, 800);
+            check(`edit (${width}): a username that is someone's code focuses Username`, (await active(p)).startsWith('input:account_username') && /Kyaw Kyaw Naing's employee code, and people sign in with either/.test(await p.getByRole('dialog').innerText()), await active(p));
+            await p.fill('#account_username', 'admin');
+            await p.getByRole('dialog').getByRole('button', { name: 'Save' }).click(); await settle(p, 900);
+            check(`edit (${width}): Save closes and focuses the notice`, (await active(p)).startsWith('div[notice]:Account saved.'), await active(p));
+            await c.close();
+        }
+        {
+            const linked = (await login(b, 'audit.admin')).state;
+            const { c, p } = await page(b, linked, 'light', width);
+            await p.goto(`${BASE}/profile`, { waitUntil: 'networkidle' });
+            await p.getByRole('button', { name: 'Edit account' }).click(); await settle(p);
+            check(`edit (${width}, linked): opening focuses Email`, (await active(p)).startsWith('input:account_email'), await active(p));
+            check(`edit (${width}, linked): no name field, a link to the record`, (await p.locator('#account_name').count()) === 0 && await p.getByRole('dialog').getByRole('link', { name: 'Edit on your employee record' }).isVisible());
+            await p.keyboard.press('Escape'); await settle(p);
+            check(`edit (${width}, linked): Escape returns to Edit`, (await active(p)).startsWith('button:Edit account'), await active(p));
+            await c.close();
+        }
+    }
+
+    // Phase 6i follow-up: an admin renames a linked login from the employee
+    // page's Login card. Kyaw is renamed and named back, so later sign-ins work.
+    {
+        const kyaw = execSync(`${EXEC} php artisan tinker --execute="echo App\\Models\\Employee::where('employee_code', 'EMP-0002')->value('id');"`, { cwd: REPO }).toString().trim().split('\n').pop();
+        for (const width of [1440, 390]) {
+            const { c, p } = await page(b, admin, 'light', width);
+            await p.goto(`${BASE}/employees/${kyaw}`, { waitUntil: 'networkidle' });
+            const rename = async (value) => {
+                await p.getByRole('button', { name: 'Change username' }).click();
+                await p.locator('#login_username').waitFor({ timeout: 20000 });
+                await settle(p, 200);
+                const opened = await active(p);
+                await p.fill('#login_username', value);
+                await p.getByRole('dialog').getByRole('button', { name: 'Save' }).click();
+                return opened;
+            };
+            const opened = await rename('emp-0003');
+            check(`username (${width}): Change opens on the field`, opened.startsWith('input:login_username'), opened);
+            await p.waitForFunction(() => document.activeElement?.id === 'login_username' && document.activeElement.getAttribute('aria-invalid') === 'true', null, { timeout: 20000 }).catch(() => {});
+            check(`username (${width}): someone's employee code focuses the field, with the 6g message`, (await active(p)).startsWith('input:login_username') && /employee code, and people sign in with either/.test(await p.getByRole('dialog').innerText()), await active(p));
+            await p.fill('#login_username', 'kyaw.6i');
+            await p.getByRole('dialog').getByRole('button', { name: 'Save' }).click();
+            await p.locator('[data-focus-notice]').waitFor({ timeout: 20000 }).catch(() => {});
+            await focusLeavesDialog(p);
+            check(`username (${width}): Save closes and focuses the notice`, (await active(p)).startsWith('div[notice]:Username changed.'), await active(p));
+            await rename('kyaw.kyaw.naing');
+            await p.getByRole('dialog').waitFor({ state: 'detached', timeout: 20000 }).catch(() => {});
+            check(`username (${width}): named back`, (await p.locator('dd').filter({ hasText: 'kyaw.kyaw.naing' }).count()) > 0);
+            await c.close();
+        }
+    }
+
+    // Phase 6i follow-up: the Account card's help popover (employees and
+    // managers; an admin has Edit instead). Click or tap only; Escape returns
+    // focus to the button; a click outside and a second click close it.
+    for (const width of [1440, 390]) {
+        const c = width === 390
+            ? await b.newContext({ storageState: employee, hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } })
+            : (await page(b, employee, 'light', width)).c;
+        const p = c.pages()[0] ?? await c.newPage();
+        await p.goto(`${BASE}/profile`, { waitUntil: 'networkidle' });
+        const help = p.getByRole('button', { name: 'About your account details' });
+        const panel = p.locator('[data-help-popover]');
+        const state = () => help.evaluate((button) => ({
+            expanded: button.getAttribute('aria-expanded'),
+            live: document.getElementById(button.getAttribute('aria-controls'))?.getAttribute('role'),
+            text: document.getElementById(button.getAttribute('aria-controls'))?.textContent.trim(),
+            focused: document.activeElement === button,
+            size: Math.round(button.getBoundingClientRect().height),
+        }));
+        check(`help (${width}): closed at rest, nothing in its live region`, (await state()).expanded === 'false' && (await state()).text === '' && ! await panel.count(), JSON.stringify(await state()));
+        await help.hover(); await p.waitForTimeout(200);
+        check(`help (${width}): hovering opens nothing`, ! await panel.count());
+        width === 390 ? await help.tap() : await help.click();
+        await panel.waitFor({ timeout: 10000 });
+        const open = await state();
+        check(`help (${width}): a ${width === 390 ? 'tap' : 'click'} opens it, announced`, open.expanded === 'true' && open.live === 'status' && open.text === 'Your username and email are managed by HR. Ask HR to add or change them.', JSON.stringify(open));
+        if (width === 390) check('help (390): a 44px target', open.size >= 44, `${open.size}px`);
+        await p.keyboard.press('Escape');
+        await panel.waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
+        const escaped = await state();
+        check(`help (${width}): Escape closes it and focus is on the button`, escaped.expanded === 'false' && escaped.focused && ! await panel.count(), `${await active(p)} ${JSON.stringify(escaped)}`);
+        width === 390 ? await help.tap() : await help.click();
+        await panel.waitFor({ timeout: 10000 });
+        width === 390 ? await p.locator('h1').tap() : await p.locator('h1').click();
+        await panel.waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
+        check(`help (${width}): a click outside closes it`, (await state()).expanded === 'false' && ! await panel.count());
+        width === 390 ? await help.tap() : await help.click();
+        await panel.waitFor({ timeout: 10000 });
+        width === 390 ? await help.tap() : await help.click();
+        await panel.waitFor({ state: 'detached', timeout: 10000 }).catch(() => {});
+        check(`help (${width}): a second ${width === 390 ? 'tap' : 'click'} closes it, focus on the button`, (await state()).expanded === 'false' && (await state()).focused && ! await panel.count(), await active(p));
+        await c.close();
+    }
+    {
+        const { c, p } = await page(b, admin);
+        await p.goto(`${BASE}/profile`, { waitUntil: 'networkidle' });
+        check('help: an admin has Edit, no help button', (await p.getByRole('button', { name: 'About your account details' }).count()) === 0 && await p.getByRole('button', { name: 'Edit account' }).isVisible());
+        await c.close();
     }
 
     // Phone date labels, tapped.

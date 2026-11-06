@@ -10,6 +10,7 @@ use App\Models\Employee;
 use App\Support\AttendanceGaps;
 use App\Support\DashboardAttendance;
 use App\Support\EmployeeScope;
+use App\Support\ListUrl;
 use App\Support\StrictDate;
 use App\Support\WorkdayCalendar;
 use Illuminate\Database\Eloquent\Builder;
@@ -492,8 +493,40 @@ class Index extends Component
         ]);
     }
 
+    /**
+     * The list as the user has it now, for a detail page's way back
+     * (ListUrl, Phase 6i): every filter that isn't at its default, and the
+     * page. A range of exactly today is the default, so going back the next
+     * day shows that day, not a stale one.
+     *
+     * @return array<string, string|array<int, string>>
+     */
+    private function listQuery(): array
+    {
+        $today = today()->format('Y-m-d');
+        $todayOnly = $this->fromDate === $today && $this->toDate === $today;
+        $statuses = $this->statuses;
+        $defaults = $this->defaultStatuses();
+        sort($statuses);
+        sort($defaults);
+
+        return [
+            'from' => $todayOnly ? '' : $this->fromDate,
+            'to' => $todayOnly ? '' : $this->toDate,
+            'q' => $this->employeeFilter,
+            'department' => $this->departmentFilter,
+            'status' => $statuses === $defaults ? [] : $this->statuses,
+            'timing' => $this->timingFilters,
+            'worked-on-leave' => $this->workedOnLeave ? '1' : '',
+            'overtime' => $this->overtime ? '1' : '',
+            'page' => $this->getPage() > 1 ? (string) $this->getPage() : '',
+        ];
+    }
+
     public function render()
     {
+        ListUrl::remember('attendance.index', $this->listQuery());
+
         $scopedIds = $this->scopedEmployeeIds();
 
         $attendances = $this->baseQuery()

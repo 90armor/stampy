@@ -14,16 +14,31 @@
         <div class="min-w-0 flex items-center gap-x-2 text-sm text-slate-500 dark:text-slate-400">
             @unless (request()->routeIs('dashboard'))
                 @if ($breadcrumbs ?? null)
+                    {{-- A detail page's way back (Phase 6i, docs/DESIGN_SYSTEM.md,
+                    Navigation): the parent crumb links to the list as the user
+                    left it (App\Support\ListUrl), and only when they may open it
+                    (a crumb without a route is plain text). Below 640px the title
+                    is that link alone, "‹ Attendance", 44px tall; the page's own
+                    h1 names the record. --}}
+                    @php $parent = count($breadcrumbs) > 1 ? $breadcrumbs[count($breadcrumbs) - 2] : null; @endphp
+                    @if ($parent && ($parent['route'] ?? null))
+                        <a href="{{ $parent['route'] }}" wire:navigate data-back-link class="-my-1.5 -ml-1 inline-flex min-h-11 items-center gap-x-0.5 rounded-lg pr-2 font-medium text-slate-700 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:hidden dark:text-slate-200 dark:hover:text-slate-100">
+                            <x-icon name="chevron-left" class="h-5 w-5" />
+                            {{ $parent['label'] }}
+                        </a>
+                    @endif
                     @foreach ($breadcrumbs as $crumb)
                         @unless ($loop->first)
                             <x-icon name="chevron-right" class="hidden sm:inline w-5 h-5 text-slate-300 dark:text-slate-600" />
                         @endunless
-                        @if (! $loop->last)
-                            <a href="{{ $crumb['route'] }}" wire:navigate class="hidden rounded hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:inline dark:hover:text-slate-100">
+                        @if (! $loop->last && ($crumb['route'] ?? null))
+                            <a href="{{ $crumb['route'] }}" wire:navigate class="hidden rounded text-slate-600 underline decoration-slate-300 decoration-1 underline-offset-2 hover:text-slate-900 hover:decoration-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:inline dark:text-slate-400 dark:decoration-slate-600 dark:hover:text-slate-100 dark:hover:decoration-slate-400">
                                 {{ $crumb['label'] }}
                             </a>
+                        @elseif (! $loop->last)
+                            <span class="hidden sm:inline">{{ $crumb['label'] }}</span>
                         @else
-                            <span class="font-semibold text-slate-900 dark:text-slate-100">{{ $crumb['label'] }}</span>
+                            <span @class(['font-semibold text-slate-900 dark:text-slate-100', 'max-sm:hidden' => $parent && ($parent['route'] ?? null)])>{{ $crumb['label'] }}</span>
                         @endif
                     @endforeach
                 @else

@@ -1,11 +1,4 @@
 <div class="space-y-6">
-    <div>
-        <a href="{{ route('employees.index') }}" wire:navigate class="inline-flex items-center gap-x-1 rounded text-sm font-medium text-slate-600 transition hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-slate-400 dark:hover:text-primary-300">
-            <x-icon name="chevron-right" class="h-5 w-5 rotate-180" />
-            Back to employees
-        </a>
-    </div>
-
     @php $ownRecord = $employee->status === 'active' && $employee->user_id !== null && $employee->user_id === auth()->id() && auth()->user()->can('deactivate', $employee); @endphp
     <header @class([
         'flex flex-col gap-4',
@@ -75,7 +68,11 @@
         <x-employee-details-card :employee="$employee" class="order-1 lg:col-span-8 lg:row-start-1" />
 
         <x-card class="order-2 lg:col-span-4 lg:row-start-1">
-            <h2 class="text-lg font-semibold text-slate-900 dark:text-slate-100">Login</h2>
+            <h2 tabindex="-1" data-section-heading class="text-lg font-semibold text-slate-900 focus:outline-none dark:text-slate-100">Login</h2>
+
+            @if ($notice)
+                <div wire:key="login-notice-{{ md5($notice) }}" tabindex="-1" data-focus-notice role="status" class="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-800 ring-1 ring-inset ring-green-600/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:bg-green-900/20 dark:text-green-300 dark:ring-green-500/30">{{ $notice }}</div>
+            @endif
 
             <dl class="mt-4 space-y-4">
                 <div class="sm:grid sm:grid-cols-[max-content_minmax(0,1fr)] sm:items-baseline sm:gap-x-4">
@@ -91,7 +88,14 @@
                 @if ($employee->user)
                     <div class="sm:grid sm:grid-cols-[max-content_minmax(0,1fr)] sm:items-baseline sm:gap-x-4">
                         <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Username</dt>
-                        <dd class="mt-1 break-words text-sm text-slate-900 dark:text-slate-100">{{ $employee->user->username }}</dd>
+                        <dd class="mt-1 flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 text-sm text-slate-900 dark:text-slate-100">
+                            <span class="min-w-0 break-words">{{ $employee->user->username }}</span>
+                            {{-- An admin renames any linked login (Phase 6i), gated by the
+                            ability saveUsername() checks. --}}
+                            @can('update', $employee)
+                                <x-button variant="secondary" wire:click="openUsername" wire:loading.attr="disabled" wire:target="openUsername" aria-label="Change username">Change</x-button>
+                            @endcan
+                        </dd>
                     </div>
                     <div class="sm:grid sm:grid-cols-[max-content_minmax(0,1fr)] sm:items-baseline sm:gap-x-4">
                         <dt class="text-xs font-medium text-slate-500 dark:text-slate-400">Password</dt>
@@ -159,4 +163,28 @@
 
     <livewire:employees.form-modal />
     <livewire:employees.status-modal />
+    @if ($showUsernameModal)
+        <x-modal name="change-username-modal" :show="true" entangle="showUsernameModal" maxWidth="md" panelClass="mt-16">
+            <div class="mx-6 border-b border-slate-divider py-5">
+                <x-modal.title>Change username</x-modal.title>
+            </div>
+
+            <form id="change-username-form" wire:submit="saveUsername" class="space-y-4 px-6 py-5">
+                <div>
+                    <x-input-label for="login_username" value="Username" />
+                    <x-text-input id="login_username" type="text" wire:model="username" autocomplete="off" autocapitalize="none" spellcheck="false" autofocus />
+                    <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $employee->full_name }} signs in with it from now on, or with their employee code or email. It can't be someone else's employee code.</p>
+                    <x-input-error :messages="$errors->get('username')" class="mt-1" />
+                </div>
+            </form>
+
+            <div class="mx-6 flex items-center justify-end gap-3 border-t border-slate-divider py-4">
+                <x-button type="button" variant="secondary" wire:click="$set('showUsernameModal', false)" wire:loading.attr="disabled" wire:target="saveUsername">Cancel</x-button>
+                <x-button type="submit" form="change-username-form" variant="primary" wire:loading.attr="disabled" wire:target="saveUsername">
+                    <span wire:loading.remove wire:target="saveUsername">Save</span>
+                    <span wire:loading wire:target="saveUsername">Saving&hellip;</span>
+                </x-button>
+            </div>
+        </x-modal>
+    @endif
 </div>

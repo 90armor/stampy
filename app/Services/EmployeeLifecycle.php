@@ -10,11 +10,11 @@ use App\Services\Attendance\DailySummaryBuilder;
 use App\Services\Attendance\EmployeeScheduleAssigner;
 use App\Services\Leave\LeaveRequestService;
 use App\Services\Overtime\OvertimeRequestService;
+use App\Support\UserSessions;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -146,12 +146,7 @@ class EmployeeLifecycle
             return;
         }
 
-        $user->setRememberToken(Str::random(60));
-        $user->saveQuietly();
-
-        if (config('session.driver') === 'database') {
-            DB::connection(config('session.connection'))->table(config('session.table', 'sessions'))->where('user_id', $user->id)->delete();
-        }
+        UserSessions::end($user);
     }
 
     /**
